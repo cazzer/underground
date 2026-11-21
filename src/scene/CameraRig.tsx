@@ -1,13 +1,15 @@
 import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useLayoutEffect, useRef, type ComponentRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { useFocus } from '../lib/focus'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { nextFocus, type FocusInput } from '../lib/focusMachine'
-import { frameBounds, type Insets } from '../lib/framing'
+import { frameBounds, type Insets, type Viewport } from '../lib/framing'
+import { frameInterior, interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
+import type { InteriorModel } from './interiorModel'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
@@ -23,13 +25,24 @@ interface Flight {
   distance: number
 }
 
+/** Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal. */
+function interiorFlight(model: InteriorModel, viewport: Viewport, insets: Insets, panel: ScreenRect | null, fovDeg: number): Flight {
+  const free = interiorFreeRect(viewport, insets, panel)
+  const { distance, target } = frameInterior({ center: model.focusCenter, viewport, free, fovDeg })
+  return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance }
+}
+
 interface CameraRigProps {
   network: Network
   /** HUD-covered bands; the opening view fits the city between them. */
   insets: Insets
+  /** The focused station's interior once loaded; a click on that station frames it instead. */
+  interior: InteriorModel | null
+  /** The station panel's screen rect, kept clear when framing an interior. */
+  panel: ScreenRect | null
 }
 
-export function CameraRig({ network, insets }: CameraRigProps) {
+export function CameraRig({ network, insets, interior, panel }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -62,6 +75,12 @@ export function CameraRig({ network, insets }: CameraRigProps) {
     camera.updateProjectionMatrix()
   }, [camera, maxDistance])
 
+  // Read by the fly effect through a ref: depending on these would re-fire a stale fly request.
+  const latest = useRef({ interior, panel, size, insets })
+  useLayoutEffect(() => {
+    latest.current = { interior, panel, size, insets }
+  }, [interior, panel, size, insets])
+
   // Layout effect, not a passive one: a frame between the select and a passive effect would see
   // the new focus with no flight and drop it again (the camera is still far out).
   useLayoutEffect(() => {
@@ -69,12 +88,20 @@ export function CameraRig({ network, insets }: CameraRigProps) {
     const station = network.stationById.get(flyRequest.stationId)
     if (!station) throw new Error(`Fly request for unknown station "${flyRequest.stationId}"`)
     hold.current = null
-    flight.current = {
-      stationId: station.id,
-      target: new Vector3(station.pos.x, 0, station.pos.z),
-      distance: FOCUS_DISTANCE,
+    const l = latest.current
+    flight.current =
+      l.interior?.stationId === station.id
+        ? interiorFlight(l.interior, l.size, l.insets, l.panel, camera.fov)
+        : { stationId: station.id, target: new Vector3(station.pos.x, 0, station.pos.z), distance: FOCUS_DISTANCE }
+  }, [flyRequest, network, camera])
+
+  // The interior (first visit) or the panel's measurement can land mid-flight: retarget that
+  // flight. Focus reached by zooming has no flight, and the camera never moves on its own.
+  useEffect(() => {
+    if (interior && flight.current?.stationId === interior.stationId) {
+      flight.current = interiorFlight(interior, size, insets, panel, camera.fov)
     }
-  }, [flyRequest, network])
+  }, [interior, panel, size, insets, camera])
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((_, delta) => {

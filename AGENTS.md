@@ -50,6 +50,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   GTFS data drawn through `theme.routeLineMix` (mixed toward a theme color; amount 1 = mono), then
   pushed to at least 3:1 against `theme.background`.
   TEMPORARY: `?lines=a|b|c` picks the lines look until the 8x4.3 options round is decided (default b)
+  Interior tokens (`interiorStroke`, `interiorTrack`, `interiorEntrance`, `interiorFine`, the two
+  widths, `interiorDepthFade`) color the station interior.
+  TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
+  (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
+  `src/scene/interiorLook.ts`
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold
@@ -59,10 +64,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
     and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map);
     `cameraDistance.ts` helpers; `renderOrder.ts`
+  - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
+    level labels, `FocusRing.tsx` focused ring above the veil); `interiorModel.ts` interior JSON to a
+    drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, arrivals panel); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
+  `InteriorStatus.tsx` the panel's station-layout line (loading, error with Retry, ready, zoom-in hint)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
@@ -70,6 +79,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts`, `pickStation.ts`: pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
+  - `interiorGeometry.ts` interior to strong/fine line buffers; `interiorFraming.ts` bounds, camera
+    target, level labels, padded hull; `interiorReveal.ts` distance to interior opacity. The first
+    two have type-only `.ts` imports because a scripts/ test loads them. `interiorCamera.ts` centers an
+    interior fly-to (always 180 m) in the screen area the header, footer and station panel leave free
   - `focus.tsx` focused/dismissed-station React context (not pure). In dev only it exposes
     `window.__underground.select(stationId)` for screenshots and Playwright checks
 - `src/lib/live/`: pure helpers for the live layer (no React or three.js; tests colocated)
@@ -107,6 +120,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `RT_URL` is set), `useRealtimeFeed` (one request at a time; a hidden tab aborts and stops polling, becoming
   visible polls at once), `prepareTrips` once per snapshot, and `deriveLiveStatus`. `realtimeFetch.ts` fetches and
   validates one snapshot (the Worker doesn't expose `Retry-After`/`X-Rt-Cache` cross-origin yet; the client copes)
+- `src/data/interiorRegistry.ts` ids with a `public/data/stations/` file: add one whenever
+  `data:stations` writes a new file (`scripts/lib/interiorRegistry.test.ts` enforces it);
+  `loadStationInterior.ts` fetch and outer-shape check; `interiorCache.ts` one promise per id, failures
+  evicted; `interiorLoad.ts` the load type and its pure derivation; `useStationInterior.ts` the focused
+  station's interior load (other stations never fetch)
 - `src/data/schema.ts`: types of the six `public/data/*.json` files; `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
@@ -160,6 +178,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
 - Live train dots are instanced too, with per-slot colors (`routeLineColor` like the lines). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
+- The station interior is a group at `toGround(anchor)` with depths drawn ×2 (x/z true; labels give
+  real depths). Two merged `LineSegments2` (fine, then strong strokes) are built from the deepest
+  level up, so upper levels paint over lower ones; deeper levels mix toward the background. It fades
+  in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
+  layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong); the
+  focused ring is redrawn above it at 10; look C uses -0.6 and -0.3. Mezzanine guides and a
+  street-level copy of each mezzanine outline give a street reference. A click centers the interior
+  beside the station panel at 180 m (a partial fit on small screens).
+  drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.
 
 ## Station interior format
 `public/data/stations/<id>.json`, type `StationInterior` in `src/data/stationSchema.ts`. Built by

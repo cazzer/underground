@@ -9,9 +9,11 @@ import { theme } from '../theme'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
 
-const MARKER_MIN_METERS = 6
-const MARKER_Y = 0.2
-const SEGMENTS = 24
+export const MARKER_MIN_METERS = 6
+export const MARKER_Y = 0.2
+export const SEGMENTS = 24
+/** Ring inner radius as a fraction of the marker radius. */
+export const RING_INNER = 0.78
 /** Tap target radius: a pick within this many screen pixels of a station selects it. */
 const HIT_PX = 22
 
@@ -37,7 +39,7 @@ export function Stations({ stations }: StationsProps) {
   const geometry = useMemo(
     () => ({
       fill: new CircleGeometry(1, SEGMENTS).rotateX(-Math.PI / 2),
-      ring: new RingGeometry(0.78, 1, SEGMENTS).rotateX(-Math.PI / 2),
+      ring: new RingGeometry(RING_INNER, 1, SEGMENTS).rotateX(-Math.PI / 2),
     }),
     [],
   )

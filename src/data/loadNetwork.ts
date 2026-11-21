@@ -31,14 +31,15 @@ export function expectDataRecord<T extends DataFile>(raw: unknown, key: string, 
   return raw as T
 }
 
-export async function fetchJson(url: string, signal: AbortSignal): Promise<unknown> {
+/** Fetches and parses JSON, throwing `<url>: HTTP <status>` or `<url>: invalid JSON (...)`. */
+export async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
   // no-cache revalidates (cheap 304s), so a stale cached file can't mix two builds.
   const res = await fetch(url, { signal, cache: 'no-cache' })
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`)
   try {
     return await res.json()
   } catch (err) {
-    if (signal.aborted) throw err
+    if (signal?.aborted) throw err
     throw new Error(`${url}: invalid JSON (${err instanceof Error ? err.message : String(err)})`)
   }
 }

@@ -10,4 +10,13 @@ export const RENDER_ORDER = {
   stationRing: 4,
   trainHalo: 5,
   trains: 6,
+  // Station interior. Look C (?interior=c, temporary) draws it under the street layers.
+  interiorUnderFine: -0.6,
+  interiorUnder: -0.3,
+  // The veil dims everything above (live trains included), then fine and strong interior strokes.
+  interiorVeil: 7,
+  interiorFine: 8,
+  interior: 9,
+  // The focused station's ring, redrawn over the veil while an interior shows.
+  interiorFocusRing: 10,
 } as const

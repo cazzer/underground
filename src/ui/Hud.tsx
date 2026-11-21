@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, type Ref } from 'react'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
+import type { ScreenRect } from '../lib/interiorCamera'
 import { routeChipLabel, scheduleLabel } from '../lib/labels'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import type { Network, Route } from '../lib/network'
@@ -8,6 +9,7 @@ import { routeLineColor } from '../lib/routeColor'
 import { theme } from '../theme'
 import { Attribution } from './Attribution'
 import { LiveStatus } from './LiveStatus'
+import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
 
 /** Placeholder rows until real arrivals exist. */
 const PLACEHOLDER_ARRIVALS = [
@@ -40,13 +42,16 @@ interface ArrivalsPanelProps {
   network: Network
   stationId: string
   onClose: () => void
+  interior: InteriorStatusInfo
+  ref: Ref<HTMLElement>
 }
 
-function ArrivalsPanel({ network, stationId, onClose }: ArrivalsPanelProps) {
+function ArrivalsPanel({ network, stationId, onClose, interior, ref }: ArrivalsPanelProps) {
   const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   return (
     <aside
+      ref={ref}
       aria-label={`Arrivals at ${station.name}`}
       className="pointer-events-auto max-h-full min-h-0 w-72 max-w-full overflow-auto border border-edge bg-panel p-4 text-ink backdrop-blur-sm sm:shrink-0"
     >
@@ -68,6 +73,7 @@ function ArrivalsPanel({ network, stationId, onClose }: ArrivalsPanelProps) {
           return <RouteChip key={id} route={route} />
         })}
       </ul>
+      <InteriorStatus info={interior} />
       <p className="mt-3 text-xs uppercase tracking-widest text-ink-dim">Arrivals (placeholder)</p>
       <ul className="mt-1 divide-y divide-edge/30 text-sm">
         {PLACEHOLDER_ARRIVALS.map((a) => (
@@ -89,13 +95,18 @@ interface HudProps {
   live: LiveStatusValue
   /** Reports the screen bands the header and footer cover. */
   onInsets: (insets: Insets) => void
+  /** The focused station's interior load and reveal, shown in its panel. */
+  interior: InteriorStatusInfo
+  /** Reports where the station panel sits (viewport px), or null when it closes. */
+  onPanel: (rect: ScreenRect | null) => void
 }
 
-export function Hud({ network, live, onInsets }: HudProps) {
+export function Hud({ network, live, onInsets, interior, onPanel }: HudProps) {
   const { focusedId, dismiss } = useFocus()
   const root = useRef<HTMLDivElement>(null)
   const header = useRef<HTMLElement>(null)
   const bottom = useRef<HTMLDivElement>(null)
+  const panel = useRef<HTMLElement>(null)
 
   // Measured once, before the scene mounts, for its opening view.
   useLayoutEffect(() => {
@@ -106,6 +117,28 @@ export function Hud({ network, live, onInsets }: HudProps) {
       bottom: r.bottom - bottom.current.getBoundingClientRect().top,
     })
   }, [onInsets])
+
+  // Tracked while the panel is open, so a station fly-to can frame the view beside it. Resizes
+  // move a stacked (phone) panel's top; window resizes move a desktop panel's left edge.
+  useLayoutEffect(() => {
+    const el = panel.current
+    if (!el) {
+      onPanel(null)
+      return
+    }
+    const measure = () => {
+      const p = el.getBoundingClientRect()
+      onPanel({ left: p.left, top: p.top, right: p.right, bottom: p.bottom })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    window.addEventListener('resize', measure)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [focusedId, onPanel])
 
   useEffect(() => {
     if (!focusedId) return
@@ -126,7 +159,15 @@ export function Hud({ network, live, onInsets }: HudProps) {
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
       <div ref={bottom} className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <Attribution />
-        {focusedId && <ArrivalsPanel network={network} stationId={focusedId} onClose={dismiss} />}
+        {focusedId && (
+          <ArrivalsPanel
+            network={network}
+            stationId={focusedId}
+            onClose={dismiss}
+            interior={interior}
+            ref={panel}
+          />
+        )}
       </div>
     </div>
   )
