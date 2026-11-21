@@ -1,21 +1,25 @@
 import { Canvas } from '@react-three/fiber'
-import { useMemo } from 'react'
+import type { LiveLayer } from '../data/useLive'
 import type { Insets } from '../lib/framing'
 import type { Network } from '../lib/network'
 import { theme } from '../theme'
+import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { CameraRig } from './CameraRig'
+import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
-import { Trains } from './Trains'
 
 interface SceneProps {
   network: Network
   insets: Insets
+  /** Placed trips to draw; null draws none. */
+  live: LiveLayer | null
+  /** A render crash in the live layer: the map stays and the HUD reports it. */
+  onLiveError: (error: Error) => void
 }
 
-export function Scene({ network, insets }: SceneProps) {
-  const primaryShapes = useMemo(() => network.shapes.filter((s) => s.primary), [network])
+export function Scene({ network, insets, live, onLiveError }: SceneProps) {
   return (
     <Canvas
       // No tone mapping, so every theme token renders as the exact color it names.
@@ -30,7 +34,11 @@ export function Scene({ network, insets }: SceneProps) {
       <MapGrid />
       <SubwayLines network={network} />
       <Stations stations={network.stations} />
-      <Trains paths={primaryShapes} />
+      {live && (
+        <ErrorBoundary fallback={null} onError={onLiveError}>
+          <LiveTrains {...live} network={network} />
+        </ErrorBoundary>
+      )}
       <CameraRig network={network} insets={insets} />
     </Canvas>
   )

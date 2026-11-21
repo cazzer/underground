@@ -9,7 +9,7 @@ export interface SmoothingParams {
   holdBackM: number
 }
 
-export const SMOOTHING: SmoothingParams = { tauS: 1.5, maxSpeedMps: 40, snapM: 1500, holdBackM: 400 }
+export const SMOOTHING: SmoothingParams = { tauS: 1.5, maxSpeedMps: 40, snapM: 1500, holdBackM: 1500 }
 
 /**
  * Eases the displayed distance along a shape toward `target` so a new poll never teleports a dot.

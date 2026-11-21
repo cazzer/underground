@@ -1,6 +1,6 @@
 import { Matrix4, Quaternion, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
-import { writeMarkerMatrices } from './markerMatrices'
+import { writeInstanceMatrix, writeMarkerMatrices } from './markerMatrices'
 
 const composed = (x: number, y: number, z: number, s: number) =>
   new Matrix4().compose(new Vector3(x, y, z), new Quaternion(), new Vector3(s, s, s)).elements
@@ -26,5 +26,15 @@ describe('writeMarkerMatrices', () => {
     writeMarkerMatrices(out, [{ x: 1, z: 2 }], 0, 1, -1, 1)
     expect(out).toBe(ref)
     expect([...out.subarray(16)]).toEqual(new Array(16).fill(9))
+  })
+})
+
+describe('writeInstanceMatrix', () => {
+  it('matches Matrix4.compose and touches only its instance', () => {
+    const out = new Float32Array(48).fill(9)
+    writeInstanceMatrix(out, 1, 4, 0.5, -8, 2.5)
+    expect([...out.subarray(16, 32)]).toEqual(composed(4, 0.5, -8, 2.5).map(Math.fround))
+    expect([...out.subarray(0, 16)]).toEqual(new Array(16).fill(9))
+    expect([...out.subarray(32)]).toEqual(new Array(16).fill(9))
   })
 })

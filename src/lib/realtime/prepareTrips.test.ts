@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FEED_IDS, RT_SCHEMA_VERSION, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import { geometries, lookup, segments } from './fixture'
+import { hopDistance, positionAlongShape } from './position'
 import { prepareTrips } from './prepareTrips'
 
 const NOW = 1_795_228_554
@@ -76,5 +77,27 @@ describe('prepareTrips', () => {
   it('throws if a joined shape has no geometry', () => {
     const snap = snapshot({ nqrw: [trip('128750_W..N', 'W')] })
     expect(() => prepareTrips(snap, { lookup, geometries: new Map(), segments }, NOW)).toThrow(/no geometry/)
+  })
+})
+
+describe('prepareTrips plans', () => {
+  it('gives each trip a plan that evaluates to the positionAlongShape distance', () => {
+    const snap = snapshot({
+      nqrw: [trip('128750_W..N', 'W'), trip('129900_1..N03R', '1', { stopId: '101N', arrivals: [['101N', NOW + 100]] })],
+    })
+    const { trips } = prepareTrips(snap, { lookup, geometries, segments }, NOW)
+    expect(trips).toHaveLength(2)
+    for (const t of trips) {
+      const placed = positionAlongShape({
+        geometry: t.geometry,
+        status: t.trip.status,
+        stopId: t.trip.stopId,
+        arrivals: t.trip.arrivals,
+        segments,
+        now: NOW + 7,
+      })
+      if (!placed.ok) throw new Error('unexpected failure')
+      expect(hopDistance(t.plan, t.geometry, NOW + 7)).toBe(placed.distance)
+    }
   })
 })

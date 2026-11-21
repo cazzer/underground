@@ -16,5 +16,5 @@ export {
   STALE_AFTER_S,
 } from '../../worker/src/schema'
 
-/** Worker endpoint, e.g. http://localhost:8787/rt from `wrangler dev`. Null when unset. */
-export const RT_URL: string | null = import.meta.env.VITE_RT_URL ?? null
+/** Worker endpoint, e.g. http://localhost:8787/rt from `wrangler dev`. Null when unset or empty. */
+export const RT_URL: string | null = import.meta.env.VITE_RT_URL || null

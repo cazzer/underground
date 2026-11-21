@@ -18,6 +18,10 @@ export interface Theme {
   stationStroke: string
   stationFocus: string
   train: string
+  /** Live-trains state in the HUD: connected, delayed, failed. Each is at least 4.5:1 on the background (theme.test.ts). */
+  statusLive: string
+  statusWarn: string
+  statusError: string
   /** HUD */
   ink: string
   inkDim: string
@@ -42,6 +46,9 @@ export const THEMES = {
     stationStroke: '#ffffff',
     stationFocus: '#ffd166',
     train: '#ffffff',
+    statusLive: '#7cf5a6',
+    statusWarn: '#ffd166',
+    statusError: '#ff6b6b',
     ink: '#e6f6ff',
     inkDim: '#8fb4de',
     panel: 'rgba(11, 33, 71, 0.82)',
@@ -61,6 +68,9 @@ export const THEMES = {
     stationStroke: '#2b2b2b',
     stationFocus: '#a63d2f',
     train: '#2b2b2b',
+    statusLive: '#2f6b3a',
+    statusWarn: '#8a5a00',
+    statusError: '#a63d2f',
     ink: '#2b2b2b',
     inkDim: '#6b6655',
     panel: 'rgba(243, 239, 228, 0.9)',
@@ -80,6 +90,9 @@ export const THEMES = {
     stationStroke: '#33ff66',
     stationFocus: '#ffffff',
     train: '#eaffef',
+    statusLive: '#33ff66',
+    statusWarn: '#ffff66',
+    statusError: '#ff5555',
     ink: '#33ff66',
     inkDim: '#1f9940',
     panel: 'rgba(0, 0, 0, 0.85)',
@@ -133,6 +146,9 @@ export function applyThemeCss(t: Theme, root: HTMLElement = document.documentEle
     '--ug-panel': t.panel,
     '--ug-panel-border': t.panelBorder,
     '--ug-focus': t.stationFocus,
+    '--ug-status-live': t.statusLive,
+    '--ug-status-warn': t.statusWarn,
+    '--ug-status-error': t.statusError,
     '--ug-font-sans': t.fontSans,
     '--ug-font-mono': t.fontMono,
   }

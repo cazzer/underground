@@ -1,5 +1,18 @@
 import type { Ground } from './projection'
 
+/** Writes one uniform-scale-plus-translate 4x4 matrix (column-major) at instance `i` of `out`. No allocation. */
+export function writeInstanceMatrix(out: Float32Array, i: number, x: number, y: number, z: number, scale: number): void {
+  const o = i * 16
+  out.fill(0, o, o + 16)
+  out[o] = scale
+  out[o + 5] = scale
+  out[o + 10] = scale
+  out[o + 12] = x
+  out[o + 13] = y
+  out[o + 14] = z
+  out[o + 15] = 1
+}
+
 /**
  * Writes one scale-plus-translate 4x4 matrix (column-major, as three.js stores them) per
  * position into `out`. The instance at `focusedIndex` (-1 for none) is scaled by
@@ -15,15 +28,6 @@ export function writeMarkerMatrices(
 ): void {
   for (let i = 0; i < positions.length; i++) {
     const p = positions[i]!
-    const s = i === focusedIndex ? scale * focusScale : scale
-    const o = i * 16
-    out.fill(0, o, o + 16)
-    out[o] = s
-    out[o + 5] = s
-    out[o + 10] = s
-    out[o + 12] = p.x
-    out[o + 13] = y
-    out[o + 14] = p.z
-    out[o + 15] = 1
+    writeInstanceMatrix(out, i, p.x, y, p.z, i === focusedIndex ? scale * focusScale : scale)
   }
 }

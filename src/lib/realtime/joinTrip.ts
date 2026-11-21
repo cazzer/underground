@@ -37,10 +37,43 @@ function pickShape(
   return pool.find((s) => s === primary) ?? pool[0]!
 }
 
+/**
+ * The fallback shape for a trip with no usable id: of the route's patterns in this direction, the one
+ * calling at the train's stop that covers the most of its predicted stops. Ties go to the shape the trip had
+ * last poll (so it doesn't flap), then to the primary.
+ */
+function bestPattern(
+  primary: ShapeId,
+  route: string,
+  direction: Direction,
+  trip: Pick<RealtimeTrip, 'stopId'> & Partial<Pick<RealtimeTrip, 'arrivals'>>,
+  lookup: TripLookup,
+  previous: ShapeId | undefined,
+): ShapeId {
+  const { stopId, arrivals } = trip
+  if (!arrivals || arrivals.length === 0) return primary
+  const all = lookup.patternsOf.get(primaryKey(route, direction)) ?? [primary]
+  const calling = stopId ? all.filter((s) => lookup.patterns[s]?.stops.includes(stopId)) : all
+  let best = primary
+  let bestCovered = -1
+  for (const shapeId of calling.length > 0 ? calling : all) {
+    const stops = lookup.patterns[shapeId]!.stops
+    const covered = arrivals.reduce((n, a) => n + (stops.includes(a[0]) ? 1 : 0), 0)
+    const rank = (s: ShapeId) => (s === previous ? 2 : s === primary ? 1 : 0)
+    if (covered > bestCovered || (covered === bestCovered && rank(shapeId) > rank(best))) {
+      best = shapeId
+      bestCovered = covered
+    }
+  }
+  return best
+}
+
 export function joinTrip(
-  trip: Pick<RealtimeTrip, 'tripId' | 'route' | 'startDate' | 'stopId'>,
+  trip: Pick<RealtimeTrip, 'tripId' | 'route' | 'startDate' | 'stopId'> & Partial<Pick<RealtimeTrip, 'arrivals'>>,
   lookup: TripLookup,
   now: number,
+  /** The shape this trip was placed on last poll, to break ties between equally good fallback shapes. */
+  previousShape?: ShapeId,
 ): JoinResult {
   const p = parseTripId(trip.tripId)
   if (!p) return { matched: false, reason: 'unparseable-id' }
@@ -74,8 +107,9 @@ export function joinTrip(
     }
   }
 
-  const primary =
-    lookup.primary.get(primaryKey(trip.route, p.direction)) ?? lookup.primary.get(primaryKey(p.route, p.direction))
-  if (primary) return { matched: true, shapeId: primary, stage: 'primary' }
+  for (const route of routes.toReversed()) {
+    const primary = lookup.primary.get(primaryKey(route, p.direction))
+    if (primary) return { matched: true, shapeId: bestPattern(primary, route, p.direction, trip, lookup, previousShape), stage: 'primary' }
+  }
   return { matched: false, reason: 'unknown-route' }
 }

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Network } from '../lib/network'
-import { loadNetwork } from './loadNetwork'
+import { loadNetwork, type NetworkFiles } from './loadNetwork'
 
 export type NetworkLoad =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; network: Network }
+  | { status: 'ready'; network: Network; files: NetworkFiles }
 
 /** Loads public/data once per mount (and again on `retry`). */
 export function useNetwork(): { load: NetworkLoad; retry: () => void } {
@@ -15,8 +15,8 @@ export function useNetwork(): { load: NetworkLoad; retry: () => void } {
   useEffect(() => {
     const controller = new AbortController()
     loadNetwork(import.meta.env.BASE_URL, controller.signal).then(
-      (network) => {
-        if (!controller.signal.aborted) setLoad({ status: 'ready', network })
+      ({ network, files }) => {
+        if (!controller.signal.aborted) setLoad({ status: 'ready', network, files })
       },
       (err: unknown) => {
         if (controller.signal.aborted) return

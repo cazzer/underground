@@ -2,10 +2,12 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import { routeChipLabel, scheduleLabel } from '../lib/labels'
+import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import type { Network, Route } from '../lib/network'
 import { routeLineColor } from '../lib/routeColor'
 import { theme } from '../theme'
 import { Attribution } from './Attribution'
+import { LiveStatus } from './LiveStatus'
 
 /** Placeholder rows until real arrivals exist. */
 const PLACEHOLDER_ARRIVALS = [
@@ -83,11 +85,13 @@ function ArrivalsPanel({ network, stationId, onClose }: ArrivalsPanelProps) {
 
 interface HudProps {
   network: Network
+  /** Live-trains state, shown under the schedule line. */
+  live: LiveStatusValue
   /** Reports the screen bands the header and footer cover. */
   onInsets: (insets: Insets) => void
 }
 
-export function Hud({ network, onInsets }: HudProps) {
+export function Hud({ network, live, onInsets }: HudProps) {
   const { focusedId, dismiss } = useFocus()
   const root = useRef<HTMLDivElement>(null)
   const header = useRef<HTMLElement>(null)
@@ -117,6 +121,7 @@ export function Hud({ network, onInsets }: HudProps) {
       <header ref={header}>
         <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
         <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)} / theme: {theme.name}</p>
+        <LiveStatus status={live} />
       </header>
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
       <div ref={bottom} className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">

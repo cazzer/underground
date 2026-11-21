@@ -25,7 +25,8 @@ describe('smoothDistance', () => {
   })
   it('holds rather than moving backward, then snaps past the hold limit', () => {
     expect(smoothDistance(1000, 900, FRAME)).toBe(1000)
-    expect(smoothDistance(1000, 500, FRAME)).toBe(500)
+    expect(smoothDistance(2000, 1000, FRAME)).toBe(2000)
+    expect(smoothDistance(5000, 3400, FRAME)).toBe(3400)
   })
   it('converges on a stationary target', () => {
     let d = 0

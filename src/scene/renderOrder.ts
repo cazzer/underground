@@ -8,5 +8,6 @@ export const RENDER_ORDER = {
   lineFocus: 2,
   stationFill: 3,
   stationRing: 4,
-  trains: 5,
+  trainHalo: 5,
+  trains: 6,
 } as const

@@ -7,9 +7,10 @@ wireframe map with small dots for moving trains. Pinch/scroll zooms. Zooming tow
 a station continuously tilts the camera from top-down to isometric; later that view
 shows the station's levels, stairways, and upcoming arrivals.
 
-Status: the real static network (every route shape and station from `public/data/`) renders;
-trains are still fake motion and arrivals are placeholders until the client calls the realtime
-Worker (`worker/`), which is built and not yet deployed.
+Status: the real static network (every route shape and station from `public/data/`) renders, and
+trains are live: the client polls the realtime Worker (`worker/`, built, not yet deployed) and draws
+dots from the pure realtime library. With no `VITE_RT_URL` there is no live data (the HUD says
+"Live trains off") and no fake motion. Arrivals are still placeholders (8x4.8).
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -55,30 +56,57 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; picks raycast an invisible
     22 px hit disc per station and take the nearest);
-    `Trains.tsx` (instanced dots); `cameraDistance.ts` helpers; `renderOrder.ts`
-- `src/ui/Hud.tsx`: Tailwind overlay (title, arrivals panel); `LoadStatus.tsx` loading/error panel
+    `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
+    and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map);
+    `cameraDistance.ts` helpers; `renderOrder.ts`
+- `src/ui/Hud.tsx`: Tailwind overlay (title, live status, arrivals panel); `LoadStatus.tsx` loading/error panel
+  plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
+  `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
+  stages, per-feed trips/stale, offset/skew/age; updates per poll)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts`, `pickStation.ts`: pure render helpers; `labels.ts`
-    HUD text (route chips, schedule date); `pingPong.ts` triangle wave
+    HUD text (route chips, schedule date)
   - `focus.tsx` focused/dismissed-station React context (not pure). In dev only it exposes
     `window.__underground.select(stationId)` for screenshots and Playwright checks
+- `src/lib/live/`: pure helpers for the live layer (no React or three.js; tests colocated)
+  - `clock.ts` the live clock: `now = offsetS + performance.now()/1000`, where `offsetS` is the maximum over
+    polls of `generatedAt - receivedPerfMs/1000`. Monotone (a poll served from the Worker's 15 s memo
+    can't move it back), never reads the device clock; `SNAPSHOT_MAX_AGE_S` (120) drops old data
+  - `backoff.ts` poll delay (20 s; jittered exponential backoff on failure; Retry-After capped at 5 min; "warming" 503s);
+    `pollOutcome.ts` the pure per-poll decision (state, delay, log; a too-old success is a failure; a schema
+    mismatch sticks until a success) that `useRealtimeFeed` runs
+  - `liveStatus.ts` `deriveLiveStatus` for the HUD (off/connecting/live/stale/error; one failed poll with
+    a snapshot is not shown, two show a delay while trains stay drawn; technical text never appears)
+  - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
+    poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, glide to
+    arrive on time, or cross-fade; reduced motion cross-fades). On a shape change the dot's ground point is
+    projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
+    (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
   - `tripLookup.ts` trip-index to per-service trip-key maps and primary shapes
-  - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then primary
+  - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then the route's pattern
+    that calls at the train's stop and covers most of its predicted stops (ties go to the primary)
   - `polyline.ts` cumulative length, point/heading at distance, forward-only projection
   - `shapeGeometry.ts` stop distances along each shape, computed at load
-  - `position.ts` positionAlongShape: distance, ground point and heading from status, arrivals, run times
+  - `position.ts` `planHop` (once per poll: hop, run time, arrival) and `hopDistance` (per frame, no
+    allocation); `positionAlongShape` is their composition. A trip with no VehiclePosition doesn't advance
+    to its next hop until the next poll
   - `smoothing.ts` smoothDistance: per-frame ease that never goes backward
   - `filters.ts` ghostReason: unassigned, stale vehicle, no future arrival
-  - `prepareTrips.ts` per poll: filter, join, place; returns live trips and per-reason drop counts
+  - `prepareTrips.ts` per poll: filter, join, plan; returns live trips (each with its `HopPlan`) and
+    per-reason drop counts
 - `src/data/loadNetwork.ts` fetches stations/routes/shapes JSON and validates their outer shape;
-  `useNetwork.ts` is the loading/error/ready hook
+  `useNetwork.ts` is the loading/error/ready hook (ready also carries the raw `files` the realtime join needs)
+- `src/data/useLive.ts` composes live trains for `App`: `useRealtimeStatic` (trip-index + segments, only when
+  `RT_URL` is set), `useRealtimeFeed` (one request at a time; a hidden tab aborts and stops polling, becoming
+  visible polls at once), `prepareTrips` once per snapshot, and `deriveLiveStatus`. `realtimeFetch.ts` fetches and
+  validates one snapshot (the Worker doesn't expose `Retry-After`/`X-Rt-Cache` cross-origin yet; the client copes)
 - `src/data/schema.ts`: types of the six `public/data/*.json` files; `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
@@ -122,7 +150,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`screenScale`) so they stay legible when zoomed out.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
-  station fill 3, station ring 4, trains 5.
+  station fill 3, station ring 4, train halo 5, trains 6.
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
@@ -130,6 +158,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then
   route_sort_order. Don't add per-route `<Line>`s.
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
+- Live train dots are instanced too, with per-slot colors (`routeLineColor` like the lines). Their per-frame
+  path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
 
 ## Station interior format
 `public/data/stations/<id>.json`, type `StationInterior` in `src/data/stationSchema.ts`. Built by
