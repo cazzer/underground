@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { STALE_AFTER_S, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
+import { formatArrivalTimes } from './arrivals'
 import { DELAYED_NOTE } from './arrivalsView'
 import type { LiveStatus, LiveStatusKind } from './liveStatus'
 import {
@@ -131,6 +132,12 @@ describe('stopEta', () => {
       return `${eta.clock} · ${eta.away}`
     })
     expect(rows).toEqual(['12:50 · 6 min', '12:52 · 8 min', '12:55 · 11 min'])
+  })
+  it('agrees with the station panel for the same train', () => {
+    const now = epoch('2026-11-21T17:44:37Z')
+    for (const offset of [-20, 10, 29, 30, 44, 100, 330, 1790]) {
+      expect(stopEta(now + offset, now).away).toBe(formatArrivalTimes([now + offset], now))
+    }
   })
   it('never says 0 min once past the Now window', () => {
     expect(stopEta(epoch('2026-11-21T17:44:50Z'), epoch('2026-11-21T17:44:10Z')).away).toBe('1 min')

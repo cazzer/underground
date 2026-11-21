@@ -1,6 +1,6 @@
 import { STALE_AFTER_S, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import type { StationId, StopId } from '../../data/schema'
-import { NOW_UNDER_S, PAST_GRACE_S, stationOfStop } from './arrivals'
+import { PAST_GRACE_S, minutesAway, stationOfStop } from './arrivals'
 import { DELAYED_NOTE } from './arrivalsView'
 import type { LiveStatus } from './liveStatus'
 
@@ -63,15 +63,10 @@ export interface StopEta {
   away: string
 }
 
-/**
- * "Now" under 30 s away (or past), else whole minutes counted on the clock face: the arrival's clock minute
- * minus the current one, so a row reads "1:50 · 6 min" and the next "1:52 · 8 min" (rounding the distances
- * instead would disagree with the clock times beside them). Never less than 1.
- */
+/** The clock time and `minutesAway` (shared with the station panel) as "Now" or "3 min". */
 export function stopEta(time: number, nowS: number): StopEta {
-  const clock = nyClockTime(time)
-  if (time - nowS < NOW_UNDER_S) return { clock, away: 'Now' }
-  return { clock, away: `${Math.max(1, Math.floor(time / 60) - Math.floor(nowS / 60))} min` }
+  const minutes = minutesAway(time, nowS)
+  return { clock: nyClockTime(time), away: minutes === 'Now' ? minutes : `${minutes} min` }
 }
 
 /** Screen-reader text for a row's time: "1:46, in 2 minutes", or "now". The visible clock and minutes are hidden. */

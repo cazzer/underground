@@ -13,6 +13,7 @@ import {
 } from '../lib/live/trainStops'
 import type { Network } from '../lib/network'
 import type { LiveTrip } from '../lib/realtime/prepareTrips'
+import { useStopListScroll } from './useStopListScroll'
 
 /** How often the times are recomputed from the live clock; a new poll updates them sooner. */
 const TICK_MS = 15_000
@@ -72,7 +73,7 @@ function ExpandToggle({ expanded, total, controls, onToggle, onFocusLost }: Expa
       onClick={onToggle}
       className="-mx-2 mt-1 flex min-h-11 cursor-pointer items-center px-2 text-sm text-ink-dim hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
     >
-      {expanded ? 'Show fewer' : `Show next ${total} stops`}
+      {expanded ? 'Show fewer' : `Show all ${total} stops`}
     </button>
   )
 }
@@ -120,9 +121,15 @@ export function TrainStops({ network, trip, source, status }: TrainStopsProps) {
   const showToggle = all.length > COLLAPSED_ROWS
   // The cut-off note belongs under the last known stop, so only once that row is on screen.
   const cutShort = rows.length === all.length && isCutShort(all, terminal)
+  const { scroller, list, capPx, overflows, atEnd, onScroll } = useStopListScroll(rows.length)
   return (
     <section className="mt-3">
-      <h3 ref={heading} id={headingId} tabIndex={-1} className="text-xs uppercase tracking-widest text-ink-dim outline-none">
+      <h3
+        ref={heading}
+        id={headingId}
+        tabIndex={-1}
+        className="text-xs uppercase tracking-widest text-ink-dim outline-none focus-visible:outline-2 focus-visible:outline-focus"
+      >
         Next stops
       </h3>
       <div role="status" aria-live="polite">
@@ -134,21 +141,34 @@ export function TrainStops({ network, trip, source, status }: TrainStopsProps) {
       </div>
       {view.kind === 'empty' && <p className="mt-1 text-sm">No upcoming stops</p>}
       {rows.length > 0 && (
-        // Capped on a phone so the header (and the train on the map) stay in view; the list scrolls inside.
-        <div
-          role="region"
-          aria-labelledby={headingId}
-          tabIndex={0}
-          className="mt-1 max-h-[40dvh] overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-focus sm:max-h-none"
-        >
-          <ol id={listId} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-2 divide-y divide-edge/30 text-sm">
-            {rows.map((stop, i) => (
-              <StopRow key={`${stop.stopId}|${i}`} stop={stop} nowS={nowS} />
-            ))}
-          </ol>
+        <div className="relative mt-1">
+          {/* On a phone the list is capped at whole rows so the train stays in view above the panel (see
+              useStopListScroll); it is a focusable region only while it actually scrolls. */}
+          <div
+            ref={scroller}
+            onScroll={onScroll}
+            style={capPx === null ? undefined : { maxHeight: capPx }}
+            {...(overflows ? ({ role: 'region', 'aria-labelledby': headingId, tabIndex: 0 } as const) : {})}
+            // `relative` contains the rows' absolutely positioned screen-reader text, which would otherwise
+            // escape the scroller's clipping and make the whole panel scroll.
+            className="relative overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-focus"
+          >
+            <ol
+              ref={list}
+              id={listId}
+              className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-2 divide-y divide-edge/30 text-sm"
+            >
+              {rows.map((stop, i) => (
+                <StopRow key={`${stop.stopId}|${i}`} stop={stop} nowS={nowS} />
+              ))}
+            </ol>
+            {cutShort && <p className="mt-1 text-xs text-ink-dim">{CUT_SHORT_NOTE}</p>}
+          </div>
+          {overflows && !atEnd && (
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-linear-to-t from-panel to-transparent" />
+          )}
         </div>
       )}
-      {cutShort && <p className="mt-1 text-xs text-ink-dim">{CUT_SHORT_NOTE}</p>}
       {showToggle && (
         <ExpandToggle
           expanded={expanded}

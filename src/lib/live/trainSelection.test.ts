@@ -65,18 +65,25 @@ describe('trainSelectionReducer', () => {
     expect(s.missed).toBe(0)
   })
 
-  it('does not count an outage, or a poll after it, against the train until fresh polls miss it twice', () => {
+  it('pauses the miss count during an outage: neither added to nor reset', () => {
     const s = run([poll('b'), select('b'), poll('a'), outage])
-    expect(s.missed).toBe(0)
-    const back = run([poll('b'), select('b'), outage, poll('b')], initialTrainSelection<Trip, string>())
-    expect(back.key).toBe('b')
-    expect(back.lastTrip).toEqual({ key: 'b' })
-    const missOnce = run([poll('a')], s)
-    expect(missOnce.key).toBe('b')
-    expect(missOnce.missed).toBe(1)
-    const cleared = run([poll('a'), poll('a')], s)
+    expect(s.key).toBe('b')
+    expect(s.missed).toBe(1)
+    // The next fresh poll without the trip is its second miss.
+    const cleared = run([poll('a')], s)
     expect(cleared.key).toBeNull()
     expect(cleared.notice).toEqual({ summary: 'b' })
+    // A fresh poll with it resets the count as usual.
+    const back = run([poll('b'), poll('a')], s)
+    expect(back.key).toBe('b')
+    expect(back.lastTrip).toEqual({ key: 'b' })
+    expect(back.missed).toBe(1)
+  })
+
+  it('still clears a truly gone trip when the layer flips between present and gone', () => {
+    const s = run([poll('b'), select('b'), outage, poll('a'), outage, poll('a'), outage, poll('a')])
+    expect(s.key).toBeNull()
+    expect(s.notice).toEqual({ summary: 'b' })
   })
 
   it('reports an unknown trip with no summary', () => {

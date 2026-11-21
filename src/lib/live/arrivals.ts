@@ -100,13 +100,19 @@ export function arrivalsAt(
     .sort((a, b) => a.direction.localeCompare(b.direction) || a.times[0]! - b.times[0]! || a.routeId.localeCompare(b.routeId) || a.headsign.localeCompare(b.headsign))
 }
 
-/** "Now" under 30 seconds (or already past), else whole minutes rounded down, never less than 1. */
-function minutesText(deltaS: number): string {
-  return deltaS < NOW_UNDER_S ? 'Now' : String(Math.max(1, Math.floor(deltaS / 60)))
+/**
+ * Minutes away, the one rule both panels use: "Now" under 30 seconds (or already past), else the arrival's
+ * clock minute minus the current one, never less than 1. Counting on the clock face keeps "1:50 · 6 min" and
+ * "1:52 · 8 min" consistent with each other, and the two panels agree for the same train (New York is a whole
+ * number of minutes from UTC, so epoch minutes are clock minutes).
+ */
+export function minutesAway(timeS: number, nowS: number): string {
+  if (timeS - nowS < NOW_UNDER_S) return 'Now'
+  return String(Math.max(1, Math.floor(timeS / 60) - Math.floor(nowS / 60)))
 }
 
 /** "4, 9, 15 min", or "Now, 6 min"; a lone "Now" has no unit. */
 export function formatArrivalTimes(times: readonly number[], nowS: number): string {
-  const parts = times.map((t) => minutesText(t - nowS)).filter((p, i, all) => p !== 'Now' || i === all.indexOf('Now'))
+  const parts = times.map((t) => minutesAway(t, nowS)).filter((p, i, all) => p !== 'Now' || i === all.indexOf('Now'))
   return parts.at(-1) === 'Now' ? parts.join(', ') : `${parts.join(', ')} min`
 }
