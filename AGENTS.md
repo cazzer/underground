@@ -149,7 +149,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
     `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`) and its
-    weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`); `platformMask.ts` the mask's line buffers;
+    weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the mask's line buffers;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,

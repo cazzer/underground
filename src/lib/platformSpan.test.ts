@@ -64,9 +64,9 @@ describe('span weights', () => {
   })
 
   it('tints a car by the veil only where it leaves the platform, and not at all before the reveal', () => {
-    expect(veilTint(1, 1, 0.7)).toBe(0)
+    expect(veilTint(1, 1, 0.7)).toBeCloseTo(0.14, 12)
     expect(veilTint(1, 0, 0.7)).toBeCloseTo(0.7, 12)
-    expect(veilTint(0.5, 0.5, 0.7)).toBeCloseTo(0.175, 12)
+    expect(veilTint(0.5, 0.5, 0.7)).toBeCloseTo(0.21, 12)
     expect(veilTint(0, 0, 0.7)).toBe(0)
   })
 })
