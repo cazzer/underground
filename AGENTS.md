@@ -421,7 +421,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   ends within 6 m), smoothstep ramps at a 3% average real grade (horizontal true, so 340 m for Bedford Av's
   10.2 m) to 0, and 0 everywhere else. Close stations ease from one depth to the next. Ramps get the fewest
   vertices that keep the drawn chords within 0.5 m of the ease (`rampSampling.ts`, densest where it curves most;
-  flat runs add none), and the platform fade one per ramp end; trains read `profileAt` exactly. Top-down everything is flat.
+  flat runs add none), and the platform fade one per ramp end; trains take y on the drawn chord between those vertices
+  (`trackPointInto`), so they sit exactly on their line. Top-down everything is flat.
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
 - Picking is screen space, on click only: `ScenePicker` listens on the canvas (never stopping or
   preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),

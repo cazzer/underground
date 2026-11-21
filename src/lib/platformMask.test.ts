@@ -35,6 +35,7 @@ describe('maskBreaks', () => {
 })
 
 describe('writePlatformFade', () => {
+  // 164: an extra line vertex inside the fade (e.g. a ramp break), to check the weight between the mask's own breaks.
   const xs = [0, 100, ...maskBreaks({ d0: 160, d1: 240 }).flatMap((d) => (d === 160 ? [160, 164] : [d])), 300, 400]
   const a = path('a', xs)
   const b = path('b', [0, 400])

@@ -1,6 +1,7 @@
 /**
  * The map's tracks meet Bedford Av's (L08) interior rails, on the committed public/data at the default vertical
- * scale. Builds the lines the way network.ts does (trackLine, profileRuns, buildTrackProfile, resampleForProfile),
+ * scale. Builds the lines the way network.ts does (trackLine, profileRuns, buildTrackProfile, then the same ramp breaks via resampleForProfile; network.ts adds band and
+ * fade breaks too, which only insert collinear vertices),
  * from the .ts-import modules Node can load. The daily refresh regenerates shapes, so bounds keep some headroom.
  */
 import { readFileSync } from 'node:fs'

@@ -3,12 +3,17 @@ import type { Ground } from '../projection'
 import { buildPolyline, pointAtDistance, type Polyline } from '../realtime/polyline'
 import { MAX_CARS, type Consist } from './consist'
 import { consistSpanInto, createConsistScratch, writeConsist, type CarFrame } from './consistLayout'
-import { buildTrackProfile, EMPTY_PROFILE, GRADE, profileAt, type TrackProfile } from '../trackProfile'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleAt, type TrackProfile } from '../trackProfile'
+import { rampBreaks } from '../rampSampling'
 import { createBandView } from '../bandOffset'
-import type { DrawnTrack } from './trackPoint'
+import { createTrackPoint, trackPointInto, type DrawnTrack } from './trackPoint'
 
 /** An unbanded track (no miters, so the band view leaves it where it is), and a view that shifts nothing. */
-const track = (line: Polyline, profile: TrackProfile = EMPTY_PROFILE): DrawnTrack => ({ line, profile, bandInputs: new Float32Array(line.points.length * 4) })
+/** The drawn track: the line resampled through its ramps, as network.ts draws it. */
+const track = (line: Polyline, profile: TrackProfile = EMPTY_PROFILE): DrawnTrack => {
+  const drawn = buildPolyline(resampleAt(line.points, line.cumulative, rampBreaks(profile)).points)
+  return { line: drawn, profile, bandInputs: new Float32Array(drawn.points.length * 4) }
+}
 const VIEW = createBandView()
 
 const FRAME: CarFrame = { gapM: 1.2, rimM: 0.5, widthM: 3, crossScale: 1, y: 0.5, extrude: 1 }
@@ -200,7 +205,9 @@ describe('writeConsist', () => {
     const s = consistSpanInto({ cars: 0, pitch: 0, step: 0, rear: 0 }, 1000, 530, TEN, 1)
     for (let c = 0; c < TEN.cars; c++) {
       const o = c * 16
-      const [ya, yb] = [profileAt(profile, s.rear + c * s.step), profileAt(profile, s.rear + (c + 1) * s.step)]
+      // Chord ends sit on the drawn line (trackPointInto), which follows the eased profile within the ramp tolerance.
+      const drawnY = (d: number) => trackPointInto(track(line, profile), d, VIEW, createTrackPoint()).y
+      const [ya, yb] = [drawnY(s.rear + c * s.step), drawnY(s.rear + (c + 1) * s.step)]
       expect(onRamp.bodies[o + 13]).toBeCloseTo((ya + yb) / 2 + FRAME.y, 4)
       expect(onRamp.halos[o + 13]).toBeCloseTo((ya + yb) / 2 + FRAME.y, 4)
       // Forward points down the ramp along the chord; up tilts back so it stays perpendicular.
