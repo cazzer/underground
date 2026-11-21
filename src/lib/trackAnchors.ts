@@ -30,6 +30,8 @@ export interface AnchoredRuns {
   runs: Map<ShapeId, ProfileRun[]>
   /** Authored tracks no shape rides (wrong data, or the shapes moved); their stations keep street-level tracks. */
   unmatched: StopId[]
+  /** Real rail height of each station's deepest track that some shape rides. */
+  stationRailY: Map<StationId, number>
 }
 
 const START = { segment: 0, t: 0 }
@@ -47,6 +49,7 @@ export function profileRuns(
   const routesAt = new Map(stations.map((s) => [s.id, new Set(s.routeIds)]))
   const runs = new Map<ShapeId, ProfileRun[]>()
   const unmatched: StopId[] = []
+  const stationRailY = new Map<StationId, number>()
   for (const station of depths.stations) {
     const routes = routesAt.get(station.stationId)
     const origin = toGround(station.anchor)
@@ -70,7 +73,8 @@ export function profileRuns(
         matched = true
       }
       if (!matched) unmatched.push(track.stopId)
+      else stationRailY.set(station.stationId, Math.min(track.railY, stationRailY.get(station.stationId) ?? 0))
     }
   }
-  return { runs, unmatched }
+  return { runs, unmatched, stationRailY }
 }

@@ -1,16 +1,20 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { StationDepthsFile, StationInterior } from '../../src/data/stationSchema.ts'
 import { toStableJson } from './stableJson.ts'
 import { buildStationDepths } from './stationDepths.ts'
 
-const readJson = (path: string): unknown => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
-const l08 = readJson('../../public/data/stations/L08.json') as StationInterior
+const interiorDir = new URL('../../public/data/stations/', import.meta.url)
+const interiors = readdirSync(interiorDir)
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => JSON.parse(readFileSync(new URL(f, interiorDir), 'utf8')) as StationInterior)
+const l08 = interiors.find((i) => i.stationId === 'L08')!
 const committed = readFileSync(new URL('../../public/data/station-depths.json', import.meta.url), 'utf8')
 
 describe('buildStationDepths', () => {
   it('matches the committed station-depths.json (rerun npm run data:stations if not)', () => {
-    expect(toStableJson(buildStationDepths([l08]), 2)).toBe(committed)
+    expect(interiors.length).toBeGreaterThan(0)
+    expect(toStableJson(buildStationDepths(interiors), 2)).toBe(committed)
   })
 
   it('puts the L08 rails 1.1 m below the platform (-9.1 m) and keeps the track ends', () => {

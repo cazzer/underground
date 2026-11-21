@@ -121,6 +121,7 @@ describe('buildNetwork track profile', () => {
   it('keeps every shape at y = 0 with no station depths', () => {
     const net = buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7, NO_DEPTHS, 2)
     expect(net.profiles.size).toBe(0)
+    expect(net.stationTrackY.size).toBe(0)
     for (const s of net.shapes) {
       expect(s.profile).toBe(EMPTY_PROFILE)
       expect(s.y).toEqual(s.points.map(() => 0))
@@ -142,7 +143,9 @@ describe('buildNetwork track profile', () => {
       stations: [{ stationId: '101', anchor, tracks: [{ stopId: '101N', railY: -10.2, ends }, { stopId: '101S', railY: -10.2, ends }] }],
     }
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const shape = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, depths, 2).shapes[0]!
+    const net = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, depths, 2)
+    const shape = net.shapes[0]!
+    expect(net.stationTrackY).toEqual(new Map([['101', -20.4]]))
     expect(warn).toHaveBeenCalledTimes(1)
     expect(warn.mock.calls[0]![0]).toMatch(/101S/)
     warn.mockRestore()

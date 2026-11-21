@@ -56,10 +56,19 @@ describe('buildTrackProfile / profileAt', () => {
     )
     expect(dropped).toEqual([])
     expect([...profile.d]).toEqual([1000 - 10 / GRADE, 1000, 1100, 1500, 1600, 1600 + 6 / GRADE])
+    // 4 m over 400 m is 1%, gentle enough not to report.
+    expect(buildTrackProfile([{ d0: 1500, d1: 1600, yReal: -6 }, { d0: 1000, d1: 1100, yReal: -10 }], OPTS).steep).toEqual([])
     for (let d = 1100; d <= 1500; d += 10) {
       expect(profileAt(profile, d)).toBeLessThanOrEqual(-6)
       expect(profileAt(profile, d)).toBeGreaterThanOrEqual(-10)
     }
+  })
+
+  it('reports an ease between close runs steeper than twice the grade', () => {
+    const a = { d0: 1000, d1: 1100, yReal: -20 }
+    const b = { d0: 1200, d1: 1300, yReal: -5 }
+    const { steep } = buildTrackProfile([a, b], OPTS)
+    expect(steep).toEqual([{ from: a, to: b, grade: expect.closeTo(0.15, 12) }])
   })
 
   it('climbs to the street between runs far apart', () => {

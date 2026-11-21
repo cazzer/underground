@@ -14,6 +14,7 @@ import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
 import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
+import { StationTies } from './StationTies'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
 import { YouAreHere } from './YouAreHere'
@@ -49,6 +50,7 @@ export function Scene({ network, insets, live, onLiveError, interior, panel, onI
       <color attach="background" args={[theme.background]} />
       <MapGrid />
       <SubwayLines network={network} />
+      <StationTies network={network} />
       <Stations stations={network.stations} />
       <ScenePicker stations={network.stations} trainPick={trainPick} />
       {live && (

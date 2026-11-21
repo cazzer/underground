@@ -75,7 +75,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `useStationOrbit.ts` the focused-station orbit (azimuth window per frame, pan-radius clamp);
     `orbitLook.ts` TEMPORARY `?orbit=` override
-  - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
+  - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `StationTies.tsx` a thin vertical tie
+    from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
+    LineSegments2, faded out between 1.5 and 3 km); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; `FocusRing.tsx` redraws the focused ring above the
     trains and the veil; `markerShape.ts` the shared marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
@@ -285,14 +287,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   drei's `update()` at -1; the pivot and pan clamp at -0.5), not as changing props. Never use a
   positive `useFrame` priority (it takes over rendering).
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
-  an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
+  an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   you-are-here reticle 6.55, focused ring 10
   (whenever a station is focused, so a train never covers it).
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
-  above the ground, and everything after it (veil, interior, focus ring) has depthTest false.
+  (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior, focus ring) has depthTest false.
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
