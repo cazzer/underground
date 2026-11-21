@@ -1,21 +1,37 @@
 import { describe, expect, it } from 'vitest'
-import { ENTER_RADIUS, EXIT_DISTANCE, EXIT_RADIUS } from './focusMachine'
+import { PerspectiveCamera, Vector3 } from 'three'
+import { EXIT_DISTANCE, EXIT_RADIUS } from './focusMachine'
+import { freeCenterShift, interiorFreeRect } from './interiorCamera'
 import {
   azimuthBounds,
   azimuthLimit,
-  clampToRadius,
-  ORBIT_RADIUS,
+  focusPoint,
+  PAN_GIVE,
+  PAN_MARGIN,
+  PAN_RADIUS_BARE,
+  PAN_RADIUS_MAX,
+  panClampArmed,
+  panRadius,
+  pivotShift,
   rotateScreenOffset,
+  softClampToRadius,
   springToward,
   type AzimuthBounds,
 } from './orbitLimits'
+import { ISO_POLAR } from './tilt'
 
 const LIMIT = Math.PI / 4
 
-describe('ORBIT_RADIUS', () => {
-  it('sits between the focus enter and exit radii, so panning never drops focus', () => {
-    expect(ORBIT_RADIUS).toBeGreaterThan(ENTER_RADIUS)
-    expect(ORBIT_RADIUS).toBeLessThan(EXIT_RADIUS)
+describe('panRadius', () => {
+  it('is the bare radius without an interior, else the half-extent plus the margin', () => {
+    expect(panRadius(null)).toBe(PAN_RADIUS_BARE)
+    expect(panRadius(90)).toBe(90 + PAN_MARGIN)
+  })
+
+  it('is capped so a full stretch plus a phone-sized view offset stays inside the focus exit radius', () => {
+    expect(panRadius(1000)).toBe(PAN_RADIUS_MAX)
+    expect(PAN_RADIUS_MAX + PAN_GIVE + 60).toBeLessThan(EXIT_RADIUS)
+    expect(PAN_RADIUS_BARE + PAN_GIVE).toBeLessThan(EXIT_RADIUS)
   })
 })
 
@@ -79,21 +95,56 @@ describe('azimuthBounds', () => {
   })
 })
 
-describe('clampToRadius', () => {
+describe('panClampArmed', () => {
+  it('a released hold outside R does not jump: it arms only once the view comes inside', () => {
+    let armed = panClampArmed(false, true, true, false)
+    expect(armed).toBe(false)
+    armed = panClampArmed(armed, true, false, false)
+    expect(armed).toBe(false)
+    armed = panClampArmed(armed, true, false, true)
+    expect(armed).toBe(true)
+    armed = panClampArmed(armed, true, false, false)
+    expect(armed).toBe(true)
+  })
+
+  it('disarms while busy and when the focus center changes', () => {
+    expect(panClampArmed(true, true, true, true)).toBe(false)
+    expect(panClampArmed(true, false, false, false)).toBe(false)
+  })
+})
+
+describe('softClampToRadius', () => {
   const c = { x: 100, z: -50 }
+  const r = 120
 
   it('leaves a point inside untouched', () => {
     const o = { x: 0, z: 0 }
-    expect(clampToRadius({ x: 130, z: -10 }, c, 200, o)).toBe(false)
+    expect(softClampToRadius({ x: 130, z: -10 }, c, r, 1 / 60, o)).toBe(false)
     expect(o).toEqual({ x: 130, z: -10 })
   })
 
-  it('projects an outside point onto the circle on the same bearing', () => {
+  it('never lets a stretch pass the give, on the same bearing', () => {
     const o = { x: 0, z: 0 }
-    expect(clampToRadius({ x: 100 + 600, z: -50 + 800 }, c, 200, o)).toBe(true)
-    expect(Math.hypot(o.x - c.x, o.z - c.z)).toBeCloseTo(200, 9)
-    expect(o.x - c.x).toBeCloseTo(120)
-    expect(o.z - c.z).toBeCloseTo(160)
+    expect(softClampToRadius({ x: 100 + 600, z: -50 + 800 }, c, r, 1 / 60, o)).toBe(true)
+    const d = Math.hypot(o.x - c.x, o.z - c.z)
+    expect(d).toBeCloseTo(r + PAN_GIVE, 9)
+    expect((o.x - c.x) / d).toBeCloseTo(0.6)
+    expect((o.z - c.z) / d).toBeCloseTo(0.8)
+  })
+
+  it('eases a released stretch back onto the circle without overshoot', () => {
+    let p = { x: c.x + r + 20, z: c.z }
+    let prev = 20
+    for (let i = 0; i < 600; i++) {
+      const o = { x: 0, z: 0 }
+      if (!softClampToRadius(p, c, r, 1 / 60, o)) break
+      const stretch = o.x - c.x - r
+      expect(stretch).toBeGreaterThanOrEqual(0)
+      expect(stretch).toBeLessThan(prev)
+      prev = stretch
+      p = o
+    }
+    expect(p.x).toBe(c.x + r)
   })
 })
 
@@ -111,5 +162,53 @@ describe('rotateScreenOffset', () => {
   it('preserves length', () => {
     const o = rotateScreenOffset(3, 4, 0.8)
     expect(Math.hypot(o.x, o.z)).toBeCloseTo(5)
+  })
+})
+
+describe('pivotShift', () => {
+  const phone = { width: 390, height: 844 }
+  const free = interiorFreeRect(phone, { top: 80, bottom: 70 }, { left: 16, top: 470, right: 374, bottom: 770 })
+  const distance = 180
+  const depth = 9
+  const towardCamera = depth * Math.tan(ISO_POLAR)
+
+  function camera(target: Vector3, theta: number) {
+    const cam = new PerspectiveCamera(35, phone.width / phone.height, 1, 5000)
+    cam.position.copy(target).add(new Vector3().setFromSphericalCoords(distance, ISO_POLAR, theta))
+    cam.lookAt(target)
+    cam.updateMatrixWorld()
+    return cam
+  }
+  const screen = (p: Vector3, cam: PerspectiveCamera) => {
+    const v = p.clone().project(cam)
+    return { x: ((v.x + 1) / 2) * phone.width, y: ((1 - v.y) / 2) * phone.height }
+  }
+
+  it.each([
+    [0, 0.6],
+    [-0.5, 1.0],
+    [0.7, -0.7],
+  ])('turning from %f to %f rad keeps the interior mid-depth center at the free area middle', (theta0, theta1) => {
+    const s = freeCenterShift(phone, free, 35, distance, ISO_POLAR, { right: 0, toward: 0 })
+    s.toward += towardCamera
+    const target = new Vector3(500, 0, -300)
+    const p = focusPoint({ x: target.x, z: target.z }, s.right, s.toward, theta0, { x: 0, z: 0 })
+    const interiorCenter = new Vector3(p.x, -depth, p.z)
+    const before = screen(interiorCenter, camera(target, theta0))
+    // Near, not on: the shift is sized at the target's depth, and perspective stretches the phone's
+    // ~150 px vertical offset by about a fifth (frameInterior lands in the same spot).
+    expect(Math.abs(before.x - (free.left + free.right) / 2)).toBeLessThan(15)
+    expect(Math.abs(before.y - (free.top + free.bottom) / 2)).toBeLessThan(40)
+
+    // The controls turn the camera about the target; the shift then slides both.
+    const m = pivotShift(s.right, s.toward, theta0, theta1, { x: 0, z: 0 })
+    const after = screen(interiorCenter, camera(target.clone().add(new Vector3(m.x, 0, m.z)), theta1))
+    expect(after.x).toBeCloseTo(before.x, 6)
+    expect(after.y).toBeCloseTo(before.y, 6)
+  })
+
+  it('is zero when the angle held, and the focus point is the target with no offset', () => {
+    expect(pivotShift(12, 30, 0.4, 0.4, { x: 1, z: 1 })).toEqual({ x: 0, z: 0 })
+    expect(focusPoint({ x: 3, z: 4 }, 0, 0, 0.9, { x: 0, z: 0 })).toEqual({ x: 3, z: 4 })
   })
 })

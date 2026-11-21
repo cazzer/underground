@@ -10,6 +10,7 @@ import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
 import { LiveStatus } from './LiveStatus'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
+import { OrbitHint } from './OrbitHint'
 import { RouteChip } from './RouteChip'
 
 interface ArrivalsPanelProps {
@@ -56,6 +57,7 @@ function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, 
         })}
       </ul>
       <InteriorStatus info={interior} />
+      <OrbitHint />
       <ArrivalsList network={network} station={station} source={arrivals} status={live} />
     </aside>
   )

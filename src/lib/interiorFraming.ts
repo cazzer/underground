@@ -30,6 +30,8 @@ export interface FocusAnchor {
   center: Ground
   /** Meters the camera target must sit toward the camera so the mid-depth center is mid-screen. */
   towardCamera: number
+  /** Half the longer side of the plan extent, meters: sizes the station orbit's pan radius. */
+  halfExtent: number
 }
 
 /**
@@ -43,6 +45,7 @@ export function interiorFocusAnchor(origin: Ground, interior: StationInterior, y
   return {
     center: { x: origin.x + (b.minX + b.maxX) / 2, z: origin.z + (b.minZ + b.maxZ) / 2 },
     towardCamera: ((-minY * yScale) / 2) * tanPolar,
+    halfExtent: Math.max(b.maxX - b.minX, b.maxZ - b.minZ) / 2,
   }
 }
 
@@ -61,7 +64,9 @@ export interface LevelLabel {
 
 /**
  * Midpoint of the outline edge that faces south (toward the camera) the most, weighted by length,
- * pushed `gap` meters outward.
+ * pushed `gap` meters outward. Deliberately fixed to south rather than following the station orbit:
+ * within the ±60 degree window the south edge still faces the camera, so labels stay legible and
+ * don't hop between edges mid-turn (revisit with the pah.5 orbit-limit decision).
  */
 function southEdgeAnchor(outline: readonly LocalPoint[], gap: number): LocalPoint {
   // Shoelace: twice the signed area. Its sign says which side of each edge is outside, for

@@ -1,6 +1,6 @@
 import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useCallback, useEffect, useLayoutEffect, useRef, type ComponentRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { useFocus } from '../lib/focus'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
@@ -143,7 +143,19 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
   const busy = useCallback(() => flight.current !== null || hold.current !== null, [])
-  useStationOrbit({ controls, camera, focusPos, busy })
+  // A counter, not a flag: a wheel tick inside a drag dispatches its own start and end.
+  const gestures = useRef(0)
+  const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
+  useStationOrbit({
+    controls,
+    camera,
+    focusPos,
+    interior: interior?.stationId === focusedId ? interior : null,
+    viewport: size,
+    free,
+    busy,
+    gestures,
+  })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((_, delta) => {
@@ -193,6 +205,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   // document pointerup listener, leaving the controls stuck in a drag (no wheel, no pan) until
   // reload (underground-by0).
   const onStart = useCallback(() => {
+    gestures.current += 1
     const f = flight.current
     const c = controls.current
     if (f && c) {
@@ -205,6 +218,11 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     flight.current = null
   }, [camera])
 
+  // OrbitControls dispatches end on every pointerup (and pointercancel), even one with no start.
+  const onEnd = useCallback(() => {
+    gestures.current = Math.max(0, gestures.current - 1)
+  }, [])
+
   return (
     <MapControls
       ref={controls}
@@ -214,6 +232,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       minDistance={MIN_DISTANCE}
       maxDistance={maxDistance}
       onStart={onStart}
+      onEnd={onEnd}
     />
   )
 }
