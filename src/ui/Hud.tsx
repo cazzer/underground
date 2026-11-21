@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useFocus } from '../lib/focus'
 import { network } from '../lib/network'
 import { theme } from '../theme'
+import { Attribution } from './Attribution'
 
 /** Placeholder rows until real arrivals exist. */
 const PLACEHOLDER_ARRIVALS = [
@@ -79,8 +80,9 @@ export function Hud() {
         <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
         <p className="text-xs text-ink-dim">sample data / theme: {theme.name}</p>
       </header>
-      <div className="flex justify-start sm:justify-end">
+      <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-end sm:justify-between sm:gap-4">
         {focusedId && <ArrivalsPanel stationId={focusedId} onClose={dismiss} />}
+        <Attribution />
       </div>
     </div>
   )
