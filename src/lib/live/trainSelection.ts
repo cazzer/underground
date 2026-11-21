@@ -36,8 +36,8 @@ function lost<T extends { key: string }, S>(s: TrainSelectionState<T, S>, observ
 
 /**
  * Selection across polls: a present trip resets the miss count, MISSES_TO_CLEAR misses in a row clear the
- * selection with a notice, and losing the live layer altogether (null trips) clears it with a notice too.
- * A user clear is silent.
+ * selection with a notice. Losing the live layer altogether (null trips) keeps the selection and resets the
+ * count, so an outage never blames the train. A user clear is silent.
  */
 export function trainSelectionReducer<T extends { key: string }, S>(
   s: TrainSelectionState<T, S>,
@@ -63,7 +63,11 @@ export function trainSelectionReducer<T extends { key: string }, S>(
     case 'observe': {
       if (e.trips === s.observed) return s
       if (s.key === null) return { ...s, observed: e.trips }
-      if (e.trips === null) return lost(s, null)
+      // No live layer is an outage (the feed failed past its cutoff, or the layer crashed), not a train that
+      // left: the selection stays, with its last trip, and the panel says the times are unavailable. The miss
+      // count pauses (it is neither added to nor reset), so flapping between a layer and none cannot hide a
+      // train that is really gone.
+      if (e.trips === null) return { ...s, observed: null }
       const trip = e.trips.find((t) => t.key === s.key)
       if (trip) return { ...s, missed: 0, lastTrip: trip, lastSummary: e.summarize(trip), observed: e.trips }
       if (s.missed + 1 >= MISSES_TO_CLEAR) return lost(s, e.trips)

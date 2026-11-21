@@ -92,7 +92,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
-  each pick, and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
+  each pick (its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
+  `useStopListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
   notice, then the station, and closing either of the first two returns focus to the station heading or else
   the location button); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
@@ -154,8 +155,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
   - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends);
-    `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice);
-    `trainSummary.ts` route and headsign for the train panel and the notice
+    `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice; no live layer, an outage, keeps it);
+    `trainSummary.ts` route and headsign for the train panel and the notice;
+    `trainStops.ts` the train's next stops (feed arrivals not yet passed, the dwell stop kept), `nyClockTime`
+    (New York 12 h without AM/PM), `stopEta` (clock plus "Now"/"3 min"), `tripTimesDelayed`, `deriveTrainStopsView` (states). Minutes away
+    come from `minutesAway` in `arrivals.ts`, shared by the station and train panels: "Now" under 30 s, else
+    the arrival's clock minute minus the current one (not floor of seconds), so adjacent rows and both
+    panels agree
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
     (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape
     (`consistSpanInto`, shared with picking), each on its chord, unfolding from the dot point (spacing and length by mix, section by the slot fade);

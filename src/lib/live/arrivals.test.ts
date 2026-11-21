@@ -6,6 +6,7 @@ import {
   arrivalsAt,
   formatArrivalTimes,
   MAX_TIMES_PER_GROUP,
+  minutesAway,
   PAST_GRACE_S,
   type ArrivalOptions,
 } from './arrivals'
@@ -113,16 +114,24 @@ describe('arrivalsAt', () => {
 })
 
 describe('formatArrivalTimes', () => {
-  const f = (...deltas: number[]) => formatArrivalTimes(deltas.map((d) => NOW + d), NOW)
+  // Now on a whole minute, so seconds away and clock minutes away line up.
+  const NOW_ON_MINUTE = NOW - (NOW % 60)
+  const f = (...deltas: number[]) => formatArrivalTimes(deltas.map((d) => NOW_ON_MINUTE + d), NOW_ON_MINUTE)
   it('says Now under 30 seconds, including already-past times', () => {
     expect(f(29)).toBe('Now')
     expect(f(-20)).toBe('Now')
   })
-  it('counts whole minutes down, never below 1', () => {
+  it('counts clock minutes down, never below 1', () => {
     expect(f(30)).toBe('1 min')
     expect(f(119)).toBe('1 min')
     expect(f(120)).toBe('2 min')
     expect(f(29 * 60 + 40)).toBe('29 min')
+  })
+  it('counts the clock minutes between now and the arrival, as the train panel does', () => {
+    // 54 s into a minute: 6 s later is the next clock minute, so 35 s away reads 1 min and 95 s reads 2.
+    expect(formatArrivalTimes([NOW + 35, NOW + 95], NOW)).toBe('1, 2 min')
+    expect(minutesAway(NOW + 330, NOW)).toBe('6')
+    expect(minutesAway(NOW + 450, NOW)).toBe('8')
   })
   it('joins several times with one unit', () => {
     expect(f(120, 400, 900)).toBe('2, 6, 15 min')
