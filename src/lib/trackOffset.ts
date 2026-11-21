@@ -66,7 +66,7 @@ export function offsetPolyline(points: readonly Ground[], offsetM: number): Grou
     const sumLen = Math.hypot(sx, sz)
     if (sumLen < 1e-6) {
       // An exact reversal has no bisector: put the tip on the miter cap along the incoming
-      // tangent (a.z, -a.x), as a near-reversal would be.
+      // tangent (a.z, -a.x), as a near-reversal turning away from the offset side would be.
       const len = offsetM * MITER_LIMIT
       return { x: p.x + a.z * len, z: p.z - a.x * len }
     }

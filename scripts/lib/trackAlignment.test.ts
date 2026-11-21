@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { decodeShapePoints } from '../../src/data/codec.ts'
-import type { ShapesFile } from '../../src/data/schema.ts'
+import type { ShapesFile, StationsFile, StopId, TripIndexFile } from '../../src/data/schema.ts'
 import type { StationInterior } from '../../src/data/stationSchema.ts'
 import { toGround, type Ground } from '../../src/lib/projection.ts'
 import { dropSpurs, trackLine } from '../../src/lib/trackLine.ts'
@@ -14,6 +14,11 @@ import { MITER_LIMIT, TRACK_OFFSETS } from '../../src/lib/trackOffset.ts'
 const readJson = (path: string): unknown => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
 const shapes = (readJson('../../public/data/shapes.json') as ShapesFile).shapes
 const l08 = readJson('../../public/data/stations/L08.json') as StationInterior
+const patterns = (readJson('../../public/data/trip-index.json') as TripIndexFile).patterns
+const stationOfStop = new Map<StopId, { id: string; pos: Ground }>()
+for (const st of (readJson('../../public/data/stations.json') as StationsFile).stations) {
+  for (const stop of st.stops) stationOfStop.set(stop, { id: st.id, pos: toGround(st) })
+}
 const D = TRACK_OFFSETS.a
 
 function nearestOnPolyline(p: Ground, line: readonly Ground[]): Ground {
@@ -102,12 +107,34 @@ describe('the track line of every shape', () => {
       for (let i = 0; i < out.length; i++) {
         const moved = dist(out[i]!, center[i]!)
         expect(Number.isFinite(moved), s.id).toBe(true)
+        expect(moved, `${s.id} vertex ${i}`).toBeGreaterThanOrEqual(D - 1e-6)
         expect(moved, `${s.id} vertex ${i}`).toBeLessThanOrEqual(MITER_LIMIT * D + 1e-6)
         if (i === 0) continue
         const dot =
           (out[i]!.x - out[i - 1]!.x) * (center[i]!.x - center[i - 1]!.x) +
           (out[i]!.z - out[i - 1]!.z) * (center[i]!.z - center[i - 1]!.z)
         expect(dot, `${s.id} segment ${i}`).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  // Guards dropSpurs against eating real track: a refresh with a sparsely sampled tight curve
+  // would pull the line off its stations or drop many vertices. Measured against the raw shape,
+  // because some station points already sit off it (Q05, 96 St, is 104 m past the Q shapes' end).
+  // Fall 2026: worst move R23 at 10.9 m (0.3 → 11.2 m), at most 6 vertices dropped (N..N20R/S20R).
+  it('stays near every station of its pattern and drops only a few vertices', () => {
+    for (const s of shapes) {
+      const raw = decodeShapePoints(s).map((p) => toGround(p))
+      const center = dropSpurs(raw)
+      expect(raw.length - center.length, s.id).toBeLessThanOrEqual(8)
+      const pattern = patterns[s.id]
+      if (!pattern) throw new Error(`No trip-index pattern for shape ${s.id}`)
+      for (const stop of pattern.stops) {
+        const station = stationOfStop.get(stop)
+        if (!station) throw new Error(`Shape ${s.id} calls at unknown stop ${stop}`)
+        const before = dist(station.pos, nearestOnPolyline(station.pos, raw))
+        const after = dist(station.pos, nearestOnPolyline(station.pos, center))
+        expect(after - before, `${s.id} at ${station.id}`).toBeLessThan(15)
       }
     }
   })

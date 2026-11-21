@@ -27,6 +27,8 @@ function distinctNeighbor(points: readonly Ground[], i: number, step: 1 | -1): n
 export function dropSpurs(points: readonly Ground[], minTurnDeg = 160): Ground[] {
   const out = [...points]
   const cosLimit = Math.cos((minTurnDeg * Math.PI) / 180)
+  // Whole passes until one removes nothing. Stepping back after each removal instead gives a
+  // different, asymmetric result (N..S20R lost 8 vertices against 6 for its reverse N..N20R).
   let removed = true
   while (removed) {
     removed = false
