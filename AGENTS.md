@@ -73,12 +73,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
-  TEMPORARY: `?approx=a|b|c` (dimmed, dashed, fine only; default b) until the 9wc.5 card is decided: how a
-  generated interior's strokes draw (authored ones never change). A mixes them toward the background by
-  `interiorApproxMix` (machines exempt); B dashes platform and slab outlines and the slabs' street guides in world
-  meters (`interiorApproxDash`, `interiorApproxGap`; tracks, stairs, machines and entrances stay solid), in the same
-  two layers: their materials turn dashed and per-segment `distances` (0, 0 = solid) say what to cut; C draws
-  everything at the fine width in one layer. The removal list is in `src/scene/approxLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   TEMPORARY: `?generated=1` shows generated station interiors until 9wc.5 labels them: without it, index entries
   with `provenance: 'generated'` count as not listed and `stations/depths-generated.json` is never fetched; with
@@ -114,11 +108,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
     veil blends, so a copy at weight 0 renders exactly like its veiled street car. Along those platforms the map
     track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
-  - `StationInterior.tsx` the focused station's interior (two line layers, both dashed for a generated interior under `?approx=b`; `InteriorVeil.tsx`, drei Html
+  - `StationInterior.tsx` the focused station's interior (two line layers; for a generated interior both materials are dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
-    drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides;
-    `approxLook.ts` TEMPORARY `?approx=` look of
-    generated interiors
+    drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,

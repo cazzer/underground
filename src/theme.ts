@@ -65,11 +65,7 @@ export interface Theme {
   interiorFineWidth: number
   /** 0..1: how far the deepest level's strokes mix toward the background (depth cue). */
   interiorDepthFade: number
-  /**
-   * TEMPORARY with ?approx= (src/scene/approxLook.ts). A: 0..1 mix of a generated interior's strokes toward the
-   * background, before the depth fade (machines exempt). B: dash and gap of its outlines and tracks, meters.
-   */
-  interiorApproxMix: number
+  /** Dash and gap of a generated interior's platform and slab outlines and slab guides, in world meters. */
   interiorApproxDash: number
   interiorApproxGap: number
 }
@@ -118,9 +114,8 @@ export const THEMES = {
     interiorLineWidth: 1.5,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,
-    interiorApproxMix: 0.4,
-    interiorApproxDash: 3,
-    interiorApproxGap: 2,
+    interiorApproxDash: 1.5,
+    interiorApproxGap: 0.75,
   },
 } as const satisfies Record<string, Theme>
 

@@ -26,7 +26,7 @@ export function routeLineBuffers(network: Network, paths: readonly ShapePath[], 
   })
 }
 
-/** Dash pattern in world meters (TEMPORARY with ?approx=b, see approxLook.ts). */
+/** Dash pattern in world meters (a generated interior's outlines). */
 export interface LineDash {
   size: number
   gap: number
