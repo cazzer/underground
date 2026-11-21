@@ -46,7 +46,15 @@ export function nextFocus(input: FocusInput): FocusState {
 
   const dismissed = dismissedId && (distance > EXIT_DISTANCE || dd > EXIT_RADIUS) ? null : dismissedId
   let focused = focusedId && (distance > EXIT_DISTANCE || fd > EXIT_RADIUS) ? null : focusedId
-  if (distance < ENTER_DISTANCE && nd < ENTER_RADIUS && nearest !== dismissed) focused = nearest
+  if (distance < ENTER_DISTANCE && nd < ENTER_RADIUS) {
+    if (nearest === dismissed) {
+      // Centered on a station the user closed: don't leave a neighbour's panel up either.
+      focused = null
+    } else if (focused === null || fd > ENTER_RADIUS) {
+      // Switch only once the current station is clearly behind, so neighbours don't flip-flop.
+      focused = nearest
+    }
+  }
 
   if (focused === focusedId && dismissed === dismissedId) return input
   return { focusedId: focused, dismissedId: dismissed }

@@ -78,6 +78,22 @@ describe('nextFocus', () => {
     expect(run(dismissed('A'), 200, 250, 0, [A, E]).next).toEqual({ focusedId: 'E', dismissedId: 'A' })
   })
 
+  it('does not hand focus to a neighbour while centered on the dismissed station', () => {
+    const stations = [A, station('B', 250, 0)]
+    const toB = run(dismissed('A'), 200, 130, 0, stations).next
+    expect(toB).toEqual({ focusedId: 'B', dismissedId: 'A' })
+    expect(run(toB, 200, 0, 0, stations).next).toEqual(dismissed('A'))
+  })
+
+  it('switches stations only once the focused one is past the enter radius', () => {
+    const stations = [A, station('B', 200, 0)]
+    for (const x of [100, 110]) {
+      const { input, next } = run(focused('A'), 200, x, 0, stations)
+      expect(next).toBe(input)
+    }
+    expect(run(focused('A'), 200, 150, 0, stations).next).toEqual(focused('B'))
+  })
+
   it('does nothing without stations', () => {
     const { input, next } = run(NONE, 100, 0, 0, [])
     expect(next).toBe(input)
