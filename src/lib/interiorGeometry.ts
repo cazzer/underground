@@ -35,24 +35,47 @@ export interface InteriorBufferOptions {
    */
   guides: boolean
   /**
-   * TEMPORARY (approxLook.ts, look B): mark platform and slab outlines, the slab guides and their street-level copy
+   * Generated interiors: mark platform and slab outlines, the slab guides and their street-level copy
    * as dashed in `distances` (tracks stay solid). Positions and colors are the same either way.
    */
   dashStructure?: boolean
+  /**
+   * Index into `interior.levels` of the level the lifted platform trains ride (`trainLevelIndex`). Levels above it
+   * (lower indices) and connectors reaching above it go to the `over` layers, drawn after the trains; this level and
+   * the ones below stay in the base layers. Undefined puts everything in the base layers.
+   */
+  splitLevel?: number
   /** Linear RGB for a role on the level at `levelIndex`, an index into `interior.levels` (highest first, so the
    *  street is 0 below ground and the last level at an elevated station). */
   colorOf: (role: InteriorRole, levelIndex: number) => Rgb
 }
 
+/** The base strong and fine layers, and the `over` pair drawn above the lifted platform trains. */
+export interface InteriorLayers {
+  strong: Buffers
+  fine: Buffers
+  overStrong: Buffers
+  overFine: Buffers
+}
+
 /**
- * Two merged layers for one station interior, emitted from the deepest level up to the street.
- * Interior layers draw with depthTest off, so buffer order is the overlap rule: upper levels
- * paint over lower ones.
+ * Index of the deepest level with a platform track (levels run highest first, so the last such index): where the
+ * deepest lifted platform trains ride. Undefined when no platform has a track.
  */
-export function buildInteriorBuffers(
-  interior: StationInterior,
-  opts: InteriorBufferOptions,
-): { strong: Buffers; fine: Buffers } {
+export function trainLevelIndex(interior: StationInterior): number | undefined {
+  let deepest: number | undefined
+  interior.levels.forEach((level, i) => {
+    if (interior.platforms.some((p) => p.level === level.id && p.tracks.length > 0)) deepest = i
+  })
+  return deepest
+}
+
+/**
+ * Merged layers for one station interior, emitted from the deepest level up to the street.
+ * Interior layers draw with depthTest off, so buffer order is the overlap rule: upper levels
+ * paint over lower ones. With `splitLevel`, the levels above it go to the `over` pair instead (see the option).
+ */
+export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBufferOptions): InteriorLayers {
   const { yScale, colorOf } = opts
   const levelIndex = new Map(interior.levels.map((l, i) => [l.id, i]))
   const indexOf = (levelId: string, elementId: string): number => {
@@ -62,16 +85,16 @@ export function buildInteriorBuffers(
   }
   const realY = (i: number) => interior.levels[i]!.y
   const streetIndex = interior.levels.findIndex((l) => l.kind === 'street')
-  const strong = new SegmentWriter()
-  const fine = new SegmentWriter()
+  const base = { strong: new SegmentWriter(), fine: new SegmentWriter() }
+  const over = opts.splitLevel === undefined ? base : { strong: new SegmentWriter(), fine: new SegmentWriter() }
+  // A level, or a connector by its upper end, above the split draws over the trains.
+  const isOver = (i: number) => opts.splitLevel !== undefined && i < opts.splitLevel
   const dash = opts.dashStructure === true
 
   // Also throws for an interior with nothing to draw, so it becomes an error load.
   const bounds = interiorBounds(interior)
   const anchors = spreadBanks(interior.connectors, interior.entrances)
-  const ctx: ConnectorContext = {
-    strong,
-    fine,
+  const shared: Omit<ConnectorContext, 'strong' | 'fine'> = {
     realY,
     streetIndex,
     yScale,
@@ -81,12 +104,16 @@ export function buildInteriorBuffers(
     center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
     anchorOf: (id) => anchors.get(id),
   }
+  const baseCtx: ConnectorContext = { ...shared, ...base }
+  const overCtx: ConnectorContext = { ...shared, ...over }
+  const ctxOf = (i: number) => (isOver(i) ? overCtx : baseCtx)
 
   for (let li = interior.levels.length - 1; li >= 0; li--) {
     const level = interior.levels[li]!
     const y = level.y * yScale
     const platforms = interior.platforms.filter((p) => indexOf(p.level, p.id) === li)
     const slabs = interior.slabs.filter((s) => indexOf(s.level, s.id) === li)
+    const { strong, fine } = isOver(li) ? over : base
 
     for (const p of platforms) {
       strong.loop(p.outline, y, colorOf('outline', li), dash)
@@ -102,12 +129,13 @@ export function buildInteriorBuffers(
       const upper = indexOf(c.upper.level, c.id)
       if (c.kind === 'elevator') {
         // The shaft spans every level in between; it stops only at its two ends, each written in
-        // that level's pass so the levels above still paint over it.
-        if (lower === li) drawElevatorShaft(ctx, c, lower, upper)
-        if (lower === li || upper === li) drawElevatorStop(ctx, c, li)
+        // that level's pass so the levels above still paint over it. A shaft reaching above the split draws over the
+        // trains whole, like a stair or escalator from the platform up.
+        if (lower === li) drawElevatorShaft(ctxOf(upper), c, lower, upper)
+        if (lower === li || upper === li) drawElevatorStop(ctxOf(li), c, li)
       } else if (lower === li) {
-        if (c.kind === 'escalator') drawEscalator(ctx, c, lower, upper)
-        else drawRamp(ctx, c, lower, upper)
+        if (c.kind === 'escalator') drawEscalator(ctxOf(upper), c, lower, upper)
+        else drawRamp(ctxOf(upper), c, lower, upper)
       }
     }
 
@@ -134,5 +162,10 @@ export function buildInteriorBuffers(
     }
   }
 
-  return { strong: strong.build(), fine: fine.build() }
+  const built = { strong: base.strong.build(), fine: base.fine.build() }
+  if (over === base) {
+    const empty = new SegmentWriter().build()
+    return { ...built, overStrong: empty, overFine: empty }
+  }
+  return { ...built, overStrong: over.strong.build(), overFine: over.fine.build() }
 }
