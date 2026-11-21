@@ -26,13 +26,25 @@ export interface ConnectorContext {
   axis: LocalPoint
   /** Plan center of the interior: elevator doors face it, zero-run escalators descend toward it. */
   center: LocalPoint
-  /** Street entrance that lists a connector, if any. */
-  entranceOf: (connectorId: string) => LocalPoint | undefined
+  /** Where a zero-run escalator's run sits (`spreadBanks`); undefined for every other connector. */
+  anchorOf: (connectorId: string) => RunAnchor | undefined
   machines: MachineStyle
 }
 
+/**
+ * Where an escalator with no plan run of its own is laid. `point` is shared by its whole bank;
+ * `lateral` (meters) moves it across the station axis, toward the axis turned 90 degrees clockwise
+ * in plan (south for an east axis).
+ */
+export interface RunAnchor {
+  point: LocalPoint
+  /** The run's street (upper) end sits on `point`; otherwise the run is centered on it. */
+  atEntrance: boolean
+  lateral: number
+}
+
 /** Below this plan run (meters) a connector has no direction to draw along. */
-const MIN_RUN = 0.01
+export const MIN_RUN = 0.01
 /** Plan run per meter of rise for an escalator with no run of its own: a 30 degree incline. */
 const ESCALATOR_RUN_PER_RISE = Math.sqrt(3)
 /** Handrails: lateral position as a fraction of the half-width, and real (unexaggerated) height above the steps. */
@@ -52,26 +64,29 @@ const CAB_INSET = 0.25
 
 /**
  * Plan ends of an inclined connector. An escalator from the equipment inventory has one point for
- * both ends; it gets a 30 degree run along `axis`. When a street entrance lists it, its upper end
- * sits at that entrance; otherwise the run is centered on its point. Either way it descends toward
- * `center`. Any other connector without a run is a data error.
+ * both ends; it gets a 30 degree run along `axis`, placed by `anchor` (by default centered on its
+ * own point), descending toward `center`. Any other connector without a run is a data error.
  */
 export function inclineEnds(
   c: Connector,
   riseM: number,
   axis: LocalPoint,
   center: LocalPoint,
-  entrance?: LocalPoint,
+  anchor?: RunAnchor,
 ): { lower: LocalPoint; upper: LocalPoint } {
   const run = Math.hypot(c.upper.x - c.lower.x, c.upper.z - c.lower.z)
   if (run >= MIN_RUN) return { lower: [c.lower.x, c.lower.z], upper: [c.upper.x, c.upper.z] }
   if (c.kind !== 'escalator') throw new Error(`Connector "${c.id}" has no horizontal run`)
   const length = riseM * ESCALATOR_RUN_PER_RISE
-  const ref: LocalPoint = entrance ?? [c.lower.x, c.lower.z]
+  const { point: ref, atEntrance, lateral } = anchor ?? { point: [c.lower.x, c.lower.z], atEntrance: false, lateral: 0 }
   // +1 when the reference point lies along +axis from the center: the lower end then goes toward -axis.
+  // Taken from the shared point, so every escalator of a bank runs the same way.
   const s = (ref[0] - center[0]) * axis[0] + (ref[1] - center[1]) * axis[1] < 0 ? -1 : 1
-  const at = (t: number): LocalPoint => [ref[0] + s * axis[0] * t, ref[1] + s * axis[1] * t]
-  return entrance ? { lower: at(-length), upper: ref } : { lower: at(-length / 2), upper: at(length / 2) }
+  const at = (t: number): LocalPoint => [
+    ref[0] + s * axis[0] * t - axis[1] * lateral,
+    ref[1] + s * axis[1] * t + axis[0] * lateral,
+  ]
+  return atEntrance ? { lower: at(-length), upper: at(0) } : { lower: at(-length / 2), upper: at(length / 2) }
 }
 
 interface Incline {
@@ -85,7 +100,7 @@ interface Incline {
 
 function incline(ctx: ConnectorContext, c: Connector, li: number, ui: number): Incline {
   const rise = ctx.realY(ui) - ctx.realY(li)
-  const { lower, upper } = inclineEnds(c, rise, ctx.axis, ctx.center, ctx.entranceOf(c.id))
+  const { lower, upper } = inclineEnds(c, rise, ctx.axis, ctx.center, ctx.anchorOf(c.id))
   const dx = upper[0] - lower[0]
   const dz = upper[1] - lower[1]
   const run = Math.hypot(dx, dz)

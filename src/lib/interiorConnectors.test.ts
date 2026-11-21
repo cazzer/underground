@@ -179,12 +179,37 @@ describe('escalators', () => {
     expect(westUp).toBeCloseTo(-10 - half)
   })
 
+  /** The fixture with entrance E1 (at x 9, z 10) listing these connector ids. */
+  const listedBy = (connectors: Connector[], ids: string[]) => {
+    const i = fixture(connectors)
+    return { ...i, entrances: [{ ...i.entrances[0]!, connectors: ids }] }
+  }
+
   it('pins a zero-run escalator at the street entrance that lists it, running toward the center', () => {
-    const i = fixture([zeroRunAt(10)])
-    const listed = { ...i, entrances: [{ ...i.entrances[0]!, connectors: ['ES1'] }] }
-    const [lower, upper] = ends(listed)
+    const [lower, upper] = ends(listedBy([zeroRunAt(9)], ['ES1']))
     expect(upper).toBeCloseTo(9)
     expect(lower).toBeCloseTo(9 - 4 * Math.sqrt(3))
+  })
+
+  it('keeps an authored `at` off the entrance: the run is centered on its own point', () => {
+    const half = (4 * Math.sqrt(3)) / 2
+    const [lower, upper] = ends(listedBy([zeroRunAt(-10)], ['ES1']))
+    expect(lower).toBeCloseTo(-10 + half)
+    expect(upper).toBeCloseTo(-10 - half)
+  })
+
+  it('draws a two-escalator bank at one entrance as two parallel bands, 0.3 m apart', () => {
+    const second = { ...zeroRunAt(9), id: 'ES2' }
+    const i = listedBy([{ ...second, travel: undefined }, { ...zeroRunAt(9), travel: undefined }], ['ES1', 'ES2'])
+    const { strong } = buildInteriorBuffers(i, opts({ guides: false, machines: B }))
+    const sides = withRole(strong, 'escalator').map((k) => seg(strong, k)).filter((s) => s[1] !== s[4])
+    expect(sides).toHaveLength(4)
+    for (const s of sides) {
+      expect(s[2]).toBeCloseTo(s[5]!)
+      expect([s[0], s[3]].sort((a, b) => a! - b!)[1]).toBeCloseTo(9)
+    }
+    const zs = sides.map((s) => s[2]!).sort((a, b) => a - b)
+    expect(zs).toEqual([7.85, 9.85, 10.15, 12.15].map((z) => expect.closeTo(z)))
   })
 
   it('look B: band and chevrons, nothing fine; look C: band, centerline and one arrow head', () => {
