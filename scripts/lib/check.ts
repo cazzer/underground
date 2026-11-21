@@ -38,3 +38,14 @@ export function record(v: unknown, path: string): Record<string, unknown> {
   }
   return v as Record<string, unknown>
 }
+
+export function bool(v: unknown, path: string): boolean {
+  if (typeof v !== 'boolean') throw new Error(`${path}: expected true or false, got ${JSON.stringify(v)}`)
+  return v
+}
+
+/** Throws on any key of `obj` that is not in `allowed`. */
+export function onlyKeys(obj: Record<string, unknown>, allowed: readonly string[], path: string): void {
+  const extra = Object.keys(obj).filter((k) => !allowed.includes(k))
+  if (extra.length > 0) throw new Error(`${path}: unknown key ${extra.map((k) => JSON.stringify(k)).join(', ')} (allowed: ${allowed.join(', ')})`)
+}

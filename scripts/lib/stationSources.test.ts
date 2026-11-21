@@ -62,6 +62,10 @@ describe('trimOverpassWays', () => {
       ways: [{ id: 7, version: 4, timestamp: '2025-05-01T00:00:00Z', tags: { level: '-2', name: 'Bedford Av', railway: 'platform' }, ring: [[1, 2], [1, 3], [2, 3], [1, 2]] }],
     })
   })
+  it('throws for a ring whose last point differs from its first', () => {
+    const open = { ...way, geometry: way.geometry.slice(0, 3) }
+    expect(() => trimOverpassWays(response([open]), [7])).toThrow(/expected a closed ring/)
+  })
   it('throws for a missing way or a way without geometry', () => {
     expect(() => trimOverpassWays(response([way]), [8])).toThrow(/way 8/)
     expect(() => trimOverpassWays(response([{ ...way, geometry: undefined }]), [7])).toThrow(/way 7.*geometry/)
@@ -84,7 +88,14 @@ describe('parseServing', () => {
     ['platform to mezzanine for 94 St & 2nd Ave exit', 'platform', 'mezzanine'],
     ['95 St & 2nd Ave entrance (SW corner) to mezzanine for downtown service', 'street', 'mezzanine'],
   ])('%s', (text, from, to) => {
-    expect(parseServing(text)).toEqual({ from, to })
+    expect(parseServing(text)).toMatchObject({ from, to })
+  })
+  it('flags "both directions"', () => {
+    expect(parseServing('mezzanine to platform for service in both directions').bothDirections).toBe(true)
+    expect(parseServing('platform to mezzanine for 94 St & 2nd Ave exit').bothDirections).toBe(false)
+  })
+  it('throws on more than one " to " (multi-landing machines)', () => {
+    expect(() => parseServing('street to mezzanine to platform')).toThrow(/more than one " to "/)
   })
   it('throws without a separator', () => {
     expect(() => parseServing('elevator')).toThrow(/no " to "/)

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { toStableJson } from './stableJson.ts'
 import { fixture, ll } from './stationFixture.ts'
-import { buildStationInterior, ELEVATOR_WIDTH_M, ESCALATOR_WIDTH_M } from './stationMerge.ts'
+import { ELEVATOR_WIDTH_M, ESCALATOR_WIDTH_M } from './stationEquipment.ts'
+import { buildStationInterior } from './stationMerge.ts'
 
 const build = (mutate: (f: ReturnType<typeof fixture>) => void = () => {}) => {
   const f = fixture()
@@ -88,9 +89,13 @@ describe('entrance links', () => {
     })).toThrow(/is a Elevator but connector st-street is a stair/)
     const out = build((f) => {
       f.sources.entrances.rows[0]!.type = 'Stair/Escalator'
+      f.sources.equipment.rows[2]!.serving = 'Main St (NE corner) to mezzanine for downtown service'
       f.authored.equipment = [{ code: 'EL1', entrance: 'elev-ent' }, { code: 'EL2', at: [-26, 0] }, { code: 'ES1', entrance: 'stair-ent', at: [-15, 1] }]
     })
     expect(out.entrances.find((e) => e.id === 'stair-ent')!.connectors).toEqual(['ES1', 'st-street'])
+  })
+  it('rejects an entrance override on a machine that does not reach the street', () => {
+    expect(() => build((f) => { f.authored.equipment.push({ code: 'ES1', entrance: 'stair-ent', at: [-15, 1] }) })).toThrow(/ES1 does not reach the street/)
   })
 })
 
@@ -115,10 +120,12 @@ describe('equipment', () => {
     expect(connector(raw, 'EL2').lower.x).toBeCloseTo(-24, 1)
     expect(connector(raw, 'EL2').lower.z).toBeCloseTo(2, 1)
   })
-  it('sets escalator travel from the serving direction', () => {
+  it('sets escalator travel from a one-way serving text and omits it for "both directions"', () => {
     expect(connector(build(), 'ES1').travel).toBe('up')
-    const down = build((f) => { f.sources.equipment.rows[2]!.serving = 'mezzanine to platform for Main St exit' })
+    const serve = (text: string) => build((f) => { f.sources.equipment.rows[2]!.serving = text })
+    const down = serve('mezzanine to platform for Main St exit')
     expect(connector(down, 'ES1')).toMatchObject({ travel: 'down', lower: { level: 'platform' }, upper: { level: 'mezz' } })
+    expect(connector(serve('platform to mezzanine for service in both directions'), 'ES1')).not.toHaveProperty('travel')
   })
   it('applies default widths and honors an override', () => {
     const out = build((f) => { f.authored.equipment[1]!.width = 1.8 })
@@ -143,6 +150,28 @@ describe('equipment', () => {
     expect(connector(out, 'EL1').lower.level).toBe('mezz2')
     expect(connector(out, 'ES1').upper.level).toBe('mezz2')
   })
+  it('takes the ends straight from a levels override, so a machine can join two mezzanine-kind levels', () => {
+    const out = build((f) => {
+      f.authored.levels.push({ id: 'mezz2', name: 'Upper mezzanine', kind: 'mezzanine', y: -2 })
+      f.authored.slabs.push({ id: 'slab2', level: 'mezz2', name: 'Upper', outline: [[-40, -20], [-10, -20], [-10, 10], [-40, 10]] })
+      f.sources.equipment.rows.push({ code: 'ES2', kind: 'escalator', lat: ll(-20, 0)[0], lon: ll(-20, 0)[1], serving: 'mezzanine to mezzanine for transfer' })
+      f.authored.equipment = [
+        { code: 'EL1', entrance: 'elev-ent', levels: { lower: 'mezz', upper: 'street' } },
+        { code: 'EL2', at: [-26, 0], levels: { lower: 'platform', upper: 'mezz' } },
+        { code: 'ES1', levels: { lower: 'platform', upper: 'mezz' } },
+        { code: 'ES2', levels: { lower: 'mezz2', upper: 'mezz' } },
+      ]
+    })
+    expect(connector(out, 'ES2')).toMatchObject({ lower: { level: 'mezz' }, upper: { level: 'mezz2' } })
+    expect(connector(out, 'ES2')).not.toHaveProperty('travel')
+  })
+  it('names an unknown level id, an unknown key, and a duplicate override', () => {
+    const withOverride = (o: object) => () => build((f) => { f.authored.equipment.push(o as never) })
+    expect(() => build((f) => { f.authored.equipment[1] = { code: 'EL2', at: [-26, 0], levels: { lower: 'platform', upper: 'attic' } } })).toThrow(/levels\.upper: unknown level "attic"/)
+    expect(() => build((f) => { f.authored.equipment[1] = { code: 'EL2', at: [-26, 0], widht: 2 } as never })).toThrow(/equipment\[1\]: unknown key "widht"/)
+    expect(withOverride({ code: 'EL2', at: [-26, 0] })).toThrow(/duplicate override for EL2/)
+    expect(withOverride({ code: '' })).toThrow(/equipment\[2\]\.code/)
+  })
   it('throws for an override with no E&E row', () => {
     expect(() => build((f) => { f.authored.equipment.push({ code: 'EL9' }) })).toThrow(/no E&E row for "EL9"/)
   })
@@ -155,6 +184,14 @@ describe('containment', () => {
   it('accepts 0.3 m outside, and never checks street endpoints', () => {
     expect(() => build((f) => { f.authored.equipment[1] = { code: 'EL2', at: [-30.3, 0] } })).not.toThrow()
     expect(connector(build(), 'EL1').upper.level).toBe('street')
+  })
+})
+
+describe('pinned source rows', () => {
+  it('are validated at the merge boundary', () => {
+    expect(() => build((f) => { (f.sources.entrances.rows[0] as { entry: unknown }).entry = 'YES' })).toThrow(/entrances\.rows\[0\]\.entry/)
+    expect(() => build((f) => { f.sources.entrances.rows[0]!.type = '' })).toThrow(/entrances\.rows\[0\]\.type/)
+    expect(() => build((f) => { (f.sources.equipment.rows[0] as { kind: unknown }).kind = 'lift' })).toThrow(/equipment\.rows\[0\]\.kind/)
   })
 })
 

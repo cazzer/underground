@@ -2,17 +2,15 @@
  *  StationInterior contract. Hand-edited input is read through the path-labelled checkers, so a bad
  *  field fails with its JSON path. No IO. */
 import type {
-  Connector, Endpoint, Entrance, FareLine, InteriorSource, Level, LocalPoint, Platform, Slab, StationInterior,
+  Connector, Endpoint, Entrance, FareLine, Level, LocalPoint, Platform, Slab, StationInterior,
 } from '../../src/data/stationSchema.ts'
-import { finite, list, oneOf, pair, record, text } from './check.ts'
-import type { AuthoredStation, EquipmentRow, StationSources } from './stationInputs.ts'
+import { bool, finite, list, oneOf, pair, record, text } from './check.ts'
+import type { Ctx } from './stationCtx.ts'
+import { entranceOf, levelOf, srcs } from './stationCtx.ts'
+import { buildMachines } from './stationEquipment.ts'
 import { distanceToRing, makeFrame, openRing } from './stationGeometry.ts'
-import type { Frame } from './stationGeometry.ts'
-import { parseServing } from './stationSources.ts'
+import type { AuthoredStation, StationSources } from './stationInputs.ts'
 
-/** Estimates: the E&E inventory has no shaft or escalator width. Override per machine. */
-export const ELEVATOR_WIDTH_M = 2
-export const ESCALATOR_WIDTH_M = 1.2
 const ROW_TOLERANCE_DEG = 1e-6
 const CONTAINMENT_M = 0.5
 const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
@@ -20,20 +18,7 @@ const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
   nyopendata: 'Metropolitan Transportation Authority, data.ny.gov',
 }
 
-interface Ctx {
-  frame: Frame
-  levels: Map<string, Level>
-  street: Level
-}
-
 const byId = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
-const srcs = (...s: InteriorSource[]): InteriorSource[] => [...new Set(s)].sort()
-
-function levelOf(ctx: Ctx, id: unknown, path: string): Level {
-  const level = ctx.levels.get(text(id, path))
-  if (!level) throw new Error(`${path}: unknown level ${JSON.stringify(id)}`)
-  return level
-}
 
 function points(ctx: Ctx, v: unknown, path: string, min: number): LocalPoint[] {
   const out = list(v, path).map((p, i) => ctx.frame.fromUV(pair(p, `${path}[${i}]`)))
@@ -121,22 +106,20 @@ function buildEntrances(authored: AuthoredStation, sources: StationSources, ctx:
     )
     if (hits.length !== 1) throw new Error(`${at} (${id}): ${lat},${lon} matches ${hits.length} Open Data rows, expected 1`)
     const row = rows[hits[0]!]!
+    const rowAt = `sources.entrances.rows[${hits[0]}]`
     const owner = claimed.get(hits[0]!)
     if (owner !== undefined) throw new Error(`${at} (${id}): row ${lat},${lon} is already claimed by entrance ${owner}`)
     claimed.set(hits[0]!, id)
     if (out.has(id)) throw new Error(`${at}.id: duplicate entrance id ${id}`)
-    const [x, z] = ctx.frame.fromLatLon(finite(row.lat, `${at} row.lat`), finite(row.lon, `${at} row.lon`))
-    out.set(id, { id, x, z, type: row.type, entry: row.entry, exit: row.exit, connectors: [], sources: ['nyopendata'] })
+    const [x, z] = ctx.frame.fromLatLon(finite(row.lat, `${rowAt}.lat`), finite(row.lon, `${rowAt}.lon`))
+    out.set(id, {
+      id, x, z, type: text(row.type, `${rowAt}.type`), entry: bool(row.entry, `${rowAt}.entry`), exit: bool(row.exit, `${rowAt}.exit`),
+      connectors: [], sources: ['nyopendata'],
+    })
   })
   const missing = rows.filter((_, k) => !claimed.has(k)).map((row) => `${row.lat},${row.lon} (${row.type})`)
   if (missing.length > 0) throw new Error(`Open Data entrance rows not mapped in the authored file: ${missing.join('; ')}. Add them to entrances.`)
   return out
-}
-
-function entranceOf(entrances: Map<string, Entrance>, id: unknown, path: string): Entrance {
-  const e = entrances.get(text(id, path))
-  if (!e) throw new Error(`${path}: unknown entrance ${JSON.stringify(id)}`)
-  return e
 }
 
 function buildStairs(authored: AuthoredStation, ctx: Ctx, entrances: Map<string, Entrance>): Connector[] {
@@ -169,48 +152,6 @@ function buildStairs(authored: AuthoredStation, ctx: Ctx, entrances: Map<string,
       upper: upper.end,
       width,
       sources: srcs('authored', ...(upper.viaEntrance ? (['nyopendata'] as const) : [])),
-    }
-  })
-}
-
-/** One connector per E&E row; the level pair comes from the serving text. */
-function buildMachines(authored: AuthoredStation, sources: StationSources, ctx: Ctx, entrances: Map<string, Entrance>): Connector[] {
-  const rows = sources.equipment.rows
-  const overrides = list(authored.equipment, 'equipment').map((o, i) => ({ at: `equipment[${i}]`, o: record(o, `equipment[${i}]`) }))
-  for (const { at, o } of overrides) {
-    if (!rows.some((row) => row.code === o.code)) throw new Error(`${at}.code: no E&E row for ${JSON.stringify(o.code)}`)
-  }
-  return rows.map((row: EquipmentRow): Connector => {
-    const ov = overrides.find(({ o }) => o.code === row.code)
-    const at = ov?.at ?? `equipment ${row.code}`
-    const o = ov?.o ?? {}
-    const levelIds = o.levels === undefined ? undefined : record(o.levels, `${at}.levels`)
-    const pick = (kind: Level['kind']): Level => {
-      const found = [...ctx.levels.values()].filter(
-        (l) => l.kind === kind && (!levelIds || l.id === levelIds.lower || l.id === levelIds.upper),
-      )
-      if (found.length !== 1) throw new Error(`${at}: ${row.serving} -> ${found.length} ${kind} levels; add "levels" to the override`)
-      return found[0]!
-    }
-    const serving = parseServing(row.serving)
-    const from = pick(serving.from)
-    const to = pick(serving.to)
-    if (from.y === to.y) throw new Error(`${at}: ${row.serving} joins two levels at the same elevation`)
-    const [lowerLevel, upperLevel] = from.y < to.y ? [from, to] : [to, from]
-    const entrance = o.entrance === undefined ? undefined : entranceOf(entrances, o.entrance, `${at}.entrance`)
-    const [x, z] = o.at !== undefined ? ctx.frame.fromUV(pair(o.at, `${at}.at`)) : entrance ? [entrance.x, entrance.z] : ctx.frame.fromLatLon(row.lat, row.lon)
-    entrance?.connectors.push(row.code)
-    const width = o.width === undefined ? (row.kind === 'elevator' ? ELEVATOR_WIDTH_M : ESCALATOR_WIDTH_M) : finite(o.width, `${at}.width`)
-    if (width <= 0) throw new Error(`${at}.width: must be > 0, got ${width}`)
-    return {
-      id: row.code,
-      kind: row.kind,
-      // The inventory gives one point per machine, so both ends share x/z.
-      lower: { x, z, level: lowerLevel.id },
-      upper: { x, z, level: upperLevel.id },
-      width,
-      ...(row.kind === 'escalator' ? { travel: from.y > to.y ? ('down' as const) : ('up' as const) } : {}),
-      sources: srcs('nyopendata', ...(o.at !== undefined ? (['authored'] as const) : [])),
     }
   })
 }

@@ -77,7 +77,7 @@ export interface Connector {
   upper: Endpoint
   /** Meters across the direction of travel; elevators: shaft side length. */
   width: number
-  /** Escalators only, when the source states a direction. */
+  /** Escalators only, when the serving text names one direction of travel; omitted for "both directions". */
   travel?: 'up' | 'down'
   sources: InteriorSource[]
 }

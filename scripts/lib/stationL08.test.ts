@@ -22,10 +22,12 @@ describe('committed L08 interior', () => {
   it('is fresh: the merge of the committed inputs reproduces public/data/stations/L08.json byte for byte', () => {
     expect(toStableJson(buildStationInterior(authored, sources), 2)).toBe(committed)
   })
-  it('has street > mezzanine > platform at plausible depths', () => {
+  it('has street > mezzanine > platform, with the platform 5-20 m below the street', () => {
     expect(out.levels.map((l) => l.id)).toEqual(['street', 'mezzanine', 'platform'])
     expect(yOf('street')).toBe(0)
     expect(yOf('platform')).toBeLessThan(yOf('mezzanine'))
+    expect(yOf('platform')).toBeLessThan(-5)
+    expect(yOf('platform')).toBeGreaterThan(-20)
   })
   it('has one island platform with L08N and L08S 3-7 m from its long axis, on opposite sides', () => {
     expect(out.platforms).toHaveLength(1)

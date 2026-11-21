@@ -16,6 +16,7 @@ const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
 const SODA = 'https://data.ny.gov'
 const HEADERS = { 'User-Agent': 'underground-data-build/1.0', Accept: 'application/json' }
 const TIMEOUT_MS = 90_000
+const ROW_LIMIT = 1000
 
 async function getJson(url: string, init: RequestInit = {}): Promise<unknown> {
   const res = await fetch(url, { ...init, headers: { ...HEADERS, ...init.headers }, signal: AbortSignal.timeout(TIMEOUT_MS) })
@@ -29,7 +30,12 @@ async function rowsUpdatedAt(dataset: string): Promise<string> {
 }
 
 function sodaUrl(dataset: string, filter: Record<string, string>): string {
-  return `${SODA}/resource/${dataset}.json?${new URLSearchParams({ ...filter, $limit: '1000' })}`
+  return `${SODA}/resource/${dataset}.json?${new URLSearchParams({ ...filter, $limit: String(ROW_LIMIT) })}`
+}
+
+/** A full page may have been cut off at the limit; refuse rather than pin a partial extract. */
+function assertNotTruncated(rows: unknown, dataset: string): void {
+  if (Array.isArray(rows) && rows.length >= ROW_LIMIT) throw new Error(`${dataset}: got ${rows.length} rows, the $limit; the extract may be truncated`)
 }
 
 async function main(): Promise<void> {
@@ -48,6 +54,8 @@ async function main(): Promise<void> {
   const equipmentUrl = sodaUrl('94fv-bak7', { station_mrn: wanted.equipmentStationMrn })
   const entranceRows = await getJson(entrancesUrl)
   const equipmentRows = await getJson(equipmentUrl)
+  assertNotTruncated(entranceRows, 'i9wp-a4ja')
+  assertNotTruncated(equipmentRows, '94fv-bak7')
 
   const osm = trimOverpassWays(overpass, wanted.osmWays)
   const sources: StationSources = {

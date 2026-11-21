@@ -32,7 +32,10 @@ export function trimOverpassWays(json: unknown, ids: number[]): { baseTimestamp:
       const pt = record(p, `${at}.geometry[${i}]`)
       return [finite(pt.lat, `${at}.geometry[${i}].lat`), finite(pt.lon, `${at}.geometry[${i}].lon`)]
     })
-    if (ring.length < 4) throw new Error(`${at}: expected a closed ring, got ${ring.length} points`)
+    const [first, last] = [ring[0], ring[ring.length - 1]]
+    if (ring.length < 4 || !first || !last || first[0] !== last[0] || first[1] !== last[1]) {
+      throw new Error(`${at}: expected a closed ring (first point equal to last, at least 4 points), got ${ring.length} points`)
+    }
     const tags = record(el.tags ?? {}, `${at}.tags`)
     return {
       id,
@@ -87,9 +90,18 @@ function sideKind(side: string): LevelKind {
   return 'street'
 }
 
-/** Splits an E&E serving text on its first " to " and classifies each side by keyword. */
-export function parseServing(serving: string): { from: LevelKind; to: LevelKind } {
-  const at = serving.search(/ to /i)
-  if (at < 0) throw new Error(`serving text has no " to ": ${JSON.stringify(serving)}`)
-  return { from: sideKind(serving.slice(0, at)), to: sideKind(serving.slice(at + 4)) }
+export interface Serving {
+  from: LevelKind
+  to: LevelKind
+  /** The text says "both directions", so there is no single direction of travel. */
+  bothDirections: boolean
+}
+
+/** Splits an E&E serving text on its only " to " and classifies each side by keyword.
+ *  Machines with more than two landings are not supported. */
+export function parseServing(serving: string): Serving {
+  const parts = serving.split(/ to /i)
+  if (parts.length < 2) throw new Error(`serving text has no " to ": ${JSON.stringify(serving)}`)
+  if (parts.length > 2) throw new Error(`serving text has more than one " to " (multi-landing machines are unsupported): ${JSON.stringify(serving)}`)
+  return { from: sideKind(parts[0]!), to: sideKind(parts[1]!), bothDirections: /both directions/i.test(serving) }
 }
