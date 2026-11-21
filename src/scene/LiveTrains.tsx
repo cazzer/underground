@@ -8,6 +8,7 @@ import { trackY } from '../lib/live/consistLayout'
 import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import { trainRouteId } from '../lib/live/trainRoute'
+import { interiorOpacity } from '../lib/interiorReveal'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
 import { hopDistance } from '../lib/realtime/position'
@@ -17,8 +18,10 @@ import { useTrainSelection } from '../lib/trainSelection'
 import { theme } from '../theme'
 import { cameraDistance, getControls, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
+import { SpanCars } from './SpanCars'
 import { TrainCars } from './TrainCars'
 import { trainRadiusPx } from './trainSize'
+import { useSpanCars } from './useSpanCars'
 import { useTrainCars } from './useTrainCars'
 
 const DOT_MIN_METERS = 2.5
@@ -36,6 +39,8 @@ interface LiveTrainsProps extends LiveLayer {
   network: Network
   /** Filled while mounted, so a click can be tested against the trains as drawn. */
   trainPick: RefObject<TrainPickSource | null>
+  /** The station whose interior is loaded (null for none): its platform trains draw above the veil as it reveals. */
+  interiorStationId: string | null
 }
 
 /**
@@ -44,7 +49,7 @@ interface LiveTrainsProps extends LiveLayer {
  * poll's hop plan at the live clock and writes matrices without allocating. Zoomed in, each dot
  * unfolds into its train's cars (carMix): the dot shrinks by 1 - mix as the train lengthens by mix.
  */
-export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: LiveTrainsProps) {
+export function LiveTrains({ trips, offsetS, patterns, network, trainPick, interiorStationId }: LiveTrainsProps) {
   const dots = useRef<InstancedMesh>(null)
   const halo = useRef<InstancedMesh>(null)
   // The selected train's dot is drawn on its own, above every other dot: rim, background gap, then the dot.
@@ -53,6 +58,8 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
   const selectedHalo = useRef<Mesh>(null)
   const selectedDot = useRef<Mesh<CircleGeometry, MeshBasicMaterial>>(null)
   const cars = useTrainCars()
+  const spanCars = useSpanCars(cars)
+  const spans = (interiorStationId !== null && network.platformSpans.get(interiorStationId)) || null
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
   const { selectedKey } = useTrainSelection()
   /** The slot drawn as selected, -1 for none. Read once per frame. */
@@ -112,11 +119,12 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
     d.instanceMatrix.setUsage(DynamicDrawUsage)
     h.instanceMatrix.setUsage(DynamicDrawUsage)
     cars.prepare()
+    spanCars.prepare()
     for (let i = 0; i < TRAIN_CAPACITY; i++) colorSlot(d, i)
     cars.setSelected(selectedSlot.current)
     d.instanceColor!.needsUpdate = true
     d.count = h.count = 0
-  }, [colorSlot, cars])
+  }, [colorSlot, cars, spanCars])
 
   useLayoutEffect(() => {
     trainPick.current = { table, consistOf: cars.consistOf, y: DOT_Y, carHeightM: cars.carHeightM }
@@ -210,6 +218,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
     }
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn)
+    spanCars.write(table, spans, interiorOpacity(camera), mix, localS, sel, slotColors, cars.consistOf)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
     range.count = table.high * 16
     d.instanceMatrix.updateRanges.push(range)
@@ -249,6 +258,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
         </mesh>
       </group>
       <TrainCars layer={cars} />
+      <SpanCars layer={spanCars} cars={cars} />
     </>
   )
 }

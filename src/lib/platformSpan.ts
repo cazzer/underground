@@ -1,0 +1,70 @@
+/**
+ * Where each shape runs along a station's platform tracks, and how strongly a point near them belongs to the
+ * station view: the live layer lifts trains there above the interior veil, and the map track there gives way to
+ * the interior's own track. Pure; no allocation in the weight functions (they run per frame).
+ */
+import type { ShapeId, StationId } from '../data/schema'
+import type { ProfileRun } from './trackProfile'
+
+/** Distances [d0, d1] (d0 <= d1) along a shape's track line covered by one station's platform tracks. */
+export interface PlatformSpan {
+  d0: number
+  d1: number
+}
+
+export type StationSpans = ReadonlyMap<ShapeId, PlatformSpan>
+
+/** A train car's weight falls from 1 at a platform end to 0 this far beyond it. */
+export const TRAIN_RAMP_M = 40
+/** The map track gives way to the interior's track over this much of each platform end, inside it. */
+export const MASK_INSET_M = 10
+
+/**
+ * Spans per station and shape from the runs each shape's profile kept (buildTrackProfile's `kept`): the union of
+ * a shape's runs at one station, should it ride more than one of its tracks. Runs without a station are skipped.
+ */
+export function platformSpans(kept: Iterable<readonly [ShapeId, readonly ProfileRun[]]>): Map<StationId, Map<ShapeId, PlatformSpan>> {
+  const out = new Map<StationId, Map<ShapeId, PlatformSpan>>()
+  for (const [shapeId, runs] of kept) {
+    for (const run of runs) {
+      if (run.stationId === undefined) continue
+      let byShape = out.get(run.stationId)
+      if (!byShape) out.set(run.stationId, (byShape = new Map()))
+      const span = byShape.get(shapeId)
+      if (span) {
+        span.d0 = Math.min(span.d0, run.d0)
+        span.d1 = Math.max(span.d1, run.d1)
+      } else byShape.set(shapeId, { d0: run.d0, d1: run.d1 })
+    }
+  }
+  return out
+}
+
+/**
+ * 1 on [start, end], easing (smoothstep) to 0 at `rampM` outside it. With start > end (a span shorter than two
+ * insets) the peak, midway, stays below 1. Continuous in d; rampM must be positive.
+ */
+export function rampWeight(d: number, start: number, end: number, rampM: number): number {
+  const outside = Math.max(start - d, d - end, 0)
+  if (outside >= rampM) return 0
+  const t = 1 - outside / rampM
+  return t * t * (3 - 2 * t)
+}
+
+/** How much of a train car at distance d is lifted above the veil: 1 along the platform, 0 past the ramp. */
+export function trainSpanWeight(d: number, span: PlatformSpan): number {
+  return rampWeight(d, span.d0, span.d1, TRAIN_RAMP_M)
+}
+
+/** How much of the map track at d gives way to the interior's: 1 inside the platform, 0 at its ends and beyond. */
+export function maskSpanWeight(d: number, span: PlatformSpan): number {
+  return rampWeight(d, span.d0 + MASK_INSET_M, span.d1 - MASK_INSET_M, MASK_INSET_M)
+}
+
+/**
+ * How far a lifted car mixes toward the background, so it matches the veil it is drawn above: the veil's
+ * opacity at this reveal where the car leaves the span (weight 0), none on the platform (weight 1).
+ */
+export function veilTint(reveal: number, weight: number, veilOpacity: number): number {
+  return veilOpacity * reveal * (1 - weight)
+}

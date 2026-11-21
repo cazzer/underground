@@ -12,6 +12,8 @@
  * - interiorModel.ts: `hull` and the cut-line buffer (unless B wins)
  * - interiorFraming.ts: `paddedHull` and its tests (unless B wins)
  * - renderOrder.ts: `interiorUnderFine` / `interiorUnder` (unless C wins), or `interiorVeil` (if C wins)
+ * - useSpanCars.ts: `VEIL_TINT` and `SPAN_LIFT` become constants (if C wins, delete SpanCars, useSpanCars and their
+ *   render orders: the interior draws under the trains)
  * - AGENTS.md: the `?interior=` / `?interiorY=` TEMPORARY note, "padded hull" in the directory map
  *   (unless B wins), and "look C uses -0.6 and -0.3" in the rendering conventions (unless C wins)
  */
