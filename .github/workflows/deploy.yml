@@ -28,7 +28,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-  # Own lockfile and deps; does not gate the Pages deploy. Deploying the Worker is manual.
+  # Own lockfile and deps; does not gate the Pages deploy. worker-deploy ships it after this passes.
   worker:
     runs-on: ubuntu-latest
     defaults:
@@ -50,6 +50,42 @@ jobs:
           git diff --exit-code -- src/gen
           test -z "$(git status --porcelain -- src/gen)"
 
+  # Deploys the realtime Worker on every push to main (wrangler deploy is idempotent).
+  # Needs repo secrets CLOUDFLARE_API_TOKEN ("Edit Cloudflare Workers" template) and CLOUDFLARE_ACCOUNT_ID.
+  worker-deploy:
+    if: github.event_name != 'pull_request'
+    needs: worker
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Skip until the Cloudflare secrets are set
+        id: secrets
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set; skipping the Worker deploy."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: .
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/checkout@v7
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - if: steps.secrets.outputs.ready == 'true'
+        run: npm ci
+      - if: steps.secrets.outputs.ready == 'true'
+        run: npx wrangler deploy
+
   build:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -65,6 +101,9 @@ jobs:
       - run: npm test
       # Includes tsc -b, so type errors fail the build.
       - run: npm run build
+        env:
+          # Repo variable: the deployed Worker's /rt URL. Unset builds the "Live trains off" site.
+          VITE_RT_URL: ${{ vars.VITE_RT_URL }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
