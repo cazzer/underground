@@ -1,5 +1,5 @@
 /** public/data → render model: projected stations, routes, and shape paths. Pure. */
-import type { Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
+import type { AdaStatus, Borough, Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
 import type { StationDepthsFile } from '../data/stationSchema'
 import { boundsCenter } from './framing'
 import { toGround, type Ground } from './projection'
@@ -16,6 +16,22 @@ export interface Station {
   routeIds: readonly RouteId[]
   /** Child stop ids (one per platform direction), sorted. */
   stops: readonly StopId[]
+  /** Undefined when an older cached stations.json predates the field. */
+  borough?: Borough
+  access: StationAccessInfo
+}
+
+/** ADA status; `note` is the MTA's direction text for a partly accessible station ("Downtown only"). */
+export interface StationAccessInfo {
+  status: AdaStatus
+  note?: string
+}
+
+/** A file without `ada` (an older cached build) or with an unknown value reads as not accessible: no false badge. */
+export function stationAccess(s: Partial<Pick<StationsFile['stations'][number], 'ada' | 'adaPartial'>>): StationAccessInfo {
+  if (s.ada === 'full') return { status: 'full' }
+  if (s.ada === 'partial') return s.adaPartial?.note ? { status: 'partial', note: s.adaPartial.note } : { status: 'partial' }
+  return { status: 'none' }
 }
 
 export interface Route {
@@ -109,7 +125,7 @@ export function buildNetwork(
   const stations = stationsFile.stations.map((s): Station => {
     const pos = toGround(s)
     extend(bounds, pos)
-    return { id: s.id, name: s.name, pos, routeIds: s.routes, stops: s.stops }
+    return { id: s.id, name: s.name, pos, routeIds: s.routes, stops: s.stops, borough: s.borough, access: stationAccess(s) }
   })
 
   const lines = shapesFile.shapes.map((s) => {

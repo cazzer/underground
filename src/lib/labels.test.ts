@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { routeChipLabel, routeSpokenName, scheduleLabel } from './labels'
+import { readFileSync } from 'node:fs'
+import type { StationsFile } from '../data/schema'
+import { accessLabel, boroughName, routeChipLabel, routeSpokenName, scheduleLabel, sharedNames } from './labels'
+import { stationAccess } from './network'
 
 describe('routeChipLabel', () => {
   it('writes express variants as the base route plus a diamond', () => {
@@ -35,5 +38,53 @@ describe('scheduleLabel', () => {
   it('falls back to the raw id when there is no valid date prefix', () => {
     expect(scheduleLabel('fall-2026')).toBe('Schedule: fall-2026')
     expect(scheduleLabel('20261328-x')).toBe('Schedule: 20261328-x')
+  })
+})
+
+describe('boroughName', () => {
+  it('spells out every borough code', () => {
+    expect(boroughName('Bx')).toBe('Bronx')
+    expect(boroughName('M')).toBe('Manhattan')
+    expect(boroughName('Bk')).toBe('Brooklyn')
+    expect(boroughName('Q')).toBe('Queens')
+    expect(boroughName('SI')).toBe('Staten Island')
+  })
+})
+
+describe('accessLabel', () => {
+  it('labels accessible and partly accessible stations, with the direction note when there is one', () => {
+    expect(accessLabel({ status: 'full' })).toBe('Accessible station')
+    expect(accessLabel({ status: 'partial', note: 'Downtown only' })).toBe('Partly accessible: Downtown only')
+    expect(accessLabel({ status: 'partial' })).toBe('Partly accessible')
+  })
+
+  it('gives no label to a station that is not accessible', () => {
+    expect(accessLabel({ status: 'none' })).toBeNull()
+  })
+
+  it('reads a station from an older file without the fields as not accessible', () => {
+    expect(stationAccess({})).toEqual({ status: 'none' })
+    expect(stationAccess({ ada: 'full' })).toEqual({ status: 'full' })
+    expect(stationAccess({ ada: 'partial', adaPartial: { north: false, south: true, note: 'Uptown only' } })).toEqual({
+      status: 'partial',
+      note: 'Uptown only',
+    })
+  })
+})
+
+describe('sharedNames', () => {
+  it('collects only names used by more than one station', () => {
+    const names = sharedNames([{ name: '86 St' }, { name: 'Canal St' }, { name: '86 St' }, { name: 'Bedford Av' }, { name: '86 St' }])
+    expect([...names]).toEqual(['86 St'])
+  })
+
+  it('finds shared names in the shipped stations, and every partly accessible one has a note', () => {
+    const file = JSON.parse(readFileSync('public/data/stations.json', 'utf8')) as StationsFile
+    const shared = sharedNames(file.stations)
+    expect(shared.has('86 St')).toBe(true)
+    expect(shared.has('Bedford Av')).toBe(false)
+    const partial = file.stations.filter((s) => s.ada === 'partial')
+    expect(partial.length).toBeGreaterThan(0)
+    for (const s of partial) expect(accessLabel(stationAccess(s)), s.id).toMatch(/^Partly accessible: \S/)
   })
 })

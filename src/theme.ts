@@ -43,6 +43,12 @@ export interface Theme {
   inkDim: string
   panel: string
   panelBorder: string
+  /**
+   * TEMPORARY with ?access=b (src/ui/accessLook.ts): the filled access badge and the glyph inside it. The badge
+   * is at least 3:1 on the panel, the glyph 4.5:1 on the badge (theme.test.ts).
+   */
+  accessBadge: string
+  accessBadgeInk: string
   fontSans: string
   fontMono: string
   /** Station interior: outlines and stairs; track centerlines; street entrances; steps, guides, fare lines. */
@@ -97,6 +103,8 @@ export const THEMES = {
     inkDim: '#8fb4de',
     panel: 'rgba(11, 33, 71, 0.82)',
     panelBorder: '#5ce1ff',
+    accessBadge: '#6fa8ff',
+    accessBadgeInk: '#0b2147',
     fontSans: mono,
     fontMono: mono,
     interiorStroke: '#e6f6ff',
@@ -135,6 +143,8 @@ export const THEMES = {
     inkDim: '#6b6655',
     panel: 'rgba(243, 239, 228, 0.9)',
     panelBorder: '#2b2b2b',
+    accessBadge: '#1f4e8c',
+    accessBadgeInk: '#f3efe4',
     fontSans: '"Iowan Old Style", "Palatino Linotype", Georgia, serif',
     fontMono: mono,
     interiorStroke: '#2b2b2b',
@@ -173,6 +183,8 @@ export const THEMES = {
     inkDim: '#1f9940',
     panel: 'rgba(0, 0, 0, 0.85)',
     panelBorder: '#33ff66',
+    accessBadge: '#33ff66',
+    accessBadgeInk: '#000000',
     fontSans: mono,
     fontMono: mono,
     interiorStroke: '#33ff66',
@@ -230,6 +242,8 @@ export function applyThemeCss(t: Theme, root: HTMLElement = document.documentEle
     '--ug-ink-dim': t.inkDim,
     '--ug-panel': t.panel,
     '--ug-panel-border': t.panelBorder,
+    '--ug-access-badge': t.accessBadge,
+    '--ug-access-badge-ink': t.accessBadgeInk,
     '--ug-focus': t.stationFocus,
     '--ug-here': t.here,
     '--ug-status-live': t.statusLive,

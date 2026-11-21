@@ -1,4 +1,5 @@
 import { useId, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react'
+import { sharedNames } from '../lib/labels'
 import type { Network } from '../lib/network'
 import { buildSearchIndex, SEARCH_LIMIT, searchStations } from '../lib/stationSearch'
 import { SearchResult } from './SearchResult'
@@ -41,6 +42,7 @@ export function StationSearch({ network, onChoose, onClose, ref }: StationSearch
   const listId = `${id}-list`
   const hintId = `${id}-hint`
   const index = useMemo(() => buildSearchIndex(network.stations), [network])
+  const shared = useMemo(() => sharedNames(network.stations), [network])
   const keyboardInset = useKeyboardInset()
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -167,6 +169,7 @@ export function StationSearch({ network, onChoose, onClose, ref }: StationSearch
                 id={optionId(station.id)}
                 network={network}
                 station={station}
+                sharedName={shared.has(station.name)}
                 active={i === current}
                 onChoose={() => choose(station.id)}
                 onActive={() => setActive(i)}
