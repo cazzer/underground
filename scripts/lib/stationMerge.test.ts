@@ -137,6 +137,15 @@ describe('equipment', () => {
     expect(connector(down, 'ES1')).toMatchObject({ travel: 'down', lower: { level: 'platform' }, upper: { level: 'mezz' } })
     expect(connector(serve('platform to mezzanine for service in both directions'), 'ES1')).not.toHaveProperty('travel')
   })
+  it('gives an escalator its own run from an `ends` override, by elevation, adding authored', () => {
+    const es1 = connector(build((f) => { f.authored.equipment.push({ code: 'ES1', ends: { lower: [-15, 0], upper: [-20, 0] } }) }), 'ES1')
+    expect(es1).toMatchObject({ lower: { x: -15, z: 0, level: 'platform' }, upper: { x: -20, z: 0, level: 'mezz' } })
+    expect(es1.sources).toEqual(['authored', 'nyopendata'])
+  })
+  it('rejects `ends` on an elevator or together with `at`', () => {
+    expect(() => build((f) => { f.authored.equipment[1] = { code: 'EL2', ends: { lower: [-24, 0], upper: [-26, 0] } } })).toThrow(/only an escalator has a run/)
+    expect(() => build((f) => { f.authored.equipment.push({ code: 'ES1', at: [-15, 0], ends: { lower: [-15, 0], upper: [-20, 0] } }) })).toThrow(/either "at" or "ends"/)
+  })
   it('applies default widths and honors an override', () => {
     const out = build((f) => { f.authored.equipment[1]!.width = 1.8 })
     expect([connector(out, 'EL1').width, connector(out, 'ES1').width, connector(out, 'EL2').width]).toEqual([ELEVATOR_WIDTH_M, ESCALATOR_WIDTH_M, 1.8])

@@ -6,12 +6,12 @@ import type { Level, LevelId, LevelKind } from '../../../src/data/stationSchema.
 import type { DepthSource } from '../depth.ts'
 import { distanceToRing } from '../stationGeometry.ts'
 import type { OsmCatalogWay } from '../catalogTypes.ts'
-import type { AuthoredStation, EquipmentRow, FramePoint, GeneratedStation } from '../stationInputs.ts'
+import type { AuthoredConnector, AuthoredEnd, AuthoredStation, EquipmentRow, FramePoint, GeneratedStation } from '../stationInputs.ts'
 import type { TemplateCtx } from './context.ts'
 import { machineOverrides } from './machineSites.ts'
 import type { MachineSites } from './machineSites.ts'
 import { MACHINE_ENTRANCE_TYPES, planMachines } from './machines.ts'
-import type { PlanEntrance } from './machines.ts'
+import type { MachinePlan, PlanEntrance } from './machines.ts'
 import { mezzanineSlabs, slabDistance, slabOutline } from './slabs.ts'
 import { sliceSources } from './slice.ts'
 import type { GeneratorCatalog } from './slice.ts'
@@ -37,6 +37,37 @@ export interface TemplateInputs {
 export const FAR_ENTRANCE_M = 200
 
 const pad = (n: number): string => String(n).padStart(2, '0')
+
+/** Throws unless every level is reached from the street through the stairs and machines, and the mezzanine (or
+ *  station house) is joined to the street directly: one whose street stairs were all dropped would only hang off
+ *  the platform (E 180 St). */
+function checkReachable(levels: TemplateLevels, stairs: readonly AuthoredConnector[], plans: readonly MachinePlan[]): void {
+  const byKind = new Map([levels.street, levels.mezzanine, levels.platform].flatMap((l) => (l ? [[l.kind, l.id] as const] : [])))
+  const levelOf = (end: AuthoredEnd): string => ('entrance' in end ? levels.street.id : end.level)
+  const edges = [
+    ...stairs.map((c): [string, string] => [levelOf(c.lower), levelOf(c.upper)]),
+    ...plans.map((p): [string, string] => [byKind.get(p.kinds[0])!, byKind.get(p.kinds[1])!]),
+  ]
+  const reached = new Set([levels.street.id])
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const [a, b] of edges) {
+      if (reached.has(a) !== reached.has(b)) {
+        reached.add(a).add(b)
+        grew = true
+      }
+    }
+  }
+  const cut = [...byKind.values()].filter((id) => !reached.has(id))
+  if (cut.length > 0) throw new Error(`no stair or machine reaches the ${cut.join(' and ')} level from the street`)
+  const mezz = levels.mezzanine?.id
+  if (mezz && !edges.some(([a, b]) => (a === mezz && b === levels.street.id) || (b === mezz && a === levels.street.id))) {
+    throw new Error(`no stair or machine joins the ${mezz} level to the street`)
+  }
+}
+
+const levelHeights = (levels: TemplateLevels): Partial<Record<LevelKind, number>> =>
+  Object.fromEntries([levels.street, levels.mezzanine, levels.platform].flatMap((l) => (l ? [[l.kind, l.y]] : [])))
 
 /** Machines, entrances, slabs and stairs for one set of candidate entrances. `unplaced` lists the entrances whose
  *  street stair found no landing. */
@@ -66,7 +97,7 @@ function planLayout(
   })
   const plans = machines.plans.map((p) => (p.entrance === undefined ? p : { ...p, entrance: keptIndex.get(p.entrance)! }))
   const slabs = levels.mezzanine ? mezzanineSlabs(ctx, entrances.map((e) => e.at)) : []
-  const { overrides: equipment, notes: machineNotes } = machineOverrides(ctx, plans, entrances, { slabs, platformFor })
+  const { overrides: equipment, notes: machineNotes } = machineOverrides(ctx, plans, entrances, { slabs, platformFor, levelY: levelHeights(levels) })
   const street = streetStairs(ctx, entrances, slabs, levels, log)
   const connectors = [...street.connectors, ...(levels.mezzanine ? levelStairs(ctx, slabs, levels.mezzanine, levels.platform) : [])]
   return { dropped, entrances, plans, slabs, equipment, machineNotes, connectors, unplaced: street.unplaced }
@@ -110,6 +141,7 @@ export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inpu
   }
   dropped.push(...layout.dropped)
   const { entrances, plans, slabs, equipment, machineNotes, connectors } = layout
+  checkReachable(levels, connectors, plans)
 
   const platforms = ctx.platforms.flatMap((p) => {
     // A platform split into several OSM ways keeps its tracks on the longest one, so each stop has one track.

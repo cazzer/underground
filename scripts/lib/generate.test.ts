@@ -126,12 +126,35 @@ describe('template limits', () => {
     const { interior } = generate(spec)
     const bank = interior.connectors.filter((c) => c.id.startsWith('ES2'))
     expect(bank).toHaveLength(3)
+    // Each has its own plan run, about 30 degrees at the drawn (x2) rise, at least 1.6 x the 4.5 m rise.
+    for (const c of bank) {
+      const run = Math.hypot(c.upper.x - c.lower.x, c.upper.z - c.lower.z)
+      expect(run, c.id).toBeGreaterThanOrEqual(1.6 * 4.5 - 0.01)
+      expect(run, c.id).toBeLessThanOrEqual(2 * Math.sqrt(3) * 4.5 + 0.01)
+    }
     for (let i = 0; i < bank.length; i++) {
       for (let j = i + 1; j < bank.length; j++) {
         expect(Math.hypot(bank[i]!.lower.x - bank[j]!.lower.x, bank[i]!.lower.z - bank[j]!.lower.z)).toBeGreaterThanOrEqual(1.5 - 0.02)
       }
     }
     expectLandingsContained(interior)
+  })
+
+  it('points every stair from one slab the same way along the platforms, so two never cross', () => {
+    const spec: FixtureSpec = { ...islandCutCover(), id: 'T11', platforms: [[-10, -5.5], [5.5, 10]], tracks: [-2.4, 2.4] }
+    const { g } = generate(spec)
+    const slabStairs = g.authored.connectors.filter((c) => c.id.startsWith('st-slab-1-'))
+    expect(slabStairs).toHaveLength(2)
+    const sense = slabStairs.map((c) => Math.sign((c.lower as { at: [number, number] }).at[0] - (c.upper as { at: [number, number] }).at[0]))
+    expect(new Set(sense).size).toBe(1)
+  })
+
+  it('skips a station whose mezzanine only the platform reaches (its street stairs all dropped)', () => {
+    const spec = elevatedIsland()
+    spec.entrances = [{ type: 'Stair', at: [-10, 60] }, { type: 'Stair', at: [10, -60] }, { type: 'Elevator', at: [0, 12] }]
+    spec.equipment = spec.equipment.filter((e) => e.code === 'EL7')
+    spec.equipment.push({ code: 'ES8', kind: 'escalator', serving: 'mezzanine to platform for service in both directions' })
+    expect(skippedFor(spec)).toEqual([{ stationId: 'T30', reason: 'no stair or machine joins the station-house level to the street' }])
   })
 
   it('keeps every slab within the platforms plus 15 m along them and 10 m across', () => {

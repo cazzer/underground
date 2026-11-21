@@ -118,12 +118,10 @@ export function streetStairs(
   return { connectors, unplaced }
 }
 
-/** Plan ends of a slab-to-platform stair: the slab end just inside the slab edge facing the platform's middle,
+/** Plan ends of a slab-to-platform stair: the slab end just inside the slab edge facing direction `d`,
  *  the platform end RUN_PER_RISE x rise further on along the platform centerline. Steps back into the slab, then
  *  tries the other edge, until both ends land. */
-function levelRun(slab: SlabPlan, platform: PlatformGeom, run: number): { slabEnd: FramePoint; platformEnd: FramePoint } | null {
-  const pmid = (platform.uRange[0] + platform.uRange[1]) / 2
-  const d = Math.sign(pmid - slabCenter(slab)[0]) || 1
+function levelRun(slab: SlabPlan, platform: PlatformGeom, run: number, d: 1 | -1): { slabEnd: FramePoint; platformEnd: FramePoint } | null {
   for (const dir of [d, -d]) {
     const edge = dir > 0 ? slab.uRange[1] : slab.uRange[0]
     for (let k = 0; ; k++) {
@@ -147,7 +145,9 @@ export function levelStairs(ctx: TemplateCtx, slabs: readonly SlabPlan[], mezzan
   for (const platform of ctx.platforms) {
     let reached = false
     for (const slab of slabs) {
-      const ends = levelRun(slab, platform, run)
+      // One direction per slab, toward the middle of all the platforms, so its stairs run side by side, never in an X.
+      const d = Math.sign((ctx.uSpan[0] + ctx.uSpan[1]) / 2 - slabCenter(slab)[0]) || 1
+      const ends = levelRun(slab, platform, run, d as 1 | -1)
       if (!ends) continue
       reached = true
       const width = platform.kind === 'island' ? ISLAND_STAIR_WIDTH_M : SIDE_STAIR_WIDTH_M

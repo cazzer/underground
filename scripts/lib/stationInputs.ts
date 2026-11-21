@@ -39,6 +39,9 @@ export interface EquipmentOverride {
   code: string
   /** Replaces the E&E position (adds 'authored' to sources). */
   at?: FramePoint
+  /** Escalators only, instead of `at`: the lower and upper plan ends (by elevation), giving it a run of its own
+   *  (adds 'authored'). A street end with an `entrance` sits on the entrance point whatever is given for it. */
+  ends?: { lower: FramePoint; upper: FramePoint }
   /** Street entrance this machine serves (one of its two levels must be the street). Without `at`, the
    *  machine sits at the entrance point. */
   entrance?: string
