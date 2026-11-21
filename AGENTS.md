@@ -78,20 +78,27 @@ Track work in beads (`bd`). File tickets in Breakdown, not GitHub issues. Includ
 description and an acceptance criterion on create.
 
 ## Review
-Every change gets a `reviewer` agent pass. When the review is critical, send the
-findings to the user as Breakdown review items and hold the merge until they decide.
+Every change gets a `reviewer` agent pass. When the review is critical, file the
+findings for the user as review cards on the work item's bead in Breakdown. Hold the
+merge until they decide.
 A review is critical when:
 - it finds a blocker or a should-fix,
 - the change touches deploy/CI, the data pipeline, the CORS worker, or licensing, or
 - it involves a look or feel decision.
 
 How to file:
-- Open a draft PR first so the items have a link.
-- File one inbox item per finding with `brain_write`: `nodeType: inbox_item`,
-  `sourceSystem: inbox`, `externalId: underground:pr/<n>/review/<slug>`, and metadata
-  `{source: session, action: decide, status: pending, priority, url, links}`.
-- Group nits into one item.
-- The content gives the finding with file:line, then the proposed fix.
+- Open a draft PR first so the cards can link to it.
+- Write one decision card per finding: a markdown file with frontmatter `question`,
+  `options`, `recommend`, `on_accept`, `key`. The body is the evidence with file:line,
+  at most 300 words.
+- File them with `review-request <bead-id> a.md b.md …` (up to 6 per call). The format
+  is in `~/.claude/skills/context/visual-review.md`.
+- Never use the Breakdown inbox (`brain_write` inbox items) for reviews.
+- Group nits into one card. Only the top-level session files cards; subagents write
+  cards and return their paths.
+- Fallback: until this checkout is registered with Breakdown, `review-request`
+  refuses. Put the question, options and recommendation in the session report
+  instead, and still hold the merge.
 
 Reviews with nits only can be fixed in-loop without filing.
 
