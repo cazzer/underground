@@ -90,9 +90,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
     if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
-    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.3 to 0.6); `LineHighlight.tsx` holds the
+    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.3 to 0.6; the focused station's tie is dropped when it has an interior, kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
-    instance is scaled to 0, so it has no marker; `markerShape.ts` the marker constants);
+    instance is scaled to 0 when it has an interior (ready or loading), so it has no marker, and drawn normally when it has none or its load failed (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, `theme.train` if `routeLineMix.amount` is 1 (mono lines); stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a

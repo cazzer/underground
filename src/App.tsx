@@ -52,6 +52,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             onLiveError={live.onLayerError}
             panel={panel}
             interior={model}
+            focusedMarker={interior.streetMarker}
             here={here}
           />
         )}

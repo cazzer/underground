@@ -22,6 +22,17 @@ export type IndexLoad =
   | { status: 'error'; message: string }
   | { status: 'ready'; index: StationIndex }
 
+/**
+ * Whether the focused station keeps its street-level marker and tie. A station with an interior (ready, or still
+ * loading, so a good load doesn't pop) is marked by that interior and draws neither; one with no interior (not in
+ * the index, or the index failed) or a failed load keeps them as the fallback. While the index is still loading
+ * nothing is known, so the marker stays hidden rather than flashing for a station that turns out to have one.
+ */
+export function focusedMarkerShown(stationId: string | null, index: IndexLoad, load: InteriorLoad): boolean {
+  if (!stationId || index.status === 'loading') return false
+  return load.status === 'none' || load.status === 'error'
+}
+
 /** The station's id when the index is ready and lists it; otherwise null. */
 export function interiorIdOf(stationId: string | null, index: IndexLoad): string | null {
   if (!stationId || index.status !== 'ready') return null
