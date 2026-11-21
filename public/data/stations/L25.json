@@ -1,0 +1,35 @@
+{
+  "stationId": "L25",
+  "name": "Sutter Av",
+  "anchor": {
+    "lat": 40.66937804431362,
+    "lon": -73.90197627968477
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-542269837","level":"platform","outline":[[-21.07,-79.44],[-18.46,-79.94],[12.51,81.09],[10.14,81.48]],"tracks":[{"stopId":"L25S","path":[[-17,-79.92],[-16.61,-77.98],[13.33,76.92],[13.9,79.86]]}],"osmRef":"way/542269837","sources":["generated","osm"]},
+    {"id":"way-542269838","level":"platform","outline":[[17.31,73.32],[19.8,72.84],[-9.35,-78.11],[-11.19,-77.82]],"tracks":[{"stopId":"L25N","path":[[-12.82,-77.38],[-12.11,-73.66],[16.27,72.53]]}],"osmRef":"way/542269838","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[19.88,62.65],[25.86,93.8],[10.72,96.7],[4.74,65.55]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":17.82,"z":94.63,"level":"street"},"upper":{"x":16.63,"z":87.54,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":16.88,"z":64.24,"level":"station-house"},"upper":{"x":15.52,"z":57.17,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":8.34,"z":65.88,"level":"station-house"},"upper":{"x":6.98,"z":58.81,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":17.82,"z":94.63,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

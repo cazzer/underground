@@ -1,0 +1,39 @@
+{
+  "stationId": "610",
+  "name": "Morrison Av-Soundview",
+  "anchor": {
+    "lat": 40.82950079365159,
+    "lon": -73.87461106621066
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-426103247","level":"platform","outline":[[76.09,-34.72],[75.22,-37.23],[64.69,-33.98],[-73.96,18.48],[-72.44,22.26]],"tracks":[{"stopId":"610S","path":[[-71.98,23.22],[76.23,-33.18]]}],"osmRef":"way/426103247","sources":["generated","osm"]},
+    {"id":"way-426103248","level":"platform","outline":[[72.67,-21.83],[73.66,-18.75],[-44.42,26.55],[-59.97,32.17],[-67.39,34.76],[-75.31,36.93],[-76.15,34.76]],"tracks":[{"stopId":"610N","path":[[-76.41,33.23],[71.88,-23.2]]}],"osmRef":"way/426103248","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-22.88,-3.09],[13.33,-16.86],[21.16,3.74],[-15.05,17.51]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-15.74,"z":15.68,"level":"street"},"upper":{"x":-10.73,"z":10.51,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-20.94,"z":-1.8,"level":"street"},"upper":{"x":-13.78,"z":-1.05,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":13.8,"z":-15.59,"level":"street"},"upper":{"x":8.92,"z":-10.3,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":13.81,"z":-12.78,"level":"station-house"},"upper":{"x":20.54,"z":-15.34,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-15.47,"z":13.58,"level":"station-house"},"upper":{"x":-22.2,"z":16.14,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-15.74,"z":15.68,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-20.94,"z":-1.8,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":13.8,"z":-15.59,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

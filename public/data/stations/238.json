@@ -1,0 +1,41 @@
+{
+  "stationId": "238",
+  "name": "Eastern Pkwy-Brooklyn Museum",
+  "anchor": {
+    "lat": 40.672037338256196,
+    "lon": -73.96474027171135
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-4.5,"depthSource":"osm-level"},
+    {"id":"platform","name":"Platform","kind":"platform","y":-9,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907163215","level":"platform","outline":[[75.15,23.71],[74.26,27.16],[-77.84,-13.9],[-76.82,-17.33]],"tracks":[{"stopId":"238S","path":[[-76.46,-18.59],[75.48,22.43]]}],"osmRef":"way/907163215","sources":["generated","osm"]},
+    {"id":"way-907163216","level":"platform","outline":[[-75.05,-23.66],[-74.14,-27.13],[77.62,13.84],[76.78,17.33]],"tracks":[{"stopId":"238N","path":[[24.57,4.61],[75.5,18.37]]}],"osmRef":"way/907163216","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine","outline":[[32.41,-0.44],[51.72,4.78],[46.72,23.31],[27.41,18.1]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"EL755","kind":"elevator","lower":{"x":29.49,"z":17.63,"level":"mezzanine"},"upper":{"x":29.49,"z":17.63,"level":"street"},"width":2,"sources":["nyopendata"]},
+    {"id":"EL756","kind":"elevator","lower":{"x":41.08,"z":5.83,"level":"platform"},"upper":{"x":41.08,"z":5.83,"level":"mezzanine"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL757","kind":"elevator","lower":{"x":43.49,"z":6.48,"level":"platform"},"upper":{"x":43.49,"z":6.48,"level":"mezzanine"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":38.16,"z":20.48,"level":"mezzanine"},"upper":{"x":37.05,"z":27.61,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":47.54,"z":4.16,"level":"mezzanine"},"upper":{"x":53.65,"z":-9.64,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":25.44,"z":1.61,"level":"platform"},"upper":{"x":32.39,"z":3.48,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":22.79,"z":11.42,"level":"platform"},"upper":{"x":29.74,"z":13.29,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":37.05,"z":27.61,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":29.49,"z":17.63,"type":"Elevator","entry":true,"exit":true,"connectors":["EL755"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":53.65,"z":-9.64,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

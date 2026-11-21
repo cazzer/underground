@@ -1,0 +1,42 @@
+{
+  "stationId": "244",
+  "name": "Church Av",
+  "anchor": {
+    "lat": 40.65090580057866,
+    "lon": -73.94958989035811
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-5.36,"depthSource":"ee-rise"}
+  ],
+  "platforms": [
+    {"id":"way-907189291","level":"platform","outline":[[9.31,77.67],[-3,-78.2],[0.27,-78.46],[12.6,77.48]],"tracks":[{"stopId":"244N","path":[[-4.24,-77.12],[8,77.74]]}],"osmRef":"way/907189291","sources":["generated","osm"]},
+    {"id":"way-907189292","level":"platform","outline":[[2.99,78.07],[-0.27,78.26],[-12.6,-77.48],[-9.33,-77.74]],"tracks":[{"stopId":"244S","path":[[-8.02,-77.84],[4.21,76.99]]}],"osmRef":"way/907189292","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"EL320","kind":"elevator","lower":{"x":6.15,"z":16.78,"level":"platform"},"upper":{"x":6.15,"z":16.78,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL321","kind":"elevator","lower":{"x":-3.31,"z":19.18,"level":"platform"},"upper":{"x":-3.31,"z":19.18,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-3.01,"z":22.9,"level":"platform"},"upper":{"x":-8.13,"z":31.9,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":6.42,"z":20.12,"level":"platform"},"upper":{"x":13.68,"z":28.14,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-05","kind":"stair","lower":{"x":-4.25,"z":7.31,"level":"platform"},"upper":{"x":-19.39,"z":-0.1,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-06","kind":"stair","lower":{"x":5.37,"z":6.91,"level":"platform"},"upper":{"x":14.54,"z":-2.42,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-07","kind":"stair","lower":{"x":-4.8,"z":0.31,"level":"platform"},"upper":{"x":-11.54,"z":-7.76,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-8.13,"z":31.9,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":13.68,"z":28.14,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":-14.17,"z":18.38,"type":"Elevator","entry":true,"exit":true,"connectors":["EL320"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":17.37,"z":17.55,"type":"Elevator","entry":true,"exit":true,"connectors":["EL321"],"sources":["nyopendata"]},
+    {"id":"ent-05","x":-19.39,"z":-0.1,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]},
+    {"id":"ent-06","x":14.54,"z":-2.42,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-06"],"sources":["nyopendata"]},
+    {"id":"ent-07","x":-11.54,"z":-7.76,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-07"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

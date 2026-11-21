@@ -1,0 +1,37 @@
+{
+  "stationId": "G32",
+  "name": "Myrtle-Willoughby Avs",
+  "anchor": {
+    "lat": 40.69456910518917,
+    "lon": -73.94904680499556
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-4.5,"depthSource":"osm-level"},
+    {"id":"platform","name":"Platform","kind":"platform","y":-9,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-903983348","level":"platform","outline":[[-8.57,-98.92],[21.13,96.44],[17.92,96.87],[-11.79,-98.5]],"tracks":[{"stopId":"G32N","path":[[-13.12,-97.51],[-12.97,-96.53],[16.27,97.08]]}],"osmRef":"way/903983348","sources":["generated","osm"]},
+    {"id":"way-903983349","level":"platform","outline":[[-17.91,-96.86],[11.79,98.5],[8.58,98.94],[-21.14,-96.44]],"tracks":[{"stopId":"G32S","path":[[-16.42,-96.34],[-16.27,-95.35],[12.9,96.58],[13.05,97.56]]}],"osmRef":"way/903983349","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine","outline":[[-8.69,-113.02],[-5,-88.78],[-21.61,-86.25],[-25.3,-110.49]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-23.16,"z":-99.75,"level":"mezzanine"},"upper":{"x":-35.47,"z":-98.62,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-7.6,"z":-102.5,"level":"mezzanine"},"upper":{"x":6.96,"z":-105.5,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-7.66,"z":-82.1,"level":"platform"},"upper":{"x":-8.74,"z":-89.22,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-17.09,"z":-80.67,"level":"platform"},"upper":{"x":-18.17,"z":-87.79,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-35.47,"z":-98.62,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":6.96,"z":-105.5,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

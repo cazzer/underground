@@ -1,0 +1,36 @@
+{
+  "stationId": "122",
+  "name": "79 St",
+  "anchor": {
+    "lat": 40.78390677481472,
+    "lon": -73.97995368018057
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-449258640","level":"platform","outline":[[51.83,-66.65],[47.23,-69.07],[21.64,-23.58],[-14.24,41.51],[-33.51,76.76],[-29.13,78.99]],"tracks":[{"stopId":"122N","path":[[-35.38,75.69],[45.02,-69.4]]}],"osmRef":"way/449258640","sources":["generated","osm"]},
+    {"id":"way-449258642","level":"platform","outline":[[29.78,-78.83],[33.88,-76.58],[8.28,-31.07],[-27.82,34.07],[-46.94,69.37],[-51.79,66.51]],"tracks":[{"stopId":"122S","path":[[-45.08,70.31],[10.09,-29.97],[35.19,-74.6],[35.68,-75.47]]}],"osmRef":"way/449258642","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-0.27,"z":21.64,"level":"platform"},"upper":{"x":1.65,"z":30.94,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-18.99,"z":13.07,"level":"platform"},"upper":{"x":-28.39,"z":16.08,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":15.7,"z":-7.23,"level":"platform"},"upper":{"x":24.95,"z":-10.32,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":-5.78,"z":-10.62,"level":"platform"},"upper":{"x":-8.03,"z":-20.11,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":1.65,"z":30.94,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-28.39,"z":16.08,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":24.95,"z":-10.32,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":-8.03,"z":-20.11,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

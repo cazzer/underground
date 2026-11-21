@@ -1,0 +1,41 @@
+{
+  "stationId": "R39",
+  "name": "45 St",
+  "anchor": {
+    "lat": 40.649028257122765,
+    "lon": -74.00992452840877
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-4.5,"depthSource":"osm-level"},
+    {"id":"platform","name":"Platform","kind":"platform","y":-9,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907183037","level":"platform","outline":[[63.27,-68.49],[66.19,-66.27],[-48.74,79.34],[-51.68,77.11]],"tracks":[{"stopId":"R39N","path":[[-52.28,75.41],[62.05,-69.42]]}],"osmRef":"way/907183037","sources":["generated","osm"]},
+    {"id":"way-907183038","level":"platform","outline":[[51.78,-77.26],[48.88,-79.51],[-66.2,66.26],[-63.24,68.47]],"tracks":[{"stopId":"R39S","path":[[-62.01,69.38],[52.38,-75.53]]}],"osmRef":"way/907183038","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine","outline":[[17.58,-43.1],[29.97,-58.8],[50.23,-42.8],[37.84,-27.1]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":36.82,"z":-34.23,"level":"mezzanine"},"upper":{"x":39.11,"z":-27.4,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":43.55,"z":-42.2,"level":"mezzanine"},"upper":{"x":50.73,"z":-41.65,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":23.33,"z":-44.15,"level":"mezzanine"},"upper":{"x":16.18,"z":-44.96,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":29.9,"z":-52.66,"level":"mezzanine"},"upper":{"x":27.16,"z":-59.32,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":16.76,"z":-35.85,"level":"platform"},"upper":{"x":21.22,"z":-41.5,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":30.98,"z":-24.62,"level":"platform"},"upper":{"x":35.44,"z":-30.27,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":39.11,"z":-27.4,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":50.73,"z":-41.65,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":16.18,"z":-44.96,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":27.16,"z":-59.32,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

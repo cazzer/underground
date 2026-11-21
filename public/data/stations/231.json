@@ -1,0 +1,38 @@
+{
+  "stationId": "231",
+  "name": "Clark St",
+  "anchor": {
+    "lat": 40.69742650765677,
+    "lon": -73.99291294412936
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-4.5,"depthSource":"osm-level"},
+    {"id":"platform","name":"Platform","kind":"platform","y":-9,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-904602836","level":"platform","outline":[[-72.4,-27.78],[73.13,25.72],[72.47,27.7],[-73.22,-25.65]],"tracks":[{"stopId":"231N","path":[[-71.94,-29.01],[73.52,24.46]]},{"stopId":"231S","path":[[-72.78,-24.08],[71.91,29.09]]}],"osmRef":"way/904602836","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine","outline":[[-40.95,-18.37],[-17.92,-9.92],[-20.08,-4.02],[-43.11,-12.47]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"EL310","kind":"elevator","lower":{"x":-20.47,"z":-9.79,"level":"mezzanine"},"upper":{"x":-20.47,"z":-9.79,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL311","kind":"elevator","lower":{"x":-25.16,"z":-11.51,"level":"mezzanine"},"upper":{"x":-25.16,"z":-11.51,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL312","kind":"elevator","lower":{"x":-19.2,"z":-9.33,"level":"mezzanine"},"upper":{"x":-19.2,"z":-9.33,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-34.98,"z":-15.65,"level":"mezzanine"},"upper":{"x":-40.07,"z":-20.75,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-21.13,"z":-10.57,"level":"mezzanine"},"upper":{"x":-10.63,"z":-29.8,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-13.18,"z":-4.84,"level":"platform"},"upper":{"x":-19.94,"z":-7.32,"level":"mezzanine"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-40.07,"z":-20.75,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-10.63,"z":-29.8,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

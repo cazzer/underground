@@ -1,0 +1,37 @@
+{
+  "stationId": "109",
+  "name": "Dyckman St",
+  "anchor": {
+    "lat": 40.86060155089719,
+    "lon": -73.92549674512564
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.8
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":6.56,"depthSource":"ee-rise"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4,"depthSource":"structure-default"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-326119849","level":"platform","outline":[[36.65,-55.86],[38.71,-54.34],[26.3,-31.83],[5.66,5.11],[0.87,12.6],[-12.67,35.44],[-29.35,64.49],[-38.72,81.07],[-40.55,79.91],[-12.78,30.14],[8.41,-7.56],[23.99,-34.88]],"tracks":[{"stopId":"109N","path":[[-41.36,79.09],[-21.94,44.17],[5.72,-5.5],[25.12,-40.15],[35.29,-56.29]]}],"osmRef":"way/326119849","sources":["generated","osm"]},
+    {"id":"way-326119850","level":"platform","outline":[[43.62,-78.3],[30.59,-60.26],[13.71,-31.41],[0.49,-7.38],[-34.38,56.85],[-37.48,55.01],[-25.58,34.14],[-14.86,15.32],[-13.63,13.23],[-15.26,12.55],[-4.6,-6.23],[6.34,-25.62],[20.94,-52.13],[26.81,-62.29],[39.78,-79.37]],"tracks":[{"stopId":"109S","path":[[-33.05,57.23],[8.49,-18.3],[21.86,-42.01],[32.02,-58.86],[45.07,-77.03]]}],"osmRef":"way/326119850","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[19.68,-53.98],[29.77,-71.8],[46.22,-62.49],[36.13,-44.67]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"EL178","kind":"elevator","lower":{"x":25.39,"z":-55.58,"level":"street"},"upper":{"x":25.39,"z":-55.58,"level":"platform"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL179","kind":"elevator","lower":{"x":37.25,"z":-54.36,"level":"street"},"upper":{"x":37.25,"z":-54.36,"level":"platform"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":30.72,"z":-59.77,"level":"street"},"upper":{"x":35.98,"z":-56.14,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":23.75,"z":-52.82,"level":"station-house"},"upper":{"x":21.73,"z":-49.25,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":33.23,"z":-47.46,"level":"station-house"},"upper":{"x":31.21,"z":-43.89,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":30.72,"z":-59.77,"type":"Station House","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

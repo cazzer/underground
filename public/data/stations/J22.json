@@ -1,0 +1,35 @@
+{
+  "stationId": "J22",
+  "name": "Cleveland St",
+  "anchor": {
+    "lat": 40.679909324003646,
+    "lon": -73.88477097892937
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-804714904","level":"platform","outline":[[-77.3,30.14],[75.53,-34.35],[77.31,-30.14],[-75.53,34.35]],"tracks":[{"stopId":"J22N","path":[[-74.6,35.15],[77.1,-28.44]]},{"stopId":"J22S","path":[[-77.7,27.97],[-76.77,27.59],[74.09,-35.65]]}],"osmRef":"way/804714904","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-87.36,32.21],[-68.88,24.41],[-65.54,32.31],[-84.03,40.11]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-74.42,"z":37.73,"level":"street"},"upper":{"x":-76.93,"z":30.98,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-79.1,"z":25.5,"level":"street"},"upper":{"x":-76.48,"z":32.2,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-68.13,"z":28.75,"level":"station-house"},"upper":{"x":-61.5,"z":25.95,"level":"platform"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-74.42,"z":37.73,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-79.1,"z":25.5,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

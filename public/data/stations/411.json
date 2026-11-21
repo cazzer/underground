@@ -1,0 +1,37 @@
+{
+  "stationId": "411",
+  "name": "Mt Eden Av",
+  "anchor": {
+    "lat": 40.844471702981814,
+    "lon": -73.91466468167997
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-425510345","level":"platform","outline":[[-35.86,77.79],[-34.24,78.48],[-25.54,66.25],[43.05,-60.83],[39.69,-62.37]],"tracks":[{"stopId":"411N","path":[[-37.05,76.84],[37.89,-62.21],[38.37,-63.09]]}],"osmRef":"way/425510345","sources":["generated","osm"]},
+    {"id":"way-425510346","level":"platform","outline":[[36.05,-77.65],[33.38,-79.14],[26.77,-68.53],[17.41,-51.1],[-28.87,34.6],[-40.07,55],[-42.24,59.59],[-38.86,61.2]],"tracks":[{"stopId":"411S","path":[[-37.37,61.51],[37.15,-76.64]]}],"osmRef":"way/425510346","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-10.19,-4.46],[1.26,-25.6],[20.74,-15.05],[9.3,6.09]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":8.39,"z":5.6,"level":"street"},"upper":{"x":6.96,"z":-1.45,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":1.23,"z":-25.61,"level":"street"},"upper":{"x":3.01,"z":-18.63,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-6.16,"z":-3.41,"level":"station-house"},"upper":{"x":-9.59,"z":2.92,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":6.35,"z":3.36,"level":"station-house"},"upper":{"x":2.92,"z":9.69,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":8.39,"z":5.6,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":1.23,"z":-25.61,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

@@ -1,0 +1,39 @@
+{
+  "stationId": "252",
+  "name": "Saratoga Av",
+  "anchor": {
+    "lat": 40.661462025365985,
+    "lon": -73.91631301185794
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-426103260","level":"platform","outline":[[-81.67,10.61],[79.58,-21],[79.07,-23.89],[-82.18,7.68]],"tracks":[{"stopId":"252N","path":[[-81.35,11.96],[78,-19.32],[78.98,-19.51]]}],"osmRef":"way/426103260","sources":["generated","osm"]},
+    {"id":"way-426103261","level":"platform","outline":[[-79.58,21.19],[-78.9,23.91],[82.01,-7.66],[81.45,-10.32],[61.39,-6.52],[-16.72,8.89]],"tracks":[{"stopId":"252S","path":[[-79.2,19.32],[79.47,-11.82],[80.44,-12]]}],"osmRef":"way/426103261","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[59.29,-22.1],[85.76,-27.29],[89.72,-7.12],[63.24,-1.92]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":64.95,"z":6.79,"level":"street"},"upper":{"x":67.22,"z":-3.21,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":88.47,"z":-11.39,"level":"street"},"upper":{"x":81.45,"z":-13.01,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":86.03,"z":-25.93,"level":"street"},"upper":{"x":80.89,"z":-20.89,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":60.94,"z":-18.85,"level":"station-house"},"upper":{"x":53.88,"z":-17.46,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":63.56,"z":-5.49,"level":"station-house"},"upper":{"x":56.5,"z":-4.11,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":64.95,"z":6.79,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":88.47,"z":-11.39,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":86.03,"z":-25.93,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

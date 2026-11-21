@@ -1,0 +1,41 @@
+{
+  "stationId": "715",
+  "name": "40 St-Lowery St",
+  "anchor": {
+    "lat": 40.74379279716897,
+    "lon": -73.92405256028354
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-426103090","level":"platform","outline":[[89.19,19.6],[-90.59,-8.08],[-90.9,-5.03],[52.92,16.95],[53.17,15.81],[89.02,21.29]],"tracks":[{"stopId":"715N","path":[[-89.67,-9.39],[88.14,17.75],[89.13,17.9]]}],"osmRef":"way/426103090","sources":["generated","osm"]},
+    {"id":"way-426103091","level":"platform","outline":[[-89.4,-18.5],[-88.84,-22.46],[55.63,-0.2],[55.52,1.1],[91.14,6.66],[90.96,8.53]],"tracks":[{"stopId":"715S","path":[[-89.16,-17.2],[-88.17,-17.04],[89.57,9.64],[90.56,9.79]]}],"osmRef":"way/426103091","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-26.44,-14.94],[-6.67,-11.91],[-9.92,9.38],[-29.69,6.35]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-11.82,"z":5.6,"level":"street"},"upper":{"x":-16.18,"z":-0.14,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-26.51,"z":3.69,"level":"street"},"upper":{"x":-20.82,"z":-0.73,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":-10.47,"z":-8.64,"level":"street"},"upper":{"x":-16.2,"z":-4.29,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":-24.54,"z":-11.08,"level":"street"},"upper":{"x":-20.16,"z":-5.36,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-8.25,"z":-8.2,"level":"station-house"},"upper":{"x":-1.13,"z":-7.11,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-10.38,"z":5.78,"level":"station-house"},"upper":{"x":-3.27,"z":6.87,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-11.82,"z":5.6,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-26.51,"z":3.69,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":-10.47,"z":-8.64,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":-24.54,"z":-11.08,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

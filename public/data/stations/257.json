@@ -1,0 +1,35 @@
+{
+  "stationId": "257",
+  "name": "New Lots Av",
+  "anchor": {
+    "lat": 40.66624848717375,
+    "lon": -73.88406246832622
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-426103249","level":"platform","outline":[[-76.92,12.55],[-76.05,17.13],[76.94,-12.51],[76,-17.17]],"tracks":[{"stopId":"257N","path":[[-77.13,11.29],[3.14,-4.36]]},{"stopId":"257S","path":[[-75.01,18.61],[4.01,3.12]]}],"osmRef":"way/426103249","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[55.18,-15.17],[74.81,-18.98],[76.48,-10.38],[56.85,-6.57]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":66.92,"z":-6.77,"level":"street"},"upper":{"x":65.63,"z":-13.86,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":64.3,"z":-21.06,"level":"street"},"upper":{"x":65.61,"z":-13.98,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":57,"z":-11.06,"level":"station-house"},"upper":{"x":49.93,"z":-9.69,"level":"platform"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":66.92,"z":-6.77,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":64.3,"z":-21.06,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

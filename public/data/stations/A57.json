@@ -1,0 +1,29 @@
+{
+  "stationId": "A57",
+  "name": "Grant Av",
+  "anchor": {
+    "lat": 40.67709634668198,
+    "lon": -73.86502506661436
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-904333063","level":"platform","outline":[[-73.81,58.2],[-68.49,64.48],[73.28,-58.92],[69.3,-63.24],[-53.02,41.91]],"tracks":[{"stopId":"A57N","path":[[-64.06,48.46],[-54.19,40.73],[18.03,-21.08],[67.8,-63.65],[68.55,-64.31]]},{"stopId":"A57S","path":[[-66.91,64.97],[-47.4,48.15],[73.43,-57.29]]}],"osmRef":"way/904333063","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-31.02,"z":27.42,"level":"platform"},"upper":{"x":-36.98,"z":31.53,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-36.98,"z":31.53,"type":"Station House","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

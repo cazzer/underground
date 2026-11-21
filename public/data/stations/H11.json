@@ -1,0 +1,35 @@
+{
+  "stationId": "H11",
+  "name": "Far Rockaway-Mott Av",
+  "anchor": {
+    "lat": 40.60395129282134,
+    "lon": -73.75548745401586
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":4.5,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":2.25,"depthSource":"structure-default"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-291384445","level":"platform","outline":[[-26.12,22.49],[-81.71,61.13],[-84.76,56.7],[-30.33,16.38],[81.31,-61.68],[85.78,-55.34]],"tracks":[{"stopId":"H11N","path":[[-85.58,55.02],[-84.84,54.42],[-73.27,45.15],[-42.23,22.19],[-32.95,15.83],[-3.17,-4.98],[8.12,-12.93]]},{"stopId":"H11S","path":[[-80.09,62.23],[-79.32,61.69],[-37.29,32.18],[-25.62,24.02],[14.58,-3.93]]}],"osmRef":"way/291384445","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[71.8,-57.84],[92.26,-72.21],[99.2,-62.33],[78.75,-47.95]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"EL497","kind":"elevator","lower":{"x":85.78,"z":-55.34,"level":"street"},"upper":{"x":85.78,"z":-55.34,"level":"platform"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL498","kind":"elevator","lower":{"x":85.78,"z":-55.34,"level":"street"},"upper":{"x":85.78,"z":-55.34,"level":"platform"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":110.55,"z":-78.47,"level":"street"},"upper":{"x":94.99,"z":-67.45,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":76.16,"z":-53.37,"level":"station-house"},"upper":{"x":73.22,"z":-51.3,"level":"platform"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":110.55,"z":-78.47,"type":"Station House","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

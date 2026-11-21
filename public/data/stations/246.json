@@ -1,0 +1,34 @@
+{
+  "stationId": "246",
+  "name": "Newkirk Av-Little Haiti",
+  "anchor": {
+    "lat": 40.63996889301014,
+    "lon": -73.94842323394649
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907188236","level":"platform","outline":[[-3.2,-78.44],[0.05,-78.7],[12.79,77.72],[9.52,77.99]],"tracks":[{"stopId":"246N","path":[[-4.43,-77.35],[8.21,78.09]]}],"osmRef":"way/907188236","sources":["generated","osm"]},
+    {"id":"way-907188458","level":"platform","outline":[[3.19,78.43],[-0.06,78.57],[-12.78,-77.73],[-9.53,-77.95]],"tracks":[{"stopId":"246S","path":[[-8.22,-78.04],[4.43,77.38]]}],"osmRef":"way/907188458","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-4.84,"z":-0.21,"level":"platform"},"upper":{"x":-21.32,"z":8.36,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":4.71,"z":-1.29,"level":"platform"},"upper":{"x":21.96,"z":4.54,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":-12.78,"z":-77.73,"level":"platform"},"upper":{"x":-14.66,"z":-86.08,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-21.32,"z":8.36,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":21.96,"z":4.54,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":-14.66,"z":-86.08,"type":"Stair","entry":false,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

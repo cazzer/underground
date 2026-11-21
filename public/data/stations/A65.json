@@ -1,0 +1,44 @@
+{
+  "stationId": "A65",
+  "name": "Ozone Park-Lefferts Blvd",
+  "anchor": {
+    "lat": 40.685955450505645,
+    "lon": -73.82578751748605
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-426287763","level":"platform","outline":[[-95.97,12.11],[-95.89,12.64],[-95.02,12.63],[-93.85,13.25],[-93.69,14.93],[-94.76,15.78],[-95.47,15.92],[-95.36,16.96],[56.5,-3.95],[73.86,-6.73],[86.02,-9.21],[95.06,-11.19],[96.14,-11.65],[94.39,-18.15],[92.41,-17.47],[84.44,-15.83],[73.07,-13.17],[55.31,-9.61],[12.69,-3.84],[-31.36,2.43],[-67.2,7.69],[-87.05,10.91]],"tracks":[{"stopId":"A65N","path":[[-95.72,10.26],[-81.39,8.26],[-3.15,-3.09],[3.72,-4.08]]},{"stopId":"A65S","path":[[-94.85,18.42],[-0.53,5.05],[5.41,4.22]]}],"osmRef":"way/426287763","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house 1","outline":[[-111.54,9.99],[-86.8,6.37],[-84.98,18.8],[-109.72,22.42]],"sources":["generated"]},
+    {"id":"slab-2","level":"station-house","name":"Station house 2","outline":[[83.64,-27.98],[108.37,-31.6],[111.54,-9.99],[86.8,-6.37]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"EL462","kind":"elevator","lower":{"x":105.2,"z":-30.13,"level":"street"},"upper":{"x":105.2,"z":-30.13,"level":"station-house"},"width":2,"sources":["nyopendata"]},
+    {"id":"EL463","kind":"elevator","lower":{"x":96.14,"z":-11.65,"level":"station-house"},"upper":{"x":96.14,"z":-11.65,"level":"platform"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-106.34,"z":22.81,"level":"street"},"upper":{"x":-101.36,"z":17.62,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-109.06,"z":7.28,"level":"street"},"upper":{"x":-103.05,"z":11.24,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":125.13,"z":-18.25,"level":"street"},"upper":{"x":109.97,"z":-17.28,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-05","kind":"stair","lower":{"x":119.98,"z":-33,"level":"street"},"upper":{"x":108.34,"z":-28.36,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-86.8,"z":13.3,"level":"station-house"},"upper":{"x":-79.67,"z":12.26,"level":"platform"},"width":2.4,"sources":["generated"]},
+    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":86.93,"z":-12.38,"level":"station-house"},"upper":{"x":79.81,"z":-11.34,"level":"platform"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-106.34,"z":22.81,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-109.06,"z":7.28,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":125.13,"z":-18.25,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":105.2,"z":-30.13,"type":"Elevator","entry":true,"exit":true,"connectors":["EL462"],"sources":["nyopendata"]},
+    {"id":"ent-05","x":119.98,"z":-33,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

@@ -1,0 +1,35 @@
+{
+  "stationId": "L27",
+  "name": "New Lots Av",
+  "anchor": {
+    "lat": 40.65873115931586,
+    "lon": -73.89923478844156
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.8
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-542263802","level":"platform","outline":[[-14.96,-95.61],[-12.86,-96.01],[-3.95,-49.86],[0.12,-28.78],[4.14,-7.99],[8.05,12.26],[17.96,63.55],[15.76,63.95],[5.88,12.66],[-5.98,-49.55]],"tracks":[{"stopId":"L27N","path":[[0.45,-7.56],[14.11,63.28],[14.28,64.21]]}],"osmRef":"way/542263802","sources":["generated","osm"]},
+    {"id":"way-542263803","level":"platform","outline":[[14.96,95.57],[12.81,96.02],[-2.9,14.51],[-6.92,-6.3],[-12.87,-37.2],[-14.43,-45.25],[-18.13,-64.45],[-16.04,-64.9],[-12.31,-45.61],[-0.77,14.15]],"tracks":[{"stopId":"L27S","path":[[-3.19,-6.8],[16.3,93.89],[16.46,94.79]]}],"osmRef":"way/542263803","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-0.29,-41.63],[3.5,-21.99],[-11.43,-19.11],[-15.21,-38.75]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-6.72,"z":-30.21,"level":"street"},"upper":{"x":0.35,"z":-31.57,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":0.27,"z":-22.39,"level":"station-house"},"upper":{"x":1.63,"z":-15.32,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-8.59,"z":-20.68,"level":"station-house"},"upper":{"x":-7.23,"z":-13.61,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-6.72,"z":-30.21,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

@@ -1,0 +1,41 @@
+{
+  "stationId": "601",
+  "name": "Pelham Bay Park",
+  "anchor": {
+    "lat": 40.85252118544321,
+    "lon": -73.82799796602335
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":8.32,"depthSource":"ee-rise"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":3.9,"depthSource":"ee-rise"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-425936110","level":"platform","outline":[[69.94,-44.58],[-71.91,40.71],[-69.83,44.77],[71.98,-40.97]],"tracks":[{"stopId":"601N","path":[[-68.4,45.8],[-58.36,39.78],[-3.83,6.89]]},{"stopId":"601S","path":[[-72.99,39.46],[-62.15,32.88],[-7.63,0.15]]}],"osmRef":"way/425936110","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[58.95,-43.44],[85.04,-59.17],[90.74,-49.72],[64.65,-33.98]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"EL122","kind":"elevator","lower":{"x":69.94,"z":-44.58,"level":"station-house"},"upper":{"x":69.94,"z":-44.58,"level":"platform"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"ES120","kind":"escalator","lower":{"x":84.69,"z":-57.8,"level":"street"},"upper":{"x":84.69,"z":-57.8,"level":"station-house"},"width":1.2,"travel":"up","sources":["nyopendata"]},
+    {"id":"ES121","kind":"escalator","lower":{"x":69.94,"z":-44.58,"level":"station-house"},"upper":{"x":69.94,"z":-44.58,"level":"platform"},"width":1.2,"travel":"up","sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":169.33,"z":13.78,"level":"street"},"upper":{"x":90.05,"z":-49.89,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":80.99,"z":-33.67,"level":"street"},"upper":{"x":76.76,"z":-41.87,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":69.47,"z":-54.58,"level":"street"},"upper":{"x":72.95,"z":-49.4,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":63.3,"z":-38.16,"level":"station-house"},"upper":{"x":57.24,"z":-34.51,"level":"platform"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":169.33,"z":13.78,"type":"Overpass","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":80.99,"z":-33.67,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":69.47,"z":-54.58,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":84.69,"z":-57.8,"type":"Escalator","entry":true,"exit":false,"connectors":["ES120"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

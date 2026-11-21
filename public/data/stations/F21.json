@@ -1,0 +1,46 @@
+{
+  "stationId": "F21",
+  "name": "Carroll St",
+  "anchor": {
+    "lat": 40.68017856511982,
+    "lon": -73.99503772432887
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-4.5,"depthSource":"osm-level"},
+    {"id":"platform","name":"Platform","kind":"platform","y":-9,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-903989649","level":"platform","outline":[[56.12,-75.53],[51.1,-67.05],[-44.1,84.56],[-39.87,86.92],[54.15,-65.56],[59.09,-74.08]],"tracks":[{"stopId":"F21N","path":[[22.94,-25.62],[49.47,-67.76],[53.73,-74.7],[54.74,-76.39]]}],"osmRef":"way/903989649","sources":["generated","osm"]},
+    {"id":"way-903989650","level":"platform","outline":[[39.85,-86.88],[34.83,-78.42],[-60.38,73.2],[-56.66,75.56],[38.78,-75.11],[44.25,-84.47]],"tracks":[{"stopId":"F21S","path":[[-1.3,-8.35],[40.12,-73.94],[45.37,-82.81]]}],"osmRef":"way/903989650","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine 1","outline":[[-70.55,85.69],[-56.78,63.69],[-32.49,78.9],[-46.26,100.9]],"sources":["generated"]},
+    {"id":"slab-2","level":"mezzanine","name":"Mezzanine 2","outline":[[32.51,-78.93],[46.26,-100.9],[70.55,-85.69],[56.8,-63.72]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-57.71,"z":93.14,"level":"mezzanine"},"upper":{"x":-62.35,"z":101.02,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-36.15,"z":83.8,"level":"mezzanine"},"upper":{"x":-20.66,"z":91.15,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":54.6,"z":-76.71,"level":"mezzanine"},"upper":{"x":58.05,"z":-70.39,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":59.19,"z":-84.25,"level":"mezzanine"},"upper":{"x":66.17,"z":-86.01,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-05","kind":"stair","lower":{"x":50.97,"z":-97.36,"level":"mezzanine"},"upper":{"x":51.2,"z":-105.08,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-49.88,"z":60.69,"level":"platform"},"upper":{"x":-53.7,"z":66.79,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-32.98,"z":71.27,"level":"platform"},"upper":{"x":-36.8,"z":77.38,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":33.26,"z":-71.14,"level":"platform"},"upper":{"x":37.08,"z":-77.25,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":49.36,"z":-61.07,"level":"platform"},"upper":{"x":53.18,"z":-67.17,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-62.35,"z":101.02,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-20.66,"z":91.15,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":58.05,"z":-70.39,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":66.17,"z":-86.01,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]},
+    {"id":"ent-05","x":51.2,"z":-105.08,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

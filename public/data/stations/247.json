@@ -1,0 +1,44 @@
+{
+  "stationId": "247",
+  "name": "Flatbush Av-Brooklyn College",
+  "anchor": {
+    "lat": 40.632888699999995,
+    "lon": -73.94766824999999
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-15.65,"depthSource":"ee-rise"}
+  ],
+  "platforms": [
+    {"id":"way-907187741","level":"platform","outline":[[-9.41,-77.66],[-12.69,-77.46],[-0.32,78.15],[2.88,77.98]],"tracks":[{"stopId":"247S","path":[[-8.09,-77.74],[-1.05,11.49]]}],"osmRef":"way/907187741","sources":["generated","osm"]},
+    {"id":"way-907187742","level":"platform","outline":[[9.21,77.65],[12.69,77.46],[0.18,-78.3],[-3.08,-78.08]],"tracks":[{"stopId":"247N","path":[[-4.31,-77],[2.42,8.29]]}],"osmRef":"way/907187742","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"EL319","kind":"elevator","lower":{"x":8.57,"z":47.66,"level":"platform"},"upper":{"x":8.57,"z":47.66,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":2.88,"z":77.98,"level":"platform"},"upper":{"x":0.13,"z":114.7,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":7.7,"z":36.72,"level":"platform"},"upper":{"x":15.51,"z":61.21,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":7.57,"z":35.05,"level":"platform"},"upper":{"x":23.56,"z":58.9,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-05","kind":"stair","lower":{"x":4.05,"z":-9.15,"level":"platform"},"upper":{"x":24.46,"z":14.34,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-06","kind":"stair","lower":{"x":3,"z":-22.29,"level":"platform"},"upper":{"x":11.02,"z":2.19,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-07","kind":"stair","lower":{"x":-6.46,"z":-19.71,"level":"platform"},"upper":{"x":-22.06,"z":-43.59,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-08","kind":"stair","lower":{"x":-6.65,"z":-22.13,"level":"platform"},"upper":{"x":-14.27,"z":-46.65,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":0.13,"z":114.7,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":15.51,"z":61.21,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":23.56,"z":58.9,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":12.68,"z":47.34,"type":"Elevator","entry":true,"exit":true,"connectors":["EL319"],"sources":["nyopendata"]},
+    {"id":"ent-05","x":24.46,"z":14.34,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]},
+    {"id":"ent-06","x":11.02,"z":2.19,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-06"],"sources":["nyopendata"]},
+    {"id":"ent-07","x":-22.06,"z":-43.59,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-07"],"sources":["nyopendata"]},
+    {"id":"ent-08","x":-14.27,"z":-46.65,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-08"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}
