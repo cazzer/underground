@@ -393,7 +393,9 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   `width`. Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
   outages. Elevators, and escalators from the E&E inventory, have identical x/z at both ends (the renderer
   gives such an escalator a 30 degree run; when an entrance lists it and it sits there, its street end is pinned
-  at the entrance: the upper end below ground, the lower end at an elevated station).
+  at the entrance: the upper end below ground, the lower end at an elevated station). An escalator override's
+  `ends` (escalators only, instead of `at`) gives it a run of its own; generated escalators always have one, sized
+  about 30 degrees at the drawn rise (`DRAWN_Y_SCALE` in `scripts/lib/templates/stairs.ts`, kept equal to `?interiorY`).
 - `entrances` are street-level points (raw NY Open Data type, entry/exit) listing the `connectors`
   that reach them. An entrance is whichever connector end sits on the street level: the upper end below ground,
   the lower end at an elevated station (street 0 is the lowest level; the other levels have positive `y`). The

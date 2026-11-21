@@ -5,7 +5,8 @@ is shipped to the site.
 
 An authored `{ "entrance": ... }` connector end, and an E&E machine's `entrance` override, go on whichever
 end is at the street: the upper end below ground, the lower end at an elevated station (where the street,
-y 0, is the lowest level).
+y 0, is the lowest level). An escalator override may give `ends` (`{ "lower": [u, v], "upper": [u, v] }`, by elevation) instead of `at`
+for a run of its own; with an `entrance`, its street end sits on the entrance point.
 
 This project is not endorsed by the MTA. Data may not be real time and is not guaranteed to
 be accurate.
