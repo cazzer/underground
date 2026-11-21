@@ -5,6 +5,7 @@ import { Vector3, type PerspectiveCamera } from 'three'
 import { useFocus } from '../lib/focus'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { nextFocus, type FocusInput } from '../lib/focusMachine'
+import { flightDistance, flightDuration, flightProgress } from '../lib/flight'
 import { frameBounds, type Insets, type Viewport } from '../lib/framing'
 import { frameInterior, interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
@@ -19,14 +20,22 @@ const MAX_ZOOM_OUT = 1.3
 /** Camera distance after clicking a station: inside the fully-tilted range. */
 const FOCUS_DISTANCE = 170
 
-interface Flight {
+interface Destination {
   stationId: string
   target: Vector3
   distance: number
 }
 
+/** A destination plus where the flight started; progress is eased by expoInOut (src/lib/flight.ts). */
+interface Flight extends Destination {
+  from: Vector3
+  fromDistance: number
+  elapsed: number
+  duration: number
+}
+
 /** Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal. */
-function interiorFlight(model: InteriorModel, viewport: Viewport, insets: Insets, panel: ScreenRect | null, fovDeg: number): Flight {
+function interiorFlight(model: InteriorModel, viewport: Viewport, insets: Insets, panel: ScreenRect | null, fovDeg: number): Destination {
   const free = interiorFreeRect(viewport, insets, panel)
   const { distance, target } = frameInterior({ center: model.focusCenter, viewport, free, fovDeg })
   return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance }
@@ -89,17 +98,31 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     if (!station) throw new Error(`Fly request for unknown station "${flyRequest.stationId}"`)
     hold.current = null
     const l = latest.current
-    flight.current =
+    const c = controls.current
+    if (!c) throw new Error('Fly request before the map controls mounted')
+    const dest =
       l.interior?.stationId === station.id
         ? interiorFlight(l.interior, l.size, l.insets, l.panel, camera.fov)
         : { stationId: station.id, target: new Vector3(station.pos.x, 0, station.pos.z), distance: FOCUS_DISTANCE }
+    const fromDistance = camera.position.distanceTo(c.target)
+    flight.current = {
+      ...dest,
+      from: c.target.clone(),
+      fromDistance,
+      elapsed: 0,
+      duration: flightDuration(fromDistance, dest.distance),
+    }
   }, [flyRequest, network, camera])
 
   // The interior (first visit) or the panel's measurement can land mid-flight: retarget that
-  // flight. Focus reached by zooming has no flight, and the camera never moves on its own.
+  // flight's destination, keeping its start and progress. Focus reached by zooming has no flight,
+  // and the camera never moves on its own.
   useEffect(() => {
-    if (interior && flight.current?.stationId === interior.stationId) {
-      flight.current = interiorFlight(interior, size, insets, panel, camera.fov)
+    const f = flight.current
+    if (interior && f?.stationId === interior.stationId) {
+      const dest = interiorFlight(interior, size, insets, panel, camera.fov)
+      f.target = dest.target
+      f.distance = dest.distance
     }
   }, [interior, panel, size, insets, camera])
 
@@ -111,14 +134,16 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
 
     const f = flight.current
     if (f) {
-      const k = 1 - Math.exp(-delta * 4)
-      const step = scratch.current.copy(f.target).sub(c.target).multiplyScalar(k)
+      f.elapsed += delta
+      const e = flightProgress(f.elapsed, f.duration)
+      // Move the camera with the target so the view direction holds, then set the eased distance.
+      const step = scratch.current.copy(f.from).lerp(f.target, e).sub(c.target)
       c.target.add(step)
       camera.position.add(step)
-      distance += (f.distance - distance) * k
+      distance = flightDistance(f.fromDistance, f.distance, e)
       const offset = scratch.current.copy(camera.position).sub(c.target).setLength(distance)
       camera.position.copy(c.target).add(offset)
-      if (c.target.distanceTo(f.target) < 0.5 && Math.abs(distance - f.distance) < 1) flight.current = null
+      if (e >= 1) flight.current = null
     } else if (hold.current && focusedId !== hold.current.stationId) {
       hold.current = null
     } else if (hold.current && !shouldReleaseHold(hold.current, distance, c.target)) {

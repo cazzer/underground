@@ -6,7 +6,6 @@ import { scheduleLabel } from '../lib/labels'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import type { Network } from '../lib/network'
-import { theme } from '../theme'
 import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
 import { LiveStatus } from './LiveStatus'
@@ -132,7 +131,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel }: Hu
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
       <header ref={header}>
         <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
-        <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)} / theme: {theme.name}</p>
+        <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)}</p>
         <LiveStatus status={live} />
       </header>
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
