@@ -11,6 +11,10 @@ export function SubwayLines() {
           points={route.points.map((p) => [p.x, 0, p.z] as [number, number, number])}
           color={theme.lines[route.colorIndex % theme.lines.length]}
           lineWidth={theme.lineWidth}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+          renderOrder={1}
         />
       ))}
     </group>

@@ -9,7 +9,12 @@ import { cameraDistance, screenScale } from './cameraDistance'
 const MARKER_PX = 8
 const MARKER_MIN_METERS = 6
 
-function StationMarker({ station, focused }: { station: Station; focused: boolean }) {
+interface StationMarkerProps {
+  station: Station
+  focused: boolean
+}
+
+function StationMarker({ station, focused }: StationMarkerProps) {
   const group = useRef<Group>(null)
   const { select } = useFocus()
 
@@ -29,12 +34,13 @@ function StationMarker({ station, focused }: { station: Station; focused: boolea
         onPointerOut={() => (document.body.style.cursor = '')}
       >
         <circleGeometry args={[1, 24]} />
-        <meshBasicMaterial color={theme.stationFill} depthTest={false} depthWrite={false} />
+        <meshBasicMaterial color={theme.stationFill} transparent depthTest={false} depthWrite={false} />
       </mesh>
       <mesh renderOrder={3}>
         <ringGeometry args={[focused ? 1.1 : 0.78, focused ? 1.5 : 1, 24]} />
         <meshBasicMaterial
           color={focused ? theme.stationFocus : theme.stationStroke}
+          transparent
           depthTest={false}
           depthWrite={false}
         />
