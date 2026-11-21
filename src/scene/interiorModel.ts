@@ -18,10 +18,6 @@ export interface InteriorModel {
   labels: LevelLabel[]
   /** Ground target that puts the plan center at mid-depth mid-screen, seen isometrically. */
   focusCenter: Ground
-  /** Plan extent (meters east-west and north-south) and scaled depth, for framing beside the HUD. */
-  width: number
-  length: number
-  depth: number
   /** Look B's cutaway outline (group-local), or null. */
   hull: LocalPoint[] | null
   yScale: number
@@ -88,7 +84,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     colorOf,
   })
   // Throws for an interior with nothing to draw, so it becomes an error load.
-  const bounds = interiorBounds(interior)
+  interiorBounds(interior)
   const origin = toGround(interior.anchor)
   const hull =
     interiorLook.veil === 'footprint'
@@ -101,9 +97,6 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     fine: hull ? withCutLine(fine, hull, colorOf('fare', 0)) : fine,
     labels: levelLabels(interior, yScale),
     focusCenter: interiorFocusTarget(origin, interior, yScale, Math.tan(ISO_POLAR)),
-    width: bounds.maxX - bounds.minX,
-    length: bounds.maxZ - bounds.minZ,
-    depth: -Math.min(...interior.levels.map((l) => l.y)) * yScale,
     hull,
     yScale,
   }

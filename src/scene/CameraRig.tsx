@@ -8,7 +8,7 @@ import { nextFocus, type FocusInput } from '../lib/focusMachine'
 import { frameBounds, type Insets, type Viewport } from '../lib/framing'
 import { frameInterior, interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
-import { DEFAULT_TILT, ISO_POLAR, tiltForDistance } from '../lib/tilt'
+import { tiltForDistance } from '../lib/tilt'
 import type { InteriorModel } from './interiorModel'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
@@ -18,8 +18,6 @@ const MIN_DISTANCE = 40
 const MAX_ZOOM_OUT = 1.3
 /** Camera distance after clicking a station: inside the fully-tilted range. */
 const FOCUS_DISTANCE = 170
-/** Closest camera distance after clicking a station with an interior: where it is fully revealed. */
-const INTERIOR_FOCUS_DISTANCE = DEFAULT_TILT.nearDistance
 
 interface Flight {
   stationId: string
@@ -27,19 +25,10 @@ interface Flight {
   distance: number
 }
 
-/** Fly-to that fits the interior into the screen area the HUD leaves free and centers it there. */
+/** Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal. */
 function interiorFlight(model: InteriorModel, viewport: Viewport, insets: Insets, panel: ScreenRect | null, fovDeg: number): Flight {
-  const { distance, target } = frameInterior({
-    center: model.focusCenter,
-    width: model.width,
-    length: model.length,
-    depth: model.depth,
-    viewport,
-    free: interiorFreeRect(viewport, insets, panel),
-    fovDeg,
-    polar: ISO_POLAR,
-    minDistance: INTERIOR_FOCUS_DISTANCE,
-  })
+  const free = interiorFreeRect(viewport, insets, panel)
+  const { distance, target } = frameInterior({ center: model.focusCenter, viewport, free, fovDeg })
   return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance }
 }
 

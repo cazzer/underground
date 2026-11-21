@@ -98,6 +98,33 @@ describe('levelLabels', () => {
     expect(z).toBeCloseTo(2)
   })
 
+  it('finds the same edge for either winding', () => {
+    const reversed = { ...interior, platforms: [{ ...interior.platforms[0]!, outline: [...interior.platforms[0]!.outline].reverse() }] }
+    expect(levelLabels(reversed, 2)).toEqual(levelLabels(interior, 2))
+    expect(levelLabels(reversed, 2)[1]!.position).toEqual([0, -16, 5])
+  })
+
+  it('takes the outward side from the winding, not the centroid, for a concave outline', () => {
+    // A U open to the south. The notch's top edge faces south into open space, but the vertex
+    // centroid lies south of it, so a centroid test would point its normal north.
+    const u: LocalPoint[] = [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [8, 10],
+      [8, 2],
+      [2, 2],
+      [2, 10],
+      [0, 10],
+    ]
+    for (const outline of [u, [...u].reverse()]) {
+      const level = { ...interior, slabs: [], platforms: [{ ...interior.platforms[0]!, outline }] }
+      const [x, , z] = levelLabels(level, 1, 1)[0]!.position
+      expect(x).toBeCloseTo(5)
+      expect(z).toBeCloseTo(3)
+    }
+  })
+
   it('uses the westmost outline when a level has several', () => {
     const east: LocalPoint[] = [
       [40, 0],

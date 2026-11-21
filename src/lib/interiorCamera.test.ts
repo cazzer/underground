@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { frameInterior, interiorFreeRect, type InteriorFrameInput } from './interiorCamera'
+import { ENTER_RADIUS, EXIT_DISTANCE } from './focusMachine'
+import { interiorOpacity } from './interiorReveal'
 import { ISO_POLAR } from './tilt'
 
 const viewport = { width: 1440, height: 900 }
@@ -22,45 +24,49 @@ describe('interiorFreeRect', () => {
   })
 })
 
-const base: InteriorFrameInput = {
-  center: { x: 1000, z: 2000 },
-  width: 50,
-  length: 40,
-  depth: 18,
-  viewport,
-  free: { left: 0, top: 0, right: 1440, bottom: 900 },
-  fovDeg: 35,
-  polar: ISO_POLAR,
-  minDistance: 180,
-  pad: 0,
-}
-const mpp = (d: number) => (2 * d * Math.tan((35 * Math.PI) / 360)) / 900
+const center = { x: 1000, z: 2000 }
+const mpp = (d: number, height: number) => (2 * d * Math.tan((35 * Math.PI) / 360)) / height
 
 describe('frameInterior', () => {
-  it('keeps the minimum distance and the center when it fits the whole viewport', () => {
-    expect(frameInterior(base)).toEqual({ distance: 180, target: { x: 1000, z: 2000 } })
+  const cases: [string, InteriorFrameInput][] = [
+    [
+      'desktop 1440x900, panel on the right',
+      { center, viewport, fovDeg: 35, free: interiorFreeRect(viewport, insets, { left: 1136, top: 628, right: 1424, bottom: 884 }) },
+    ],
+    [
+      'phone 390x844, panel stacked above the footer',
+      {
+        center,
+        viewport: { width: 390, height: 844 },
+        fovDeg: 35,
+        free: interiorFreeRect({ width: 390, height: 844 }, { top: 80, bottom: 70 }, { left: 16, top: 470, right: 374, bottom: 770 }),
+      },
+    ],
+    ['a tiny free rect', { center, viewport, fovDeg: 35, free: { left: 0, top: 70, right: 40, bottom: 90 } }],
+  ]
+
+  it.each(cases)('%s: stays at full reveal and keeps the station focused', (_, input) => {
+    const { distance, target } = frameInterior(input)
+    expect(distance).toBeLessThanOrEqual(180)
+    expect(interiorOpacity(distance)).toBe(1)
+    expect(distance).toBeLessThan(EXIT_DISTANCE)
+    // The view center stays close enough that the camera-driven focus keeps this station.
+    expect(Math.hypot(target.x - center.x, target.z - center.z)).toBeLessThan(ENTER_RADIUS)
   })
 
-  it('pulls back until the plan width fits the free width', () => {
-    const { distance } = frameInterior({ ...base, width: 200 })
-    expect(200 / mpp(distance)).toBeCloseTo(1440)
-  })
-
-  it('pulls back for the projected height: length at cos, depth at sin', () => {
-    const { distance } = frameInterior({ ...base, length: 250, depth: 30 })
-    const h = 250 * Math.cos(ISO_POLAR) + 30 * Math.sin(ISO_POLAR)
-    expect(h / mpp(distance)).toBeCloseTo(900)
+  it('keeps the center when the free rect is the whole viewport', () => {
+    const free = { left: 0, top: 0, right: 1440, bottom: 900 }
+    expect(frameInterior({ center, viewport, free, fovDeg: 35 })).toEqual({ distance: 180, target: center })
   })
 
   it('shifts the target east when the free rect is left of center, so the interior moves left', () => {
-    const { distance, target } = frameInterior({ ...base, free: { left: 0, top: 0, right: 1120, bottom: 900 } })
-    expect(distance).toBe(180)
-    expect(target.x).toBeCloseTo(1000 + 160 * mpp(180))
+    const { target } = frameInterior({ center, viewport, fovDeg: 35, free: { left: 0, top: 0, right: 1120, bottom: 900 } })
+    expect(target.x).toBeCloseTo(1000 + 160 * mpp(180, 900))
     expect(target.z).toBe(2000)
   })
 
   it('shifts the target north when the free band is below center, like frameBounds', () => {
-    const { target } = frameInterior({ ...base, free: { left: 0, top: 100, right: 1440, bottom: 900 } })
-    expect(target.z).toBeCloseTo(2000 - (50 * mpp(180)) / Math.cos(ISO_POLAR))
+    const { target } = frameInterior({ center, viewport, fovDeg: 35, free: { left: 0, top: 100, right: 1440, bottom: 900 } })
+    expect(target.z).toBeCloseTo(2000 - (50 * mpp(180, 900)) / Math.cos(ISO_POLAR))
   })
 })

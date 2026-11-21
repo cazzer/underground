@@ -59,11 +59,19 @@ export interface LevelLabel {
 
 /**
  * Midpoint of the outline edge that faces south (toward the camera) the most, weighted by length,
- * pushed `gap` meters outward. Outward is away from the outline's vertex centroid.
+ * pushed `gap` meters outward.
  */
 function southEdgeAnchor(outline: readonly LocalPoint[], gap: number): LocalPoint {
-  const cx = outline.reduce((s, p) => s + p[0], 0) / outline.length
-  const cz = outline.reduce((s, p) => s + p[1], 0) / outline.length
+  // Shoelace: twice the signed area. Its sign says which side of each edge is outside, for
+  // either winding and for concave outlines too.
+  let area2 = 0
+  for (let i = 0; i < outline.length; i++) {
+    const a = outline[i]!
+    const b = outline[(i + 1) % outline.length]!
+    area2 += a[0] * b[1] - b[0] * a[1]
+  }
+  if (area2 === 0) throw new Error('Outline has no area')
+  const side = Math.sign(area2)
   let best: { score: number; at: LocalPoint } | null = null
   for (let i = 0; i < outline.length; i++) {
     const a = outline[i]!
@@ -72,13 +80,9 @@ function southEdgeAnchor(outline: readonly LocalPoint[], gap: number): LocalPoin
     const mz = (a[1] + b[1]) / 2
     const len = Math.hypot(b[0] - a[0], b[1] - a[1])
     if (len === 0) continue
-    // Unit normal, flipped to point away from the centroid.
-    let nx = (b[1] - a[1]) / len
-    let nz = -(b[0] - a[0]) / len
-    if (nx * (mx - cx) + nz * (mz - cz) < 0) {
-      nx = -nx
-      nz = -nz
-    }
+    // Outward unit normal.
+    const nx = (side * (b[1] - a[1])) / len
+    const nz = (-side * (b[0] - a[0])) / len
     const score = nz * len
     if (!best || score > best.score) best = { score, at: [mx + nx * gap, mz + nz * gap] }
   }

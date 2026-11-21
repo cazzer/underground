@@ -1,6 +1,6 @@
 import { Html } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
 import type { Network } from '../lib/network'
 import { interiorOpacity } from '../lib/interiorReveal'
@@ -37,6 +37,8 @@ export function StationInterior({ model, network, onRevealed }: StationInteriorP
   const labels = useRef<(HTMLDivElement | null)[]>([])
   const shown = useRef(-1)
   const revealed = useRef<boolean | null>(null)
+  // Unmounting (focus moved on, or the load was replaced) hides the interior.
+  useEffect(() => () => onRevealed(false), [onRevealed])
   const { under } = interiorLook
   const strong = useLineLayer(model.strong, under ? RENDER_ORDER.interiorUnder : RENDER_ORDER.interior, theme.interiorLineWidth)
   const fine = useLineLayer(
