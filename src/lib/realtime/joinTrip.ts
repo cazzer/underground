@@ -1,5 +1,5 @@
 import { parseTripId, shapeIdOf, tripKey } from '../../data/codec'
-import type { ShapeId } from '../../data/schema'
+import type { Direction, ShapeId } from '../../data/schema'
 import type { RealtimeTrip } from '../../data/realtime'
 import { addDays, nyDate, servicesOn } from './serviceDate'
 import { primaryKey, type TripLookup } from './tripLookup'
@@ -13,15 +13,28 @@ export type JoinResult =
   | { matched: true; shapeId: ShapeId; stage: JoinStage }
   | { matched: false; reason: 'unparseable-id' | 'unknown-route' }
 
-/** Several shapes can share a key: prefer ones that call at the train's stop, then the route's primary, then the first. */
-function pickShape(shapes: readonly ShapeId[], stopId: string | null, lookup: TripLookup): ShapeId {
-  const calling = stopId ? shapes.filter((s) => lookup.patterns[s]?.stops.includes(stopId)) : []
-  const pool = calling.length > 0 ? calling : shapes
-  const isPrimary = (s: ShapeId): boolean => {
-    const pattern = lookup.patterns[s]
-    return !!pattern && lookup.primary.get(primaryKey(pattern.routeId, pattern.direction)) === s
-  }
-  return pool.find(isPrimary) ?? pool[0]!
+/** Keeps the shapes that satisfy `keep`, or all of them when none do. */
+function narrow(shapes: readonly ShapeId[], keep: (s: ShapeId) => boolean): readonly ShapeId[] {
+  const kept = shapes.filter(keep)
+  return kept.length > 0 ? kept : shapes
+}
+
+/**
+ * Several shapes can share a key (an N and a W shape, or two paths of one route). Prefer the train's own
+ * route, then shapes calling at its stop, then the primary shape of the route that produced the key hit.
+ */
+function pickShape(
+  candidates: readonly ShapeId[],
+  trip: Pick<RealtimeTrip, 'route' | 'stopId'>,
+  routeOfHit: string,
+  direction: Direction,
+  lookup: TripLookup,
+): ShapeId {
+  let pool = narrow(candidates, (s) => lookup.patterns[s]?.routeId === trip.route)
+  const { stopId } = trip
+  if (stopId) pool = narrow(pool, (s) => lookup.patterns[s]?.stops.includes(stopId) ?? false)
+  const primary = lookup.primary.get(primaryKey(routeOfHit, direction))
+  return pool.find((s) => s === primary) ?? pool[0]!
 }
 
 export function joinTrip(
@@ -38,8 +51,12 @@ export function joinTrip(
   }
 
   const routes = p.route === trip.route ? [p.route] : [p.route, trip.route]
-  const today = nyDate(now)
-  const dates = trip.startDate ? [trip.startDate] : [today, addDays(today, -1)]
+  let dates: string[]
+  if (trip.startDate) dates = [trip.startDate]
+  else {
+    const today = nyDate(now)
+    dates = [today, addDays(today, -1)]
+  }
   for (const date of dates) {
     const candidates = [
       { day: date, origin: p.origin },
@@ -49,7 +66,9 @@ export function joinTrip(
       for (const service of servicesOn(day, lookup.calendar, lookup.exceptions)) {
         for (const route of routes) {
           const shapes = lookup.keys.get(service)?.get(tripKey(origin, route, p.direction))
-          if (shapes) return { matched: true, shapeId: pickShape(shapes, trip.stopId, lookup), stage: 'tripKey' }
+          if (shapes) {
+            return { matched: true, shapeId: pickShape(shapes, trip, route, p.direction, lookup), stage: 'tripKey' }
+          }
         }
       }
     }

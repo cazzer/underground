@@ -39,5 +39,7 @@ export function servicesOn(
 
 /** New York calendar date (YYYYMMDD) of an epoch-seconds instant. */
 export function nyDate(epochSec: number): string {
-  return NY_DATE.format(new Date(epochSec * 1000)).replaceAll('-', '')
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    NY_DATE.formatToParts(new Date(epochSec * 1000)).find((p) => p.type === type)!.value
+  return part('year') + part('month') + part('day')
 }

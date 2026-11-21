@@ -55,6 +55,7 @@ const clamp01 = (v: number): number => Math.min(Math.max(v, 0), 1)
 function chooseHop(input: PositionInput): Hop | PositionResult {
   const { geometry, status, stopId, arrivals, now } = input
   const stops = geometry.stops
+  // Linear scans per call are fine at ~340 trips; 8x4.7 can cache the hop per trip per poll if profiling asks.
   const arrivalAt = (stop: StopId): number | undefined => arrivals.find((a) => a[0] === stop)?.[1]
   const atOrigin = (tN: number): Hop => ({ from: 0, to: 0, arriveAt: null, departsInS: tN - now, fraction: 0 })
 

@@ -1,18 +1,10 @@
 import { FEED_IDS, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import type { ShapeId } from '../../data/schema'
 import { GHOST, ghostReason, type GhostReason } from './filters'
-import { joinTrip, type JoinStage } from './joinTrip'
-import { positionAlongShape } from './position'
+import { joinTrip, type JoinResult, type JoinStage } from './joinTrip'
+import { positionAlongShape, type PositionResult } from './position'
 import type { ShapeGeometry } from './shapeGeometry'
 import type { TripLookup } from './tripLookup'
-
-export type DropReason =
-  | GhostReason
-  | 'unparseable-id'
-  | 'unknown-route'
-  | 'off-pattern'
-  | 'no-arrival'
-  | 'not-departed'
 
 export interface StaticRealtimeData {
   lookup: TripLookup
@@ -35,7 +27,11 @@ export interface PreparedTrips {
   dropped: Record<DropReason, number>
 }
 
-const DROP_REASONS: readonly DropReason[] = [
+type JoinFailure = Extract<JoinResult, { matched: false }>['reason']
+type PositionFailure = Extract<PositionResult, { ok: false }>['reason']
+
+/** Every reason a trip can be dropped. The type is derived from this list, and `satisfies` keeps it to known reasons. */
+const DROP_REASONS = [
   'unassigned',
   'stale-vehicle',
   'no-future-arrival',
@@ -44,7 +40,9 @@ const DROP_REASONS: readonly DropReason[] = [
   'off-pattern',
   'no-arrival',
   'not-departed',
-]
+] as const satisfies readonly (GhostReason | JoinFailure | PositionFailure | 'not-departed')[]
+
+export type DropReason = (typeof DROP_REASONS)[number]
 
 /**
  * Once per poll: drops ghosts, joins each remaining trip to a shape, and drops what can't be placed.

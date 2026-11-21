@@ -64,6 +64,7 @@ const S_STOPS = ['103S', '102S', '101S']
 const DEFS: { id: string; routeId: string; direction: Direction; primary: boolean; stops: StopId[] }[] = [
   { id: '1..N03R', routeId: '1', direction: 'N', primary: true, stops: N_STOPS },
   { id: '1..N05R', routeId: '1', direction: 'N', primary: false, stops: ['102N', '103N', '104N'] },
+  { id: '1..S01R', routeId: '1', direction: 'S', primary: false, stops: ['102S', '101S'] },
   { id: '1..S03R', routeId: '1', direction: 'S', primary: true, stops: S_STOPS },
   { id: 'N..N70R', routeId: 'W', direction: 'N', primary: true, stops: N_STOPS },
   { id: 'N..S70R', routeId: 'W', direction: 'S', primary: true, stops: S_STOPS },
@@ -101,8 +102,13 @@ export const index: TripIndexFile = {
     Weekday: {
       '1..N03R': deltaEncode([129600, 130000, 145000]),
       '1..N05R': deltaEncode([130000]),
+      // Primary sorts after the non-primary shape it collides with.
+      '1..S01R': deltaEncode([131000]),
+      '1..S03R': deltaEncode([131000]),
       'SI..S03R': deltaEncode([126600]),
-      'N..S70R': deltaEncode([123650]),
+      // N and W shapes share key 140000_N..S; W's is primary for W.
+      'N..S70R': deltaEncode([123650, 140000]),
+      'N..S72R': deltaEncode([140000]),
       'N..N70R': deltaEncode([128750]),
     },
     Saturday: { '1..N03R': [600] },

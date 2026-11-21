@@ -31,6 +31,10 @@ describe('nyDate', () => {
     expect(nyDate(Date.UTC(2026, 10, 21, 4, 59, 59) / 1000)).toBe('20261120')
     expect(nyDate(Date.UTC(2026, 10, 21, 5, 0, 0) / 1000)).toBe('20261121')
   })
+  it('uses the New York calendar date across the EDT midnight boundary', () => {
+    expect(nyDate(Date.UTC(2026, 6, 1, 3, 59, 59) / 1000)).toBe('20260630')
+    expect(nyDate(Date.UTC(2026, 6, 1, 4, 0, 0) / 1000)).toBe('20260701')
+  })
   it('reads a recorded feed timestamp', () => {
     expect(nyDate(1795228554)).toBe('20261120')
   })

@@ -22,6 +22,7 @@ export function smoothDistance(
   dtS: number,
   p: SmoothingParams = SMOOTHING,
 ): number {
+  if (!Number.isFinite(target)) return displayed ?? target
   if (displayed === null) return target
   if (dtS <= 0) return displayed
   const e = target - displayed

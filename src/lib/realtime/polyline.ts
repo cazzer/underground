@@ -60,9 +60,15 @@ export function pointAtDistance(line: Polyline, distance: number): { point: Grou
   return { point: { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }, heading: heading ?? 0 }
 }
 
+/** Stop scanning once the line is this far past a candidate that is already close to the point. */
+const SCAN_PAST_BEST_M = 500
+const CLOSE_ENOUGH_M = 150
+
 /**
  * Closest point on the line at or after `from` (segment index and parameter), so successive calls
  * never move backward. Ties go to the earliest segment. offsetM is the perpendicular distance.
+ * The scan ends early once the line has run SCAN_PAST_BEST_M past a candidate within CLOSE_ENOUGH_M;
+ * a candidate that is still far away keeps the scan going (hairpins, loops).
  */
 export function projectForward(
   line: Polyline,
@@ -73,8 +79,12 @@ export function projectForward(
   if (pts.length === 0) throw new Error('projectForward: empty polyline')
   if (pts.length === 1) return { distance: 0, offsetM: Math.hypot(p.x - pts[0]!.x, p.z - pts[0]!.z), segment: 0, t: 0 }
 
+  const cum = line.cumulative
+  const distanceOf = (segment: number, t: number): number => cum[segment]! + t * (cum[segment + 1]! - cum[segment]!)
   let best = { offsetM: Infinity, segment: from.segment, t: from.t }
+  let bestDistance = Infinity
   for (let s = from.segment; s < pts.length - 1; s++) {
+    if (best.offsetM <= CLOSE_ENOUGH_M && cum[s]! > bestDistance + SCAN_PAST_BEST_M) break
     const a = pts[s]!
     const b = pts[s + 1]!
     const dx = b.x - a.x
@@ -83,8 +93,10 @@ export function projectForward(
     let t = len2 > 0 ? ((p.x - a.x) * dx + (p.z - a.z) * dz) / len2 : 0
     t = Math.min(Math.max(t, s === from.segment ? from.t : 0), 1)
     const offsetM = Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t))
-    if (offsetM < best.offsetM) best = { offsetM, segment: s, t }
+    if (offsetM < best.offsetM) {
+      best = { offsetM, segment: s, t }
+      bestDistance = distanceOf(s, t)
+    }
   }
-  const segLen = line.cumulative[best.segment + 1]! - line.cumulative[best.segment]!
-  return { ...best, distance: line.cumulative[best.segment]! + best.t * segLen }
+  return { ...best, distance: bestDistance }
 }

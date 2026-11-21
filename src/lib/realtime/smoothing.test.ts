@@ -8,6 +8,11 @@ describe('smoothDistance', () => {
     expect(smoothDistance(null, 123, FRAME)).toBe(123)
     expect(smoothDistance(100, 200, 0)).toBe(100)
   })
+  it('ignores a non-finite target', () => {
+    expect(smoothDistance(100, NaN, FRAME)).toBe(100)
+    expect(smoothDistance(100, Infinity, FRAME)).toBe(100)
+    expect(smoothDistance(null, NaN, FRAME)).toBeNaN()
+  })
   it('eases a small error exponentially', () => {
     expect(smoothDistance(0, 10, FRAME)).toBeCloseTo(10 * (1 - Math.exp(-FRAME / SMOOTHING.tauS)))
   })
