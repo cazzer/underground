@@ -1,6 +1,6 @@
 import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useLayoutEffect, useRef, type ComponentRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, type ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { useFocus } from '../lib/focus'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
@@ -143,6 +143,22 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     c.maxPolarAngle = polar
   }, -2)
 
+  // Must stay referentially stable: drei's MapControls re-runs its connect effect when onStart
+  // changes, and that dispose() mid-drag drops the document pointerup listener, which leaves the
+  // controls stuck in a drag (no wheel, no pan) until reload (underground-by0).
+  const onStart = useCallback(() => {
+    const f = flight.current
+    const c = controls.current
+    if (f && c) {
+      hold.current = {
+        stationId: f.stationId,
+        distance: camera.position.distanceTo(c.target),
+        target: { x: c.target.x, z: c.target.z },
+      }
+    }
+    flight.current = null
+  }, [camera])
+
   return (
     <MapControls
       ref={controls}
@@ -152,18 +168,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       zoomToCursor
       minDistance={MIN_DISTANCE}
       maxDistance={maxDistance}
-      onStart={() => {
-        const f = flight.current
-        const c = controls.current
-        if (f && c) {
-          hold.current = {
-            stationId: f.stationId,
-            distance: camera.position.distanceTo(c.target),
-            target: { x: c.target.x, z: c.target.z },
-          }
-        }
-        flight.current = null
-      }}
+      onStart={onStart}
     />
   )
 }
