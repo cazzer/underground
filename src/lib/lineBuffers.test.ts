@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { buildLineBuffers, type Rgb } from './lineBuffers'
+import { buildLineBuffers, vertexBandInputs, type Rgb } from './lineBuffers'
 import type { ShapePath } from './network'
+import { NO_BANDS } from './corridors'
 import { EMPTY_PROFILE } from './trackProfile'
 
-function path(id: string, routeId: string, primary: boolean, points: [number, number][], y = points.map(() => 0)): ShapePath {
+function path(
+  id: string,
+  routeId: string,
+  primary: boolean,
+  points: [number, number][],
+  y = points.map(() => 0),
+  band = points.map(() => 0),
+  bandHalf = points.map(() => 0),
+): ShapePath {
   return {
     id,
     routeId,
@@ -14,6 +23,12 @@ function path(id: string, routeId: string, primary: boolean, points: [number, nu
     length: 0,
     y,
     profile: EMPTY_PROFILE,
+    bandInputs: vertexBandInputs(
+      points.map(([x, z]) => ({ x, z })),
+      band,
+      bandHalf,
+    ),
+    bands: NO_BANDS,
   }
 }
 
@@ -78,5 +93,23 @@ describe('buildLineBuffers', () => {
       colorOf,
     )
     expect([...colors]).toEqual([1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1])
+  })
+
+  it('writes the miter vector, band slot and half-width at both segment ends, eight floats per segment', () => {
+    // East, then south: right of travel is south (+z), then west (-x); the corner's miter is the bisector, its
+    // length the miter factor (sqrt 2 for a right angle), so (-1, 1).
+    const { bands } = buildLineBuffers(
+      [path('a', 'A', true, [[0, 0], [10, 0], [10, 10]], undefined, [1, 0.5, -1], [1, 1.5, 0.5])],
+      ORDER,
+      colorOf,
+    )
+    expect(bands.length).toBe(2 * 8)
+    const expected = [0, 1, 1, 1, -1, 1, 0.5, 1.5, -1, 1, 0.5, 1.5, -1, 0, -1, 0.5]
+    expected.forEach((v, i) => expect(bands[i]).toBeCloseTo(v, 6))
+  })
+
+  it('leaves the miter of a path with no direction at zero, so it draws unshifted', () => {
+    const { bands } = buildLineBuffers([path('a', 'A', true, [[3, 3], [3, 3]], undefined, [1, 1])], ORDER, colorOf)
+    expect([...bands]).toEqual([0, 0, 1, 0, 0, 0, 1, 0])
   })
 })

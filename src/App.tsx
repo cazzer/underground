@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useBands } from './data/useBands'
 import { useLive } from './data/useLive'
 import { useNetwork } from './data/useNetwork'
 import { useLocate } from './data/useLocate'
@@ -9,7 +10,7 @@ import { markedPlacement } from './lib/locate'
 import type { Insets } from './lib/framing'
 import type { ScreenRect } from './lib/interiorCamera'
 import type { Network } from './lib/network'
-import type { TrackProfile } from './lib/trackProfile'
+import type { BandedShapes } from './lib/networkBands'
 import { TrainSelectionProvider } from './lib/trainSelection'
 import { Scene } from './scene/Scene'
 import { ErrorBoundary } from './ui/ErrorBoundary'
@@ -19,12 +20,15 @@ import { LiveDebug } from './ui/LiveDebug'
 
 interface MapViewProps {
   network: Network
+  /** useNetwork's bands, found after the first paint. */
+  bands: Promise<BandedShapes>
   live: ReturnType<typeof useLive>
 }
 
 /** The map and its HUD; owns the focused station's interior load. */
-function MapView({ network, live }: MapViewProps) {
+function MapView({ network, bands, live }: MapViewProps) {
   const { focusedId, flyToPoint } = useFocus()
+  const banded = useBands(bands)
   const locate = useLocate(network, flyToPoint)
   const interior = useStationInterior(focusedId)
   const stationHash = useStationHash(network)
@@ -42,6 +46,7 @@ function MapView({ network, live }: MapViewProps) {
         {insets && (
           <Scene
             network={network}
+            banded={banded}
             insets={insets}
             live={live.layer}
             onLiveError={live.onLayerError}
@@ -68,22 +73,19 @@ function MapView({ network, live }: MapViewProps) {
   )
 }
 
-/** Until the network loads there are no files, so nothing reads these. */
-const NO_PROFILES: ReadonlyMap<string, TrackProfile> = new Map()
-
 export function App() {
   const { load, retry } = useNetwork()
   const live = useLive(
     load.status === 'ready' ? load.files : null,
     load.status === 'ready' ? load.network.trackOffsetM : 0,
-    load.status === 'ready' ? load.network.profiles : NO_PROFILES,
+    load.status === 'ready' ? load.bands : null,
   )
   return (
     <FocusProvider>
       <main className="relative h-full w-full bg-canvas">
         {load.status === 'ready' ? (
           <TrainSelectionProvider layer={live.layer} network={load.network}>
-            <MapView network={load.network} live={live} />
+            <MapView network={load.network} bands={load.bands} live={live} />
           </TrainSelectionProvider>
         ) : (
           <LoadStatus load={load} onRetry={retry} />

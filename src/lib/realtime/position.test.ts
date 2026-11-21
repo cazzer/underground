@@ -14,6 +14,7 @@ const northbound: ShapeGeometry = {
   stopDistances: [0, 1000, 2000],
   maxStopOffsetM: 0,
   profile: EMPTY_PROFILE,
+  bandInputs: new Float32Array(0),
 }
 const southbound: ShapeGeometry = {
   shapeId: '1..S03R',
@@ -22,6 +23,7 @@ const southbound: ShapeGeometry = {
   stopDistances: [0, 1000, 2000],
   maxStopOffsetM: 0,
   profile: EMPTY_PROFILE,
+  bandInputs: new Float32Array(0),
 }
 // A 100 s hop includes a 30 s dwell at its origin, so the train moves for the last 70 s.
 const SEGMENTS = { '101N>102N': 100, '102N>103N': 100 }
@@ -195,7 +197,7 @@ describe('planHop and hopDistance', () => {
 describe('STOPPED_AT with no prediction for the next stop', () => {
   const stops = ['A', 'B', 'C', 'D', 'E', 'F'].map((s) => `${s}N`)
   const line = buildPolyline(stops.map((_, i) => ({ x: 0, z: -i * 1000 })))
-  const long: ShapeGeometry = { shapeId: 'L..N', line, stops, stopDistances: stops.map((_, i) => i * 1000), maxStopOffsetM: 0, profile: EMPTY_PROFILE }
+  const long: ShapeGeometry = { shapeId: 'L..N', line, stops, stopDistances: stops.map((_, i) => i * 1000), maxStopOffsetM: 0, profile: EMPTY_PROFILE, bandInputs: new Float32Array(line.points.length * 4) }
   const plan = (stopId: string, arrivals: Arrival[]) =>
     planHop({ geometry: long, status: 'STOPPED_AT', stopId, arrivals, segments: {}, now: NOW })
 

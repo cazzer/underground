@@ -6,7 +6,7 @@ export function parseStationHash(hash: string): string | null {
   return id ? id : null
 }
 
-/** The URL for `id` (or none), keeping the path and query (`?theme=`, `?lines=`). */
+/** The URL for `id` (or none), keeping the path and query (`?lines=`, `?debug`). */
 export function stationHashUrl(location: { pathname: string; search: string }, id: string | null): string {
   return `${location.pathname}${location.search}${id === null ? '' : `#station=${encodeURIComponent(id)}`}`
 }

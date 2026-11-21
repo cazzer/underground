@@ -20,6 +20,7 @@ function shape(shapeId: string, x = 0): ShapeGeometry {
     stopDistances: [0, 1000, 2000],
     maxStopOffsetM: 0,
     profile: EMPTY_PROFILE,
+    bandInputs: new Float32Array(0),
   }
 }
 const SHAPES: Record<string, ShapeGeometry> = { S1: shape('S1'), S1b: shape('S1b', 10), S2: shape('S2', 500) }

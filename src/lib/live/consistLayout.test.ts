@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { Ground } from '../projection'
 import { buildPolyline, pointAtDistance, type Polyline } from '../realtime/polyline'
 import { MAX_CARS, type Consist } from './consist'
-import { consistSpanInto, createConsistScratch, trackY, writeConsist, type CarFrame } from './consistLayout'
-import { buildTrackProfile, EMPTY_PROFILE, GRADE, type TrackProfile } from '../trackProfile'
+import { consistSpanInto, createConsistScratch, writeConsist, type CarFrame } from './consistLayout'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, profileAt, type TrackProfile } from '../trackProfile'
+import { createBandView } from '../bandOffset'
+import type { DrawnTrack } from './trackPoint'
+
+/** An unbanded track (no miters, so the band view leaves it where it is), and a view that shifts nothing. */
+const track = (line: Polyline, profile: TrackProfile = EMPTY_PROFILE): DrawnTrack => ({ line, profile, bandInputs: new Float32Array(line.points.length * 4) })
+const VIEW = createBandView()
 
 const FRAME: CarFrame = { gapM: 1.2, rimM: 0.5, widthM: 3, crossScale: 1, y: 0.5 }
 const TEN: Consist = { cars: 10, pitchM: 15.5 }
@@ -22,7 +28,7 @@ function layout(line: Polyline, shown: number, consist = TEN, mix = 1, slot = 0,
   const size = (slot + 1) * MAX_CARS * 16
   const bodies = new Float32Array(size).fill(7)
   const halos = new Float32Array(size).fill(7)
-  writeConsist(bodies, halos, slot, line, profile, shown, consist, mix, k, 1, FRAME, createConsistScratch())
+  writeConsist(bodies, halos, slot, track(line, profile), VIEW, shown, consist, mix, k, 1, FRAME, createConsistScratch())
   const cars: Car[] = []
   for (let c = 0; c < consist.cars; c++) {
     const o = (slot * MAX_CARS + c) * 16
@@ -125,7 +131,7 @@ describe('writeConsist', () => {
   it('widens the section by crossScale without changing the spacing', () => {
     const bodies = new Float32Array(MAX_CARS * 16)
     const halos = new Float32Array(MAX_CARS * 16)
-    writeConsist(bodies, halos, 0, straight(1000), EMPTY_PROFILE, 500, TEN, 1, 1, 1, { ...FRAME, crossScale: 2 }, createConsistScratch())
+    writeConsist(bodies, halos, 0, track(straight(1000)), VIEW, 500, TEN, 1, 1, 1, { ...FRAME, crossScale: 2 }, createConsistScratch())
     expect(bodies[5]).toBe(2)
     expect(bodies[16 + 12]! - bodies[12]!).toBeCloseTo(15.5, 3)
   })
@@ -161,7 +167,7 @@ describe('writeConsist', () => {
     const bodies = new Float32Array(MAX_CARS * 16)
     const halos = new Float32Array(MAX_CARS * 16)
     const b60: Consist = { cars: 8, pitchM: 18.3 }
-    writeConsist(bodies, halos, 0, straight(1000), EMPTY_PROFILE, 500, b60, 1, 1, 1.075, FRAME, createConsistScratch())
+    writeConsist(bodies, halos, 0, track(straight(1000)), VIEW, 500, b60, 1, 1, 1.075, FRAME, createConsistScratch())
     const length = Math.hypot(bodies[8]!, bodies[10]!)
     expect(length).toBeGreaterThan(18.3 - 1.2)
     expect(length).toBeLessThanOrEqual(18.3 - 0.6 + 1e-4)
@@ -175,7 +181,7 @@ describe('writeConsist', () => {
     const s = consistSpanInto({ cars: 0, pitch: 0, step: 0, rear: 0 }, 1000, 530, TEN, 1)
     for (let c = 0; c < TEN.cars; c++) {
       const o = c * 16
-      const [ya, yb] = [trackY(line, profile, s.rear + c * s.step), trackY(line, profile, s.rear + (c + 1) * s.step)]
+      const [ya, yb] = [profileAt(profile, s.rear + c * s.step), profileAt(profile, s.rear + (c + 1) * s.step)]
       expect(onRamp.bodies[o + 13]).toBeCloseTo((ya + yb) / 2 + FRAME.y, 4)
       expect(onRamp.halos[o + 13]).toBeCloseTo((ya + yb) / 2 + FRAME.y, 4)
       // Forward points down the ramp along the chord; up tilts back so it stays perpendicular.
