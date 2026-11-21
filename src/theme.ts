@@ -26,8 +26,9 @@ export interface Theme {
   hereAccuracyOpacity: number
   hereLineWidth: number
   /**
-   * Rim drawn around the selected train (dot and cars), outside a background-colored gap. A hue no line uses,
-   * at least 3:1 on the background; theme.test.ts holds it apart from every line color.
+   * Rim drawn around the selected train (dot and cars), outside a background-colored gap. A hue no route line
+   * uses, at least 3:1 on the background; theme.test.ts holds it apart from every route line color. Interior
+   * tokens may share its hue (drafting's escalator is also violet): the street layer is veiled under an interior.
    */
   trainSelectedRim: string
   /** Train car shading: linear multipliers of the car color on its sides and ends (the roof is 1). */
