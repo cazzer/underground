@@ -1,7 +1,11 @@
 import { useEffect, useRef, type Ref } from 'react'
+import type { ArrivalsSource } from '../lib/live/arrivals'
+import type { LiveStatus } from '../lib/live/liveStatus'
 import type { TrainSummary } from '../lib/live/trainSummary'
 import type { Network } from '../lib/network'
+import type { LiveTrip } from '../lib/realtime/prepareTrips'
 import { RouteChip } from './RouteChip'
+import { TrainStops } from './TrainStops'
 
 const PANEL =
   'pointer-events-auto max-h-full min-h-0 w-72 max-w-full overflow-auto border border-edge bg-panel p-4 text-ink backdrop-blur-sm sm:shrink-0'
@@ -27,6 +31,10 @@ function CloseButton({ label, onClick }: CloseButtonProps) {
 interface TrainPanelProps {
   network: Network
   summary: TrainSummary
+  /** The selected trip as of the latest poll that had it; its predicted stops are the timetable. */
+  trip: LiveTrip | null
+  source: ArrivalsSource | null
+  status: LiveStatus
   /** Changes on every explicit pick; the heading takes focus each time. */
   focusKey: number
   onClose: () => void
@@ -34,7 +42,7 @@ interface TrainPanelProps {
 }
 
 /** The selected train: its route and where it is headed. Sits where the station panel does, over it. */
-export function TrainPanel({ network, summary, focusKey, onClose, ref }: TrainPanelProps) {
+export function TrainPanel({ network, summary, trip, source, status, focusKey, onClose, ref }: TrainPanelProps) {
   const heading = useRef<HTMLHeadingElement>(null)
   // Two frames late: after a touch tap the browser's compatibility mouse events land on the canvas and would
   // blur a heading focused at once.
@@ -67,6 +75,7 @@ export function TrainPanel({ network, summary, focusKey, onClose, ref }: TrainPa
         </h2>
         <CloseButton label="Close train panel" onClick={onClose} />
       </div>
+      <TrainStops key={trip?.key} network={network} trip={trip} source={source} status={status} />
     </aside>
   )
 }
