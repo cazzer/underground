@@ -371,7 +371,7 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   focus change) no station shows an interior panel. The object's key order lists integer-like ids first; don't rely on it. `index` is not a valid station id.
 - `public/data/station-depths.json` (`StationDepthsFile`) is extracted from these files by the same build: per
   station its anchor and, per track, `stopId`, real `railY` and the path's two ends. ODbL, with the union of the
-  interiors' credits minus the OPEN-NY note, plus its own line ("railY values from E&E rises are MTA data under
+  interiors' credits minus the OPEN-NY note, plus its own line ("Some railY values come from E&E rises and are MTA data under
   the OPEN-NY Terms of Use") only when a platform level's `depthSource` is `ee-rise`.
 - Authoring uses a `[u, v]` frame aligned to the platform; the merge converts it. Guesses are marked
   `UNVERIFIED:` in the authored file's `notes`; they are not copied to the output.

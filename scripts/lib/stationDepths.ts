@@ -5,7 +5,7 @@ import { OPEN_NY_NOTE } from './stationMerge.ts'
 
 const OSM_CREDIT = '© OpenStreetMap contributors'
 /** Only when a rail height comes from an E&E rise (an MTA/OPEN-NY value); the interiors' own OPEN-NY note is about their elements. */
-export const DEPTHS_OPEN_NY_NOTE = 'railY values from E&E rises are MTA data under the OPEN-NY Terms of Use'
+export const DEPTHS_OPEN_NY_NOTE = 'Some railY values come from E&E rises and are MTA data under the OPEN-NY Terms of Use'
 const round2 = (v: number): number => Math.round(v * 100) / 100
 
 function stationDepth(interior: StationInterior): StationDepth {

@@ -38,7 +38,8 @@ element's `sources` says where it came from, and elements whose `sources` includ
 MTA data under the OPEN-NY Terms of Use (the file's `attribution` says so, see below).
 `station-depths.json` is extracted from those files (each platform
 track's ends and rail height, so the map's tracks can descend to the platform) and carries
-the same license and credits.
+the same license and the OSM and MTA credits; it adds an OPEN-NY line only when a rail height
+comes from an E&E rise.
 
 ## NY Open Data / MTA Elevator and Escalator feeds
 
