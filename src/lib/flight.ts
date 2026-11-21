@@ -30,3 +30,20 @@ export function flightProgress(elapsed: number, duration: number): number {
 export function flightDistance(fromDistance: number, toDistance: number, e: number): number {
   return Math.exp(Math.log(fromDistance) + (Math.log(toDistance) - Math.log(fromDistance)) * e)
 }
+
+/**
+ * Share of the start-to-destination ground offset still left when the camera is at `distance`.
+ * Tying the pan to the zoom keeps the destination near where it was on screen while the camera
+ * closes in (screen offset ~ ground offset / distance only shrinks), then centers it at the end.
+ * A flight with little zoom change pans on the eased progress `e` instead.
+ */
+export function remainingPan(fromDistance: number, toDistance: number, distance: number, e: number): number {
+  const span = fromDistance - toDistance
+  if (Math.abs(span) < 0.05 * Math.max(fromDistance, toDistance)) return 1 - e
+  return Math.min(Math.max((distance - toDistance) / span, 0), 1)
+}
+
+/** Progress of a flight rebased at eased progress `e0` (a mid-flight retarget), mapped back to 0..1. */
+export function rebasedProgress(e: number, e0: number): number {
+  return e0 >= 1 ? 1 : Math.min(Math.max((e - e0) / (1 - e0), 0), 1)
+}

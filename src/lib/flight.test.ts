@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expoInOut, flightDistance, flightDuration, flightProgress } from './flight'
+import { expoInOut, flightDistance, flightDuration, flightProgress, rebasedProgress, remainingPan } from './flight'
 
 describe('expoInOut', () => {
   it('starts at 0, passes through 0.5 at the midpoint, ends at 1', () => {
@@ -44,5 +44,38 @@ describe('flightDistance', () => {
     expect(flightDistance(10_000, 100, 0)).toBeCloseTo(10_000)
     expect(flightDistance(10_000, 100, 1)).toBeCloseTo(100)
     expect(flightDistance(10_000, 100, 0.5)).toBeCloseTo(1000)
+  })
+})
+
+describe('remainingPan', () => {
+  // The destination's screen offset is proportional to (remaining ground offset) / distance.
+  const screenOffsets = (d0: number, d1: number): number[] =>
+    Array.from({ length: 101 }, (_, i) => {
+      const e = expoInOut(i / 100)
+      const d = flightDistance(d0, d1, e)
+      return remainingPan(d0, d1, d, e) / d
+    })
+
+  it('never lets the destination drift further off-center on a dive or a zoom-out', () => {
+    for (const [d0, d1] of [[60_000, 170], [2000, 180], [170, 5000]] as const) {
+      const offsets = screenOffsets(d0, d1)
+      for (let i = 1; i < offsets.length; i++) expect(offsets[i]!).toBeLessThanOrEqual(offsets[i - 1]! * (1 + 1e-9))
+      expect(offsets[offsets.length - 1]).toBeCloseTo(0)
+    }
+  })
+
+  it('starts with the full offset and pans on progress when the zoom barely changes', () => {
+    expect(remainingPan(60_000, 170, 60_000, 0)).toBe(1)
+    expect(remainingPan(170, 172, 171, 0.25)).toBeCloseTo(0.75)
+  })
+})
+
+describe('rebasedProgress', () => {
+  it('maps the rest of a flight after a retarget onto 0..1', () => {
+    expect(rebasedProgress(0.6, 0.6)).toBe(0)
+    expect(rebasedProgress(0.8, 0.6)).toBeCloseTo(0.5)
+    expect(rebasedProgress(1, 0.6)).toBe(1)
+    expect(rebasedProgress(0.3, 0)).toBeCloseTo(0.3)
+    expect(rebasedProgress(1, 1)).toBe(1)
   })
 })

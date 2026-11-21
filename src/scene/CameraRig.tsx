@@ -5,7 +5,7 @@ import { Vector3, type PerspectiveCamera } from 'three'
 import { useFocus } from '../lib/focus'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { nextFocus, type FocusInput } from '../lib/focusMachine'
-import { flightDistance, flightDuration, flightProgress } from '../lib/flight'
+import { flightDistance, flightDuration, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets, type Viewport } from '../lib/framing'
 import { frameInterior, interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
@@ -32,6 +32,8 @@ interface Flight extends Destination {
   fromDistance: number
   elapsed: number
   duration: number
+  /** Eased progress when `from` was last rebased (a mid-flight retarget); 0 at the start. */
+  e0: number
 }
 
 /** Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal. */
@@ -111,16 +113,21 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       fromDistance,
       elapsed: 0,
       duration: flightDuration(fromDistance, dest.distance),
+      e0: 0,
     }
   }, [flyRequest, network, camera])
 
   // The interior (first visit) or the panel's measurement can land mid-flight: retarget that
-  // flight's destination, keeping its start and progress. Focus reached by zooming has no flight,
-  // and the camera never moves on its own.
+  // flight's destination. It rebases on the camera's current pose and keeps the timing, so the
+  // camera doesn't jump. Focus reached by zooming has no flight, and the camera never moves on its own.
   useEffect(() => {
     const f = flight.current
-    if (interior && f?.stationId === interior.stationId) {
+    const c = controls.current
+    if (interior && c && f?.stationId === interior.stationId) {
       const dest = interiorFlight(interior, size, insets, panel, camera.fov)
+      f.from.copy(c.target)
+      f.fromDistance = camera.position.distanceTo(c.target)
+      f.e0 = flightProgress(f.elapsed, f.duration)
       f.target = dest.target
       f.distance = dest.distance
     }
@@ -135,12 +142,13 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     const f = flight.current
     if (f) {
       f.elapsed += delta
-      const e = flightProgress(f.elapsed, f.duration)
-      // Move the camera with the target so the view direction holds, then set the eased distance.
-      const step = scratch.current.copy(f.from).lerp(f.target, e).sub(c.target)
+      const e = rebasedProgress(flightProgress(f.elapsed, f.duration), f.e0)
+      distance = flightDistance(f.fromDistance, f.distance, e)
+      // Pan tied to the zoom; move the camera with the target so the view direction holds.
+      const u = remainingPan(f.fromDistance, f.distance, distance, e)
+      const step = scratch.current.copy(f.target).lerp(f.from, u).sub(c.target)
       c.target.add(step)
       camera.position.add(step)
-      distance = flightDistance(f.fromDistance, f.distance, e)
       const offset = scratch.current.copy(camera.position).sub(c.target).setLength(distance)
       camera.position.copy(c.target).add(offset)
       if (e >= 1) flight.current = null
