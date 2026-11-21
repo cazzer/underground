@@ -143,9 +143,10 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     c.maxPolarAngle = polar
   }, -2)
 
-  // Must stay referentially stable: drei's MapControls re-runs its connect effect when onStart
-  // changes, and that dispose() mid-drag drops the document pointerup listener, which leaves the
-  // controls stuck in a drag (no wheel, no pan) until reload (underground-by0).
+  // Every on* handler passed to MapControls (onStart, onEnd, onChange) must stay referentially
+  // stable: drei re-runs its connect effect when one changes, and that dispose() mid-drag drops the
+  // document pointerup listener, leaving the controls stuck in a drag (no wheel, no pan) until
+  // reload (underground-by0).
   const onStart = useCallback(() => {
     const f = flight.current
     const c = controls.current
