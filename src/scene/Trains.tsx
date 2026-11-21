@@ -4,13 +4,14 @@ import { DynamicDrawUsage, Object3D, type InstancedMesh } from 'three'
 import { pointAlong, type ShapePath } from '../lib/network'
 import { pingPong } from '../lib/pingPong'
 import { theme } from '../theme'
-import { cameraDistance, screenScale } from './cameraDistance'
+import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
 
 const TRAINS_PER_SHAPE = 3
 /** Fake motion: much faster than real service so movement is visible when zoomed out. */
 const SPEED_MPS = 60
-const DOT_PX = 3.5
+/** Dot radius relative to station markers, so dots never outsize stations at the overview. */
+const DOT_TO_MARKER = 0.5
 const DOT_MIN_METERS = 2.5
 
 interface Train {
@@ -50,7 +51,8 @@ export function Trains({ paths }: TrainsProps) {
   useFrame((state) => {
     const m = mesh.current
     if (!m) return
-    const scale = screenScale(cameraDistance(state), DOT_PX, DOT_MIN_METERS)
+    const d = cameraDistance(state)
+    const scale = screenScale(d, markerRadiusPx(d) * DOT_TO_MARKER, DOT_MIN_METERS)
     const travelled = state.clock.elapsedTime * SPEED_MPS
     for (let i = 0; i < trains.length; i++) {
       const train = trains[i]!

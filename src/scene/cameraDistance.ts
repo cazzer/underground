@@ -23,8 +23,11 @@ export function screenScale(distance: number, px: number, minMeters: number): nu
   return Math.max(distance * px * 0.0008, minMeters)
 }
 
-/** Marker radius ramp: small enough at the city overview that dense Manhattan doesn't blob. */
-const MARKER_FAR = { distance: 40_000, px: 3 }
+/**
+ * Marker radius ramp: small enough at the city overview that dense Manhattan doesn't blob.
+ * About 3 px at the landscape fit (~76 km), 2 px at the portrait fit (~159 km).
+ */
+const MARKER_FAR = { distance: 150_000, px: 2 }
 const MARKER_NEAR = { distance: 4_000, px: 7 }
 
 /** Station marker radius in screen pixels for a camera distance; log-linear between the ends. */
