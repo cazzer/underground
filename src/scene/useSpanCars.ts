@@ -38,12 +38,14 @@ export interface SpanCarsLayer {
    * After this frame's cars are written: copies every car with a span weight above 0 (`spans` is the focused
    * station's platform spans, null for none) into the above-veil meshes, with the selected train's rim, each mixed
    * toward the veil by how far it is past the platform. `reveal` is the interior's opacity; at 0 nothing draws.
+   * `veil` is the veil's weight (interiorReveal.ts veilWeight), which the tint follows as the veil does.
    * With more than SPAN_TRAINS candidates, the ones most on the platforms win. No allocation; never throws.
    */
   write(
     table: SlotTable,
     spans: StationSpans | null,
     reveal: number,
+    veil: number,
     mix: number,
     localS: number,
     selected: number,
@@ -116,7 +118,7 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
           b.instanceColor!.setUsage(DynamicDrawUsage)
         }
       },
-      write(table, spans, reveal, mix, localS, selected, colors, consistOf) {
+      write(table, spans, reveal, veil, mix, localS, selected, colors, consistOf) {
         const b = bodies.current
         const h = halos.current
         const r = rims.current
@@ -163,7 +165,7 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
             for (let c = 0; c < span.cars; c++) {
               const w = carWeight(c, s)
               if (w <= 0) continue
-              const tint = veilTint(reveal, w, VEIL_TINT)
+              const tint = veilTint(veil, w, VEIL_TINT)
               copyMatrix(srcB.instanceMatrix.array, i * MAX_CARS + c, outB, n)
               copyMatrix(srcH.instanceMatrix.array, i * MAX_CARS + c, outH, n)
               bodyColors[n * 3] = color.r

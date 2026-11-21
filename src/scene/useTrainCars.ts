@@ -50,10 +50,10 @@ export interface TrainCarsLayer {
   consistOf(i: number): Consist
   /** The selected slot (-1 for none): its cars get a wider background gap and the selection rim outside it. */
   setSelected(i: number): void
-  /** Car body height this frame at full unfold, before a slot's fade. */
+  /** Car body height this frame at full unfold, before a slot's fade and the depth factor. */
   carHeightM(): number
-  /** Per-frame sizes for the camera distance; call before writeTrain. */
-  beginFrame(cameraDistance: number): void
+  /** Per-frame sizes for the camera distance, and the depth factor the bodies are extruded by; call before writeTrain. */
+  beginFrame(cameraDistance: number, depth: number): void
   /** Lays out slot i's cars at `shown` along `track`, as drawn in `view`: `mix` unfolds the train from the dot, `k` is the slot's fade. */
   writeTrain(i: number, track: DrawnTrack, view: BandView, shown: number, mix: number, k: number): void
   /** Hides slot i's cars (a freed slot). */
@@ -87,7 +87,7 @@ export function useTrainCars(): TrainCarsLayer {
 
   const layer = useMemo((): Omit<TrainCarsLayer, 'bodies' | 'halos' | 'rims' | 'geometry'> => {
     const consists = new Array<Consist>(TRAIN_CAPACITY).fill(DEFAULT_CONSIST)
-    const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: CAR_WIDTH_M, crossScale: 1, y: CAR_Y }
+    const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: CAR_WIDTH_M, crossScale: 1, y: CAR_Y, extrude: 1 }
     const gapFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM, y: CAR_Y + SELECTED_LIFT_M }
     const rimFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM + SELECTED_RIM.minM }
     /** writeConsist writes bodies with the footprints; the rim's bodies land here and are never drawn. */
@@ -145,7 +145,8 @@ export function useTrainCars(): TrainCarsLayer {
         selected = i
       },
       carHeightM: () => CAR_HEIGHT_M * frame.crossScale,
-      beginFrame(cameraDistance) {
+      beginFrame(cameraDistance, depth) {
+        frame.extrude = gapFrame.extrude = rimFrame.extrude = depth
         frame.gapM = gapFrame.gapM = rimFrame.gapM = screenScale(cameraDistance, GAP.px, GAP.minM)
         frame.rimM = screenScale(cameraDistance, RIM.px, RIM.minM)
         gapFrame.rimM = screenScale(cameraDistance, SELECTED_GAP.px, SELECTED_GAP.minM)

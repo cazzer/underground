@@ -15,6 +15,11 @@ export interface CarFrame {
   crossScale: number
   /** Height of the car floor and its halo above the track (the profile's y). */
   y: number
+  /**
+   * The depth factor (tilt.ts, 0 to 1) the body height is drawn at: 0 flattens each car to its roof footprint at
+   * the floor, so a top-down view has no height, and the cars grow into 3D as the camera tips.
+   */
+  extrude: number
 }
 
 /** Where a train's cars sit along its shape: car c spans [rear + c * step, rear + (c + 1) * step]. */
@@ -85,7 +90,7 @@ export function writeConsist(
     const { pitch, step, rear } = consistSpanInto(scratch.span, line.length, shown, consist, u)
     const cross = k * frame.crossScale * widen
     // Height grows in over the first quarter of the handoff, so a stub of a train can't pop up at a tilt.
-    const height = cross * Math.min(1, 4 * mix)
+    const height = cross * Math.min(1, 4 * mix) * frame.extrude
     // Widened too (end faces), but never past the gap's middle, so neighbouring cars can't overlap.
     const fullLength = Math.max(pitch - frame.gapM, 0.5 * pitch)
     const bodyLength = u * Math.min(widen * fullLength, Math.max(fullLength, pitch - 0.5 * frame.gapM))

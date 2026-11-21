@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { interiorOpacity, REVEAL_FAR, REVEAL_NEAR } from './interiorReveal'
+import { interiorOpacity, labelOpacity, LABELS_FROM_DEPTH, LABELS_FULL_DEPTH, REVEAL_FAR, REVEAL_NEAR, veilWeight } from './interiorReveal'
 
 describe('interiorOpacity', () => {
   it('is hidden at and beyond the far distance', () => {
@@ -24,5 +24,25 @@ describe('interiorOpacity', () => {
 
   it('never returns NaN', () => {
     for (const d of [Number.NaN, Infinity, -1]) expect(Number.isNaN(interiorOpacity(d))).toBe(false)
+  })
+})
+
+describe('veilWeight', () => {
+  it('is the opacity at full depth and nothing while the interior lies flat', () => {
+    expect(veilWeight(1, 1)).toBe(1)
+    expect(veilWeight(0.4, 1)).toBe(0.4)
+    expect(veilWeight(1, 0)).toBe(0)
+    expect(veilWeight(0.5, 0.5)).toBe(0.25)
+  })
+})
+
+describe('labelOpacity', () => {
+  it('hides the labels until the levels separate, then follows the opacity', () => {
+    expect(labelOpacity(1, 0)).toBe(0)
+    expect(labelOpacity(1, LABELS_FROM_DEPTH)).toBe(0)
+    expect(labelOpacity(1, (LABELS_FROM_DEPTH + LABELS_FULL_DEPTH) / 2)).toBeCloseTo(0.5, 9)
+    expect(labelOpacity(1, LABELS_FULL_DEPTH)).toBe(1)
+    expect(labelOpacity(0.3, 1)).toBeCloseTo(0.3, 9)
+    expect(labelOpacity(0, 1)).toBe(0)
   })
 })
