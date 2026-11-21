@@ -5,7 +5,6 @@ import type { FeedOutcome } from './transform'
 const BASE_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/'
 const TIMEOUT_MS = 5000
 const MAX_BYTES = 2 * 1024 * 1024
-const UPSTREAM_CACHE_TTL_S = 15
 
 export const FEED_PATHS: Record<FeedId, string> = {
   '1234567': 'nyct%2Fgtfs',
@@ -49,23 +48,28 @@ async function readBody(res: Response): Promise<Uint8Array | string> {
 
 async function fetchFeed(id: FeedId): Promise<FeedOutcome> {
   let bytes: Uint8Array | string
+  let cacheStatus: string | null = null
   try {
     const res = await fetch(BASE_URL + FEED_PATHS[id], {
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      // Shares one upstream fetch per feed across isolates in a colo.
-      cf: { cacheTtl: UPSTREAM_CACHE_TTL_S, cacheEverything: true },
+      // Shares one upstream fetch per feed across isolates in a colo; errors are not cached.
+      cf: { cacheTtlByStatus: { '200-299': 15, '400-599': 0 }, cacheEverything: true },
     })
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
+    cacheStatus = res.headers.get('cf-cache-status')
+    if (!res.ok) {
+      await res.body?.cancel()
+      return { ok: false, error: `HTTP ${res.status}`, cacheStatus }
+    }
     bytes = await readBody(res)
   } catch (e) {
-    if ((e as { name?: unknown } | null)?.name === 'TimeoutError') return { ok: false, error: `timeout after ${TIMEOUT_MS} ms` }
-    return { ok: false, error: `fetch failed: ${describe(e)}` }
+    if ((e as { name?: unknown } | null)?.name === 'TimeoutError') return { ok: false, error: `timeout after ${TIMEOUT_MS} ms`, cacheStatus }
+    return { ok: false, error: `fetch failed: ${describe(e)}`, cacheStatus }
   }
-  if (typeof bytes === 'string') return { ok: false, error: bytes }
+  if (typeof bytes === 'string') return { ok: false, error: bytes, cacheStatus }
   try {
-    return { ok: true, message: decodeFeed(bytes) }
+    return { ok: true, message: decodeFeed(bytes), cacheStatus }
   } catch (e) {
-    return { ok: false, error: `decode failed: ${describe(e)}` }
+    return { ok: false, error: `decode failed: ${describe(e)}`, cacheStatus }
   }
 }
 

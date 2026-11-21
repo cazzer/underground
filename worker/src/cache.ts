@@ -7,20 +7,22 @@ export interface Memo {
   expiresAt: number
 }
 
-export type CacheDecision = 'memory' | 'stale' | 'refresh'
+export type CacheDecision = 'memory' | 'stale' | 'busy' | 'refresh'
 
 /**
  * Per-isolate herd guard, no shared promises:
  * - fresh body: serve it ('memory')
  * - expired body while a recent refresh is in flight: serve the old body ('stale')
+ * - no body at all while a recent refresh is in flight: ask the caller to retry ('busy')
  * - otherwise: this request refreshes ('refresh')
  *
- * Bound: with no body at all (cold isolate) every concurrent request refreshes, so a
- * burst of N requests hitting a cold isolate causes up to N upstream rounds. Once the
- * first refresh lands, the rest of that isolate's traffic is served from the memo.
+ * Bound: at most one refresh is in flight per isolate (a claim older than the grace
+ * period is presumed dead and may be taken over).
+ *
+ * Freshness: worst case about 36 s = 15 s upstream cf cache + 15 s memo + 6 s grace.
  */
 export function cacheDecision(now: number, memo: Memo | null, refreshingSince: number | null): CacheDecision {
   if (memo && now < memo.expiresAt) return 'memory'
-  if (memo && refreshingSince !== null && now - refreshingSince < REFRESH_GRACE_MS) return 'stale'
+  if (refreshingSince !== null && now - refreshingSince < REFRESH_GRACE_MS) return memo ? 'stale' : 'busy'
   return 'refresh'
 }

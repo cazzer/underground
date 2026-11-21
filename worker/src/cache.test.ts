@@ -22,8 +22,16 @@ describe('cacheDecision', () => {
     expect(cacheDecision(1200 + REFRESH_GRACE_MS, memo, 1200)).toBe('refresh')
   })
 
-  it('always refreshes when there is no body yet', () => {
+  it('refreshes when there is no body and nothing is refreshing', () => {
     expect(cacheDecision(0, null, null)).toBe('refresh')
-    expect(cacheDecision(0, null, 0)).toBe('refresh')
+  })
+
+  it('is busy when there is no body and a recent refresh is in flight', () => {
+    expect(cacheDecision(0, null, 0)).toBe('busy')
+    expect(cacheDecision(REFRESH_GRACE_MS - 1, null, 0)).toBe('busy')
+  })
+
+  it('takes over a dead claim even with no body', () => {
+    expect(cacheDecision(REFRESH_GRACE_MS, null, 0)).toBe('refresh')
   })
 })

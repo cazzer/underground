@@ -19,7 +19,10 @@ type StopTimeUpdate = transit_realtime.TripUpdate.StopTimeUpdate.$Properties
 type TripUpdate = transit_realtime.TripUpdate.$Properties
 type Vehicle = transit_realtime.VehiclePosition.$Properties
 
-export type FeedOutcome = { ok: true; message: Message } | { ok: false; error: string }
+// cacheStatus is the upstream cf-cache-status header; it is logged, never put in the snapshot.
+export type FeedOutcome =
+  | { ok: true; message: Message; cacheStatus?: string | null }
+  | { ok: false; error: string; cacheStatus?: string | null }
 
 // uint64/int64 decode to Long objects, which JSON.stringify would emit as {low, high, unsigned}.
 export function toSeconds(v: number | { toNumber(): number } | null | undefined): number | null {

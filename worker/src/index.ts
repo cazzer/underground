@@ -1,10 +1,10 @@
 import { TTL_MS, cacheDecision, type CacheDecision, type Memo } from './cache'
 import { PREFLIGHT_HEADERS, corsHeaders } from './cors'
-import { RT_SCHEMA_VERSION, FEED_IDS, type RealtimeSnapshot } from './schema'
-import { buildSnapshot } from './transform'
+import { RT_SCHEMA_VERSION, FEED_IDS, type FeedId, type RealtimeSnapshot } from './schema'
+import { buildSnapshot, type FeedOutcome } from './transform'
 import { fetchAllFeeds } from './upstream'
 
-type CacheState = CacheDecision | 'edge' | 'miss'
+type CacheState = Exclude<CacheDecision, 'busy' | 'refresh'> | 'edge' | 'miss'
 
 // Resolved values only: Workers can hang on promises shared across requests.
 let memo: Memo | null = null
@@ -21,7 +21,7 @@ function respond(body: string, state: CacheState, origin: string | null): Respon
   })
 }
 
-function logMiss(request: Request, snapshot: RealtimeSnapshot): void {
+function logMiss(request: Request, snapshot: RealtimeSnapshot, outcomes: Record<FeedId, FeedOutcome>): void {
   const feeds = FEED_IDS.map((id) => ({ id, ...snapshot.feeds[id] }))
   // Read by Workers Logs to check "at most one upstream fetch per 15 s per colo".
   console.log(
@@ -29,6 +29,8 @@ function logMiss(request: Request, snapshot: RealtimeSnapshot): void {
       event: 'rt-miss',
       colo: request.cf?.colo,
       errors: feeds.flatMap((f) => (f.error === null ? [] : [{ feed: f.id, error: f.error }])),
+      // Upstream cf-cache-status per feed: shows whether cross-isolate dedupe works.
+      upstreamCache: Object.fromEntries(FEED_IDS.map((id) => [id, outcomes[id].cacheStatus ?? null])),
       dropped: feeds.reduce((sum, f) => sum + f.droppedEntities, 0),
       emptyRoute: feeds.reduce((sum, f) => sum + f.trips.filter((t) => t.route === '').length, 0),
     }),
@@ -66,21 +68,32 @@ async function refresh(request: Request, ctx: ExecutionContext): Promise<{ memo:
       )
       .catch(console.error),
   )
-  logMiss(request, snapshot)
+  logMiss(request, snapshot, outcomes)
   return { memo: fresh, state: 'miss' }
 }
 
 async function serveRealtime(request: Request, ctx: ExecutionContext, origin: string | null): Promise<Response> {
   const now = Date.now()
   const decision = cacheDecision(now, memo, refreshingSince)
+  if (decision === 'busy') {
+    return new Response('{"error":"warming"}', {
+      status: 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'retry-after': '1', ...corsHeaders(origin) },
+    })
+  }
   if (decision !== 'refresh' && memo) return respond(memo.body, decision, origin)
 
   // Claimed synchronously, before any await, so concurrent requests see it.
   refreshingSince = now
   try {
     const result = await refresh(request, ctx)
-    memo = result.memo
+    // Overlapping refreshes can finish out of order; never move the memo backwards.
+    if (!memo || result.memo.expiresAt > memo.expiresAt) memo = result.memo
     return respond(result.memo.body, result.state, origin)
+  } catch (e) {
+    if (!memo) throw e
+    console.error(e)
+    return respond(memo.body, 'stale', origin)
   } finally {
     if (refreshingSince === now) refreshingSince = null
   }
