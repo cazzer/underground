@@ -31,11 +31,13 @@ function clearLabel(state: LocateState): string {
 export function LocateStatus({ state, onClear }: LocateStatusProps) {
   const { select } = useFocus()
   const message = locateMessage(state)
+  // A plain "showing where you are" is screen-reader only: the button's active colour shows it.
+  const visible = message !== null && !message.srOnly
   const action = message?.action
   return (
-    <div className={message ? 'mt-1 flex max-w-72 items-start gap-3 text-xs' : 'text-xs'}>
-      <div className={`min-w-0 ${message ? TONE[message.tone] : ''}`}>
-        <p role="status">
+    <div className={visible ? 'mt-1 flex max-w-72 items-start gap-3 text-xs' : 'text-xs'}>
+      <div className={`min-w-0 ${visible ? TONE[message.tone] : ''}`}>
+        <p role="status" className={visible ? undefined : 'sr-only'}>
           {message && (
             <>
               <span aria-hidden="true">{GLYPH[message.tone]} </span>
@@ -53,7 +55,7 @@ export function LocateStatus({ state, onClear }: LocateStatusProps) {
           </button>
         )}
       </div>
-      {message && (
+      {visible && (
         <button
           type="button"
           onClick={onClear}

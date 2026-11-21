@@ -10,6 +10,8 @@ export interface LocateMessage {
   tone: 'info' | 'warn' | 'error'
   text: string
   action?: LocateAction
+  /** Announced to screen readers only; the location button's active colour is the visible cue. */
+  srOnly?: boolean
 }
 
 const METERS_PER_MILE = 1609.344
@@ -48,6 +50,7 @@ export function locateMessage(state: LocateState): LocateMessage | null {
         text: p.approximate
           ? `Showing where you are (approximate, within ${formatDistance(p.accuracyM)}).`
           : 'Showing where you are.',
+        srOnly: true,
       }
     }
   }
