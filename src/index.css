@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+/* Values come from src/theme.ts via CSS variables set in applyThemeCss(). */
+@theme inline {
+  --color-canvas: var(--ug-bg);
+  --color-ink: var(--ug-ink);
+  --color-ink-dim: var(--ug-ink-dim);
+  --color-panel: var(--ug-panel);
+  --color-edge: var(--ug-panel-border);
+  --color-focus: var(--ug-focus);
+  --font-sans: var(--ug-font-sans);
+  --font-mono: var(--ug-font-mono);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--ug-bg);
+  color: var(--ug-ink);
+  font-family: var(--ug-font-sans);
+}
