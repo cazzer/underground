@@ -1,5 +1,4 @@
-import { useThree } from '@react-three/fiber'
-import { useEffect, useLayoutEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Color } from 'three'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
@@ -16,7 +15,7 @@ export function routeLineBuffers(network: Network, paths: readonly ShapePath[], 
   const colors = new Map<RouteId, Rgb>()
   for (const r of network.routes) {
     // Color(hex) converts sRGB to linear, which is what vertex colors must be.
-    const c = new Color(routeLineColor(r.color, mix))
+    const c = new Color(routeLineColor(r.color, mix, theme.background))
     colors.set(r.id, [c.r, c.g, c.b])
   }
   return buildLineBuffers(paths, order, (id) => {
@@ -28,10 +27,11 @@ export function routeLineBuffers(network: Network, paths: readonly ShapePath[], 
 
 /**
  * One merged LineSegments2 (a single draw call) for `buffers`; null when there is nothing to
- * draw. Rebuilt when `buffers` changes, disposed on change and unmount.
+ * draw. Rebuilt when `buffers` changes, disposed on change and unmount. LineSegments2 sets its
+ * material's resolution from the viewport (CSS pixels) before each render, so linewidth is in
+ * CSS pixels at any dpr.
  */
 export function useLineLayer(buffers: LineBuffers | null, renderOrder: number): LineSegments2 | null {
-  const size = useThree((s) => s.size)
   const lines = useMemo(() => {
     if (!buffers || buffers.positions.length === 0) return null
     const geometry = new LineSegmentsGeometry().setPositions(buffers.positions).setColors(buffers.colors)
@@ -54,11 +54,6 @@ export function useLineLayer(buffers: LineBuffers | null, renderOrder: number): 
     },
     [lines],
   )
-
-  // Linewidth is in pixels of this resolution; CSS pixels keep it the same at any dpr.
-  useLayoutEffect(() => {
-    lines?.material.resolution.set(size.width, size.height)
-  }, [lines, size.width, size.height])
 
   return lines
 }

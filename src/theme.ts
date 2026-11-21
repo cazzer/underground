@@ -10,7 +10,7 @@ export interface Theme {
   gridSection: string
   /** How a route's GTFS color is drawn: mixed toward a theme color (amount 1 = mono). */
   routeLineMix: RouteLineMix
-  /** Single line color for the mono looks (?lines=a|c). */
+  /** TEMPORARY (removed with ?lines=, see LineHighlight.tsx): single line color for the mono looks a and c. */
   lineMono: string
   /** Line width in screen pixels. */
   lineWidth: number

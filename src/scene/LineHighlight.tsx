@@ -1,6 +1,12 @@
 /**
- * TEMPORARY: the ?lines=a and ?lines=c variants for the 8x4.3 look pick. Delete this file
- * (and its two uses in SubwayLines) once a look is chosen.
+ * TEMPORARY: the ?lines=a and ?lines=c variants for the 8x4.3 look pick. Once a look is chosen,
+ * remove together:
+ * - this file and its two uses in SubwayLines.tsx (which then passes theme.routeLineMix directly)
+ * - theme.ts: `lineMono` (interface field and the three presets), `LinesMode`, `resolveLinesMode`,
+ *   `linesMode`, `baseLineMix`
+ * - renderOrder.ts: `RENDER_ORDER.lineFocus` (renumber the layers above it)
+ * - AGENTS.md: the `?lines=` TEMPORARY note, `LineHighlight.tsx` in the directory map, and
+ *   "line focus 2" in the render order list
  */
 import { useFrame } from '@react-three/fiber'
 import { useMemo } from 'react'
