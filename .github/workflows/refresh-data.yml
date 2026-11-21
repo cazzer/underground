@@ -1,0 +1,99 @@
+name: Refresh GTFS data
+
+# Regenerates public/data from the MTA static GTFS zip and opens (or updates) one PR
+# when the output changed. Needs Settings > Actions > General > "Allow GitHub Actions
+# to create and approve pull requests".
+on:
+  schedule:
+    - cron: '17 7 * * *' # daily, 07:17 UTC (about 2-3 am New York), off the :00 rush
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+env:
+  FEED_URL: https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip
+  BRANCH: chore/data-refresh
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Record current feed state
+        run: |
+          echo "OLD_VERSION=$(node -p "require('./public/data/stations.json').feedVersion")" >> "$GITHUB_ENV"
+          # Informational only; the diff below decides whether anything changed.
+          echo "LAST_MODIFIED=$(curl -sIf "$FEED_URL" | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified: *//p')" >> "$GITHUB_ENV"
+
+      - name: Regenerate public/data
+        run: npm run data 2>&1 | tee "$RUNNER_TEMP/data.log"
+
+      - name: Check for changes
+        id: diff
+        run: |
+          changed=$({ git diff --name-only; git ls-files --others --exclude-standard; })
+          if [ -z "$changed" ]; then
+            echo "No change (feed ${OLD_VERSION}, Last-Modified ${LAST_MODIFIED:-unknown})."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The refresh may only touch public/data.
+          stray=$(printf '%s\n' "$changed" | grep -v '^public/data/' || true)
+          if [ -n "$stray" ]; then
+            echo "::error::Unexpected changes outside public/data:"
+            echo "$stray"
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the PR
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          NEW_VERSION=$(node -p "require('./public/data/stations.json').feedVersion")
+          {
+            echo "Regenerated \`public/data\` from \`$FEED_URL\`."
+            echo
+            echo "- feedVersion: \`$OLD_VERSION\` -> \`$NEW_VERSION\`"
+            echo "- Last-Modified: ${LAST_MODIFIED:-unknown}"
+            echo
+            echo "Script output (gzip sizes):"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/data.log"
+            echo '```'
+            echo
+            echo "**Checks do not run on this PR.** It was opened with \`GITHUB_TOKEN\`, which"
+            echo "does not trigger the PR check workflow. Run \`CI and deploy to GitHub Pages\`"
+            echo "manually on \`$BRANCH\` (Actions > Run workflow) before merging."
+          } > "$RUNNER_TEMP/body.md"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -B "$BRANCH"
+          git add public/data
+          git commit -m "chore(data): refresh GTFS data ($OLD_VERSION -> $NEW_VERSION)"
+          git push --force origin "$BRANCH"
+
+          title="Refresh GTFS data ($NEW_VERSION)"
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
+            gh pr edit "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --head "$BRANCH" --base "$BASE" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          fi
