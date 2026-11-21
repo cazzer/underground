@@ -4,6 +4,7 @@ import type { HopPlan } from '../realtime/position'
 import type { LiveTrip } from '../realtime/prepareTrips'
 import type { ShapeGeometry } from '../realtime/shapeGeometry'
 import { EMPTY_PROFILE } from '../trackProfile'
+import { GLIDE_CATCHUP_MPS, GLIDE_MAX_S } from './motion'
 import { createSlotTable, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, type ReconcileOptions, type SlotTable } from './slots'
 
 const FADE = 0.4
@@ -25,11 +26,11 @@ function shape(shapeId: string, x = 0): ShapeGeometry {
 }
 const SHAPES: Record<string, ShapeGeometry> = { S1: shape('S1'), S1b: shape('S1b', 10), S2: shape('S2', 500) }
 
-/** A trip arriving at stop 1 (1000 m) at `arriveAt` after a 100 s hop, or fixed at `fixed` of the hop. */
-function trip(key: string, over: { shapeId?: string; arriveAt?: number; fixed?: number } = {}): LiveTrip {
+/** A trip arriving at stop `to` (default 1, at 1000 m) at `arriveAt` after a 100 s hop, or fixed at `fixed` of the hop. */
+function trip(key: string, over: { shapeId?: string; arriveAt?: number; fixed?: number; to?: number } = {}): LiveTrip {
   const plan: HopPlan = {
     from: 0,
-    to: 1,
+    to: over.to ?? 1,
     arriveAt: over.fixed === undefined ? (over.arriveAt ?? 1100) : null,
     runS: 100,
     dwellS: 0,
@@ -143,37 +144,48 @@ describe('corrections', () => {
   /** Where the dot is drawn on the ground. */
   const drawn = (t: SlotTable, shown: number) => pointAtDistance(t.drawGeometry[0]!.line, shown).point
 
-  it('glides forward so the train reaches the stop at its arrival time, never going back', () => {
-    // Showing 100 m; the new plan has the train arriving at 1000 m in 60 s, so it is already near 400 m.
+  const dist = (now: number) => 1000 - Math.min(1, (1060 - now) / 100) * 1000 // due at 1000 m at 1060, 100 s run
+
+  it('glides forward to catch up with the train within seconds, never going back', () => {
+    // Showing 100 m while the train is at 400 m: a 300 m gap closes in 5 s, not over the rest of the hop.
     const t = corrected(100, trip('a', { arriveAt: 1060 }))
-    expect(t.glideT[0]).toBe(60)
-    const dist = (now: number) => 1000 - Math.min(1, (1060 - now) / 100) * 1000 // target at 1000 m over a 100 s run
+    expect(t.glideT[0]).toBe(300 / GLIDE_CATCHUP_MPS)
     let prev = 100
     let maxStep = 0
-    for (let now = 1000; now <= 1060; now += DT) {
+    for (let now = 1000; now <= 1006; now += DT) {
       const shown = stepSlot(t, 0, dist(now), now, 20 + (now - 1000), DT, FADE)
       expect(shown).toBeGreaterThanOrEqual(prev)
       maxStep = Math.max(maxStep, shown - prev)
       prev = shown
     }
-    expect(maxStep / DT).toBeLessThanOrEqual(30)
-    expect(prev).toBeCloseTo(1000, -1)
+    expect(maxStep / DT).toBeLessThanOrEqual(GLIDE_CATCHUP_MPS + 10 + 1) // the train's own 10 m/s plus the catch-up
+    expect(dist(1006) - prev).toBeLessThan(10)
   })
 
   it('hands a finished glide over to the ease without a step', () => {
     const t = corrected(100, trip('a', { arriveAt: 1060 }))
-    const target = (now: number) => 500 + (now - 1000) * 8 // arbitrary steady plan
     let prev = 100
-    for (let now = 1000; now < 1059.9; now += DT) prev = stepSlot(t, 0, target(now), now, 20 + (now - 1000), DT, FADE)
+    for (let now = 1000; now < 1004.9; now += DT) prev = stepSlot(t, 0, dist(now), now, 20 + (now - 1000), DT, FADE)
     expect(Number.isNaN(t.glideT[0]!)).toBe(false)
     // Frames either side of u = 1: the glide ends exactly on the target, so the ease takes over from it.
-    const before = stepSlot(t, 0, target(1059.99), 1059.99, 79.99, DT, FADE)
-    const at = stepSlot(t, 0, target(1060), 1060, 80, DT, FADE)
-    const after = stepSlot(t, 0, target(1060 + DT), 1060 + DT, 80 + DT, DT, FADE)
+    const before = stepSlot(t, 0, dist(1004.99), 1004.99, 24.99, DT, FADE)
+    const at = stepSlot(t, 0, dist(1005), 1005, 25, DT, FADE)
+    const after = stepSlot(t, 0, dist(1005 + DT), 1005 + DT, 25 + DT, DT, FADE)
     expect(Number.isNaN(t.glideT[0]!)).toBe(true)
     expect(Math.abs(at - before)).toBeLessThan(1)
     expect(Math.abs(after - at)).toBeLessThan(1)
-    expect(prev).toBeLessThan(target(1060))
+    expect(prev).toBeLessThan(dist(1005))
+  })
+
+  it('continues a running glide when the next poll lands mid-glide, instead of restarting it', () => {
+    const t = corrected(100, trip('a', { arriveAt: 1060 }))
+    for (let now = 1000; now < 1002; now += DT) stepSlot(t, 0, dist(now), now, 20 + (now - 1000), DT, FADE)
+    // Same plan at 1002: the remaining gap needs less than the 3 s left, so the end holds. 900 m ahead needs longer.
+    reconcileSlots(t, [trip('a', { arriveAt: 1060 })], 22, opts({ dataNow: 1002 }))
+    expect(t.glideAt[0]! + t.glideT[0]!).toBeCloseTo(1005, 5)
+    const far = corrected(100, trip('a', { arriveAt: 1060 }))
+    reconcileSlots(far, [trip('a', { arriveAt: 1052, to: 2 })], 22, opts({ dataNow: 1002 }))
+    expect(far.glideT[0]).toBe(GLIDE_MAX_S)
   })
 
   it('carries a dot over to a shape that passes close by, drawing the same spot', () => {
@@ -249,11 +261,6 @@ describe('corrections', () => {
     expect(t.phaseAt[0]).toBe(20)
     expect(t.drawGeometry[0]).toBe(SHAPES.S1)
     expect(t.displayed[0]).toBe(500)
-  })
-
-  it('cross-fades a forward error that would need a faster train than the limit', () => {
-    // Showing 0 m, the train is due at 1000 m in 20 s (50 m/s).
-    expect(corrected(0, trip('a', { arriveAt: 1020 })).phase[0]).toBe(1)
   })
 
   it('holds a backward revision for a moving plan, and cross-fades one past the limit', () => {

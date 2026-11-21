@@ -92,6 +92,7 @@ export interface ReconcileOptions {
 function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o: ReconcileOptions): void {
   const fadeS = o.fadeS ?? FADE_S
   const { plan, geometry } = trip
+  const glideLeftS = t.glideAt[slot]! + t.glideT[slot]! - o.dataNow
   t.glideT[slot] = NaN
   let shown = t.displayed[slot]!
   if (Number.isNaN(shown)) {
@@ -116,8 +117,8 @@ function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o:
   const target = hopDistance(plan, geometry, o.dataNow)
   const c = decideCorrection({
     errM: target - shown,
-    remainingM: geometry.stopDistances[plan.to]! - shown,
-    timeToArriveS: plan.fixedFraction === null && plan.arriveAt !== null ? plan.arriveAt - o.dataNow : null,
+    // NaN (no glide) compares false, so it reads as none.
+    glideLeftS: glideLeftS > 0 ? glideLeftS : null,
     fixedPlan: plan.fixedFraction !== null,
     reducedMotion: o.reducedMotion,
   })

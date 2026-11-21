@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { decideCorrection, EASE_MAX_M, GLIDE_MAX_MPS, HOLD_BACK_M, type CorrectionInput } from './motion'
+import {
+  decideCorrection,
+  EASE_MAX_M,
+  GLIDE_CATCHUP_MPS,
+  GLIDE_MAX_M,
+  GLIDE_MAX_S,
+  GLIDE_MIN_S,
+  HOLD_BACK_M,
+  type CorrectionInput,
+} from './motion'
 
-const base: CorrectionInput = { errM: 0, remainingM: 1000, timeToArriveS: 60, fixedPlan: false, reducedMotion: false }
+const base: CorrectionInput = { errM: 0, glideLeftS: null, fixedPlan: false, reducedMotion: false }
 const decide = (over: Partial<CorrectionInput>) => decideCorrection({ ...base, ...over })
 
 describe('decideCorrection', () => {
@@ -21,24 +30,22 @@ describe('decideCorrection', () => {
     expect(decide({ errM: -900, fixedPlan: false })).toEqual({ kind: 'none' })
   })
 
-  it('caps a glide at the longest allowed', () => {
-    expect(decide({ errM: 400, remainingM: 1000, timeToArriveS: 600 })).toEqual({ kind: 'glide', durationS: 90 })
+  it('sizes a glide from the gap: the catch-up speed, within the shortest and longest glide', () => {
+    expect(decide({ errM: 300 })).toEqual({ kind: 'glide', durationS: 300 / GLIDE_CATCHUP_MPS })
+    expect(decide({ errM: EASE_MAX_M + 1 })).toEqual({ kind: 'glide', durationS: GLIDE_MIN_S })
+    expect(decide({ errM: GLIDE_MAX_M })).toEqual({ kind: 'glide', durationS: GLIDE_MAX_S })
+    // The same for a plan that isn't moving: the gap, not the time to the next stop, sets the pace.
+    expect(decide({ errM: 300, fixedPlan: true })).toEqual({ kind: 'glide', durationS: 300 / GLIDE_CATCHUP_MPS })
   })
 
-  it('glides a larger forward error so the train arrives on time', () => {
-    expect(decide({ errM: 400, remainingM: 900, timeToArriveS: 60 })).toEqual({ kind: 'glide', durationS: 60 })
+  it('continues a running glide: it keeps its end unless the new gap needs longer', () => {
+    expect(decide({ errM: 300, glideLeftS: 8 })).toEqual({ kind: 'glide', durationS: 8 })
+    expect(decide({ errM: 300, glideLeftS: 1 })).toEqual({ kind: 'glide', durationS: 300 / GLIDE_CATCHUP_MPS })
   })
 
-  it('cross-fades when the glide would need a faster train than the limit', () => {
-    expect(decide({ errM: 400, remainingM: GLIDE_MAX_MPS * 60 + 1, timeToArriveS: 60 })).toEqual({ kind: 'crossfade' })
-    expect(decide({ errM: 400, remainingM: GLIDE_MAX_MPS * 60, timeToArriveS: 60 })).toMatchObject({ kind: 'glide' })
-  })
-
-  it('closes the gap at a steady speed when the plan is not moving', () => {
-    // A fixed (or overdue) plan: no arrival to time against.
-    expect(decide({ errM: 300, timeToArriveS: null })).toEqual({ kind: 'glide', durationS: 20 })
-    expect(decide({ errM: 300, timeToArriveS: 0.5 })).toEqual({ kind: 'glide', durationS: 20 })
-    expect(decide({ errM: 3000, timeToArriveS: null })).toEqual({ kind: 'crossfade' })
+  it('cross-fades a forward gap too large to glide', () => {
+    expect(decide({ errM: GLIDE_MAX_M + 1 })).toEqual({ kind: 'crossfade' })
+    expect(decide({ errM: GLIDE_MAX_M + 1, glideLeftS: 5 })).toEqual({ kind: 'crossfade' })
   })
 
   it('cross-fades every correction past the ease range under reduced motion', () => {

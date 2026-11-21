@@ -4,6 +4,7 @@ import type { StopId } from '../../data/schema'
 import type { Ground } from '../projection'
 import { pointAtDistance } from './polyline'
 import type { ShapeGeometry } from './shapeGeometry'
+import type { StopVisit } from './stopVisit'
 
 /** Run time guess (m/s) for a stop pair missing from segments.json. */
 export const FALLBACK_SPEED_MPS = 8
@@ -27,6 +28,8 @@ export interface PositionInput {
   segments: Readonly<Record<string, number>>
   /** epoch seconds, may be fractional */
   now: number
+  /** The last stop the train was seen at (see stopVisit.ts); caps a late prediction for the hop leaving it. */
+  visit?: StopVisit | null
 }
 
 export type PositionResult =
@@ -132,6 +135,16 @@ function chooseHop(input: PositionInput): Hop | PlanFailure {
 }
 
 /**
+ * The predicted arrival, capped by the schedule from the stop the train was last seen at: no later than its
+ * arrival there plus the run (arrival to arrival), nor than when it was last there plus the run less the dwell.
+ * The later of those two bounds wins, so a train that overstays its dwell isn't shown leaving early.
+ */
+function scheduledCap(hop: Hop, stops: readonly StopId[], runS: number, dwellS: number, visit: StopVisit | null): number | null {
+  if (hop.arriveAt === null || hop.from === hop.to || visit === null || stops[hop.from] !== visit.stopId) return hop.arriveAt
+  return Math.min(hop.arriveAt, Math.max(visit.arrivedAt + runS, visit.seenAt + runS - dwellS))
+}
+
+/**
  * Chooses the hop and looks up its run time. Pass `input.now` as the time of the poll: the hop is
  * frozen between polls, so a trip with no VehiclePosition does not advance to its next hop until
  * the next poll (it waits at its next stop for at most one poll interval).
@@ -144,12 +157,13 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
   const runS =
     segments[segmentKey(stops[hop.from]!, stops[hop.to]!)] ??
     Math.max(MIN_RUN_S, (D[hop.to]! - D[hop.from]!) / FALLBACK_SPEED_MPS)
+  const dwellS = dwellFor(runS)
   return {
     from: hop.from,
     to: hop.to,
-    arriveAt: hop.arriveAt,
+    arriveAt: scheduledCap(hop, stops, runS, dwellS, input.visit ?? null),
     runS,
-    dwellS: dwellFor(runS),
+    dwellS,
     fixedFraction: hop.fraction ?? null,
     minFraction: hop.fraction === undefined && status === 'INCOMING_AT' ? INCOMING_MIN_FRACTION : 0,
     departsInS: hop.departsInS,

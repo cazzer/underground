@@ -42,6 +42,7 @@ function liveTrip(key: string, geometry: ShapeGeometry): LiveTrip {
     stage: 'path',
     geometry,
     plan: { from: 0, to: 1, arriveAt: null, runS: 100, dwellS: 0, fixedFraction: 0.5, minFraction: 0, departsInS: null },
+    visit: null,
   }
 }
 

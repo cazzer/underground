@@ -101,3 +101,20 @@ describe('prepareTrips plans', () => {
     }
   })
 })
+
+describe('prepareTrips across polls', () => {
+  it('carries the last stop into the next poll and caps a late prediction with the schedule from it', () => {
+    const data = { lookup, geometries, segments }
+    // At 102N since NOW - 20 (a 100 s hop to 103N), seen there as of the NOW header; then in transit, with the
+    // feed still saying 103N at NOW + 130.
+    const stopped = trip('129900_1..N03R', '1', { status: 'STOPPED_AT', timestamp: NOW - 20, arrivals: [['102N', NOW - 20], ['103N', NOW + 150]] })
+    const first = prepareTrips(snapshot({ '1234567': [stopped] }), data, NOW)
+    expect(first.trips[0]!.visit).toEqual({ stopId: '102N', arrivedAt: NOW - 20, seenAt: NOW })
+    const moving = trip('129900_1..N03R', '1', { stopId: '103N', timestamp: NOW + 15, arrivals: [['103N', NOW + 130]] })
+    const later = prepareTrips(snapshot({ '1234567': [moving] }), data, NOW + 20, new Map(first.trips.map((t) => [t.key, t])))
+    expect(later.trips[0]!.visit).toBe(first.trips[0]!.visit)
+    expect(later.trips[0]!.plan.arriveAt).toBe(NOW + 80)
+    // Without the previous poll there is nothing to cap it with.
+    expect(prepareTrips(snapshot({ '1234567': [moving] }), data, NOW + 20).trips[0]!.plan.arriveAt).toBe(NOW + 130)
+  })
+})

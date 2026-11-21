@@ -4,6 +4,7 @@ import { GHOST, ghostReason, type GhostReason } from './filters'
 import { joinTrip, type JoinResult, type JoinStage } from './joinTrip'
 import { planHop, type HopPlan, type PlanFailure } from './position'
 import type { ShapeGeometry } from './shapeGeometry'
+import { nextVisit, type StopVisit } from './stopVisit'
 import type { TripLookup } from './tripLookup'
 
 export interface StaticRealtimeData {
@@ -22,7 +23,12 @@ export interface LiveTrip {
   geometry: ShapeGeometry
   /** The hop as of this poll; evaluate it per frame with `hopDistance`. */
   plan: HopPlan
+  /** The last stop the train was seen at, carried to the next poll. */
+  visit: StopVisit | null
 }
+
+/** What a trip carries from one poll to the next. */
+export type TripMemory = Pick<LiveTrip, 'shapeId' | 'visit'>
 
 export interface PreparedTrips {
   trips: LiveTrip[]
@@ -54,8 +60,11 @@ export function prepareTrips(
   snapshot: RealtimeSnapshot,
   data: StaticRealtimeData,
   now: number,
-  /** Shape each trip key was placed on last poll; breaks ties in the fallback join so trips don't flap. */
-  previousShapes?: ReadonlyMap<string, ShapeId>,
+  /**
+   * Last poll's trips by key: the shape breaks ties in the fallback join so trips don't flap, and the visit
+   * carries the last stop seen into this poll's plan.
+   */
+  previous?: ReadonlyMap<string, TripMemory>,
 ): PreparedTrips {
   const dropped = Object.fromEntries(DROP_REASONS.map((r) => [r, 0])) as Record<DropReason, number>
   const trips: LiveTrip[] = []
@@ -67,7 +76,9 @@ export function prepareTrips(
         dropped[ghost]++
         continue
       }
-      const join = joinTrip(trip, data.lookup, now, previousShapes?.get(`${feed}:${trip.tripId}`))
+      const key = `${feed}:${trip.tripId}`
+      const before = previous?.get(key)
+      const join = joinTrip(trip, data.lookup, now, before?.shapeId)
       if (!join.matched) {
         dropped[join.reason]++
         continue
@@ -75,6 +86,7 @@ export function prepareTrips(
       const geometry = data.geometries.get(join.shapeId)
       if (!geometry) throw new Error(`no geometry for joined shape ${join.shapeId}`)
 
+      const visit = nextVisit(before?.visit ?? null, trip, feed, snapshot.feeds[feed].headerTimestamp)
       const plan = planHop({
         geometry,
         status: trip.status,
@@ -82,6 +94,7 @@ export function prepareTrips(
         arrivals: trip.arrivals,
         segments: data.segments,
         now,
+        visit,
       })
       if ('ok' in plan) {
         dropped[plan.reason]++
@@ -91,7 +104,7 @@ export function prepareTrips(
         dropped['not-departed']++
         continue
       }
-      trips.push({ key: `${feed}:${trip.tripId}`, feed, trip, shapeId: join.shapeId, stage: join.stage, geometry, plan })
+      trips.push({ key, feed, trip, shapeId: join.shapeId, stage: join.stage, geometry, plan, visit })
     }
   }
   return { trips, dropped }
