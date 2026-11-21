@@ -84,8 +84,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   with `provenance: 'generated'` count as not listed and `stations/depths-generated.json` is never fetched; with
   it, that file joins the startup fetch batch (its failure only logs) and its depths merge into the track
   profiles. The removal list is in `src/data/generatedLook.ts`
-  TEMPORARY: `?access=a|b|c` (plain glyph, filled badge, text pill; default a) until the epz look card is
-  decided; the `accessBadge`/`accessBadgeInk` tokens serve B; the removal list is in `src/ui/accessLook.ts`
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
@@ -159,7 +157,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
     `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`) and its
-    weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`); `platformMask.ts` the platform fade (`maskBreaks`
+    weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
     adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
     `lineBreaks`, every extra vertex a drawn line needs (ramps, band tapers every 30 m but only once the slot
     moved 0.25, fade ramps);

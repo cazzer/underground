@@ -45,12 +45,6 @@ export interface Theme {
   inkDim: string
   panel: string
   panelBorder: string
-  /**
-   * TEMPORARY with ?access=b (src/ui/accessLook.ts): the filled access badge and the glyph inside it. The badge
-   * is at least 3:1 on the panel, the glyph 4.5:1 on the badge (theme.test.ts).
-   */
-  accessBadge: string
-  accessBadgeInk: string
   fontSans: string
   fontMono: string
   /** Station interior: outlines and stairs; track centerlines; street entrances; steps, guides, fare lines. */
@@ -113,8 +107,6 @@ export const THEMES = {
     inkDim: '#8fb4de',
     panel: 'rgba(11, 33, 71, 0.82)',
     panelBorder: '#5ce1ff',
-    accessBadge: '#6fa8ff',
-    accessBadgeInk: '#0b2147',
     fontSans: mono,
     fontMono: mono,
     interiorStroke: '#e6f6ff',
@@ -162,8 +154,6 @@ export function applyThemeCss(t: Theme, root: HTMLElement = document.documentEle
     '--ug-ink-dim': t.inkDim,
     '--ug-panel': t.panel,
     '--ug-panel-border': t.panelBorder,
-    '--ug-access-badge': t.accessBadge,
-    '--ug-access-badge-ink': t.accessBadgeInk,
     '--ug-focus': t.stationFocus,
     '--ug-here': t.here,
     '--ug-status-live': t.statusLive,

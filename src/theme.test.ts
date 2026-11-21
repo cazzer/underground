@@ -33,13 +33,12 @@ function opaquePanel(panel: string, background: string): string {
 }
 
 describe('access tokens', () => {
-  it('draw the access glyph (ink, dimmed for partial, and the outlined badge) at 3:1 on the panel', async () => {
+  it('draw the access glyph (ink, dimmed for partial) at 3:1 on the panel', async () => {
     for (const t of Object.values(await themes())) {
       const panel = opaquePanel(t.panel, t.background)
-      for (const [name, color] of [['ink', t.ink], ['inkDim', t.inkDim], ['accessBadge', t.accessBadge]] as const) {
+      for (const [name, color] of [['ink', t.ink], ['inkDim', t.inkDim]] as const) {
         expect(contrastRatio(color, panel), `${t.name} ${name} ${color} on ${panel}`).toBeGreaterThanOrEqual(3)
       }
-      expect(contrastRatio(t.accessBadgeInk, t.accessBadge), `${t.name} badge glyph`).toBeGreaterThanOrEqual(4.5)
       // inkDim also sets the small text beside the glyph (the partial note, "partly", the borough line).
       expect(contrastRatio(t.inkDim, panel), `${t.name} inkDim text on ${panel}`).toBeGreaterThanOrEqual(4.5)
     }
