@@ -74,6 +74,22 @@ describe('buildInteriorBuffers', () => {
     expect(footprint).toHaveLength(4)
   })
 
+  it('colors the guides\' street end with the street level at an elevated station, where the street is the last level', () => {
+    const base = fixture([])
+    const elevated = {
+      ...base,
+      levels: [
+        { id: 'plat', name: 'Platform', kind: 'platform' as const, y: 8 },
+        { id: 'mezz', name: 'Station house', kind: 'mezzanine' as const, y: 4 },
+        { id: 'street', name: 'Street', kind: 'street' as const, y: 0 },
+      ],
+    }
+    const out = buildInteriorBuffers(elevated, opts()).fine
+    const k = firstWith(out, 'guide', 1)
+    expect(seg(out, k)[4]).toBe(0)
+    expect(Array.from(out.colors.subarray(k * 6 + 3, k * 6 + 6))).toEqual([6, 2, 0])
+  })
+
   it('draws no guides from the platform', () => {
     expect(firstWith(fine, 'guide', 2)).toBe(-1)
   })

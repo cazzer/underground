@@ -96,6 +96,11 @@ async function loadGeneratedDepths(baseUrl: string, signal: AbortSignal): Promis
   }
 }
 
+export interface LoadNetworkOptions {
+  /** TEMPORARY (generatedLook.ts): also fetch stations/depths-generated.json. */
+  generatedDepths?: boolean
+}
+
 /**
  * Fetches stations, routes, shapes, and station depths from `<baseUrl>data/` in parallel and builds the network,
  * drawing each shape `trackOffsetM` right of its travel direction, down to the station depths scaled by `yScale`.
@@ -107,7 +112,7 @@ export async function loadNetwork(
   trackOffsetM: number,
   yScale: number,
   signal: AbortSignal,
-  generatedDepths = false,
+  { generatedDepths = false }: LoadNetworkOptions = {},
 ): Promise<LoadedNetwork> {
   async function file<T extends DataFile>(key: string): Promise<T> {
     const url = `${baseUrl}data/${key}.json`

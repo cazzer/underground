@@ -38,7 +38,8 @@ export interface InteriorBufferOptions {
   guides: boolean
   /** How escalators and elevators are drawn (TEMPORARY choice, see machineLook.ts). */
   machines: MachineStyle
-  /** Linear RGB for a role on the level at `levelIndex` (0 = street). */
+  /** Linear RGB for a role on the level at `levelIndex`, an index into `interior.levels` (highest first, so the
+   *  street is 0 below ground and the last level at an elevated station). */
   colorOf: (role: InteriorRole, levelIndex: number) => Rgb
 }
 
@@ -59,6 +60,7 @@ export function buildInteriorBuffers(
     return i
   }
   const realY = (i: number) => interior.levels[i]!.y
+  const streetIndex = interior.levels.findIndex((l) => l.kind === 'street')
   const strong = new SegmentWriter()
   const fine = new SegmentWriter()
 
@@ -69,6 +71,7 @@ export function buildInteriorBuffers(
     strong,
     fine,
     realY,
+    streetIndex,
     yScale,
     stepRise: opts.stepRise,
     colorOf,
@@ -109,7 +112,7 @@ export function buildInteriorBuffers(
 
     if (opts.guides && level.kind !== 'street') {
       const cBottom = colorOf('guide', li)
-      const cTop = colorOf('guide', 0)
+      const cTop = colorOf('guide', streetIndex)
       for (const s of slabs) {
         for (const [x, z] of s.outline) fine.segment([x, y, z], [x, 0, z], cBottom, cTop)
         fine.loop(s.outline, 0, cTop)

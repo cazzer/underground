@@ -49,7 +49,7 @@ export function fixtureCatalog(spec: FixtureSpec): { catalog: GeneratorCatalog; 
     routes: ['T'], structure: spec.structure, lat: ANCHOR.lat, lon: ANCHOR.lon, ada: 0, adaNorth: false, adaSouth: false, adaNotes: null,
     northLabel: spec.northLabel ?? 'Uptown', southLabel: spec.southLabel ?? 'Downtown',
   }
-  const tags = spec.levelTag === null ? {} : { level: spec.levelTag }
+  const tags: Record<string, string> = spec.levelTag === null ? {} : { level: spec.levelTag }
   const catalog: GeneratorCatalog = {
     stations: [station],
     entrances: spec.entrances.map((e) => {

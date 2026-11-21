@@ -32,14 +32,17 @@ so dev and preview serve under that path.
 - `npm run data:access`: offline; reruns the borough/ADA join on the committed `public/data/stations.json`
   with the pinned catalog and exceptions, prints the gzip total against the budget.
 - `npm run data:stations`: merge `data/stations/*.authored.json` with the pinned `*.sources.json`
-  into `public/data/stations/*.json`, and extract `public/data/station-depths.json` (each platform track's
+  into `public/data/stations/*.json`, generate the template stations from `data/stations/catalog/` plus the
+  committed `public/data/shapes.json` and `stations.json` (a hand-authored station wins; it prints each skipped
+  candidate with its reason and each dropped source row), and extract `public/data/station-depths.json` (each platform track's
   ends and rail height; it counts toward the shared 60 KB budget) from the authored interiors, and
   `public/data/stations/depths-generated.json` (the same for generated interiors; outside the budget, capped at
   32 KB gzipped; written even when empty). Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
   pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
-  `data/stations/catalog/`. Review the diff. `data:stations` stays offline and never reads it (`npm run data` reads only `catalog/stations.json`).
+  `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors
+  are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -137,8 +140,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     HUD text (route chips, schedule date)
   - `interiorGeometry.ts` interior to strong/fine line buffers (levels, outlines, entrances);
     `interiorConnectors.ts` stairs, ramps, escalators (a zero-run one gets a 30 degree run along the
-    station axis, from its listing entrance when it sits on it, else centered, descending toward the plan
-    center) and elevators (shaft squared to the axis, a stop at each end in that level's pass; machines take
+    station axis; on its listing entrance its street end sits there and the run heads toward the plan center,
+    down below ground and up at an elevated station; else it is centered, descending toward the center) and elevators (shaft squared to the axis, a stop at each end in that level's pass; machines take
     half the depth fade); `escalatorBanks.ts` `spreadBanks`: zero-run escalators whose bands would touch
     sit side by side across the axis in id order (an authored one off its entrance stays put; one listed
     by two entrances throws);
@@ -250,8 +253,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `scripts/`: `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge; `lib/stationProvenance.ts` (`markGenerated`: authored to generated, depth sources, archetype and
-  confidence) and `lib/stationIndex.ts` (`buildStationIndex`) are pure, and `build-stations.ts` has the seam where
-  generated stations join the authored ones (hand-authored wins); `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)
+  confidence) and `lib/stationIndex.ts` (`buildStationIndex`, `NOT_INTERIOR_FILES`) are pure, and `build-stations.ts`
+  joins the generated stations to the authored ones (hand-authored wins); `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)
   - Archetype classifier (offline, nothing ships): `lib/archetype.ts` (`classifyStation`: facts to archetype,
     params, confidence and a reason per deduction; `INTERIOR_MIN_CONFIDENCE` 0.7), `stationFacts.ts` (its input
     types), `stationFactsCheck.ts` (drops or rejects bad geometry), `platformAxis.ts` (PCA axis, [u, v] frame),
@@ -259,6 +262,16 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (island/side by cross-section vote, track count, curve penalty; `platformLayout.ts` the types),
     `mezzanineEvidence.ts`, `depth.ts` + `deepStations.ts` + `riseParse.ts` (level elevations from E&E rises,
     a cited deep list, OSM level, then structure defaults)
+  - Station generator: `lib/generate.ts` (`generateStations`: classify, dispatch to a template, validate with the
+    merge; a throw skips the station with its reason; the 3 mixed island/side cut-cover stations are skipped) and
+    `lib/generatorInputs.ts` (parsed catalog files, shapes and stations to its inputs). `lib/templates/`:
+    `context.ts` (frame from the classifier's anchor and bearing, platforms in it), `slice.ts` (the in-memory
+    `StationSources` cut from the catalog; never written), `tracks.ts` (`mapTrackLines`; N/S on the two outermost
+    platform-edge tracks by the map's direction lines; paths are the OSM way clipped to the platform and 6 m of the
+    map line), `slabs.ts` (one rectangle per entrance cluster), `stairs.ts`, `machines.ts` (E&E rows the merge can
+    take, entrance links, `at` overrides), `build.ts` (assembly, dropped rows in notes and the log), `subway.ts`
+    (`cutCover`, `shallow`), `elevated.ts`; `templateFixture.ts` synthetic one-station catalogs for
+    `generate.test.ts`. `generatedOutputs.test.ts` checks the committed generated files are fresh
   - `lib/catalogFacts.ts` catalog to `StationFacts` (platforms go to their nearest station point; complexes
     flagged); `lib/pathwaysTopology.ts`, `layoutOracle.ts`, `archetypeScore.ts` score it;
     `score-archetypes.ts <feedDir> [--oracle file]` prints the report to stdout and writes nothing. The 2021 draft NYCT
@@ -374,7 +387,8 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
 - `connectors` (stair, escalator, elevator, ramp) have `lower`/`upper` endpoints `{x, z, level}` and a
   `width`. Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
   outages. Elevators, and escalators from the E&E inventory, have identical x/z at both ends (the renderer
-  gives such an escalator a 30 degree run, pinned at its street entrance when one lists it).
+  gives such an escalator a 30 degree run; when an entrance lists it and it sits there, its street end is pinned
+  at the entrance: the upper end below ground, the lower end at an elevated station).
 - `entrances` are street-level points (raw NY Open Data type, entry/exit) listing the `connectors`
   that reach them. An entrance is whichever connector end sits on the street level: the upper end below ground,
   the lower end at an elevated station (street 0 is the lowest level; the other levels have positive `y`). The
@@ -385,7 +399,8 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   the OPEN-NY Terms of Use, and `attribution` says so (`OPEN_NY_NOTE` in `stationMerge.ts`).
 - `generated` (`{ archetype, confidence }`) exists only on template-generated interiors (absent = hand-authored);
   generated interiors use `generated` in place of `authored` in `sources`. Their non-street levels carry
-  `depthSource`: only `ee-rise` is measured, the rest are estimates (label "≈"). Nothing generated ships yet.
+  `depthSource`: only `ee-rise` is measured, the rest are estimates (label "≈"). About 260 are committed, shown
+  only under the TEMPORARY `?generated=1` until 9wc.5 labels them.
 - `public/data/stations/index.json` (`StationIndex`) maps each station id with an interior file to its
   `provenance` (`authored` or `generated`). The client fetches it on mount, after the startup files and not
   render-blocking, so it is outside the 60 KB startup budget and has its own cap (the build fails above 8 KB

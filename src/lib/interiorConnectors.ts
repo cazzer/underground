@@ -17,6 +17,8 @@ export interface ConnectorContext {
   fine: SegmentWriter
   /** Real (unscaled) walking-surface y of the level at an index. */
   realY: (levelIndex: number) => number
+  /** Index of the street level: 0 below ground, the last (lowest) level at an elevated station. */
+  streetIndex: number
   /** Vertical exaggeration; x/z are never scaled. */
   yScale: number
   /** Real rise per drawn stair step, meters. */
@@ -38,7 +40,8 @@ export interface ConnectorContext {
  */
 export interface RunAnchor {
   point: LocalPoint
-  /** The run's street (upper) end sits on `point`; otherwise the run is centered on it. */
+  /** The run's street end (the upper one below ground, the lower one at an elevated station) sits on `point`;
+   *  otherwise the run is centered on it. */
   atEntrance: boolean
   lateral: number
 }
@@ -65,7 +68,9 @@ const CAB_INSET = 0.25
 /**
  * Plan ends of an inclined connector. An escalator from the equipment inventory has one point for
  * both ends; it gets a 30 degree run along `axis`, placed by `anchor` (by default centered on its
- * own point), descending toward `center`. Any other connector without a run is a data error.
+ * own point). Pinned at its entrance, the street end sits there and the run heads toward `center`:
+ * down from the street below ground (`streetEnd` 'upper'), up from it at an elevated station
+ * ('lower'). Centered, it descends toward `center`. Any other connector without a run is a data error.
  */
 export function inclineEnds(
   c: Connector,
@@ -73,6 +78,7 @@ export function inclineEnds(
   axis: LocalPoint,
   center: LocalPoint,
   anchor?: RunAnchor,
+  streetEnd: 'lower' | 'upper' = 'upper',
 ): { lower: LocalPoint; upper: LocalPoint } {
   const run = Math.hypot(c.upper.x - c.lower.x, c.upper.z - c.lower.z)
   if (run >= MIN_RUN) return { lower: [c.lower.x, c.lower.z], upper: [c.upper.x, c.upper.z] }
@@ -86,7 +92,8 @@ export function inclineEnds(
     ref[0] + s * axis[0] * t - axis[1] * lateral,
     ref[1] + s * axis[1] * t + axis[0] * lateral,
   ]
-  return atEntrance ? { lower: at(-length), upper: at(0) } : { lower: at(-length / 2), upper: at(length / 2) }
+  if (!atEntrance) return { lower: at(-length / 2), upper: at(length / 2) }
+  return streetEnd === 'upper' ? { lower: at(-length), upper: at(0) } : { lower: at(0), upper: at(-length) }
 }
 
 interface Incline {
@@ -100,7 +107,7 @@ interface Incline {
 
 function incline(ctx: ConnectorContext, c: Connector, li: number, ui: number): Incline {
   const rise = ctx.realY(ui) - ctx.realY(li)
-  const { lower, upper } = inclineEnds(c, rise, ctx.axis, ctx.center, ctx.anchorOf(c.id))
+  const { lower, upper } = inclineEnds(c, rise, ctx.axis, ctx.center, ctx.anchorOf(c.id), li === ctx.streetIndex ? 'lower' : 'upper')
   const dx = upper[0] - lower[0]
   const dz = upper[1] - lower[1]
   const run = Math.hypot(dx, dz)
