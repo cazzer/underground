@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
-import { formatDepth, interiorBounds, interiorFocusTarget, levelLabels, paddedHull } from './interiorFraming'
+import { formatDepth, interiorBounds, interiorFocusAnchor, levelLabels, paddedHull } from './interiorFraming'
 
 const interior: StationInterior = {
   stationId: 'X01',
@@ -59,11 +59,13 @@ describe('interiorBounds', () => {
   })
 })
 
-describe('interiorFocusTarget', () => {
-  it('centers the plan and shifts south by the scaled mid-depth times tan(polar)', () => {
-    const t = interiorFocusTarget({ x: 100, z: 200 }, interior, 2, Math.SQRT2)
-    expect(t.x).toBeCloseTo(100 + 5)
-    expect(t.z).toBeCloseTo(200 + 8.5 + 8 * Math.SQRT2)
+describe('interiorFocusAnchor', () => {
+  it('centers the plan, gives the scaled mid-depth times tan(polar) toward the camera and half the longer side', () => {
+    const a = interiorFocusAnchor({ x: 100, z: 200 }, interior, 2, Math.SQRT2)
+    expect(a.center.x).toBeCloseTo(100 + 5)
+    expect(a.center.z).toBeCloseTo(200 + 8.5)
+    expect(a.towardCamera).toBeCloseTo(8 * Math.SQRT2)
+    expect(a.halfExtent).toBe(25)
   })
 })
 

@@ -61,9 +61,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   TEMPORARY: `?cars=a|b|c` (box, chamfered prism, flat slab; default b) until the pah.5 look round;
   the removal list is in `src/scene/carLook.ts`
+  TEMPORARY: `?orbit=a|b|c` (azimuth window ±30/45/60 degrees; default b) until pah.5 decides; the
+  removal list is in `src/scene/orbitLook.ts`
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
-    HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold
+    HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
+    `useStationOrbit.ts` the focused-station orbit (azimuth window per frame, pan-radius clamp);
+    `orbitLook.ts` TEMPORARY `?orbit=` override
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; picks raycast an invisible
     22 px hit disc per station and take the nearest; `FocusRing.tsx` redraws the focused ring above the
@@ -81,6 +85,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
   `InteriorStatus.tsx` the panel's station-layout line (loading, error with Retry, ready, zoom-in hint)
+  `OrbitHint.tsx` the panel's turn hint (right- or Shift-drag; two fingers on a coarse pointer)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
@@ -92,10 +97,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeYawMatrix`), `pickStation.ts`: pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
-  - `interiorGeometry.ts` interior to strong/fine line buffers; `interiorFraming.ts` bounds, camera
-    target, level labels, padded hull; `interiorReveal.ts` distance to interior opacity. The first
-    two have type-only `.ts` imports because a scripts/ test loads them. `interiorCamera.ts` centers an
-    interior fly-to (always 180 m) in the screen area the header, footer and station panel leave free
+  - `interiorGeometry.ts` interior to strong/fine line buffers; `interiorFraming.ts` bounds, focus
+    anchor (plan center, toward-camera shift, half-extent), level labels, padded hull;
+    `interiorReveal.ts` distance to interior opacity. The first two have type-only `.ts` imports
+    because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always 180 m,
+    at the current azimuth) in the screen area the header, footer and station panel leave free;
+    `orbitLimits.ts` azimuth window, spring to north-up, soft pan radius, focus-point pivot
   - `focus.tsx` focused/dismissed-station React context (not pure). In dev only it exposes
     `window.__underground.select(stationId)` for screenshots and Playwright checks
 - `src/lib/live/`: pure helpers for the live layer (no React or three.js; tests colocated)
@@ -187,8 +194,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - The Canvas is `flat` (no tone mapping), so theme tokens render exactly as written.
   HUD uses Tailwind tokens (`bg-panel`, `text-ink`, ...) backed by theme CSS variables.
 - Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`).
-  User rotation is disabled. Markers and dots rescale with distance
+  The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
+  focused: azimuth stays within ±45 degrees (`?orbit=`), and the turn pivots on the focus point (the
+  interior's mid-depth center at the middle of the free area, or the view center for a bare station).
+  The focus point pans within the interior's half-extent + 20 m of its plan center (100 m of a bare
+  station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`). The window closes to 0 toward top-down, and
+  dropping focus (zoom out, close the panel) springs the view back to north-up, so the city and
+  top-down views are always north-up. `enableRotate` stays on; the azimuth window alone stops a turn
+  (toggling it mid-gesture applies a stale rotate start), and `rotateSpeed` is 0 while unfocused so
+  drift can't replay when the window opens. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
+- Every `on*` handler passed to `MapControls` (today `onStart`) stays referentially
+  stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
+  which can lock them mid-drag. Set control limits imperatively in `useFrame` (priority -2, before
+  drei's `update()` at -1; the pivot and pan clamp at -0.5), not as changing props. Never use a
+  positive `useFrame` priority (it takes over rendering).
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
   station fill 3, station ring 4, train halo 5, car halo 5.5, trains 6, cars 6.5, focused ring 10
