@@ -6,18 +6,22 @@ import { writeMarkerMatrices } from '../lib/markerMatrices'
 import type { Station } from '../lib/network'
 import { theme } from '../theme'
 import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
+import { FocusRing } from './FocusRing'
 import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
 interface StationsProps {
   stations: readonly Station[]
+  /** Draw the focused station's marker too (it has no interior, or its load failed). */
+  focusedMarker: boolean
 }
 
 /**
  * All station markers as two instanced meshes (fill, then ring). The focused station's marker is hidden
- * (its panel and interior mark it); it stays pickable, since ScenePicker picks in screen space.
+ * (its panel and interior mark it); it stays pickable, since ScenePicker picks in screen space. A station with no
+ * interior (`focusedMarker`) keeps its marker, plus a `theme.stationFocus` FocusRing above the trains.
  */
-export function Stations({ stations }: StationsProps) {
+export function Stations({ stations, focusedMarker }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
   const { focusedId } = useFocus()
@@ -35,7 +39,7 @@ export function Stations({ stations }: StationsProps) {
     [],
   )
   const stroke = useMemo(() => new Color(theme.stationStroke), [])
-  const drawn = useRef({ scale: NaN, focusedIndex: -1 })
+  const drawn = useRef({ scale: NaN, focusedIndex: -1, focusedMarker: false })
 
   useEffect(
     () => () => {
@@ -64,11 +68,12 @@ export function Stations({ stations }: StationsProps) {
     const d = cameraDistance(state)
     const scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
     const last = drawn.current
-    if (scale === last.scale && focusedIndex === last.focusedIndex) return
+    if (scale === last.scale && focusedIndex === last.focusedIndex && focusedMarker === last.focusedMarker) return
     last.scale = scale
     last.focusedIndex = focusedIndex
-    // Scale 0 collapses the focused instance, so neither its fill nor its ring draws.
-    writeMarkerMatrices(f.instanceMatrix.array as Float32Array, positions, MARKER_Y, scale, focusedIndex, 0)
+    last.focusedMarker = focusedMarker
+    // Focus scale 0 collapses the focused instance, so neither its fill nor its ring draws.
+    writeMarkerMatrices(f.instanceMatrix.array as Float32Array, positions, MARKER_Y, scale, focusedIndex, focusedMarker ? 1 : 0)
     r.instanceMatrix.array.set(f.instanceMatrix.array)
     f.instanceMatrix.needsUpdate = true
     r.instanceMatrix.needsUpdate = true
@@ -93,6 +98,7 @@ export function Stations({ stations }: StationsProps) {
         {/* Default white material: the per-instance colors are the ring colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
+      {focusedMarker && focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} />}
     </>
   )
 }

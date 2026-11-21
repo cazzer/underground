@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { buildInteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
-import { deriveInteriorLoad, interiorIdOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
+import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
 import { loadStationIndex } from './loadStationIndex'
 import { loadStationInterior } from './loadStationInterior'
 
@@ -32,9 +32,9 @@ function initialIndexLoad(): IndexLoad {
 /**
  * Interior for the focused station; stations the index doesn't list never fetch. The index is fetched on
  * mount (no waiting for a first focus); while it loads or after it fails, no station shows an interior panel.
- * `retry` retries a failed interior.
+ * `retry` retries a failed interior. `streetMarker`: whether the scene draws the focused station's own marker.
  */
-export function useStationInterior(stationId: string | null): { load: InteriorLoad; retry: () => void } {
+export function useStationInterior(stationId: string | null): { load: InteriorLoad; retry: () => void; streetMarker: boolean } {
   const [indexLoad, setIndexLoad] = useState<IndexLoad>(initialIndexLoad)
   const [settled, setSettled] = useState<SettledLoad | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -91,5 +91,7 @@ export function useStationInterior(stationId: string | null): { load: InteriorLo
     setAttempt((n) => n + 1)
   }, [])
 
-  return { load: deriveInteriorLoad(stationId, indexLoad, cache.peek, settled), retry }
+  const load = deriveInteriorLoad(stationId, indexLoad, cache.peek, settled)
+  // Whether the focused station keeps its street marker and tie (the no-interior fallback; see focusedMarkerShown).
+  return { load, retry, streetMarker: focusedMarkerShown(stationId, indexLoad, load) }
 }

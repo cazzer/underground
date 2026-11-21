@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InteriorModel } from '../scene/interiorModel'
-import { deriveInteriorLoad, interiorIdOf, type IndexLoad } from './interiorLoad'
+import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, type IndexLoad, type InteriorLoad } from './interiorLoad'
 
 const model = { stationId: 'L08' } as InteriorModel
 const empty = () => undefined
@@ -54,5 +54,27 @@ describe('deriveInteriorLoad', () => {
   it("shows this station's settled error", () => {
     const error = { id: 'L08', load: { status: 'error' as const, message: 'HTTP 500' } }
     expect(deriveInteriorLoad('L08', ready, empty, error)).toBe(error.load)
+  })
+})
+
+describe('focusedMarkerShown', () => {
+  const loading: InteriorLoad = { status: 'loading' }
+  const none: InteriorLoad = { status: 'none' }
+  const failed: InteriorLoad = { status: 'error', message: 'HTTP 500' }
+  const done: InteriorLoad = { status: 'ready', model }
+  it('hides the marker for an interior that is loading or ready', () => {
+    expect(focusedMarkerShown('L08', ready, loading)).toBe(false)
+    expect(focusedMarkerShown('L08', ready, done)).toBe(false)
+  })
+  it('shows it for a station with no interior and for a failed load', () => {
+    expect(focusedMarkerShown('L10', ready, none)).toBe(true)
+    expect(focusedMarkerShown('L08', ready, failed)).toBe(true)
+  })
+  it('shows it when the index failed (no interior will ever load) but not while the index loads', () => {
+    expect(focusedMarkerShown('L08', { status: 'error', message: 'x' }, none)).toBe(true)
+    expect(focusedMarkerShown('L08', { status: 'loading' }, none)).toBe(false)
+  })
+  it('is false with no station focused', () => {
+    expect(focusedMarkerShown(null, ready, none)).toBe(false)
   })
 })
