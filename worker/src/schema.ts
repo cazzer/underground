@@ -20,6 +20,7 @@ export interface RealtimeTrip {
   route: string                 // TripDescriptor.route_id, raw ("L", "GS", "7X", "SI", "W")
   direction: Direction | null   // NYCT direction (NORTH->N, SOUTH->S), else parsed from trip_id
   tripId: string                // realtime trip_id, raw: single-dot forms ("126600_SI.S03R") untouched
+  startDate: string | null      // TripDescriptor.start_date, YYYYMMDD; null if absent
   trainId: string | null        // NYCT train_id, raw ("1SI 2106 STG/TNV")
   assigned: boolean             // NYCT is_assigned (false/absent -> false)
   stopId: string | null         // VehiclePosition.stop_id; when no VehiclePosition, first arrival's stop

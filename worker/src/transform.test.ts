@@ -53,6 +53,7 @@ describe('SI fixture', () => {
       route: 'SI',
       direction: 'S',
       tripId: '126600_SI.S03R',
+      startDate: '20261120',
       trainId: '1SI 2106 STG/TNV',
       assigned: true,
       stopId: 'S18S',
@@ -173,6 +174,7 @@ describe('compactFeed', () => {
         route: 'L',
         direction: null,
         tripId: 't1',
+        startDate: null,
         trainId: null,
         assigned: false,
         stopId: 'L01N',
@@ -181,6 +183,11 @@ describe('compactFeed', () => {
         arrivals: [],
       },
     ])
+  })
+
+  it('takes startDate from the VehiclePosition when there is no TripUpdate', () => {
+    const { trips } = compactFeed({ entity: [{ vehicle: { trip: { tripId: 't2', startDate: '20261120' } } }] }, 0)
+    expect(trips[0]?.startDate).toBe('20261120')
   })
 
   it('reports entities without a trip_id as dropped instead of emitting them', () => {

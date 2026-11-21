@@ -60,6 +60,7 @@ function compactTrip(tripId: string, tu: TripUpdate | undefined, vp: Vehicle | u
     route: tu?.trip?.routeId ?? vp?.trip?.routeId ?? '',
     direction: parseDirection(nyct?.direction, tripId),
     tripId,
+    startDate: tu?.trip?.startDate ?? vp?.trip?.startDate ?? null,
     trainId: nyct?.trainId ?? null,
     assigned: nyct?.isAssigned === true,
     stopId: vp ? (vp.stopId ?? null) : (arrivals[0]?.[0] ?? null),
