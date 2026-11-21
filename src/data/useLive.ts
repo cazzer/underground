@@ -47,10 +47,11 @@ export interface Live {
 /**
  * Live trains: loads the join data, polls the Worker, and places the trips once per snapshot.
  * With no `VITE_RT_URL` nothing is fetched and the status says so. `files` is null until the network is ready.
+ * `trackOffsetM` is `network.trackOffsetM`, so trains ride the tracks the map draws.
  */
-export function useLive(files: NetworkFiles | null): Live {
+export function useLive(files: NetworkFiles | null, trackOffsetM: number): Live {
   const configured = RT_URL !== null
-  const staticLoad = useRealtimeStatic(configured ? files : null)
+  const staticLoad = useRealtimeStatic(configured ? files : null, trackOffsetM)
   const feed = useRealtimeFeed(RT_URL)
   const [layerError, setLayerError] = useState<string | null>(null)
   const onLayerError = useCallback((e: Error) => setLayerError(e.message), [])

@@ -1,6 +1,6 @@
 /**
  * A shape's drawn track: decode, project, drop out-and-back spurs, offset right of travel. Pure.
- * The map lines use it now; realtime stop distances (pah.3) will use it so dots ride the same line.
+ * The map lines and the realtime trip lines (shapeGeometry.ts) both use it, so dots ride the drawn track.
  * Explicit `.ts` imports because scripts/lib/trackAlignment.test.ts loads this file in Node.
  */
 import { decodeShapePoints } from '../data/codec.ts'

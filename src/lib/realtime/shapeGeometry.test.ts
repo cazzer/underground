@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { E5, deltaEncode } from '../../data/codec'
 import type { Shape, StationsFile, TripIndexFile } from '../../data/schema'
 import { toGround } from '../projection'
+import { trackLine } from '../trackLine'
+import { TRACK_OFFSETS } from '../trackOffset'
 import { geometries, index, shapes, stations } from './fixture'
 import { projectForward } from './polyline'
 import { buildShapeGeometries } from './shapeGeometry'
@@ -18,6 +20,18 @@ describe('buildShapeGeometries', () => {
     expect(g.line.length).toBeCloseTo(g.stopDistances[2]!, 0)
   })
 
+  it('runs on the offset track line the map draws, with the stops projected onto it', () => {
+    const shape = shapes.shapes.find((s) => s.id === '1..N03R')!
+    const g = buildShapeGeometries(shapes, index, stations, TRACK_OFFSETS.a).get('1..N03R')!
+    const centered = geometries.get('1..N03R')!
+    expect(g.line.points).toEqual(trackLine(shape, TRACK_OFFSETS.a))
+    // A straight shape: the track is beside it, so each stop is just as far along and 4.7 m to the side.
+    expect(g.stopDistances.length).toBe(centered.stopDistances.length)
+    g.stopDistances.forEach((d, i) => expect(Math.abs(d - centered.stopDistances[i]!), `stop ${i}`).toBeLessThan(0.1))
+    expect(g.maxStopOffsetM).toBeCloseTo(TRACK_OFFSETS.a, 1)
+  })
+
+  // At offset 0: the legs are 8.4 m apart, closer than two offsets, so offset legs would cross.
   it('keeps distances non-decreasing on a hairpin, honoring the forward-only cursor', () => {
     // Out 0.02 deg north along lon -74.0, back down along lon -73.9999. Stop C is visited last but sits
     // on the outbound leg next to A, so a global nearest-point projection would put it near distance 0.
@@ -47,7 +61,7 @@ describe('buildShapeGeometries', () => {
       ...index,
       patterns: { 'H..N01R': { routeId: 'H', direction: 'N', stops: ['AN', 'BN', 'CN'] } },
     }
-    const g = buildShapeGeometries({ feedVersion: shapes.feedVersion, shapes: [hairpin] }, idx, st).get('H..N01R')!
+    const g = buildShapeGeometries({ feedVersion: shapes.feedVersion, shapes: [hairpin] }, idx, st, 0).get('H..N01R')!
 
     const globalC = projectForward(g.line, toGround(st.stations[2]!), { segment: 0, t: 0 })
     expect(globalC.distance).toBeLessThan(50) // what an unconstrained projection would choose
@@ -64,10 +78,10 @@ describe('buildShapeGeometries', () => {
       ...index,
       patterns: { '1..N03R': { routeId: '1', direction: 'N', stops: ['101N', 'Z99N'] } },
     }
-    expect(() => buildShapeGeometries(shapes, idx, stations)).toThrow(/Z99N/)
+    expect(() => buildShapeGeometries(shapes, idx, stations, 0)).toThrow(/Z99N/)
   })
 
   it('throws when a pattern has no shape', () => {
-    expect(() => buildShapeGeometries({ feedVersion: 'x', shapes: [] }, index, stations)).toThrow(/no shape/)
+    expect(() => buildShapeGeometries({ feedVersion: 'x', shapes: [] }, index, stations, 0)).toThrow(/no shape/)
   })
 })

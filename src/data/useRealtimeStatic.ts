@@ -8,15 +8,18 @@ export type RealtimeStaticLoad =
   | { status: 'error'; message: string }
   | { status: 'ready'; data: StaticRealtimeData }
 
-/** Loads the realtime join data once `files` is available. Idle while `files` is null. No retry: a reload retries. */
-export function useRealtimeStatic(files: NetworkFiles | null): RealtimeStaticLoad {
+/**
+ * Loads the realtime join data once `files` is available, on tracks `trackOffsetM` right of travel.
+ * Idle while `files` is null. No retry: a reload retries.
+ */
+export function useRealtimeStatic(files: NetworkFiles | null, trackOffsetM: number): RealtimeStaticLoad {
   const [load, setLoad] = useState<RealtimeStaticLoad>({ status: 'idle' })
 
   useEffect(() => {
     if (!files) return
     const controller = new AbortController()
     setLoad({ status: 'loading' })
-    loadRealtimeStatic(import.meta.env.BASE_URL, files, controller.signal).then(
+    loadRealtimeStatic(import.meta.env.BASE_URL, files, trackOffsetM, controller.signal).then(
       (data) => {
         if (!controller.signal.aborted) setLoad({ status: 'ready', data })
       },
@@ -27,7 +30,7 @@ export function useRealtimeStatic(files: NetworkFiles | null): RealtimeStaticLoa
       },
     )
     return () => controller.abort()
-  }, [files])
+  }, [files, trackOffsetM])
 
   return files ? load : { status: 'idle' }
 }

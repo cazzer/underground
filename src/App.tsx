@@ -60,7 +60,10 @@ function MapView({ network, live }: MapViewProps) {
 
 export function App() {
   const { load, retry } = useNetwork()
-  const live = useLive(load.status === 'ready' ? load.files : null)
+  const live = useLive(
+    load.status === 'ready' ? load.files : null,
+    load.status === 'ready' ? load.network.trackOffsetM : 0,
+  )
   return (
     <FocusProvider>
       <main className="relative h-full w-full bg-canvas">

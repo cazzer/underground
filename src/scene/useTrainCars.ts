@@ -131,6 +131,9 @@ export function useTrainCars(): TrainCarsLayer {
         // Only changed slots go up. needsUpdate without ranges would upload the whole buffer, so skip it then.
         if (pushDirtyRanges(dirty, high, STRIDE, BRIDGE_SLOTS, pools.bodies, b.instanceMatrix.updateRanges) === 0) return
         pushDirtyRanges(dirty, high, STRIDE, BRIDGE_SLOTS, pools.halos, h.instanceMatrix.updateRanges)
+        // `dirty` is cleared once the ranges are pushed, not once three uploads them, so both meshes must be
+        // rendered every frame they are active (frustumCulled off in TrainCars.tsx): a skipped mesh would keep
+        // reusable range objects that the next commit's pool overwrites, and lose those slots' updates.
         dirty.fill(0, 0, high)
         b.instanceMatrix.needsUpdate = true
         h.instanceMatrix.needsUpdate = true

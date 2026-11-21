@@ -15,12 +15,13 @@ import { createSlotTable, reconcileSlots, stepSlot } from '../live/slots'
 import { DWELL_MAX_SHARE, dwellFor, hopDistance, planHop } from './position'
 import type { LiveTrip } from './prepareTrips'
 import { buildShapeGeometries } from './shapeGeometry'
+import { TRACK_OFFSETS } from '../trackOffset'
 
 const shapes = JSON.parse(shapesRaw) as ShapesFile
 const stations = JSON.parse(stationsRaw) as StationsFile
 const index = JSON.parse(tripIndexRaw) as TripIndexFile
 const segments = (JSON.parse(segmentsRaw) as SegmentsFile).segments
-const geometries = [...buildShapeGeometries(shapes, index, stations).values()]
+const geometries = [...buildShapeGeometries(shapes, index, stations, TRACK_OFFSETS.a).values()]
 
 const BASE = 1_795_228_554
 const POLL_S = 20

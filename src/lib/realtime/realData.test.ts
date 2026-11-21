@@ -1,11 +1,16 @@
 // Structural checks against the committed public/data, so schedule refreshes don't break them.
+// Geometry is built on the default track offset (?tracks=a), the line the map draws.
 import { describe, expect, it } from 'vitest'
 import shapesRaw from '../../../public/data/shapes.json?raw'
+import l08Raw from '../../../public/data/stations/L08.json?raw'
 import stationsRaw from '../../../public/data/stations.json?raw'
 import tripIndexRaw from '../../../public/data/trip-index.json?raw'
 import type { ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
+import type { StationInterior } from '../../data/stationSchema'
 import { createSlotTable, reconcileSlots } from '../live/slots'
-import { pointAtDistance } from './polyline'
+import { toGround } from '../projection'
+import { TRACK_OFFSETS } from '../trackOffset'
+import { buildPolyline, pointAtDistance, projectForward } from './polyline'
 import type { LiveTrip } from './prepareTrips'
 import { joinTrip } from './joinTrip'
 import { buildShapeGeometries } from './shapeGeometry'
@@ -16,7 +21,7 @@ const stations = JSON.parse(stationsRaw) as StationsFile
 const index = JSON.parse(tripIndexRaw) as TripIndexFile
 
 describe('real public/data', () => {
-  const geometries = buildShapeGeometries(shapes, index, stations)
+  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSETS.a)
 
   it('builds one geometry per pattern', () => {
     expect(geometries.size).toBe(Object.keys(index.patterns).length)
@@ -79,7 +84,7 @@ describe('primary fallback join on real data', () => {
 })
 
 describe('a trip moving between two shapes of the same route', () => {
-  const geometries = buildShapeGeometries(shapes, index, stations)
+  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSETS.a)
   const lookup = buildTripLookup(index, shapes)
 
   it('never draws the dot somewhere else: it carries over within 25 m, or shrinks in place on the old shape', () => {
@@ -119,5 +124,39 @@ describe('a trip moving between two shapes of the same route', () => {
     expect(pairs).toBeGreaterThan(1000)
     expect(carried + faded).toBe(pairs)
     expect(carried).toBeGreaterThan(0)
+  })
+})
+
+// The interior's tracks are authored from the platform, independently of GTFS: a train stopped at Bedford Av
+// should sit on its own platform track (L08N is the NE one), not between the two.
+describe('Bedford Av (L08): a stopped L train sits on its platform track', () => {
+  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSETS.a)
+  const l08 = JSON.parse(l08Raw) as StationInterior
+  const anchor = toGround(l08.anchor)
+  const trackOf = (stopId: string) => {
+    const t = l08.platforms.flatMap((p) => p.tracks).find((t) => t.stopId === stopId)
+    if (!t) throw new Error(`L08 has no ${stopId} track`)
+    return buildPolyline(t.path.map(([x, z]) => ({ x: anchor.x + x, z: anchor.z + z })))
+  }
+
+  it.each([
+    ['L08N', 'L08S'],
+    ['L08S', 'L08N'],
+  ])('at %s', (stop, other) => {
+    const own = trackOf(stop)
+    const far = trackOf(other)
+    let checked = 0
+    for (const g of geometries.values()) {
+      const i = g.stops.indexOf(stop)
+      if (i < 0) continue
+      checked++
+      const p = pointAtDistance(g.line, g.stopDistances[i]!).point
+      const hit = projectForward(own, p, { segment: 0, t: 0 })
+      expect(hit.offsetM, `${g.shapeId} from its track`).toBeLessThan(1.5)
+      expect(hit.distance / own.length, `${g.shapeId} along the platform`).toBeGreaterThanOrEqual(0.2)
+      expect(hit.distance / own.length, `${g.shapeId} along the platform`).toBeLessThanOrEqual(0.8)
+      expect(projectForward(far, p, { segment: 0, t: 0 }).offsetM, `${g.shapeId} from the other track`).toBeGreaterThan(5)
+    }
+    expect(checked).toBeGreaterThan(0)
   })
 })
