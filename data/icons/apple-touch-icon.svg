@@ -1,0 +1,13 @@
+<!-- Source for public/apple-touch-icon.png (180 px): public/favicon.svg redrawn with thin wireframe strokes.
+     Full-bleed square: iOS rounds the corners itself. Colors are the blueprint theme tokens (src/theme.ts).
+     Rebuild: rsvg-convert -w 180 -h 180 data/icons/apple-touch-icon.svg -o public/apple-touch-icon.png -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <rect width="180" height="180" fill="#0b2147"/>
+  <g fill="none" stroke-width="4" stroke-linecap="square">
+    <path d="M20 40H160" stroke="#8fb4de"/>
+    <path d="M52 40V62H74V84H96V106H118V128" stroke="#e6f6ff" stroke-linejoin="miter"/>
+    <path d="M20 140H160" stroke="#5ce1ff"/>
+  </g>
+  <circle cx="52" cy="140" r="20" fill="#0b2147"/>
+  <circle cx="52" cy="140" r="13" fill="#ffffff"/>
+</svg>

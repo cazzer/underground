@@ -8,9 +8,9 @@ a station continuously tilts the camera from top-down to isometric; later that v
 shows the station's levels, stairways, and upcoming arrivals.
 
 Status: the real static network (every route shape and station from `public/data/`) renders, and
-trains are live: the client polls the realtime Worker (`worker/`, built, not yet deployed) and draws
-dots from the pure realtime library. With no `VITE_RT_URL` there is no live data (the HUD says
-"Live trains off") and no fake motion. Arrivals are still placeholders (8x4.8).
+trains are live: the client polls the deployed realtime Worker (`worker/`) and draws dots from the
+pure realtime library. The station panel shows real arrivals, and Bedford Av (L08) has an interior.
+With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion.
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -133,6 +133,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
 - `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`
 - `public/data/`: preprocessed static JSON (generated; `npm run data`, `npm run data:stations`)
+- `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
+  `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
 - `scripts/`: `build-data.ts`, `build-stations.ts` and `fetch-station-sources.ts` (the only IO) and pure
   transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station merge
