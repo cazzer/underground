@@ -5,15 +5,16 @@ import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
-import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './Stations'
+import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './markerShape'
 
 interface FocusRingProps {
   position: Ground
 }
 
 /**
- * A copy of the focused station's ring drawn above the interior veil, so the veil dims every other
- * marker but not this one. Same geometry and per-frame size as the instanced ring it covers.
+ * A copy of the focused station's ring drawn above the live trains and the interior veil, so a passing
+ * train or the veil hides every other marker but not this one. Same geometry and per-frame size as the
+ * instanced ring it covers.
  */
 export function FocusRing({ position }: FocusRingProps) {
   const mesh = useRef<Mesh>(null)
@@ -34,7 +35,7 @@ export function FocusRing({ position }: FocusRingProps) {
   })
 
   return (
-    <mesh ref={mesh} geometry={geometry} position={[position.x, MARKER_Y, position.z]} renderOrder={RENDER_ORDER.interiorFocusRing}>
+    <mesh ref={mesh} geometry={geometry} position={[position.x, MARKER_Y, position.z]} renderOrder={RENDER_ORDER.focusRing}>
       <meshBasicMaterial color={theme.stationFocus} transparent depthTest={false} depthWrite={false} />
     </mesh>
   )

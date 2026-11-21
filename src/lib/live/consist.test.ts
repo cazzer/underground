@@ -1,0 +1,71 @@
+import { describe, expect, it } from 'vitest'
+import { carMix, CARS_AT_M, consistCenter, consistFor, DEFAULT_CONSIST, DOTS_FROM_M, MAX_CARS } from './consist'
+
+describe('consistFor', () => {
+  it('gives each division its car count and length', () => {
+    expect(consistFor('1')).toEqual({ cars: 10, pitchM: 15.5 })
+    expect(consistFor('6X')).toEqual({ cars: 10, pitchM: 15.5 })
+    expect(consistFor('7')).toEqual({ cars: 11, pitchM: 15.5 })
+    expect(consistFor('L')).toEqual({ cars: 8, pitchM: 18.3 })
+    expect(consistFor('M')).toEqual({ cars: 8, pitchM: 18.3 })
+    expect(consistFor('G')).toEqual({ cars: 5, pitchM: 18.3 })
+    expect(consistFor('SI')).toEqual({ cars: 4, pitchM: 22.9 })
+    expect(consistFor('FS')).toEqual({ cars: 2, pitchM: 22.9 })
+    expect(consistFor('A')).toEqual({ cars: 10, pitchM: 18.3 })
+  })
+
+  it('falls back to the default for unknown or missing routes', () => {
+    expect(consistFor('QQ')).toBe(DEFAULT_CONSIST)
+    expect(consistFor(null)).toBe(DEFAULT_CONSIST)
+  })
+
+  it('never exceeds MAX_CARS', () => {
+    for (const r of ['1', '2', '3', '4', '5', '6', '6X', '7', '7X', 'GS', 'L', 'J', 'Z', 'M', 'G', 'FS', 'H', 'SI', 'A', 'N']) {
+      expect(consistFor(r).cars).toBeLessThanOrEqual(MAX_CARS)
+    }
+  })
+})
+
+describe('consistCenter', () => {
+  it('centers the train on the dot mid-shape', () => {
+    expect(consistCenter(1000, 400, 150)).toBe(400)
+  })
+
+  it('pulls the train back onto the shape near either end', () => {
+    expect(consistCenter(1000, 1000, 150)).toBe(925)
+    expect(consistCenter(1000, 10, 150)).toBe(75)
+  })
+
+  it('centers a train longer than its shape on the shape', () => {
+    expect(consistCenter(50, 45, 150)).toBe(25)
+    expect(consistCenter(150, 140, 150)).toBe(75)
+  })
+
+  it('is the dot itself for a zero-length train', () => {
+    expect(consistCenter(1000, 1000, 0)).toBe(1000)
+  })
+})
+
+describe('carMix', () => {
+  it('is 0 for dots and 1 for cars at the ends', () => {
+    expect(carMix(DOTS_FROM_M)).toBeCloseTo(0, 12)
+    expect(carMix(5000)).toBe(0)
+    expect(carMix(CARS_AT_M)).toBeCloseTo(1, 12)
+    expect(carMix(200)).toBe(1)
+  })
+
+  it('rises monotonically as the camera comes in', () => {
+    let prev = -1
+    for (let d = 2000; d >= 500; d -= 5) {
+      const m = carMix(d)
+      expect(m).toBeGreaterThanOrEqual(prev)
+      prev = m
+    }
+  })
+
+  it('is continuous at both thresholds', () => {
+    for (const d of [CARS_AT_M, DOTS_FROM_M]) {
+      expect(Math.abs(carMix(d - 0.01) - carMix(d + 0.01))).toBeLessThan(1e-6)
+    }
+  })
+})

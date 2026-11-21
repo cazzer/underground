@@ -1,0 +1,142 @@
+import { type RefObject, useEffect, useMemo, useRef } from 'react'
+import { type BufferGeometry, type Color, DynamicDrawUsage, type InstancedMesh } from 'three'
+import { type Consist, consistFor, DEFAULT_CONSIST, MAX_CARS } from '../lib/live/consist'
+import { type CarFrame, clearCars, createConsistScratch, writeConsist } from '../lib/live/consistLayout'
+import { createRangePool, pushDirtyRanges } from '../lib/live/dirtyRanges'
+import { TRAIN_CAPACITY } from '../lib/live/slots'
+import type { Polyline } from '../lib/realtime/polyline'
+import { theme } from '../theme'
+import { screenScale } from './cameraDistance'
+import { createCarBodyGeometry, createCarHaloGeometry } from './carGeometry'
+import { carLook } from './carLook'
+
+export const CAR_CAPACITY = TRAIN_CAPACITY * MAX_CARS
+const CAR_Y = 0.5
+/** Gap between car bodies and the halo rim around them: real meters zoomed in, a few pixels farther out. */
+const GAP = { px: 1.5, minM: 1.2 }
+const RIM = { px: 1, minM: 0.5 }
+/** A car body is never narrower than this on screen, so a train still reads through the dot handoff. */
+const MIN_WIDTH_PX = 5
+/**
+ * Body widening per slot, 1 + level * step with 16 levels hashed from the slot, so two trains on one shape
+ * (express and local) don't z-fight: neighbouring slots, often the same line, get unrelated levels.
+ */
+const WIDEN_STEP = 0.005
+const widenFor = (slot: number): number => 1 + (Math.imul(slot, 0x9e3779b1) >>> 28) * WIDEN_STEP
+const STRIDE = MAX_CARS * 16
+/** Clean slots an upload range may span between dirty ones: fewer bufferSubData calls for a few KB more. */
+const BRIDGE_SLOTS = 16
+
+export interface TrainCarsLayer {
+  bodies: RefObject<InstancedMesh | null>
+  halos: RefObject<InstancedMesh | null>
+  geometry: { body: BufferGeometry; halo: BufferGeometry }
+  /** Before the first frame: dynamic usage, cleared matrices, nothing drawn. */
+  prepare(): void
+  /** A slot's route changed: its consist and the color of its cars. */
+  setSlot(i: number, routeId: string | null, color: Color): void
+  /** Per-frame sizes for the camera distance; call before writeTrain. */
+  beginFrame(cameraDistance: number): void
+  /** Lays out slot i's cars at `shown` along `line`: `mix` unfolds the train from the dot, `k` is the slot's fade. */
+  writeTrain(i: number, line: Polyline, shown: number, mix: number, k: number): void
+  /** Hides slot i's cars (a freed slot). */
+  clear(i: number): void
+  /** Hides slot i's cars while it is off screen; zeroes them once, not every frame. */
+  hide(i: number): void
+  /** Draws slots [0, high) and uploads the ones written since the last upload, or draws none when inactive. */
+  commit(high: number, active: boolean): void
+}
+
+/** Car instances for the live trains: per-slot consists and colors, written per frame without allocating. */
+export function useTrainCars(): TrainCarsLayer {
+  const bodies = useRef<InstancedMesh>(null)
+  const halos = useRef<InstancedMesh>(null)
+  const geometry = useMemo(
+    () => ({
+      body: createCarBodyGeometry(carLook, theme.trainCarSideShade, theme.trainCarEndShade),
+      halo: createCarHaloGeometry(),
+    }),
+    [],
+  )
+
+  useEffect(
+    () => () => {
+      geometry.body.dispose()
+      geometry.halo.dispose()
+    },
+    [geometry],
+  )
+
+  const layer = useMemo((): Omit<TrainCarsLayer, 'bodies' | 'halos' | 'geometry'> => {
+    const consists = new Array<Consist>(TRAIN_CAPACITY).fill(DEFAULT_CONSIST)
+    const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: carLook.widthM, crossScale: 1, y: CAR_Y }
+    const scratch = createConsistScratch()
+    /** Slots whose matrices changed since the last upload, and slots whose cars are already zeroed. */
+    const dirty = new Uint8Array(TRAIN_CAPACITY)
+    const hidden = new Uint8Array(TRAIN_CAPACITY)
+    // three merges ranges in place, so each buffer gets its own range objects.
+    const pools = { bodies: createRangePool(TRAIN_CAPACITY / 2), halos: createRangePool(TRAIN_CAPACITY / 2) }
+    const zero = (i: number): void => {
+      const b = bodies.current
+      const h = halos.current
+      if (!b || !h) return
+      clearCars(b.instanceMatrix.array as Float32Array, h.instanceMatrix.array as Float32Array, i)
+      hidden[i] = 1
+      dirty[i] = 1
+    }
+    return {
+      prepare() {
+        // Everything zeroed, and every slot uploaded with the first ranges (the GPU copy may be stale).
+        hidden.fill(1)
+        dirty.fill(1)
+        for (const m of [bodies.current, halos.current]) {
+          if (!m) continue
+          m.instanceMatrix.setUsage(DynamicDrawUsage)
+          ;(m.instanceMatrix.array as Float32Array).fill(0)
+          m.instanceMatrix.needsUpdate = true
+          m.count = 0
+        }
+      },
+      setSlot(i, routeId, color) {
+        consists[i] = consistFor(routeId)
+        const b = bodies.current
+        if (!b) return
+        for (let c = 0; c < MAX_CARS; c++) b.setColorAt(i * MAX_CARS + c, color)
+        b.instanceColor!.needsUpdate = true
+      },
+      beginFrame(cameraDistance) {
+        frame.gapM = screenScale(cameraDistance, GAP.px, GAP.minM)
+        frame.rimM = screenScale(cameraDistance, RIM.px, RIM.minM)
+        frame.crossScale = screenScale(cameraDistance, MIN_WIDTH_PX, carLook.widthM) / carLook.widthM
+      },
+      writeTrain(i, line, shown, mix, k) {
+        const b = bodies.current
+        const h = halos.current
+        if (!b || !h) return
+        const out = b.instanceMatrix.array as Float32Array
+        writeConsist(out, h.instanceMatrix.array as Float32Array, i, line, shown, consists[i]!, mix, k, widenFor(i), frame, scratch)
+        hidden[i] = 0
+        dirty[i] = 1
+      },
+      clear: zero,
+      hide(i) {
+        if (hidden[i] === 0) zero(i)
+      },
+      commit(high, active) {
+        const b = bodies.current
+        const h = halos.current
+        if (!b || !h) return
+        b.count = h.count = active ? high * MAX_CARS : 0
+        if (!active) return
+        // Only changed slots go up. needsUpdate without ranges would upload the whole buffer, so skip it then.
+        if (pushDirtyRanges(dirty, high, STRIDE, BRIDGE_SLOTS, pools.bodies, b.instanceMatrix.updateRanges) === 0) return
+        pushDirtyRanges(dirty, high, STRIDE, BRIDGE_SLOTS, pools.halos, h.instanceMatrix.updateRanges)
+        dirty.fill(0, 0, high)
+        b.instanceMatrix.needsUpdate = true
+        h.instanceMatrix.needsUpdate = true
+      },
+    }
+  }, [])
+
+  return useMemo(() => ({ bodies, halos, geometry, ...layer }), [geometry, layer])
+}

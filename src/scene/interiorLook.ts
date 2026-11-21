@@ -5,12 +5,11 @@
  * - this file: replace `interiorLook` with constants for the chosen look and scale
  * - InteriorVeil.tsx: the unchosen `veil` branch and, unless B wins, the `hull` prop (or the whole
  *   file if C wins)
- * - StationInterior.tsx: the `look.under` render-order switch, the `veil === 'none'` checks (veil and
- *   FocusRing), and the `hull={model.hull}` pass-through unless B wins
+ * - StationInterior.tsx: the `look.under` render-order switch, the `veil === 'none'` check, and the
+ *   `hull={model.hull}` pass-through unless B wins
  * - interiorModel.ts: `hull` and the cut-line buffer (unless B wins)
  * - interiorFraming.ts: `paddedHull` and its tests (unless B wins)
- * - renderOrder.ts: `interiorUnderFine` / `interiorUnder` (unless C wins), or `interiorVeil` and
- *   `interiorFocusRing` (if C wins)
+ * - renderOrder.ts: `interiorUnderFine` / `interiorUnder` (unless C wins), or `interiorVeil` (if C wins)
  * - AGENTS.md: the `?interior=` / `?interiorY=` TEMPORARY note, "padded hull" in the directory map
  *   (unless B wins), and "look C uses -0.6 and -0.3" in the rendering conventions (unless C wins)
  */
