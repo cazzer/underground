@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PerspectiveCamera, Vector3 } from 'three'
-import { frameInterior, interiorFreeRect, LANDING_DISTANCE, type InteriorFrameInput } from './interiorCamera'
+import { frameInterior, interiorFreeRect, LANDING_DISTANCE, landingAzimuth, type InteriorFrameInput } from './interiorCamera'
 import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_RADIUS } from './focusMachine'
 import { interiorOpacity } from './interiorReveal'
 import { DEFAULT_TILT, ISO_POLAR, tiltT } from './tilt'
@@ -111,5 +111,43 @@ describe('frameInterior at any azimuth', () => {
     const flat = project(0)
     expect(rotated.x).toBeCloseTo(flat.x, 3)
     expect(rotated.y).toBeCloseTo(flat.y, 3)
+  })
+})
+
+describe('landingAzimuth', () => {
+  const phoneFree = interiorFreeRect({ width: 390, height: 844 }, { top: 96, bottom: 70 }, { left: 16, top: 525, right: 374, bottom: 770 })
+  const deskFree = interiorFreeRect(viewport, insets, { left: 1136, top: 628, right: 1424, bottom: 884 })
+  const deg = (r: number) => (r * 180) / Math.PI
+  /** Screen direction of a plan vector at azimuth θ: [right, toward the camera] components. */
+  const onScreen = (v: readonly [number, number], theta: number) => [
+    v[0] * Math.cos(theta) - v[1] * Math.sin(theta),
+    v[0] * Math.sin(theta) + v[1] * Math.cos(theta),
+  ]
+
+  it('keeps the azimuth when the free area is wider than tall in ground terms (desktop)', () => {
+    expect(landingAzimuth([1, 0], 0.3, deskFree)).toBe(0.3)
+  })
+
+  it('on a phone turns an east-west platform to run up the screen, the short way', () => {
+    const az = landingAzimuth([1, 0], 0, phoneFree)
+    expect(Math.abs(deg(az))).toBeCloseTo(90, 9)
+    const [right] = onScreen([1, 0], az)
+    expect(Math.abs(right)).toBeLessThan(1e-9)
+  })
+
+  it('never turns more than 90 degrees and lands with the axis vertical', () => {
+    for (const a of [0, 0.4, 1.2, 2, -0.7]) {
+      const axis = [Math.cos(a), Math.sin(a)] as const
+      for (const current of [0, 1, -2, 3]) {
+        const az = landingAzimuth(axis, current, phoneFree)
+        const turn = Math.abs(Math.atan2(Math.sin(az - current), Math.cos(az - current)))
+        expect(turn).toBeLessThanOrEqual(Math.PI / 2 + 1e-9)
+        expect(Math.abs(onScreen(axis, az)[0])).toBeLessThan(1e-9)
+      }
+    }
+  })
+
+  it('leaves a north-south platform alone at north-up', () => {
+    expect(landingAzimuth([0, 1], 0, phoneFree)).toBeCloseTo(0, 12)
   })
 })

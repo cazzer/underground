@@ -46,14 +46,15 @@ interface StationOrbitOptions {
   busy: () => boolean
 }
 
-/** What the view orbits and pans around: the interior's plan (pivoting on the free area's middle) or the bare station. */
+/**
+ * What the view orbits and pans around: the interior's plan or the bare station, pivoting on the free area's
+ * middle, where a fly-to puts either.
+ */
 interface OrbitFocus {
   center: Ground
   radius: number
   /** Interior depth term at ISO_POLAR and full depth (FocusAnchor.towardCamera); 0 for a bare station. */
   towardCamera: number
-  /** Pivot on the free area's middle (where an interior fly-to puts it) rather than the view center. */
-  useFree: boolean
 }
 
 /**
@@ -73,12 +74,13 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
   const armed = useRef(false)
   const armedFor = useRef<Ground | null>(null)
   const turnedBy = useRef(0)
+  const wasFlying = useRef(false)
 
   const focus = useMemo<OrbitFocus | null>(() => {
     if (!focusPos) return null
-    if (!interior) return { center: focusPos, radius: panRadius(null), towardCamera: 0, useFree: false }
+    if (!interior) return { center: focusPos, radius: panRadius(null), towardCamera: 0 }
     const a = interior.focusAnchor
-    return { center: a.center, radius: panRadius(a.reach), towardCamera: a.towardCamera, useFree: true }
+    return { center: a.center, radius: panRadius(a.reach), towardCamera: a.towardCamera }
   }, [focusPos, interior])
 
   // Before drei's controls.update() (priority -1), beside the polar lock in CameraRig.
@@ -120,17 +122,16 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const isFlying = flying()
     const s = shift.current
     const distance = camera.position.distanceTo(c.target)
-    if (f.useFree) {
-      const polar = c.getPolarAngle()
-      freeCenterShift(viewport, free, camera.fov, distance, polar, s)
-      // The interior's mid-depth is drawn at the depth factor (StationInterior's scale.y), so its pivot shift is too.
-      s.toward += (f.towardCamera * depthFactor(distance) * Math.tan(polar)) / TAN_ISO
-    } else {
-      s.right = 0
-      s.toward = 0
-    }
+    const polar = c.getPolarAngle()
+    freeCenterShift(viewport, free, camera.fov, distance, polar, s)
+    // The interior's mid-depth is drawn at the depth factor (StationInterior's scale.y), so its pivot shift is too.
+    s.toward += (f.towardCamera * depthFactor(distance) * Math.tan(polar)) / TAN_ISO
     // The controls turned about the target; slide target and camera so the turn pivots on the focus point.
-    if (!isFlying && theta !== theta0) {
+    // Not on a flight's landing frame either: its last step turned the camera (cameraFlight's turnOffset),
+    // and pivoting that would slide the landed view off its framing.
+    const landed = wasFlying.current
+    wasFlying.current = isFlying
+    if (!isFlying && !landed && theta !== theta0) {
       turnedBy.current += Math.abs(wrapAngle(theta - theta0))
       if (turnedBy.current > TURN_SEEN) markTurned()
       const m = pivotShift(s.right, s.toward, theta0, theta, move.current)

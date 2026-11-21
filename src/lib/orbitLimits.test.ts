@@ -62,7 +62,8 @@ describe('panRadius', () => {
       worst = Math.max(worst, Math.hypot(s.right, s.toward + 30 * depthFactor(d) * Math.tan(polar)))
     }
     expect(PAN_RADIUS_MAX + PAN_GIVE + worst).toBeLessThan(EXIT_RADIUS)
-    expect(PAN_RADIUS_BARE + PAN_GIVE).toBeLessThan(EXIT_RADIUS)
+    // A bare station pivots on the free area's middle too (no depth term, so `worst` over-covers it).
+    expect(PAN_RADIUS_BARE + PAN_GIVE + worst).toBeLessThan(EXIT_RADIUS)
   })
 })
 

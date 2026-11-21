@@ -1,6 +1,6 @@
 /** Pure camera framing for a station interior beside the HUD. */
 import type { Insets, Viewport } from './framing'
-import { rotateScreenOffset } from './orbitLimits'
+import { rotateScreenOffset, wrapAngle } from './orbitLimits'
 import type { Ground } from './projection'
 import { DEFAULT_TILT, ISO_POLAR } from './tilt'
 
@@ -66,6 +66,31 @@ export function freeCenterShift(
   out.right = (viewport.width / 2 - (free.left + free.right) / 2) * metersPerPx
   out.toward = ((viewport.height / 2 - (free.top + free.bottom) / 2) * metersPerPx) / Math.cos(polar)
   return out
+}
+
+/**
+ * How much more ground the free area must cover top to bottom than across before a landing turns the
+ * view. A phone with its panel stacked below is about 1.8; a desktop beside its panel about 1.15, which
+ * keeps its azimuth.
+ */
+export const PORTRAIT_GROUND_RATIO = 1.5
+
+/**
+ * Camera azimuth for landing on an interior whose platforms run along `axis` (unit plan vector, x east,
+ * z south). When the free area is portrait in ground terms (PORTRAIT_GROUND_RATIO; screen-vertical ground
+ * spans 1 / cos(ISO_POLAR) times the pixels a horizontal one does), the view turns so the axis runs up
+ * the screen, whichever of its two directions is the shorter turn from `current`: a long station then
+ * fits along the free area's long side. Otherwise the view keeps `current`.
+ */
+export function landingAzimuth(axis: readonly [number, number], current: number, free: ScreenRect): number {
+  const across = free.right - free.left
+  const upDown = (free.bottom - free.top) / Math.cos(ISO_POLAR)
+  if (upDown < across * PORTRAIT_GROUND_RATIO) return current
+  // At azimuth θ the camera sits along (sin θ, cos θ) from the target, which is screen-vertical on the ground.
+  const along = Math.atan2(axis[0], axis[1])
+  const turn = wrapAngle(along - current)
+  const shorter = Math.abs(turn) > Math.PI / 2 ? turn - Math.sign(turn) * Math.PI : turn
+  return wrapAngle(current + shorter)
 }
 
 /**

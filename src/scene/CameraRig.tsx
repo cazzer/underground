@@ -1,86 +1,22 @@
 import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
-import { useFocus, type FlyRequest } from '../lib/focus'
+import { useFocus } from '../lib/focus'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
-import { EXIT_DISTANCE, nextFocus, type FocusInput } from '../lib/focusMachine'
+import { nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightDuration, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
-import { frameBounds, framePoint, type Insets, type Viewport } from '../lib/framing'
-import { frameInterior, interiorFreeRect, LANDING_DISTANCE, type ScreenRect } from '../lib/interiorCamera'
+import { frameBounds, type Insets } from '../lib/framing'
+import { interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
+import { flushMotion, interiorFlight, pointFlight, stationFlight, turnOffset, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
 import { useStationOrbit } from './useStationOrbit'
-
-type PointRequest = Extract<FlyRequest, { kind: 'point' }>
-
-type MapControlsImpl = ComponentRef<typeof MapControls>
-
-const keepTarget = new Vector3()
-const keepPosition = new Vector3()
-/**
- * Drops the controls' leftover damped motion (pan offset and rotation delta) without moving the
- * camera. Otherwise momentum from a pan or wheel just before a fly-to resumes when the flight
- * lands and slides the view off the station (underground-3s3). A second undamped update() with
- * zero deltas re-syncs the controls' spherical state and the camera's aim to the restored pose, so
- * getAzimuthalAngle() afterwards is the camera's real angle. No allocation; the 'change' event it
- * dispatches copies its listener list, so call it on flight start and landing, not every frame.
- */
-function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void {
-  keepTarget.copy(c.target)
-  keepPosition.copy(camera.position)
-  const damping = c.enableDamping
-  c.enableDamping = false
-  c.update() // without damping, update() applies and zeroes the pending deltas
-  c.target.copy(keepTarget)
-  camera.position.copy(keepPosition)
-  c.update() // deltas are zero now: re-syncs spherical, lastPosition and lookAt to the restored pose
-  c.enableDamping = damping
-}
 
 const MIN_DISTANCE = 40
 /** How far past the fitted city overview the user may zoom out. */
 const MAX_ZOOM_OUT = 1.3
-/** Camera distance after clicking a bare station: the same full-tilt landing as an interior. */
-const FOCUS_DISTANCE = LANDING_DISTANCE
-
-interface Destination {
-  /** Null for a flight to a point (a location fix): no station to hold focus on when interrupted. */
-  stationId: string | null
-  target: Vector3
-  distance: number
-}
-
-/** A destination plus where the flight started; progress is eased by expoInOut (src/lib/flight.ts). */
-interface Flight extends Destination {
-  from: Vector3
-  fromDistance: number
-  elapsed: number
-  duration: number
-  /** Eased progress when `from` was last rebased (a mid-flight retarget); 0 at the start. */
-  e0: number
-}
-
-/** Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal, from the current azimuth. */
-function interiorFlight(
-  model: InteriorModel,
-  viewport: Viewport,
-  insets: Insets,
-  panel: ScreenRect | null,
-  fovDeg: number,
-  azimuth: number,
-): Destination {
-  const free = interiorFreeRect(viewport, insets, panel)
-  const { distance, target } = frameInterior({ ...model.focusAnchor, azimuth, viewport, free, fovDeg })
-  return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance }
-}
-
-/** Fly-to for a ground point (a location fix): `radiusM` in view, never closer than the focus range. */
-function pointFlight(req: PointRequest, viewport: Viewport, insets: Insets, fovDeg: number, maxDistance: number): Destination {
-  const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, EXIT_DISTANCE * 1.2, maxDistance)
-  return { stationId: null, target: new Vector3(target.x, 0, target.z), distance }
-}
 
 interface CameraRigProps {
   network: Network
@@ -148,6 +84,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
         ...dest,
         from: c.target.clone(),
         fromDistance,
+        fromAzimuth: c.getAzimuthalAngle(),
         elapsed: 0,
         duration: reduced ? 0 : flightDuration(fromDistance, dest.distance),
         e0: 0,
@@ -164,33 +101,42 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     const dest =
       l.interior?.stationId === station.id
         ? interiorFlight(l.interior, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
-        : { stationId: station.id, target: new Vector3(station.pos.x, 0, station.pos.z), distance: FOCUS_DISTANCE }
+        : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
     const fromDistance = camera.position.distanceTo(c.target)
     flight.current = {
       ...dest,
       from: c.target.clone(),
       fromDistance,
+      fromAzimuth: c.getAzimuthalAngle(),
       elapsed: 0,
       duration: flightDuration(fromDistance, dest.distance),
       e0: 0,
     }
   }, [flyRequest, network, camera])
 
-  // The interior (first visit) or the panel's measurement can land mid-flight: retarget that
-  // flight's destination. It rebases on the camera's current pose and keeps the timing, so the
-  // camera doesn't jump. Focus reached by zooming has no flight, and the camera never moves on its own.
+  // The interior (first visit) or the panel's measurement (it grows as arrivals fill in) can land
+  // mid-flight: retarget that flight's destination. It rebases on the camera's current pose and keeps
+  // the timing, so the camera doesn't jump. Focus reached by zooming has no flight, and the camera
+  // never moves on its own.
   useEffect(() => {
     const f = flight.current
     const c = controls.current
-    if (interior && c && f?.stationId === interior.stationId) {
-      const dest = interiorFlight(interior, size, insets, panel, camera.fov, c.getAzimuthalAngle())
-      f.from.copy(c.target)
-      f.fromDistance = camera.position.distanceTo(c.target)
-      f.e0 = flightProgress(f.elapsed, f.duration)
-      f.target = dest.target
-      f.distance = dest.distance
-    }
-  }, [interior, panel, size, insets, camera])
+    if (!c || !f || f.stationId === null) return
+    const station = network.stationById.get(f.stationId)
+    if (!station) return
+    const az = c.getAzimuthalAngle()
+    const dest =
+      interior?.stationId === f.stationId
+        ? interiorFlight(interior, size, insets, panel, camera.fov, az)
+        : stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
+    f.from.copy(c.target)
+    f.fromDistance = camera.position.distanceTo(c.target)
+    f.fromAzimuth = az
+    f.e0 = flightProgress(f.elapsed, f.duration)
+    f.target = dest.target
+    f.distance = dest.distance
+    f.azimuth = dest.azimuth
+  }, [interior, panel, size, insets, camera, network])
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
   const flying = useCallback(() => flight.current !== null, [])
@@ -224,6 +170,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       c.target.add(step)
       camera.position.add(step)
       const offset = scratch.current.copy(camera.position).sub(c.target).setLength(distance)
+      turnOffset(offset, f, e)
       camera.position.copy(c.target).add(offset)
       if (e >= 1) {
         flight.current = null
