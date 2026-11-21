@@ -10,7 +10,9 @@ import { interiorLook } from './interiorLook'
 import type { InteriorModel } from './interiorModel'
 import { InteriorVeil } from './InteriorVeil'
 import { RENDER_ORDER } from './renderOrder'
-import { useLineLayer } from './useLineLayer'
+import { useLineLayer, type LineDash } from './useLineLayer'
+
+const DASH: LineDash = { size: theme.interiorApproxDash, gap: theme.interiorApproxGap }
 
 function showLabel(el: HTMLDivElement, opacity: number): void {
   el.style.opacity = String(opacity)
@@ -45,6 +47,12 @@ export function StationInterior({ model, network, onRevealed }: StationInteriorP
     under ? RENDER_ORDER.interiorUnderFine : RENDER_ORDER.interiorFine,
     theme.interiorFineWidth,
   )
+  const dashed = useLineLayer(
+    model.dashed,
+    under ? RENDER_ORDER.interiorUnderDashed : RENDER_ORDER.interiorDashed,
+    theme.interiorLineWidth,
+    DASH,
+  )
 
   useFrame((state) => {
     const g = group.current
@@ -59,6 +67,7 @@ export function StationInterior({ model, network, onRevealed }: StationInteriorP
     g.visible = o > 0
     if (strong) strong.material.opacity = o
     if (fine) fine.material.opacity = o
+    if (dashed) dashed.material.opacity = o
     if (veil.current) (veil.current.material as MeshBasicMaterial).opacity = interiorLook.veilOpacity * o
     for (const el of labels.current) if (el) showLabel(el, o)
   })
@@ -68,6 +77,7 @@ export function StationInterior({ model, network, onRevealed }: StationInteriorP
       <group ref={group} position={[model.origin.x, 0, model.origin.z]} visible={false}>
       {interiorLook.veil !== 'none' && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
+      {dashed && <primitive object={dashed} />}
       {strong && <primitive object={strong} />}
       {model.labels.map((label, i) => (
         // zIndexRange [0, 0]: drei's default z-index would paint labels over the HUD panel.

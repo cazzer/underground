@@ -38,20 +38,25 @@ export interface InteriorBufferOptions {
   guides: boolean
   /** How escalators and elevators are drawn (TEMPORARY choice, see machineLook.ts). */
   machines: MachineStyle
+  /**
+   * TEMPORARY (approxLook.ts, look B): write platform and slab outlines and tracks to `dashed` instead of `strong`.
+   * Off, `dashed` stays empty and `strong` is unchanged.
+   */
+  dashStructure?: boolean
   /** Linear RGB for a role on the level at `levelIndex`, an index into `interior.levels` (highest first, so the
    *  street is 0 below ground and the last level at an elevated station). */
   colorOf: (role: InteriorRole, levelIndex: number) => Rgb
 }
 
 /**
- * Two merged layers for one station interior, emitted from the deepest level up to the street.
+ * Merged layers for one station interior, emitted from the deepest level up to the street.
  * Interior layers draw with depthTest off, so buffer order is the overlap rule: upper levels
- * paint over lower ones.
+ * paint over lower ones (within a layer; `dashed`, when used, is its own layer).
  */
 export function buildInteriorBuffers(
   interior: StationInterior,
   opts: InteriorBufferOptions,
-): { strong: Buffers; fine: Buffers } {
+): { strong: Buffers; fine: Buffers; dashed: Buffers } {
   const { yScale, colorOf } = opts
   const levelIndex = new Map(interior.levels.map((l, i) => [l.id, i]))
   const indexOf = (levelId: string, elementId: string): number => {
@@ -63,6 +68,8 @@ export function buildInteriorBuffers(
   const streetIndex = interior.levels.findIndex((l) => l.kind === 'street')
   const strong = new SegmentWriter()
   const fine = new SegmentWriter()
+  const dashed = new SegmentWriter()
+  const structure = opts.dashStructure ? dashed : strong
 
   // Also throws for an interior with nothing to draw, so it becomes an error load.
   const bounds = interiorBounds(interior)
@@ -88,10 +95,10 @@ export function buildInteriorBuffers(
     const slabs = interior.slabs.filter((s) => indexOf(s.level, s.id) === li)
 
     for (const p of platforms) {
-      strong.loop(p.outline, y, colorOf('outline', li))
-      for (const t of p.tracks) strong.polyline(t.path, (level.y - opts.railDrop) * yScale, colorOf('track', li))
+      structure.loop(p.outline, y, colorOf('outline', li))
+      for (const t of p.tracks) structure.polyline(t.path, (level.y - opts.railDrop) * yScale, colorOf('track', li))
     }
-    for (const s of slabs) strong.loop(s.outline, y, colorOf('outline', li))
+    for (const s of slabs) structure.loop(s.outline, y, colorOf('outline', li))
     for (const f of interior.fareLines) {
       if (indexOf(f.level, f.id) === li) fine.polyline(f.path, y, colorOf('fare', li))
     }
@@ -133,5 +140,5 @@ export function buildInteriorBuffers(
     }
   }
 
-  return { strong: strong.build(), fine: fine.build() }
+  return { strong: strong.build(), fine: fine.build(), dashed: dashed.build() }
 }

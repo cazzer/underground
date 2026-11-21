@@ -69,6 +69,13 @@ export interface Theme {
   interiorFineWidth: number
   /** 0..1: how far the deepest level's strokes mix toward the background (depth cue). */
   interiorDepthFade: number
+  /**
+   * TEMPORARY with ?approx= (src/scene/approxLook.ts). A: 0..1 mix of a generated interior's strokes toward the
+   * background, before the depth fade (machines exempt). B: dash and gap of its outlines and tracks, meters.
+   */
+  interiorApproxMix: number
+  interiorApproxDash: number
+  interiorApproxGap: number
 }
 
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
@@ -116,6 +123,9 @@ export const THEMES = {
     interiorLineWidth: 1.5,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,
+    interiorApproxMix: 0.4,
+    interiorApproxDash: 3,
+    interiorApproxGap: 2,
   },
   drafting: {
     name: 'drafting',
@@ -156,6 +166,9 @@ export const THEMES = {
     interiorLineWidth: 1.25,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,
+    interiorApproxMix: 0.4,
+    interiorApproxDash: 3,
+    interiorApproxGap: 2,
   },
   terminal: {
     name: 'terminal',
@@ -196,6 +209,9 @@ export const THEMES = {
     interiorLineWidth: 1.5,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,
+    interiorApproxMix: 0.4,
+    interiorApproxDash: 3,
+    interiorApproxGap: 2,
   },
 } as const satisfies Record<string, Theme>
 

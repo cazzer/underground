@@ -101,6 +101,18 @@ describe('buildInteriorBuffers', () => {
     expect(count(ramp.strong)).toBe(4 + 1 + 4 + 4 + 4)
   })
 
+  it('leaves dashed empty by default and, with dashStructure, moves only outlines and tracks there', () => {
+    expect(count(buildInteriorBuffers(fixture(), opts()).dashed)).toBe(0)
+    const split = buildInteriorBuffers(fixture(), opts({ dashStructure: true }))
+    // platform 4 + track 1 + slab 4
+    expect(count(split.dashed)).toBe(9)
+    expect(count(split.strong)).toBe(31 - 9)
+    expect(split.fine).toEqual(fine)
+    const roles = (b: typeof strong) => new Set(Array.from({ length: count(b) }, (_, k) => ROLES[color(b, k)[0]!]))
+    expect(roles(split.dashed)).toEqual(new Set(['outline', 'track']))
+    expect(roles(split.strong)).toEqual(new Set(['stair', 'elevator', 'entrance']))
+  })
+
   it('throws naming the element for an unknown level', () => {
     const bad = fixture([{ ...STAIR, upper: { ...STAIR.upper, level: 'roof' } }])
     expect(() => buildInteriorBuffers(bad, opts())).toThrow('Unknown level "roof" in ST1')

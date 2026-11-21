@@ -14,18 +14,19 @@ interface InteriorStatusProps {
 
 interface ReadyLineProps {
   model: InteriorModel
-  revealed: boolean
 }
 
 /**
- * The line for a loaded interior. The card stays just name and arrivals, so an authored interior
- * shows nothing here (and the live region collapses); a line for generated interiors goes here.
+ * The line for a loaded interior. The card stays just name and arrivals, so an authored (surveyed) interior
+ * shows nothing here and the live region collapses. A generated one says it is approximate; the line shows
+ * whether or not the interior is in view, so the live region announces it once per station, not per zoom.
  */
-function ReadyLine(_props: ReadyLineProps): null {
-  return null
+function ReadyLine({ model }: ReadyLineProps) {
+  if (!model.approximate) return null
+  return <p className="text-ink-dim">Approximate layout from station type</p>
 }
 
-function StatusLine({ info: { load, revealed, onRetry } }: InteriorStatusProps) {
+function StatusLine({ info: { load, onRetry } }: InteriorStatusProps) {
   switch (load.status) {
     case 'none':
       return null
@@ -46,7 +47,7 @@ function StatusLine({ info: { load, revealed, onRetry } }: InteriorStatusProps) 
         </>
       )
     case 'ready':
-      return <ReadyLine model={load.model} revealed={revealed} />
+      return <ReadyLine model={load.model} />
   }
 }
 

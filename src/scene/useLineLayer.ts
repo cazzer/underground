@@ -25,17 +25,26 @@ export function routeLineBuffers(network: Network, paths: readonly ShapePath[], 
   })
 }
 
+/** Dash pattern in world meters (TEMPORARY with ?approx=b, see approxLook.ts). */
+export interface LineDash {
+  size: number
+  gap: number
+}
+
 /**
  * One merged LineSegments2 (a single draw call) for `buffers`; null when there is nothing to
  * draw. Rebuilt when `buffers` changes, disposed on change and unmount. LineSegments2 sets its
  * material's resolution from the viewport (CSS pixels) before each render, so linewidth is in
- * CSS pixels at any dpr.
+ * CSS pixels at any dpr. With `dash`, the segments are dashed in world meters along their running length.
  */
 export function useLineLayer(
   buffers: LineBuffers | null,
   renderOrder: number,
   linewidth = theme.lineWidth,
+  dash?: LineDash,
 ): LineSegments2 | null {
+  const dashSize = dash?.size
+  const gapSize = dash?.gap
   const lines = useMemo(() => {
     if (!buffers || buffers.positions.length === 0) return null
     const geometry = new LineSegmentsGeometry().setPositions(buffers.positions).setColors(buffers.colors)
@@ -47,9 +56,15 @@ export function useLineLayer(
       depthWrite: false,
     })
     const l = new LineSegments2(geometry, material)
+    if (dashSize !== undefined && gapSize !== undefined) {
+      material.dashed = true
+      material.dashSize = dashSize
+      material.gapSize = gapSize
+      l.computeLineDistances()
+    }
     l.renderOrder = renderOrder
     return l
-  }, [buffers, renderOrder, linewidth])
+  }, [buffers, renderOrder, linewidth, dashSize, gapSize])
 
   useEffect(
     () => () => {

@@ -7,6 +7,7 @@ import { toGround, type Ground } from '../lib/projection'
 import { mixHex } from '../lib/routeColor'
 import { ISO_POLAR } from '../lib/tilt'
 import { MACHINE_DEPTH_FADE_SHARE, theme } from '../theme'
+import { approxLook } from './approxLook'
 import { interiorLook } from './interiorLook'
 import { machineLook } from './machineLook'
 
@@ -17,6 +18,10 @@ export interface InteriorModel {
   origin: Ground
   strong: Buffers
   fine: Buffers
+  /** TEMPORARY (?approx=b, approxLook.ts): a generated interior's outlines and tracks, drawn dashed; else empty. */
+  dashed: Buffers
+  /** Generated from an archetype template rather than surveyed: the panel says it is approximate. */
+  approximate: boolean
   labels: LevelLabel[]
   /** Plan center and the toward-camera shift that puts it at mid-height mid-screen, seen isometrically. */
   focusAnchor: FocusAnchor
@@ -41,15 +46,19 @@ const HULL_PAD = 6
 
 /**
  * Linear RGB per role and level: levels farther from the street (deeper, or higher at an elevated station) mix
- * toward the background (mixed in sRGB); machines fade less.
+ * toward the background (mixed in sRGB); machines fade less. `approxMix` (look A) first mixes every
+ * non-machine stroke toward the background; the two mixes compose into one, so 0 changes nothing.
  */
-function colorTable(levels: readonly Level[]): (role: InteriorRole, levelIndex: number) => Rgb {
+function colorTable(levels: readonly Level[], approxMix: number): (role: InteriorRole, levelIndex: number) => Rgb {
   const table = new Map<string, Rgb>()
   const shares = levelFadeShares(levels)
   for (const [role, token] of Object.entries(ROLE_TOKEN)) {
+    const machine = role === 'elevator' || role === 'escalator'
+    const dim = machine ? 0 : approxMix
     for (let i = 0; i < levels.length; i++) {
-      const share = role === 'elevator' || role === 'escalator' ? MACHINE_DEPTH_FADE_SHARE : 1
-      const fade = theme.interiorDepthFade * share * shares[i]!
+      const share = machine ? MACHINE_DEPTH_FADE_SHARE : 1
+      const depthFade = theme.interiorDepthFade * share * shares[i]!
+      const fade = dim === 0 ? depthFade : 1 - (1 - dim) * (1 - depthFade)
       const c = new Color(mixHex(token, theme.background, fade))
       table.set(`${role}:${i}`, [c.r, c.g, c.b])
     }
@@ -79,19 +88,38 @@ function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buff
   return { positions, colors }
 }
 
+/** Look C: everything in one fine-width layer, fine strokes first (the order the two layers drew in). */
+function concat(a: Buffers, b: Buffers): Buffers {
+  const positions = new Float32Array(a.positions.length + b.positions.length)
+  const colors = new Float32Array(positions.length)
+  positions.set(a.positions)
+  positions.set(b.positions, a.positions.length)
+  colors.set(a.colors)
+  colors.set(b.colors, a.colors.length)
+  return { positions, colors }
+}
+
+const EMPTY: Buffers = { positions: new Float32Array(0), colors: new Float32Array(0) }
+
 /** Builds the drawable model; throws (naming the element) on inconsistent interior data or nothing to draw. */
 export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const { yScale } = interiorLook
-  const colorOf = colorTable(interior.levels)
-  const { strong, fine } = buildInteriorBuffers(interior, {
+  const approximate = interior.generated !== undefined
+  const look = approximate ? approxLook : null
+  const colorOf = colorTable(interior.levels, look === 'a' ? theme.interiorApproxMix : 0)
+  const built = buildInteriorBuffers(interior, {
     yScale,
     stepRise: 0.18,
     railDrop: RAIL_DROP_M,
     entranceSize: 2.5,
     guides: interiorLook.guides,
     machines: machineLook.style,
+    dashStructure: look === 'b',
     colorOf,
   })
+  const fineOnly = look === 'c'
+  const strong = fineOnly ? EMPTY : built.strong
+  const fine = fineOnly ? concat(built.fine, built.strong) : built.fine
   const origin = toGround(interior.anchor)
   const hull =
     interiorLook.veil === 'footprint'
@@ -102,6 +130,8 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     origin,
     strong,
     fine: hull ? withCutLine(fine, hull, colorOf('fare', 0)) : fine,
+    dashed: built.dashed,
+    approximate,
     labels: levelLabels(interior, yScale),
     focusAnchor: interiorFocusAnchor(origin, interior, yScale, Math.tan(ISO_POLAR)),
     hull,

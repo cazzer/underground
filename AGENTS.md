@@ -75,6 +75,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
+  TEMPORARY: `?approx=a|b|c` (dimmed, dashed, fine only; default b) until the 9wc.5 card is decided: how a
+  generated interior's strokes draw (authored ones never change). A mixes them toward the background by
+  `interiorApproxMix` (machines exempt); B dashes platform and slab outlines and tracks in world meters
+  (`interiorApproxDash`, `interiorApproxGap`; one extra layer at render order 8.5); C draws everything at the fine
+  width in one layer. The removal list is in `src/scene/approxLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   TEMPORARY: `?generated=1` shows generated station interiors until 9wc.5 labels them: without it, index entries
   with `provenance: 'generated'` count as not listed and `stations/depths-generated.json` is never fetched; with
@@ -106,10 +111,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
     veil blends, so a copy at weight 0 renders exactly like its veiled street car; `PlatformTrackMask.tsx` fades the map track out
     along those platforms as the interior reveals (its own small LineSegments2, not the merged lines)
-  - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
+  - `StationInterior.tsx` the focused station's interior (two line layers, plus a dashed one for a generated interior under `?approx=b`; `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides;
-    `machineLook.ts` TEMPORARY `?machines=` escalator/elevator look
+    `machineLook.ts` TEMPORARY `?machines=` escalator/elevator look; `approxLook.ts` TEMPORARY `?approx=` look of
+    generated interiors
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
@@ -124,7 +130,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `LocateButton.tsx` the header's location button (shows locating and located); `LocateStatus.tsx` its message (the sentence alone is the always-mounted live region)
   with a "Go to <nearest station>" action and a clear ×
   `InteriorStatus.tsx` the panel's station-layout line, one always-mounted live region: loading, error with Retry,
-  and `ReadyLine` for a loaded interior (null for authored ones; the one place a ready-state line goes)
+  and `ReadyLine` for a loaded interior (null for authored ones; for a generated one the dim line "Approximate layout
+  from station type", shown whether or not the interior is in view so it is announced once; the one place a
+  ready-state line goes)
   `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a combobox over a
   listbox of `SearchResult.tsx` rows (name and access icon, the borough on a dim line only for names whose stations span boroughs
   (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart); choosing a result
@@ -160,7 +168,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;
     `interiorSegments.ts` the shared segment writer; `interiorFixture.ts` the tests' mini interior;
     `interiorFraming.ts` bounds, focus anchor (plan center, toward-camera shift, half-extent), level
-    labels, padded hull; `interiorFade.ts` per-level fade share by distance from the street level;
+    labels (`levelHeightText`: authored levels "−4.3 m"; on a generated interior an `ee-rise` depth is signed to one
+    decimal, "+" above the street, and any other is "≈ −9 m", signed whole meters), padded hull; `interiorFade.ts` per-level fade share by distance from the street level;
     `interiorReveal.ts` distance to interior opacity. These have `.ts` imports
     because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always 180 m,
     at the current azimuth) in the screen area the header, footer and station panel leave free;
@@ -390,7 +399,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
   in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
-  layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong);
+  layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong), a generated one's dashed outlines and tracks at 8.5 (TEMPORARY `?approx=b`);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
   are redrawn above the veil and strokes (`SpanCars.tsx`, 9.4 to 9.5; not in look C): every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
@@ -428,7 +437,8 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   the OPEN-NY Terms of Use, and `attribution` says so (`OPEN_NY_NOTE` in `stationMerge.ts`).
 - `generated` (`{ archetype, confidence }`) exists only on template-generated interiors (absent = hand-authored);
   generated interiors use `generated` in place of `authored` in `sources`. Their non-street levels carry
-  `depthSource`: only `ee-rise` is measured, the rest are estimates (label "≈"). About 260 are committed, shown
+  `depthSource`: only `ee-rise` is measured, the rest are estimates (label "≈", see `levelHeightText`). The panel
+  says "Approximate layout from station type" for them. About 260 are committed, shown
   only under the TEMPORARY `?generated=1` until 9wc.5 labels them.
 - `public/data/stations/index.json` (`StationIndex`) maps each station id with an interior file to its
   `provenance` (`authored` or `generated`). The client fetches it on mount, after the startup files and not
