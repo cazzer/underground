@@ -9,21 +9,13 @@ import { analyzePlatforms } from './platformSides.ts'
 import type { LayoutAnalysis, PlatformLayout } from './platformSides.ts'
 import type { StationFacts } from './stationFacts.ts'
 import { cleanGeometry } from './stationFactsCheck.ts'
-import type { LocalPoint } from '../../src/data/stationSchema.ts'
+import type { Archetype, LocalPoint } from '../../src/data/stationSchema.ts'
 import { toLatLon } from '../../src/lib/projection.ts'
 import type { LatLon } from '../../src/lib/projection.ts'
 
 export type { PlatformLayout } from './platformSides.ts'
 
-export type Archetype =
-  | 'elevated-2-track'
-  | 'elevated-3-track'
-  | 'shallow-per-direction'
-  | 'cut-cover-mezzanine'
-  | 'underground-express'
-  | 'deep'
-  | 'open-air'
-  | 'unknown'
+export type { Archetype }
 
 export interface ArchetypeParams {
   platformType: 'island' | 'side' | 'mixed'

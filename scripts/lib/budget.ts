@@ -7,6 +7,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
 export const GZIP_BUDGET_BYTES = 60_000
+/** stations/index.json loads after startup (not render-blocking), so it has its own cap outside the budget above. */
+export const INDEX_GZIP_CAP_BYTES = 8_000
 
 export interface RenderedFile {
   name: string
@@ -44,4 +46,12 @@ export function checkBudget(files: readonly RenderedFile[], others: Readonly<Rec
     throw new Error(`Gzipped total ${total} B is over the ${GZIP_BUDGET_BYTES} B budget (${list}). Nothing written.`)
   }
   return total
+}
+
+/** The station index must fit its own cap; returns its gzip size. */
+export function checkIndexCap(index: RenderedFile): number {
+  if (index.gzip > INDEX_GZIP_CAP_BYTES) {
+    throw new Error(`${index.name} is ${index.gzip} B gzipped, over its ${INDEX_GZIP_CAP_BYTES} B cap. Nothing written.`)
+  }
+  return index.gzip
 }

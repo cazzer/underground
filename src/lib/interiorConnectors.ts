@@ -1,6 +1,6 @@
 /**
  * Stairs, ramps, escalators and elevators as segments in the interior's strong and fine layers.
- * `.ts` import paths: scripts/lib/interiorRegistry.test.ts (nodenext) loads this file.
+ * `.ts` import paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
  * TEMPORARY: the unchosen `MachineStyle` branches go once the 9wc.8 look card is decided (see machineLook.ts).
  */
 import type { Connector, LocalPoint } from '../data/stationSchema.ts'

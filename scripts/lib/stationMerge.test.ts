@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { toStableJson } from './stableJson.ts'
 import { fixture, ll } from './stationFixture.ts'
 import { ELEVATOR_WIDTH_M, ESCALATOR_WIDTH_M } from './stationEquipment.ts'
-import { buildStationInterior } from './stationMerge.ts'
+import { buildStationInterior, OPEN_NY_NOTE } from './stationMerge.ts'
 
 const build = (mutate: (f: ReturnType<typeof fixture>) => void = () => {}) => {
   const f = fixture()
@@ -207,7 +207,7 @@ describe('output', () => {
   it('marks the file ODbL and derives attribution from the sources present', () => {
     const out = build()
     expect(out.license).toBe('ODbL-1.0')
-    expect(out.attribution).toEqual(['© OpenStreetMap contributors', 'Metropolitan Transportation Authority, data.ny.gov'])
+    expect(out.attribution).toEqual(['© OpenStreetMap contributors', 'Metropolitan Transportation Authority, data.ny.gov', OPEN_NY_NOTE])
   })
   it('keeps every number to 2 decimals or fewer', () => {
     const nums: number[] = []

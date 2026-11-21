@@ -1,6 +1,6 @@
 /**
  * Station interior (public/data/stations/<id>.json) to LineSegments2 buffers.
- * `.ts` import paths: scripts/lib/interiorRegistry.test.ts (nodenext) loads this file.
+ * `.ts` import paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
  */
 import type { LocalPoint, StationInterior } from '../data/stationSchema.ts'
 import { stationAxis } from './interiorAxis.ts'
