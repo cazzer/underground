@@ -68,8 +68,18 @@ export function buildNetwork(
   return { stations, routes, center }
 }
 
-/** Position at `distance` meters along the route, clamped to its ends. */
-export function pointAlong(route: Route, distance: number): Ground {
+/**
+ * Position at `distance` meters along the route, clamped to its ends. Writes into `out`
+ * (pass one to avoid allocating per call) and returns it.
+ */
+export function pointAlong(route: Route, distance: number, out: Ground = { x: 0, z: 0 }): Ground {
+  const first = route.points[0]
+  if (!first) throw new Error(`Route ${route.id} has no points`)
+  if (route.points.length === 1) {
+    out.x = first.x
+    out.z = first.z
+    return out
+  }
   const d = Math.min(Math.max(distance, 0), route.length)
   let i = 1
   while (i < route.cumulative.length - 1 && route.cumulative[i]! < d) i++
@@ -77,7 +87,9 @@ export function pointAlong(route: Route, distance: number): Ground {
   const b = route.points[i]!
   const span = route.cumulative[i]! - route.cumulative[i - 1]!
   const t = span === 0 ? 0 : (d - route.cumulative[i - 1]!) / span
-  return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }
+  out.x = a.x + (b.x - a.x) * t
+  out.z = a.z + (b.z - a.z) * t
+  return out
 }
 
 export const network: Network = buildNetwork(SAMPLE_STATIONS, SAMPLE_LINES)
