@@ -32,13 +32,15 @@ interface SceneProps {
   onLiveError: (error: Error) => void
   /** The focused station's interior, once loaded. */
   interior: InteriorModel | null
+  /** The focused station draws its own street marker and tie: it has no interior, or its load failed. */
+  focusedMarker: boolean
   /** The station panel's screen rect; interior fly-tos frame beside it. */
   panel: ScreenRect | null
   /** The user's location, once found inside the covered area; null draws no marker. */
   here: { ground: Ground; accuracyM: number } | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, panel, here }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, focusedMarker, panel, here }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -56,8 +58,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, pa
       <color attach="background" args={[theme.background]} />
       <MapGrid />
       <SubwayLines network={network} paths={banded?.shapes ?? network.shapes} interiorStationId={interiorStationId} view={bandView} />
-      <StationTies network={network} />
-      <Stations stations={network.stations} />
+      <StationTies network={network} focusedMarker={focusedMarker} />
+      <Stations stations={network.stations} focusedMarker={focusedMarker} />
       <ScenePicker stations={network.stations} trainPick={trainPick} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>

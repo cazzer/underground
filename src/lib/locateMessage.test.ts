@@ -46,6 +46,7 @@ describe('locateMessage', () => {
       placement: { kind: 'near', ...marked, accuracyM: 500, approximate },
     })
     expect(locateMessage(near(false))?.text).toBe('Showing where you are.')
+    expect(locateMessage(near(false))?.srOnly).toBe(true)
     const approx = locateMessage(near(true))
     expect(approx?.text).toContain('approximate')
     expect(approx?.text).toContain('about 0.3 mi')

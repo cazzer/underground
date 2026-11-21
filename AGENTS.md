@@ -87,9 +87,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
     if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
-    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.3 to 0.6); `LineHighlight.tsx` holds the
+    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.3 to 0.6; the focused station's tie is dropped when it has an interior, kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
-    instance is scaled to 0, so it has no marker; `markerShape.ts` the marker constants);
+    instance is scaled to 0 when it has an interior (ready or loading), so it has no marker, and drawn when it has none or its load failed, with a `theme.stationFocus` `FocusRing.tsx` over the trains (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, `theme.train` if `routeLineMix.amount` is 1 (mono lines); stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
@@ -383,7 +383,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies).
+  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom) draws no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso

@@ -6,6 +6,7 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { useFocus } from '../lib/focus'
 import type { Network } from '../lib/network'
+import { focusedTie, STUB_DEPTH_M } from '../lib/stationTie'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
@@ -22,6 +23,8 @@ const tieOpacity = (depth: number): number => Math.min(Math.max((depth - TIE_FRO
 
 interface StationTiesProps {
   network: Network
+  /** The focused station's street marker is drawn (no interior, or its load failed): it keeps a tether. */
+  focusedMarker: boolean
 }
 
 /**
@@ -31,9 +34,11 @@ interface StationTiesProps {
  * for island platforms, roughly right for side platforms. One merged LineSegments2 drawn at the depth factor
  * (tilt.ts): scale.y follows it as the lines' does, so each tie ends on its sunken track; the opacity ramps in
  * once the tie is long enough to read (tieOpacity).
- * The focused station draws no marker, so its tie is left out too (swapped to the end and not drawn).
+ * A focused station with an interior draws no marker, so its tie is left out too (swapped to the end and not
+ * drawn). With no interior (focusedMarker) its marker stays and so does its tie; a station with no depth gets a
+ * short stub (stationTie.ts) in a spare last slot instead.
  */
-export function StationTies({ network }: StationTiesProps) {
+export function StationTies({ network, focusedMarker }: StationTiesProps) {
   const { focusedId } = useFocus()
   const ties = useMemo(() => {
     const positions: number[] = []
@@ -44,7 +49,9 @@ export function StationTies({ network }: StationTiesProps) {
       indexOf.set(id, positions.length / 6)
       positions.push(station.pos.x, MARKER_Y, station.pos.z, station.pos.x, y, station.pos.z)
     }
-    if (positions.length === 0) return null
+    const count = positions.length / 6
+    // The spare slot after the real ties holds the focused stub, when there is one.
+    positions.push(0, MARKER_Y, 0, 0, -STUB_DEPTH_M, 0)
     const material = new LineMaterial({
       color: theme.stationStroke,
       linewidth: theme.stationTieWidth,
@@ -55,34 +62,45 @@ export function StationTies({ network }: StationTiesProps) {
     const l = new LineSegments2(new LineSegmentsGeometry().setPositions(positions), material)
     l.renderOrder = RENDER_ORDER.stationTie
     l.frustumCulled = false
-    return { lines: l, all: new Float32Array(positions), indexOf }
+    return { lines: l, all: new Float32Array(positions), indexOf, count }
   }, [network])
-  const lines = ties?.lines ?? null
+  const lines = ties.lines
   const lastDepth = useRef(NaN)
 
-  // Every tie but the focused one: its segment trades places with the last, which is then not drawn.
+  // Every tie but a hidden focused one: its segment trades places with the last real tie, which is then not
+  // drawn. A fallback station without a tie gets the stub slot, drawn after the real ties.
   useLayoutEffect(() => {
-    if (!ties) return
     const attr = ties.lines.geometry.attributes.instanceStart as InterleavedBufferAttribute
     const buf = attr.data.array as Float32Array
     buf.set(ties.all)
-    const n = ties.all.length / 6
+    const n = ties.count
     const i = focusedId ? ties.indexOf.get(focusedId) : undefined
-    if (i !== undefined && i !== n - 1) buf.copyWithin(i * 6, (n - 1) * 6, n * 6)
-    ties.lines.geometry.instanceCount = i === undefined ? n : n - 1
+    const station = focusedId ? network.stationById.get(focusedId) : undefined
+    const plan = station ? focusedTie(i !== undefined, focusedMarker) : 'keep'
+    let drawn = n
+    if (plan === 'drop' && i !== undefined) {
+      if (i !== n - 1) buf.copyWithin(i * 6, (n - 1) * 6, n * 6)
+      drawn = n - 1
+    } else if (plan === 'stub' && station) {
+      buf[n * 6] = station.pos.x
+      buf[n * 6 + 2] = station.pos.z
+      buf[n * 6 + 3] = station.pos.x
+      buf[n * 6 + 5] = station.pos.z
+      drawn = n + 1
+    }
+    ties.lines.geometry.instanceCount = drawn
     attr.data.needsUpdate = true
-  }, [ties, focusedId])
+  }, [ties, network, focusedId, focusedMarker])
 
   useEffect(
     () => () => {
-      lines?.geometry.dispose()
-      lines?.material.dispose()
+      lines.geometry.dispose()
+      lines.material.dispose()
     },
     [lines],
   )
 
   useFrame((state) => {
-    if (!lines) return
     const depth = depthFactor(cameraDistance(state))
     if (depth === lastDepth.current) return
     lastDepth.current = depth
@@ -92,5 +110,5 @@ export function StationTies({ network }: StationTiesProps) {
     lines.material.opacity = opacity
   })
 
-  return lines && <primitive object={lines} />
+  return <primitive object={lines} />
 }

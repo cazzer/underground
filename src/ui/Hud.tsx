@@ -213,6 +213,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
           <LocateButton
             ref={locateButton}
             onLocate={locate.locate}
+            onClear={onClearLocation}
             locating={locate.state.status === 'locating'}
             located={markedPlacement(locate.state) !== null}
           />
