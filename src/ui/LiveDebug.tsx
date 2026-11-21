@@ -27,7 +27,9 @@ export function LiveDebug({ debug, technical }: LiveDebugProps) {
       aria-label="Live debug"
       className="pointer-events-none fixed top-4 right-4 max-w-64 border border-edge bg-panel p-2 font-mono text-[10px] leading-tight text-ink"
     >
-      <p>drawn {debug.drawn}</p>
+      <p>
+        drawn {debug.drawn} (arrival from schedule {debug.capped})
+      </p>
       <p>dropped {dropped.length === 0 ? 'none' : dropped.map(([k, n]) => `${k} ${n}`).join(', ')}</p>
       <p>
         join {debug.stages.path} path / {debug.stages.tripKey} tripKey / {debug.stages.primary} primary
