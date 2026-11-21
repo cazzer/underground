@@ -50,6 +50,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `network.ts` sample data to routes/stations; `focusMachine.ts` camera-driven focus
     transitions; `pingPong.ts` triangle wave
   - `focus.tsx` focused/dismissed-station React context (not pure)
+- `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
+  `fixture.ts` is the mini static world they share
+  - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
+  - `tripLookup.ts` trip-index to per-service trip-key maps and primary shapes
+  - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then primary
+  - `polyline.ts` cumulative length, point/heading at distance, forward-only projection
+  - `shapeGeometry.ts` stop distances along each shape, computed at load
+  - `position.ts` positionAlongShape: distance, ground point and heading from status, arrivals, run times
+  - `smoothing.ts` smoothDistance: per-frame ease that never goes backward
+  - `filters.ts` ghostReason: unassigned, stale vehicle, no future arrival
+  - `prepareTrips.ts` per poll: filter, join, place; returns live trips and per-reason drop counts
 - `src/data/sample.ts`: sample lines and stations in lat/lon
 - `src/data/schema.ts`: types of the six `public/data/*.json` files; `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these

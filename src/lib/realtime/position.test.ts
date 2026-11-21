@@ -1,0 +1,131 @@
+import { describe, expect, it } from 'vitest'
+import type { Arrival, VehicleStatus } from '../../data/realtime'
+import { buildPolyline } from './polyline'
+import { positionAlongShape, type PositionResult } from './position'
+import type { ShapeGeometry } from './shapeGeometry'
+
+const NOW = 1_795_228_554
+
+const northbound: ShapeGeometry = {
+  shapeId: '1..N03R',
+  line: buildPolyline([{ x: 0, z: 0 }, { x: 0, z: -1000 }, { x: 0, z: -2000 }]),
+  stops: ['101N', '102N', '103N'],
+  stopDistances: [0, 1000, 2000],
+  maxStopOffsetM: 0,
+}
+const southbound: ShapeGeometry = {
+  shapeId: '1..S03R',
+  line: buildPolyline([{ x: 0, z: -2000 }, { x: 0, z: -1000 }, { x: 0, z: 0 }]),
+  stops: ['103S', '102S', '101S'],
+  stopDistances: [0, 1000, 2000],
+  maxStopOffsetM: 0,
+}
+const SEGMENTS = { '101N>102N': 100, '102N>103N': 100 }
+
+function at(
+  status: VehicleStatus | null,
+  stopId: string | null,
+  arrivals: Arrival[],
+  opts: { geometry?: ShapeGeometry; segments?: Record<string, number> } = {},
+): PositionResult {
+  return positionAlongShape({
+    geometry: opts.geometry ?? northbound,
+    status,
+    stopId,
+    arrivals,
+    segments: opts.segments ?? SEGMENTS,
+    now: NOW,
+  })
+}
+function ok(r: PositionResult) {
+  if (!r.ok) throw new Error(`expected ok, got ${r.reason}`)
+  return r
+}
+
+describe('positionAlongShape STOPPED_AT', () => {
+  it('dwells at the platform while the next arrival is far off', () => {
+    expect(ok(at('STOPPED_AT', '102N', [['103N', NOW + 150]])).distance).toBeCloseTo(1000)
+  })
+  it('moves on when the status lags behind the next arrival', () => {
+    expect(ok(at('STOPPED_AT', '102N', [['103N', NOW + 40]])).distance).toBeCloseTo(1600)
+  })
+  it('stays at the stop with no arrival for the next stop', () => {
+    const r = ok(at('STOPPED_AT', '102N', []))
+    expect(r.distance).toBe(1000)
+    expect(r.departsInS).toBeNull()
+  })
+  it('stays at the terminal', () => {
+    expect(ok(at('STOPPED_AT', '103N', [])).distance).toBe(2000)
+  })
+})
+
+describe('positionAlongShape in transit', () => {
+  it('interpolates toward the next stop', () => {
+    const r = ok(at('IN_TRANSIT_TO', '103N', [['103N', NOW + 25]]))
+    expect(r.distance).toBeCloseTo(1750)
+    expect(r.point.x).toBeCloseTo(0)
+    expect(r.point.z).toBeCloseTo(-1750)
+    expect(r.heading).toBeCloseTo(0)
+    expect([r.fromIndex, r.toIndex]).toEqual([1, 2])
+  })
+  it('waits at the next platform when overdue', () => {
+    expect(ok(at('IN_TRANSIT_TO', '103N', [['103N', NOW - 10]])).distance).toBeCloseTo(2000)
+  })
+  it('holds at the previous stop when the arrival is far off', () => {
+    expect(ok(at('IN_TRANSIT_TO', '103N', [['103N', NOW + 500]])).distance).toBeCloseTo(1000)
+  })
+  it('floors INCOMING_AT at 75% of the hop', () => {
+    expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 80]])).distance).toBeCloseTo(1750)
+    expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 5]])).distance).toBeCloseTo(1950)
+  })
+  it('falls back to a run time from distance when the segment is unknown', () => {
+    // 1000 m at 8 m/s = 125 s; 62.5 s left is halfway.
+    const r = ok(at('IN_TRANSIT_TO', '102N', [['102N', NOW + 62.5]], { segments: {} }))
+    expect(r.distance).toBeCloseTo(500)
+  })
+  it('reports how long until a train still at its origin departs', () => {
+    const r = ok(at('IN_TRANSIT_TO', '101N', [['101N', NOW + 90]]))
+    expect(r.distance).toBe(0)
+    expect(r.departsInS).toBeCloseTo(90)
+  })
+})
+
+describe('positionAlongShape without a status', () => {
+  it('uses the first upcoming arrival as the next stop', () => {
+    const r = ok(at(null, null, [['101N', NOW - 30], ['102N', NOW + 50], ['103N', NOW + 150]]))
+    expect(r.distance).toBeCloseTo(500)
+    expect(r.departsInS).toBeNull()
+  })
+  it('sits at the origin when every arrival is ahead', () => {
+    const r = ok(at(null, null, [['101N', NOW + 300], ['102N', NOW + 400]]))
+    expect(r.distance).toBe(0)
+    expect(r.departsInS).toBeCloseTo(300)
+  })
+  it('parks at the last stop when every arrival is past', () => {
+    expect(ok(at(null, null, [['102N', NOW - 60], ['103N', NOW - 20]])).distance).toBeCloseTo(2000)
+  })
+  it('ignores arrivals for stops off the pattern', () => {
+    expect(ok(at(null, null, [['Z99N', NOW + 10], ['103N', NOW + 25]])).distance).toBeCloseTo(1750)
+  })
+})
+
+describe('positionAlongShape failures and direction', () => {
+  it('rejects a stop that is not on the pattern', () => {
+    expect(at('IN_TRANSIT_TO', 'Z99N', [['Z99N', NOW + 10]])).toEqual({ ok: false, reason: 'off-pattern' })
+    expect(at('STOPPED_AT', 'Z99N', [])).toEqual({ ok: false, reason: 'off-pattern' })
+    expect(at(null, null, [['Z99N', NOW + 10]])).toEqual({ ok: false, reason: 'off-pattern' })
+  })
+  it('rejects an in-transit train with no arrival for its stop', () => {
+    expect(at('IN_TRANSIT_TO', '103N', [['102N', NOW + 10]])).toEqual({ ok: false, reason: 'no-arrival' })
+  })
+  it('heads south on a southbound shape', () => {
+    const r = ok(
+      at('IN_TRANSIT_TO', '101S', [['101S', NOW + 50]], {
+        geometry: southbound,
+        segments: { '102S>101S': 100 },
+      }),
+    )
+    expect(r.distance).toBeCloseTo(1500)
+    expect(r.heading).toBeCloseTo(Math.PI)
+  })
+})
