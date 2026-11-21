@@ -34,6 +34,9 @@ env:
 
 jobs:
   generate:
+    # Only on the default branch (a dispatch from another branch does nothing).
+    # The schedule event has no repository object, hence the fallback.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch || 'main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -58,7 +61,7 @@ jobs:
           # Values reach $GITHUB_OUTPUT, so strip everything but a safe character set.
           old=$(node -p "require('./public/data/stations.json').feedVersion" | head -n1 | tr -cd '[:alnum:]._-')
           # Informational only; the diff below decides whether anything changed.
-          lm=$(curl -sIf "$FEED_URL" | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified: *//p' | head -n1 | tr -cd '[:alnum:] ,:-')
+          lm=$({ curl -sIf "$FEED_URL" || true; } | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified: *//p' | head -n1 | tr -cd '[:alnum:] ,:-')
           echo "old_version=$old" >> "$GITHUB_OUTPUT"
           echo "last_modified=$lm" >> "$GITHUB_OUTPUT"
 
@@ -112,14 +115,15 @@ jobs:
 
   publish:
     needs: generate
-    if: needs.generate.outputs.changed == 'true'
+    if: needs.generate.outputs.changed == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch || 'main')
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
-      BASE: ${{ github.event.repository.default_branch }}
+      # The schedule event has no repository object, so fall back to main.
+      BASE: ${{ github.event.repository.default_branch || 'main' }}
       OLD_VERSION: ${{ needs.generate.outputs.old_version }}
       NEW_VERSION: ${{ needs.generate.outputs.new_version }}
       LAST_MODIFIED: ${{ needs.generate.outputs.last_modified }}
@@ -135,8 +139,22 @@ jobs:
       - name: Commit and push
         id: push
         run: |
+          # Any failing command aborts the step (fail closed); only greps below tolerate "no match".
+          BASE=${BASE:-main}
+          git rev-parse --verify --quiet "origin/$BASE^{commit}" > /dev/null
+
+          # Artifact allowlist: plain files only, named *.json, README.md, or LICENSE-ODbL.md.
+          art="$RUNNER_TEMP/out/data"
+          odd=$(find "$art" ! -type d ! -type f)
+          bad=$(find "$art" -type f ! -name '*.json' ! -name README.md ! -name LICENSE-ODbL.md)
+          if [ -n "$odd$bad" ]; then
+            echo "::error::Artifact has files outside the allowlist:"
+            printf '%s\n' "$odd" "$bad" | grep -v '^$'
+            exit 1
+          fi
+
           rm -rf public/data
-          cp -R "$RUNNER_TEMP/out/data" public/data
+          cp -R "$art" public/data
           git config user.name 'github-actions[bot]'
           git config user.email "$BOT_EMAIL"
           git checkout -B "$BRANCH"
@@ -157,8 +175,17 @@ jobs:
 
           # Force-push guard: only overwrite the branch if the bot alone wrote it.
           lease=''
-          if git fetch origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"; then
-            others=$(git log --format='%ae' "origin/$BASE..origin/$BRANCH" | grep -vxF "$BOT_EMAIL" || true)
+          rc=0
+          git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+            echo "::error::git ls-remote failed (exit $rc)"
+            exit 1
+          fi
+          if [ "$rc" -eq 0 ]; then
+            git fetch origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+            # Author and committer of every commit on the branch must be the bot.
+            log=$(git log --format='%ae%n%ce' "origin/$BASE..origin/$BRANCH")
+            others=$(printf '%s\n' "$log" | grep -vxF "$BOT_EMAIL" | grep -v '^$' || true)
             if [ -n "$others" ]; then
               echo "::warning::$BRANCH has commits by someone other than the bot; leaving it alone."
               echo "pushed=false" >> "$GITHUB_OUTPUT"
@@ -193,11 +220,12 @@ jobs:
             echo
             echo "Script output (gzip sizes):"
             echo
-            echo '```'
-            cat "$RUNNER_TEMP/out/data.log"
-            echo '```'
+            echo '````'
+            tail -c 20000 "$RUNNER_TEMP/out/data.log"
+            echo '````'
           } > "$RUNNER_TEMP/body.md"
 
+          BASE=${BASE:-main}
           title="Refresh GTFS data ($NEW_VERSION)"
           if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
             gh pr edit "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
