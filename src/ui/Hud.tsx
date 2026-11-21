@@ -14,9 +14,14 @@ function lineColor(lineId: string): string {
   return theme.lines[(route?.colorIndex ?? 0) % theme.lines.length] ?? theme.ink
 }
 
-function ArrivalsPanel({ stationId, onClose }: { stationId: string; onClose: () => void }) {
+interface ArrivalsPanelProps {
+  stationId: string
+  onClose: () => void
+}
+
+function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
   const station = network.stations.find((s) => s.id === stationId)
-  if (!station) return null
+  if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   return (
     <aside
       aria-label={`Arrivals at ${station.name}`}
@@ -56,7 +61,7 @@ function ArrivalsPanel({ stationId, onClose }: { stationId: string; onClose: () 
 }
 
 export function Hud() {
-  const { focusedId, clear } = useFocus()
+  const { focusedId, dismiss } = useFocus()
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
       <header>
@@ -64,7 +69,7 @@ export function Hud() {
         <p className="text-xs text-ink-dim">sample data / theme: {theme.name}</p>
       </header>
       <div className="flex justify-start sm:justify-end">
-        {focusedId && <ArrivalsPanel stationId={focusedId} onClose={clear} />}
+        {focusedId && <ArrivalsPanel stationId={focusedId} onClose={dismiss} />}
       </div>
     </div>
   )
