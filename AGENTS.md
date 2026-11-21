@@ -76,7 +76,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
     their instances, consists and per-frame writes; `carGeometry.ts` the shaded body; `carLook.ts` TEMPORARY);
-    `YouAreHere.tsx` the location marker (constant-size reticle on a background halo inside a translucent
+    `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
@@ -108,7 +108,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     at the current azimuth) in the screen area the header, footer and station panel leave free;
     `orbitLimits.ts` azimuth window, spring to north-up, soft pan radius, focus-point pivot
   - `focus.tsx` focused/dismissed-station React context (not pure); it also carries point flights
-    (`flyToPoint`, used by the location button; focus untouched). In dev only it exposes
+    (`flyToPoint`, used by the location button; drops focus, so an orbited view springs back north-up during the flight). In dev only it exposes
     `window.__underground.select(stationId)` for screenshots and Playwright checks
   - `locate.ts` a geolocation fix to a placement (near a station: frame the fix; inside the network but far:
     frame the fix and its nearest station; outside: nearest station only, no marker), failure codes, and the

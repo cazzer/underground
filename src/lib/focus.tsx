@@ -3,7 +3,7 @@ import { nextFocus, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'
 
-/** A camera flight: to a station (focusing it), or to a ground point with `radiusM` in view (focus untouched). */
+/** A camera flight: to a station (focusing it), or to a ground point with `radiusM` in view (drops focus). */
 export type FlyRequest =
   | {
       kind: 'station'
@@ -20,7 +20,10 @@ interface FocusValue {
   flyRequest: FlyRequest | null
   /** Explicit pick (click): focus the station and fly the camera to it. */
   select: (stationId: string) => void
-  /** Fly the camera to a ground point showing `radiusM` around it. Doesn't change focus. */
+  /**
+   * Fly the camera to a ground point showing `radiusM` around it. Drops focus without dismissing it, so
+   * the orbit's azimuth springs back to north-up during the flight (the framing assumes north-up).
+   */
   flyToPoint: (center: Ground, radiusM: number) => void
   /** User closed the panel: unfocus and remember the station so the camera doesn't refocus it. */
   dismiss: () => void
@@ -52,7 +55,10 @@ export function FocusProvider({ children }: FocusProviderProps) {
     setFlyRequest((prev) => ({ kind: 'station', stationId, nonce: (prev?.nonce ?? 0) + 1 }))
   }, [])
   const flyToPoint = useCallback(
-    (center: Ground, radiusM: number) => setFlyRequest((prev) => ({ kind: 'point', center, radiusM, nonce: (prev?.nonce ?? 0) + 1 })),
+    (center: Ground, radiusM: number) => {
+      setState((s) => (s.focusedId === null ? s : { focusedId: null, dismissedId: s.dismissedId }))
+      setFlyRequest((prev) => ({ kind: 'point', center, radiusM, nonce: (prev?.nonce ?? 0) + 1 }))
+    },
     [],
   )
   const dismiss = useCallback(
