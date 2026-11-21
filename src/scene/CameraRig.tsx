@@ -20,9 +20,12 @@ type MapControlsImpl = ComponentRef<typeof MapControls>
 const keepTarget = new Vector3()
 const keepPosition = new Vector3()
 /**
- * Drops the controls' leftover damped motion (pan offset, rotation and zoom deltas) without moving
- * the camera. Otherwise momentum from a pan or wheel just before a fly-to resumes when the flight
- * lands and slides the view off the station (underground-3s3). Allocation-free; safe per frame.
+ * Drops the controls' leftover damped motion (pan offset and rotation delta) without moving the
+ * camera. Otherwise momentum from a pan or wheel just before a fly-to resumes when the flight
+ * lands and slides the view off the station (underground-3s3). A second undamped update() with
+ * zero deltas re-syncs the controls' spherical state and the camera's aim to the restored pose, so
+ * getAzimuthalAngle() afterwards is the camera's real angle. No allocation; the 'change' event it
+ * dispatches copies its listener list, so call it on flight start and landing, not every frame.
  */
 function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void {
   keepTarget.copy(c.target)
@@ -30,9 +33,10 @@ function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void {
   const damping = c.enableDamping
   c.enableDamping = false
   c.update() // without damping, update() applies and zeroes the pending deltas
-  c.enableDamping = damping
   c.target.copy(keepTarget)
   camera.position.copy(keepPosition)
+  c.update() // deltas are zero now: re-syncs spherical, lastPosition and lookAt to the restored pose
+  c.enableDamping = damping
 }
 
 const MIN_DISTANCE = 40
