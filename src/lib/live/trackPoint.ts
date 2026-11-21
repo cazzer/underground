@@ -60,8 +60,9 @@ const a: TrackPoint = createTrackPoint()
 const c: TrackPoint = createTrackPoint()
 
 /**
- * Writes the drawn point at `distance` (clamped to the line) into `out` and returns it: x and z on the shifted line
- * between the two vertices around it, y the profile's drawn height there. An empty line gives the origin.
+ * Writes the drawn point at `distance` (clamped to the line) into `out` and returns it: x, z and y all on the drawn
+ * line between the two vertices around it (y interpolated between the vertices' profile heights, as the GPU draws the
+ * chord), so a train sits exactly on its line however coarsely the ramps are sampled. An empty line gives the origin.
  */
 export function trackPointInto(track: DrawnTrack, distance: number, view: BandView, out: TrackPoint): TrackPoint {
   const { points, cumulative, length } = track.line
@@ -82,5 +83,7 @@ export function trackPointInto(track: DrawnTrack, distance: number, view: BandVi
   shiftedVertex(track, s + 1, view, c)
   out.x = a.x + (c.x - a.x) * t
   out.z = a.z + (c.z - a.z) * t
+  const y0 = profileAt(track.profile, cumulative[s]!)
+  out.y = (y0 + (profileAt(track.profile, cumulative[s + 1]!) - y0) * t) * view.depth
   return out
 }

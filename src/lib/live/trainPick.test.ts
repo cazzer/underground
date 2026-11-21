@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { ToScreen } from '../pick'
 import { geometries } from '../realtime/fixture'
-import { pointAtDistance } from '../realtime/polyline'
+import { buildPolyline, pointAtDistance } from '../realtime/polyline'
+import { rampBreaks } from '../rampSampling'
 import type { LiveTrip } from '../realtime/prepareTrips'
 import type { ShapeGeometry } from '../realtime/shapeGeometry'
 import { createBandView } from '../bandOffset'
-import { buildTrackProfile, GRADE } from '../trackProfile'
+import { buildTrackProfile, GRADE, resampleAt } from '../trackProfile'
 import { consistFor } from './consist'
 import { createSlotTable, type SlotTable } from './slots'
 import { nearestTrain, trainScreenPoints, type TrainPickInput } from './trainPick'
@@ -72,9 +73,14 @@ const oblique: ToScreen = (x, y, z, out) => {
   return true
 }
 /** The northbound shape descending to a platform run at 900..1100 m, 10 m down drawn x2 (y = -20). */
+const DEEP_PROFILE = buildTrackProfile([{ d0: 900, d1: 1100, yReal: -10 }], { grade: GRADE, yScale: 2 }).profile
+const DEEP_LINE = buildPolyline(resampleAt(NORTH.line.points, NORTH.line.cumulative, rampBreaks(DEEP_PROFILE)).points)
+/** As network.ts draws it: the line resampled through its ramps. */
 const DEEP: ShapeGeometry = {
   ...NORTH,
-  profile: buildTrackProfile([{ d0: 900, d1: 1100, yReal: -10 }], { grade: GRADE, yScale: 2 }).profile,
+  line: DEEP_LINE,
+  bandInputs: new Float32Array(DEEP_LINE.points.length * 4),
+  profile: DEEP_PROFILE,
 }
 
 describe('nearestTrain', () => {
