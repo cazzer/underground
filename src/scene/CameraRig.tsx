@@ -1,11 +1,11 @@
 import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useLayoutEffect, useRef, type ComponentRef } from 'react'
+import { useLayoutEffect, useRef, type ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { useFocus } from '../lib/focus'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { nextFocus, type FocusInput } from '../lib/focusMachine'
-import { fitDistance } from '../lib/framing'
+import { frameBounds, type Insets } from '../lib/framing'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
 
@@ -25,9 +25,11 @@ interface Flight {
 
 interface CameraRigProps {
   network: Network
+  /** HUD-covered bands; the opening view fits the city between them. */
+  insets: Insets
 }
 
-export function CameraRig({ network }: CameraRigProps) {
+export function CameraRig({ network, insets }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -35,7 +37,7 @@ export function CameraRig({ network }: CameraRigProps) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const get = useThree((s) => s.get)
   const size = useThree((s) => s.size)
-  const maxDistance = fitDistance(network.bounds, size.width / size.height, camera.fov) * MAX_ZOOM_OUT
+  const maxDistance = frameBounds(network.bounds, size, insets, camera.fov).distance * MAX_ZOOM_OUT
   const { focusedId, dismissedId, flyRequest, updateFromCamera } = useFocus()
   // Reused every frame so the per-frame focus check doesn't allocate.
   const input = useRef<FocusInput>({
@@ -48,11 +50,11 @@ export function CameraRig({ network }: CameraRigProps) {
 
   // Fit the whole city once; resizing later keeps the user's view.
   useLayoutEffect(() => {
-    const { center, bounds } = network
-    const { width, height } = get().size
-    camera.position.set(center.x, fitDistance(bounds, width / height, camera.fov), center.z + 0.001)
-    controls.current?.target.set(center.x, 0, center.z)
+    const { distance, target } = frameBounds(network.bounds, get().size, insets, camera.fov)
+    camera.position.set(target.x, distance, target.z + 0.001)
+    controls.current?.target.set(target.x, 0, target.z)
     controls.current?.update()
+    // Only the opening view; later inset or size changes keep the user's view.
   }, [camera, get, network])
 
   useLayoutEffect(() => {
@@ -60,7 +62,9 @@ export function CameraRig({ network }: CameraRigProps) {
     camera.updateProjectionMatrix()
   }, [camera, maxDistance])
 
-  useEffect(() => {
+  // Layout effect, not a passive one: a frame between the select and a passive effect would see
+  // the new focus with no flight and drop it again (the camera is still far out).
+  useLayoutEffect(() => {
     if (!flyRequest) return
     const station = network.stationById.get(flyRequest.stationId)
     if (!station) throw new Error(`Fly request for unknown station "${flyRequest.stationId}"`)

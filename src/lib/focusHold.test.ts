@@ -27,4 +27,10 @@ describe('shouldReleaseHold', () => {
     expect(shouldReleaseHold(HOLD, 2000, { x: 300, z: 300 })).toBe(false)
     expect(shouldReleaseHold(HOLD, 1500, { x: 100, z: 100 })).toBe(false)
   })
+
+  it('releases on a smaller pan once zoomed in after the interrupt', () => {
+    // 450 m is under 0.3 x 2000 m but over 0.3 x 1000 m.
+    expect(shouldReleaseHold(HOLD, 2000, { x: 550, z: 100 })).toBe(false)
+    expect(shouldReleaseHold(HOLD, 1000, { x: 550, z: 100 })).toBe(true)
+  })
 })
