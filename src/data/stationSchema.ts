@@ -72,7 +72,10 @@ export interface Connector {
   /** Elevators/escalators use the MTA equipment code ("EL358"), the join key for live outages. */
   id: string
   kind: ConnectorKind
-  /** y(lower.level) < y(upper.level). Elevators have identical x/z at both ends. */
+  /**
+   * y(lower.level) < y(upper.level). Elevators, and escalators from the E&E inventory, have identical x/z
+   * at both ends (the renderer gives such an escalator a 30 degree run).
+   */
   lower: Endpoint
   upper: Endpoint
   /** Meters across the direction of travel; elevators: shaft side length. */

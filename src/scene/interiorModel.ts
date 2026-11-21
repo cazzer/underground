@@ -1,11 +1,11 @@
 import { Color } from 'three'
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
-import { interiorBounds, interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
+import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { buildInteriorBuffers, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
 import { toGround, type Ground } from '../lib/projection'
 import { mixHex } from '../lib/routeColor'
 import { ISO_POLAR } from '../lib/tilt'
-import { theme } from '../theme'
+import { MACHINE_DEPTH_FADE_SHARE, theme } from '../theme'
 import { interiorLook } from './interiorLook'
 import { machineLook } from './machineLook'
 
@@ -38,12 +38,13 @@ const ROLE_TOKEN: Record<InteriorRole, string> = {
 
 const HULL_PAD = 6
 
-/** Linear RGB per role and level: deeper levels mix toward the background (mixed in sRGB). */
+/** Linear RGB per role and level: deeper levels mix toward the background (mixed in sRGB); machines fade less. */
 function colorTable(levels: number): (role: InteriorRole, levelIndex: number) => Rgb {
   const table = new Map<string, Rgb>()
   for (const [role, token] of Object.entries(ROLE_TOKEN)) {
     for (let i = 0; i < levels; i++) {
-      const fade = levels > 1 ? (theme.interiorDepthFade * i) / (levels - 1) : 0
+      const share = role === 'elevator' || role === 'escalator' ? MACHINE_DEPTH_FADE_SHARE : 1
+      const fade = levels > 1 ? (theme.interiorDepthFade * share * i) / (levels - 1) : 0
       const c = new Color(mixHex(token, theme.background, fade))
       table.set(`${role}:${i}`, [c.r, c.g, c.b])
     }
@@ -73,7 +74,7 @@ function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buff
   return { positions, colors }
 }
 
-/** Builds the drawable model; throws (naming the element) on inconsistent interior data. */
+/** Builds the drawable model; throws (naming the element) on inconsistent interior data or nothing to draw. */
 export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const { yScale } = interiorLook
   const colorOf = colorTable(interior.levels.length)
@@ -86,8 +87,6 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     machines: machineLook.style,
     colorOf,
   })
-  // Throws for an interior with nothing to draw, so it becomes an error load.
-  interiorBounds(interior)
   const origin = toGround(interior.anchor)
   const hull =
     interiorLook.veil === 'footprint'

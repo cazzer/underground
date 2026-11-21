@@ -3,13 +3,13 @@
  * `.ts` import paths: scripts/lib/interiorRegistry.test.ts (nodenext) loads this file.
  */
 import type { LocalPoint, StationInterior } from '../data/stationSchema.ts'
+import { stationAxis } from './interiorAxis.ts'
 import { interiorBounds } from './interiorFraming.ts'
 import {
   drawElevatorShaft,
   drawElevatorStop,
   drawEscalator,
   drawRamp,
-  stationAxis,
   type ConnectorContext,
   type MachineStyle,
 } from './interiorConnectors.ts'
@@ -58,7 +58,10 @@ export function buildInteriorBuffers(
   const strong = new SegmentWriter()
   const fine = new SegmentWriter()
 
+  // Also throws for an interior with nothing to draw, so it becomes an error load.
   const bounds = interiorBounds(interior)
+  const entrances = new Map<string, LocalPoint>()
+  for (const e of interior.entrances) for (const id of e.connectors) entrances.set(id, [e.x, e.z])
   const ctx: ConnectorContext = {
     strong,
     fine,
@@ -68,6 +71,7 @@ export function buildInteriorBuffers(
     colorOf,
     axis: stationAxis(interior),
     center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
+    entranceOf: (id) => entrances.get(id),
     machines: opts.machines,
   }
 

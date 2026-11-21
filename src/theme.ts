@@ -48,8 +48,10 @@ export interface Theme {
   interiorEntrance: string
   interiorFine: string
   /**
-   * Station interior machines: elevators and escalators. Each is at least 3:1 on the background and
-   * apart from the other interior tokens and statusError, which 9wc.5 will use for outages (theme.test.ts).
+   * Station interior machines: elevators and escalators. Each stays at least 3:1 on the background on the
+   * deepest level (faded by `interiorDepthFade × MACHINE_DEPTH_FADE_SHARE`), and apart from the other interior
+   * tokens and statusError (which 9wc.5 will use for outages), also under simulated red-green color
+   * blindness (theme.test.ts).
    */
   interiorElevator: string
   interiorEscalator: string
@@ -59,6 +61,9 @@ export interface Theme {
   /** 0..1: how far the deepest level's strokes mix toward the background (depth cue). */
   interiorDepthFade: number
 }
+
+/** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
+export const MACHINE_DEPTH_FADE_SHARE = 0.5
 
 const mono = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
 
@@ -132,7 +137,7 @@ export const THEMES = {
     interiorEntrance: '#a63d2f',
     interiorFine: '#8a8370',
     interiorElevator: '#1d6f8f',
-    interiorEscalator: '#4a7a2a',
+    interiorEscalator: '#7b2cbf',
     interiorLineWidth: 1.25,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,
@@ -169,7 +174,7 @@ export const THEMES = {
     interiorEntrance: '#ffffff',
     interiorFine: '#1f9940',
     interiorElevator: '#ff66cc',
-    interiorEscalator: '#ffd84a',
+    interiorEscalator: '#33ccff',
     interiorLineWidth: 1.5,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,

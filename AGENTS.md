@@ -125,8 +125,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
   - `interiorGeometry.ts` interior to strong/fine line buffers (levels, outlines, entrances);
-    `interiorConnectors.ts` stairs, ramps, escalators (a zero-run one gets a 30 degree run along
-    `stationAxis`) and elevators (shaft once, a stop at each end in that level's pass);
+    `interiorConnectors.ts` stairs, ramps, escalators (a zero-run one gets a 30 degree run along the
+    station axis, from its listing entrance or centered, descending toward the plan center) and elevators
+    (shaft squared to the axis, a stop at each end in that level's pass; machines take half the depth fade);
+    `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;
     `interiorSegments.ts` the shared segment writer; `interiorFixture.ts` the tests' mini interior;
     `interiorFraming.ts` bounds, focus anchor (plan center, toward-camera shift, half-extent), level
     labels, padded hull; `interiorReveal.ts` distance to interior opacity. These have `.ts` imports
@@ -331,7 +333,8 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   `slabs` are mezzanines and other walkable floors.
 - `connectors` (stair, escalator, elevator, ramp) have `lower`/`upper` endpoints `{x, z, level}` and a
   `width`. Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
-  outages. Elevators have identical x/z at both ends.
+  outages. Elevators, and escalators from the E&E inventory, have identical x/z at both ends (the renderer
+  gives such an escalator a 30 degree run, pinned at its street entrance when one lists it).
 - `entrances` are street-level points (raw NY Open Data type, entry/exit) listing the `connectors`
   that reach them.
 - Every element has `sources` (`osm`, `nyopendata`, `authored`). The whole file is ODbL 1.0 and carries

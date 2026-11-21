@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Connector } from '../data/stationSchema'
-import { doorSide, stationAxis } from './interiorConnectors'
+import { stationAxis } from './interiorAxis'
+import { doorSide } from './interiorConnectors'
 import { buildInteriorBuffers, type Buffers, type InteriorRole, type MachineStyle } from './interiorGeometry'
 import { count, ELEVATOR, fixture, opts, ROLES, seg } from './interiorFixture'
 
@@ -59,10 +60,27 @@ describe('elevators', () => {
   })
 
   it('picks the shaft side facing the center, south when the shaft sits on it', () => {
-    expect(doorSide(ELEVATOR, [10, 1])).toBe(1)
-    expect(doorSide(ELEVATOR, [-10, 1])).toBe(3)
-    expect(doorSide(ELEVATOR, [3, -10])).toBe(0)
-    expect(doorSide(ELEVATOR, [3, 0])).toBe(2)
+    expect(doorSide(ELEVATOR, [10, 1], [1, 0])).toBe(1)
+    expect(doorSide(ELEVATOR, [-10, 1], [1, 0])).toBe(3)
+    expect(doorSide(ELEVATOR, [3, -10], [1, 0])).toBe(0)
+    expect(doorSide(ELEVATOR, [3, 0], [1, 0])).toBe(2)
+    // Along a north-south axis, side 1 faces south and side 2 west.
+    expect(doorSide(ELEVATOR, [3, 10], [0, 1])).toBe(1)
+    expect(doorSide(ELEVATOR, [-10, 0], [0, 1])).toBe(2)
+    expect(doorSide(ELEVATOR, [3, 0], [0, 1])).toBe(1)
+  })
+
+  it('squares the shaft to the station axis', () => {
+    const i = fixture([ELEVATOR])
+    // A platform running along (0.6, 0.8).
+    const outline: [number, number][] = [[-12, -16], [12, 16], [9.6, 17.8], [-14.4, -14.2]]
+    const { strong } = buildInteriorBuffers({ ...i, platforms: [{ ...i.platforms[0]!, outline }] }, opts({ guides: false }))
+    const verticals = withRole(strong, 'elevator').map((k) => seg(strong, k)).filter((s) => s[1] !== s[4])
+    for (const s of verticals) {
+      const [du, dv] = [(s[0]! - 3) * 0.6 + s[2]! * 0.8, -(s[0]! - 3) * 0.8 + s[2]! * 0.6]
+      expect(Math.abs(du)).toBeCloseTo(1)
+      expect(Math.abs(dv)).toBeCloseTo(1)
+    }
   })
 
   it('writes each stop in its own level pass: the upper stop after the mezzanine outline', () => {
@@ -98,31 +116,39 @@ describe('elevators', () => {
 })
 
 describe('escalators', () => {
-  it('look A: a band in the escalator color, raised handrails with newels, no step hatch', () => {
+  it('look A: a band in the escalator color, handrails at their real height, no step hatch', () => {
     const { strong, fine } = machines([ESCALATOR])
     const band = withRole(strong, 'escalator')
     expect(seg(strong, band[0]!)).toEqual([0, -8, 11, 6, 0, 11])
     expect(Array.from(strong.colors.subarray(band[0]! * 6, band[0]! * 6 + 6))).toEqual([8, 1, 0, 8, 0, 0])
     expect(withRole(fine, 'step')).toHaveLength(0)
-    expect(withRole(fine, 'escalator')).toHaveLength(6)
+    expect(withRole(fine, 'escalator')).toHaveLength(2)
     const rail = seg(fine, 0)
-    expect(rail[1]).toBeCloseTo(-8 + 0.9 * 2)
-    expect(rail[4]).toBeCloseTo(0.9 * 2)
+    expect(rail[1]).toBeCloseTo(-8 + 0.9)
+    expect(rail[4]).toBeCloseTo(0.9)
     expect(rail[2]).toBeCloseTo(10 - 0.6)
   })
 
-  it('points chevrons in the travel direction, one per 3 m of run', () => {
-    const apexAndBack = (travel: Connector['travel']) => {
-      const { strong } = machines([{ ...ESCALATOR, travel }])
-      return withRole(strong, 'escalator').slice(4).map((k) => seg(strong, k))
-    }
-    const up = apexAndBack('up')
-    expect(up).toHaveLength(4)
-    for (const s of up) expect(s[3]! - s[0]!).toBeCloseTo(0.8)
-    const down = apexAndBack('down')
-    expect(down).toHaveLength(4)
-    for (const s of down) expect(s[3]! - s[0]!).toBeCloseTo(-0.8)
-    expect(apexAndBack(undefined)).toHaveLength(0)
+  const chevrons = (c: Connector) => {
+    const { strong } = machines([c])
+    return withRole(strong, 'escalator').slice(4).map((k) => seg(strong, k))
+  }
+
+  it('points 1.5 m chevrons in the travel direction, one per 4.5 m of run, arms at the band edges', () => {
+    const up = chevrons(ESCALATOR)
+    expect(up).toHaveLength(2)
+    for (const s of up) expect(s[3]! - s[0]!).toBeCloseTo(1.5)
+    expect(up.map((s) => s[2]!).sort((a, b) => a - b)).toEqual([9, 11])
+    const down = chevrons({ ...ESCALATOR, travel: 'down' })
+    expect(down).toHaveLength(2)
+    for (const s of down) expect(s[3]! - s[0]!).toBeCloseTo(-1.5)
+    expect(chevrons({ ...ESCALATOR, travel: undefined })).toHaveLength(0)
+    expect(chevrons({ ...ESCALATOR, upper: { ...ESCALATOR.upper, x: 9.5 } })).toHaveLength(4)
+  })
+
+  it('keeps a chevron within 0.4 of a short run', () => {
+    const short = chevrons({ ...ESCALATOR, upper: { ...ESCALATOR.upper, x: 3 } })
+    for (const s of short) expect(s[3]! - s[0]!).toBeCloseTo(1.2)
   })
 
   it('lays a zero-run escalator at 30 degrees along the platform axis, centered on its point', () => {
@@ -135,9 +161,35 @@ describe('escalators', () => {
     expect(side[5]).toBeCloseTo(11)
   })
 
+  const zeroRunAt = (x: number) => ({ ...ESCALATOR, lower: { ...ESCALATOR.lower, x }, upper: { ...ESCALATOR.upper, x } })
+  /** [lower x, upper x] of a zero-run escalator's first band side. */
+  const ends = (i: ReturnType<typeof fixture>) => {
+    const { strong } = buildInteriorBuffers(i, opts({ guides: false }))
+    const s = seg(strong, withRole(strong, 'escalator')[0]!)
+    return [s[0]!, s[3]!]
+  }
+
+  it('descends a zero-run escalator toward the plan center', () => {
+    const half = (4 * Math.sqrt(3)) / 2
+    const [east, eastUp] = ends(fixture([zeroRunAt(10)]))
+    expect(east).toBeCloseTo(10 - half)
+    expect(eastUp).toBeCloseTo(10 + half)
+    const [west, westUp] = ends(fixture([zeroRunAt(-10)]))
+    expect(west).toBeCloseTo(-10 + half)
+    expect(westUp).toBeCloseTo(-10 - half)
+  })
+
+  it('pins a zero-run escalator at the street entrance that lists it, running toward the center', () => {
+    const i = fixture([zeroRunAt(10)])
+    const listed = { ...i, entrances: [{ ...i.entrances[0]!, connectors: ['ES1'] }] }
+    const [lower, upper] = ends(listed)
+    expect(upper).toBeCloseTo(9)
+    expect(lower).toBeCloseTo(9 - 4 * Math.sqrt(3))
+  })
+
   it('look B: band and chevrons, nothing fine; look C: band, centerline and one arrow head', () => {
     const b = machines([ESCALATOR], B)
-    expect(count(b.strong) - BASE_STRONG).toBe(4 + 2 * 2)
+    expect(count(b.strong) - BASE_STRONG).toBe(4 + 2)
     expect(count(b.fine)).toBe(0)
     const c = machines([ESCALATOR], C)
     expect(count(c.strong) - BASE_STRONG).toBe(4 + 1 + 2)
@@ -149,12 +201,22 @@ describe('escalators', () => {
 })
 
 describe('stationAxis', () => {
-  it('follows the longest edge of the longest platform, pointing east', () => {
+  it('follows the length of the longest platform, pointing east', () => {
     const i = fixture()
     const diagonal = [[0, 0], [-30, -40], [-31, -39], [-1, 1]] as [number, number][]
     const axis = stationAxis({ ...i, platforms: [{ ...i.platforms[0]!, outline: diagonal }] })
     expect(axis[0]).toBeCloseTo(0.6)
     expect(axis[1]).toBeCloseTo(0.8)
+  })
+
+  it('reads a subdivided outline along its length, not along a long end cap', () => {
+    // 40 m by 8 m, long sides split into 4 m edges: the 8 m end caps are the longest single edges.
+    const north = Array.from({ length: 11 }, (_, k): [number, number] => [-20 + 4 * k, -4])
+    const south = Array.from({ length: 11 }, (_, k): [number, number] => [20 - 4 * k, 4])
+    const i = fixture()
+    const axis = stationAxis({ ...i, platforms: [{ ...i.platforms[0]!, outline: [...north, ...south] }] })
+    expect(axis[0]).toBeCloseTo(1)
+    expect(axis[1]).toBeCloseTo(0)
   })
 
   it('falls back to +x with no platforms', () => {
