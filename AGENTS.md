@@ -38,8 +38,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `npm --prefix worker run typecheck` / `test` / `gen`: `gen` regenerates `src/gen/`
   from `proto/subway-rt.proto`
 - Root `npm test` does not run worker tests; the `worker` CI job does.
-- Deploying the Worker is manual (`wrangler deploy`, needs the user's Cloudflare login).
-  Agents never deploy.
+- Worker deploys are controlled by GitHub Actions: the `worker-deploy` job in `deploy.yml` runs
+  `wrangler deploy` on every push to `main` after the `worker` checks pass, using the repo secrets
+  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (skipped with a warning while they're unset).
+  Agents never run `wrangler deploy` or `wrangler login` themselves; merging to `main` is the deploy.
+- The Pages build reads the repo variable `VITE_RT_URL` (the deployed Worker's `/rt` URL).
 - The Worker's Cache API layer is a no-op on workers.dev; edge caching needs a custom
   domain (tracked in 8x4.5). The per-isolate memo and upstream `cf.cacheTtl` still apply.
 - The client finds the Worker through `VITE_RT_URL` (copy `.env.example` to `.env.local`).
