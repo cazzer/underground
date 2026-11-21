@@ -97,6 +97,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `LocateButton.tsx` the header's location button (shows locating and located); `LocateStatus.tsx` its message (the sentence alone is the always-mounted live region)
   with a "Go to <nearest station>" action and a clear ×
   `InteriorStatus.tsx` the panel's station-layout line (loading, error with Retry, ready, zoom-in hint)
+  `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a combobox over a
+  listbox of `SearchResult.tsx` rows (name plus route chips, which tell duplicate names apart); choosing a result
+  calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). `useKeyboardInset.ts`
+  pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
+  location message
   `OrbitHint.tsx` the panel's turn hint (right- or Shift-drag; two fingers on a coarse pointer)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
@@ -116,6 +121,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always 180 m,
     at the current azimuth) in the screen area the header, footer and station panel leave free;
     `orbitLimits.ts` azimuth window, spring to north-up, soft pan radius, focus-point pivot
+  - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
+    `stationSearch.ts` ranks stations for a query (exact, prefix, typo-tolerant; a number only prefix-matches as the
+    last word and never with an explicit ordinal, so "14 st" and "14th" skip 145 St; half-typed long forms and ordinals
+    like "14 stre" and "14t" keep matching). `stationHash.ts` parses and builds `#station=<id>`
   - `focus.tsx` focused/dismissed-station React context (not pure); it also carries point flights
     (`flyToPoint`, used by the location button; drops focus, so an orbited view springs back north-up during the flight). In dev only it exposes
     `window.__underground.select(stationId)` for screenshots and Playwright checks
@@ -171,6 +180,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `RT_URL` is set), `useRealtimeFeed` (one request at a time; a hidden tab aborts and stops polling, becoming
   visible polls at once), `prepareTrips` once per snapshot, and `deriveLiveStatus`. `realtimeFetch.ts` fetches and
   validates one snapshot (the Worker doesn't expose `Retry-After`/`X-Rt-Cache` cross-origin yet; the client copes)
+- `src/data/useStationHash.ts` keeps `#station=<id>` and the focused station in step with `history.replaceState`
+  (no history entries): reads on mount and `hashchange`, writes on every focus change; an unknown id clears the
+  hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
 - `src/data/interiorRegistry.ts` ids with a `public/data/stations/` file: add one whenever
   `data:stations` writes a new file (`scripts/lib/interiorRegistry.test.ts` enforces it);
   `loadStationInterior.ts` fetch and outer-shape check; `interiorCache.ts` one promise per id, failures

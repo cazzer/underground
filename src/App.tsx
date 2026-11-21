@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useLive } from './data/useLive'
 import { useNetwork } from './data/useNetwork'
 import { useLocate } from './data/useLocate'
+import { useStationHash } from './data/useStationHash'
 import { useStationInterior } from './data/useStationInterior'
 import { FocusProvider, useFocus } from './lib/focus'
 import { markedPlacement } from './lib/locate'
@@ -25,6 +26,7 @@ function MapView({ network, live }: MapViewProps) {
   const { focusedId, flyToPoint } = useFocus()
   const locate = useLocate(network, flyToPoint)
   const interior = useStationInterior(focusedId)
+  const stationHash = useStationHash(network)
   // The scene waits for the HUD's measured insets so its opening view can frame around them.
   const [insets, setInsets] = useState<Insets | null>(null)
   // If the HUD crashes before measuring itself, the scene still mounts, framed with no HUD bands.
@@ -58,6 +60,7 @@ function MapView({ network, live }: MapViewProps) {
           onInsets={setInsets}
           onPanel={setPanel}
           locate={locate}
+          linkNotice={{ show: stationHash.linkNotice, onDismiss: stationHash.dismissLinkNotice }}
           interior={{ load: interior.load, revealed: interiorRevealed, onRetry: interior.retry }}
         />
       </ErrorBoundary>
