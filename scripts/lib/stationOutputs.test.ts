@@ -21,7 +21,6 @@ const OPTIONS = {
   railDrop: RAIL_DROP_M,
   entranceSize: 2.5,
   guides: true,
-  machines: { escalator: 'rails', elevator: 'cab' } as const,
   colorOf: () => [1, 1, 1] as const,
 }
 

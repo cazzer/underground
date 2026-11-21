@@ -12,12 +12,10 @@ import {
   drawEscalator,
   drawRamp,
   type ConnectorContext,
-  type MachineStyle,
 } from './interiorConnectors.ts'
 import { SegmentWriter, type Buffers, type InteriorRole, type Rgb } from './interiorSegments.ts'
 
 export type { Buffers, InteriorRole, Rgb } from './interiorSegments.ts'
-export type { MachineStyle } from './interiorConnectors.ts'
 
 /** Estimated drop from the platform edge to the rail head, meters: where the interior draws its tracks. */
 export const RAIL_DROP_M = 1.1
@@ -36,8 +34,6 @@ export interface InteriorBufferOptions {
    * the slab outline repeated at street level joining their tops. Platforms get none.
    */
   guides: boolean
-  /** How escalators and elevators are drawn (TEMPORARY choice, see machineLook.ts). */
-  machines: MachineStyle
   /**
    * TEMPORARY (approxLook.ts, look B): mark platform and slab outlines, the slab guides and their street-level copy
    * as dashed in `distances` (tracks stay solid). Positions and colors are the same either way.
@@ -84,7 +80,6 @@ export function buildInteriorBuffers(
     axis: stationAxis(interior),
     center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
     anchorOf: (id) => anchors.get(id),
-    machines: opts.machines,
   }
 
   for (let li = interior.levels.length - 1; li >= 0; li--) {

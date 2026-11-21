@@ -77,7 +77,6 @@ export const opts = (over: Partial<InteriorBufferOptions> = {}): InteriorBufferO
   railDrop: 1.1,
   entranceSize: 2.5,
   guides: true,
-  machines: { escalator: 'rails', elevator: 'cab' },
   colorOf: (role, i) => [ROLES.indexOf(role), i, 0],
   ...over,
 })

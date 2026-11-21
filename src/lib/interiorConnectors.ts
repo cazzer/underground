@@ -1,16 +1,9 @@
 /**
  * Stairs, ramps, escalators and elevators as segments in the interior's strong and fine layers.
  * `.ts` import paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
- * TEMPORARY: the unchosen `MachineStyle` branches go once the 9wc.8 look card is decided (see machineLook.ts).
  */
 import type { Connector, LocalPoint } from '../data/stationSchema.ts'
 import { lerp, lerpRgb, type InteriorRole, type Rgb, type SegmentWriter, type Vec3 } from './interiorSegments.ts'
-
-/** A: rails and cab; B: plain band and box; C: plan symbols (centerline arrow, crossed square). */
-export interface MachineStyle {
-  escalator: 'rails' | 'band' | 'arrow'
-  elevator: 'cab' | 'box' | 'cross'
-}
 
 export interface ConnectorContext {
   strong: SegmentWriter
@@ -30,7 +23,6 @@ export interface ConnectorContext {
   center: LocalPoint
   /** Where a zero-run escalator's run sits (`spreadBanks`); undefined for every other connector. */
   anchorOf: (connectorId: string) => RunAnchor | undefined
-  machines: MachineStyle
 }
 
 /**
@@ -150,22 +142,14 @@ function chevron(ctx: ConnectorContext, g: Incline, apex: number, depth: number)
   ctx.strong.segment(g.at(back, CHEVRON_SIDE), tip, cBack, cTip)
 }
 
-/** Escalators: the band, plus handrails (A), travel chevrons (A, B) or a centerline arrow (C). */
+/** Escalators: the band, handrails and, when the travel direction is known, travel chevrons. */
 export function drawEscalator(ctx: ConnectorContext, c: Connector, li: number, ui: number): void {
   const g = incline(ctx, c, li, ui)
-  const style = ctx.machines.escalator
   band(ctx, g, 'escalator')
   // A fraction of the run, signed so that a chevron opens back from the travel direction.
   const depth = (c.travel === 'down' ? -1 : 1) * Math.min(CHEVRON_DEPTH_M / g.run, CHEVRON_MAX_DEPTH)
-  if (style === 'arrow') {
-    ctx.strong.segment(g.at(0, 0), g.at(1, 0), g.color('escalator', 0), g.color('escalator', 1))
-    if (c.travel) chevron(ctx, g, depth > 0 ? 1 : 0, depth)
-    return
-  }
-  if (style === 'rails') {
-    const [c0, c1] = [g.color('escalator', 0), g.color('escalator', 1)]
-    for (const side of [-RAIL_SIDE, RAIL_SIDE]) ctx.fine.segment(g.at(0, side, RAIL_HEIGHT_M), g.at(1, side, RAIL_HEIGHT_M), c0, c1)
-  }
+  const [c0, c1] = [g.color('escalator', 0), g.color('escalator', 1)]
+  for (const side of [-RAIL_SIDE, RAIL_SIDE]) ctx.fine.segment(g.at(0, side, RAIL_HEIGHT_M), g.at(1, side, RAIL_HEIGHT_M), c0, c1)
   if (!c.travel) return
   const n = Math.max(1, Math.floor(g.run / CHEVRON_SPACING_M))
   for (let k = 0; k < n; k++) chevron(ctx, g, (k + 0.5) / n + depth / 2, depth)
@@ -181,16 +165,12 @@ function shaftCorners(c: Connector, axis: LocalPoint, inset = 0): LocalPoint[] {
   return [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)]
 }
 
-/** Elevator shaft from its lower to its upper level: four strong corner verticals (A, B) or one fine center line (C). */
+/** Elevator shaft from its lower to its upper level: four strong corner verticals. */
 export function drawElevatorShaft(ctx: ConnectorContext, c: Connector, li: number, ui: number): void {
   const yL = ctx.realY(li) * ctx.yScale
   const yU = ctx.realY(ui) * ctx.yScale
   const cL = ctx.colorOf('elevator', li)
   const cU = ctx.colorOf('elevator', ui)
-  if (ctx.machines.elevator === 'cross') {
-    ctx.fine.segment([c.lower.x, yL, c.lower.z], [c.lower.x, yU, c.lower.z], cL, cU)
-    return
-  }
   for (const [x, z] of shaftCorners(c, ctx.axis)) ctx.strong.segment([x, yL, z], [x, yU, z], cL, cU)
 }
 
@@ -214,21 +194,11 @@ export function doorSide(c: Connector, center: LocalPoint, axis: LocalPoint): nu
   return dv > 0 ? 2 : 0
 }
 
-/** One served level of an elevator: a doored square and its cab (A), a square (B) or a crossed square (C). */
+/** One served level of an elevator: a doored square and its cab. */
 export function drawElevatorStop(ctx: ConnectorContext, c: Connector, levelIndex: number): void {
   const y = ctx.realY(levelIndex) * ctx.yScale
   const color = ctx.colorOf('elevator', levelIndex)
   const corners = shaftCorners(c, ctx.axis)
-  const style = ctx.machines.elevator
-  if (style !== 'cab') {
-    ctx.strong.loop(corners, y, color)
-    if (style === 'cross') {
-      const [a, b, d, e] = corners as [LocalPoint, LocalPoint, LocalPoint, LocalPoint]
-      ctx.strong.segment([a[0], y, a[1]], [d[0], y, d[1]], color)
-      ctx.strong.segment([b[0], y, b[1]], [e[0], y, e[1]], color)
-    }
-    return
-  }
   const door = doorSide(c, ctx.center, ctx.axis)
   const edge = (1 - DOOR_GAP) / 2
   for (let i = 0; i < 4; i++) {
