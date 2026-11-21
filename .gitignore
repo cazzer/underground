@@ -13,3 +13,6 @@ coverage
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# GTFS zips are inputs only, never committed
+*.zip

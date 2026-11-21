@@ -19,7 +19,9 @@ so dev and preview serve under that path.
 - `npm run build`: `tsc -b && vite build` to `dist/`
 - `npm run preview`: serve the production build
 - `npm test`: Vitest, run once
-- `npm run typecheck`: `tsc --noEmit`
+- `npm run typecheck`: `tsc --noEmit` for `src/`, then `tsc --noEmit -p scripts`
+- `npm run data [-- --zip path]`: rebuild `public/data/*.json` from the regular GTFS zip
+  (downloads it unless `--zip` or `$GTFS_ZIP` is given; needs Node >= 22.18). Never commit the zip.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -37,18 +39,21 @@ via `.github/workflows/deploy.yml` (Actions to Pages).
     transitions; `pingPong.ts` triangle wave
   - `focus.tsx` focused/dismissed-station React context (not pure)
 - `src/data/sample.ts`: sample lines and stations in lat/lon
-- `public/data/`: (planned) preprocessed static JSON
-- `scripts/`: (planned) data preprocessing
+- `src/data/schema.ts`: types of the six `public/data/*.json` files; `src/data/codec.ts`: shared
+  pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
+- `public/data/`: preprocessed static JSON (generated; `npm run data`)
+- `scripts/`: `build-data.ts` (the only IO) and pure transforms in `scripts/lib/`, tests colocated
 - `worker/`: (planned) Cloudflare Worker CORS proxy for MTA realtime feeds
 - `docs/research/`: research notes (`data-sources.md`)
 
 ## Hard rules
-- Files stay at or under 300 lines (aim for 200). Split before exceeding.
+- Hand-written source files stay at or under 300 lines (aim for 200). Split before exceeding.
+  Generated JSON in `public/data/` is exempt; it keeps one entry per line so refresh diffs stay small.
 - Tests only where they verify real functionality: pure logic and data transforms.
   No snapshot tests, no component tests by default. Colocate as `*.test.ts`.
 - No backend, except the planned `worker/` CORS proxy. The site is static.
 - Static data is preprocessed into small JSON under `public/data/` by scripts in
-  `scripts/` (planned). Never ship raw GTFS or other large source files.
+  `scripts/`. Never ship raw GTFS or other large source files.
 - No ESLint/Prettier, routing library, or state library until there is a reason.
   React state/context is enough.
 - Named exports, interface for props, no `any`, no silent error handling.
@@ -110,7 +115,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
-  into `public/data/*.json` (about 35 KB gzipped).
+  into `public/data/*.json` (about 57 KB gzipped; the build fails above 60 KB).
 - **Station interiors are hand-authored per station.** They're merged with OSM platform
   polygons, NY Open Data entrances, and E&E elevator/escalator data. The starter
   stations are Bedford Av, 1 Av, 96 St (Q), and Park Pl.

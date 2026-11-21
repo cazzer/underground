@@ -6,5 +6,5 @@ export default defineConfig({
   base: '/underground/',
   plugins: [react(), tailwindcss()],
   build: { chunkSizeWarningLimit: 1500 }, // three.js alone is ~700 kB
-  test: { environment: 'node', include: ['src/**/*.test.ts'] },
+  test: { environment: 'node', include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'] },
 })
