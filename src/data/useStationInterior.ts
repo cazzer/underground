@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { buildInteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
 import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
-import { showGenerated } from './generatedLook'
-import { loadStationIndex, withoutGenerated } from './loadStationIndex'
+import { loadStationIndex } from './loadStationIndex'
 import { loadStationInterior } from './loadStationInterior'
 
 export type { InteriorLoad } from './interiorLoad'
@@ -21,8 +20,7 @@ const cache = createInteriorCache((id) =>
 
 /** The station index, fetched once per page load (a constant key); a failure is evicted so Retry refetches. */
 const INDEX_KEY = 'index'
-// TEMPORARY (generatedLook.ts): generated stations are unlisted unless `?generated=1`.
-const indexCache = createInteriorCache(() => loadStationIndex(BASE_URL).then((i) => (showGenerated ? i : withoutGenerated(i))))
+const indexCache = createInteriorCache(() => loadStationIndex(BASE_URL))
 
 const INDEX_LOADING: IndexLoad = { status: 'loading' }
 

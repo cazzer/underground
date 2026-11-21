@@ -7,7 +7,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { ShapesFile, StationsFile } from '../../src/data/schema.ts'
-import type { StationDepthsFile, StationInterior } from '../../src/data/stationSchema.ts'
+import { decodeStationDepths } from '../../src/data/depthsCodec.ts'
+import type { PackedDepthsFile, StationDepthsFile, StationInterior } from '../../src/data/stationSchema.ts'
 import { toGround, type Ground } from '../../src/lib/projection.ts'
 import { buildPolyline, projectForward } from '../../src/lib/realtime/polyline.ts'
 import { profileRuns } from '../../src/lib/trackAnchors.ts'
@@ -18,12 +19,15 @@ import { RAIL_DROP_M } from '../../src/lib/interiorGeometry.ts'
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
 const shapes = (readJson('../../public/data/shapes.json') as ShapesFile).shapes
-const stations = (readJson('../../public/data/stations.json') as StationsFile).stations
-const depths = readJson('../../public/data/station-depths.json') as StationDepthsFile
+const stationsFile = readJson('../../public/data/stations.json') as StationsFile
+const stations = stationsFile.stations
 const l08 = readJson('../../public/data/stations/L08.json') as StationInterior
 const Y_SCALE = 2
 
 const lines = shapes.map((s) => ({ id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(trackLine(s, TRACK_OFFSET_M)) }))
+// Bedford Av only: the committed depths decoded the way network.ts does, keeping its one station.
+const decoded = decodeStationDepths(readJson('../../public/data/station-depths.json') as PackedDepthsFile, stationsFile, lines).depths
+const depths: StationDepthsFile = { ...decoded, stations: decoded.stations.filter((s) => s.stationId === 'L08') }
 const { runs, unmatched } = profileRuns(
   depths,
   stations.map((s) => ({ id: s.id, routeIds: s.routes })),

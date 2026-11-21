@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Network } from '../lib/network'
 import type { BandedShapes } from '../lib/networkBands'
 import { loadBands } from './loadBands'
-import { showGenerated } from './generatedLook'
 import { loadNetwork, type NetworkFiles } from './loadNetwork'
 import { TRACK_OFFSET_M } from '../lib/trackOffset'
 import { interiorLook } from '../scene/interiorLook'
@@ -21,7 +20,7 @@ export function useNetwork(): { load: NetworkLoad; retry: () => void } {
   useEffect(() => {
     const controller = new AbortController()
     // The interior's vertical scale, so the tracks descend to the rails the interior draws.
-    loadNetwork(import.meta.env.BASE_URL, TRACK_OFFSET_M, interiorLook.yScale, controller.signal, { generatedDepths: showGenerated }).then(
+    loadNetwork(import.meta.env.BASE_URL, TRACK_OFFSET_M, interiorLook.yScale, controller.signal).then(
       ({ network, files }) => {
         if (controller.signal.aborted) return
         const bands = loadBands(network, controller.signal)

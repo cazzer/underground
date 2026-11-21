@@ -9,7 +9,8 @@ shows the station's levels, stairways, and upcoming arrivals.
 
 Status: the real static network (every route shape and station from `public/data/`) renders, and
 trains are live: the client polls the deployed realtime Worker (`worker/`) and draws dots from the
-pure realtime library. The station panel shows real arrivals, and Bedford Av (L08) has an interior.
+pure realtime library. The station panel shows real arrivals. Bedford Av (L08) has a hand-authored interior, and
+about 250 more stations have generated ones (labelled "Estimated layout"), shown to everyone since 9wc.5.
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion.
 
 ## Stack
@@ -34,10 +35,10 @@ so dev and preview serve under that path.
 - `npm run data:stations`: merge `data/stations/*.authored.json` with the pinned `*.sources.json`
   into `public/data/stations/*.json`, generate the template stations from `data/stations/catalog/` plus the
   committed `public/data/shapes.json` and `stations.json` (a hand-authored station wins; it prints each skipped
-  candidate with its reason and each dropped source row), and extract `public/data/station-depths.json` (each platform track's
-  ends and rail height; it counts toward the shared 60 KB budget) from the authored interiors, and
-  `public/data/stations/depths-generated.json` (the same for generated interiors; outside the budget, capped at
-  32 KB gzipped; written even when empty). Offline.
+  candidate with its reason and each dropped source row), and pack `public/data/station-depths.json` (every interior's
+  platform tracks and rail heights; it counts toward the shared 60 KB budget). It prints a `WARNING:` line listing
+  interior tracks no drawn line rides (packed as no track, so the client stays quiet about them), and fails if any
+  track packs more than 2 m off its runs. Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
   pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
@@ -74,10 +75,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
-  TEMPORARY: `?generated=1` shows generated station interiors until 9wc.5 labels them: without it, index entries
-  with `provenance: 'generated'` count as not listed and `stations/depths-generated.json` is never fetched; with
-  it, that file joins the startup fetch batch (its failure only logs) and its depths merge into the track
-  profiles. The removal list is in `src/data/generatedLook.ts`
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
@@ -258,12 +255,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `prepareTrips.ts` per poll: filter, join, plan; returns live trips (each with its `HopPlan`) and
     per-reason drop counts
 - `src/data/loadNetwork.ts` fetches stations/routes/shapes/station-depths JSON and validates their outer shape (a
-  missing depths file fails the load like the others; under `?generated=1` it also fetches
-  `stations/depths-generated.json`, whose failure only logs, and `mergeStationDepths` adds it, authored entries winning);
+  missing depths file fails the load like the others); `depthsCodec.ts` (pure, `.ts` imports for the scripts'
+  encoder) decodes the packed depths in `buildNetwork` against stations.json and the drawn lines into the per-track
+  `StationDepthsFile` that `profileRuns` reads (tracks no shape rides: one `console.warn` line);
   `useNetwork.ts` is the loading/error/ready hook (ready also carries the raw `files` the realtime join needs, and
   `bands`, loadBands.ts' promise; `useBands.ts` resolves it for the map); it passes
-  `TRACK_OFFSET_M` and `interiorLook.yScale` to `buildNetwork`. `generatedLook.ts` TEMPORARY `?generated=` value
-  (reads `window`: only `useNetwork.ts` and `useStationInterior.ts` import it)
+  `TRACK_OFFSET_M` and `interiorLook.yScale` to `buildNetwork`
 - `src/data/useLive.ts` composes live trains for `App`: `useRealtimeStatic` (trip-index + segments, only when
   `RT_URL` is set), `useRealtimeFeed` (one request at a time; a hidden tab aborts and stops polling, becoming
   visible polls at once), `prepareTrips` once per snapshot, and `deriveLiveStatus`. `realtimeFetch.ts` fetches and
@@ -273,7 +270,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
 - `src/data/loadStationIndex.ts` fetches and validates `public/data/stations/index.json` (the ids that have an
   interior; generated by `data:stations`, so nothing is hand-kept; `scripts/lib/stationOutputs.test.ts` checks it
-  against the files; TEMPORARY `withoutGenerated` drops generated entries unless `?generated=1`); `loadStationInterior.ts` fetch and outer-shape check; `interiorCache.ts` one promise per id, failures
+  against the files; authored and generated entries count alike); `loadStationInterior.ts` fetch and outer-shape check; `interiorCache.ts` one promise per id, failures
   evicted; `interiorLoad.ts` the load types (interior and index) and their pure derivation; `useStationInterior.ts` the
   focused station's interior load (the index is fetched once on mount; stations it doesn't list never fetch); `useLocate.ts` the location button's one-shot
   geolocation (on press only, never watched; the fix lives in React state and nowhere else)
@@ -281,8 +278,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and `adaPartial` on the 8 partial stations, from 39hk-dx4f via `scripts/lib/stationAccess.ts`); `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
-- `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`, and
-  `StationDepthsFile` for `public/data/station-depths.json`
+- `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`,
+  `PackedDepthsFile` for `public/data/station-depths.json`, and `StationDepthsFile`, its per-track decoded form
 - `public/data/`: preprocessed static JSON (generated; `npm run data`, `npm run data:stations`)
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
@@ -415,8 +412,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `ShapePath.y` feeds the line buffers, the shapes go through `useLive` to `buildShapeGeometries`, and
   dots, cars and picks take `profileAt` × `BandView.depth` through trackPointInto (never blended by interior opacity);
   the line layers draw it with `scale.y` = the depth factor (floored at 1e-3, `depthScaleY`), and car height
-  (`CarFrame.extrude`) and the pick roof scale by it too, so cars are flat footprints top-down. It is anchored only at authored
-  interiors (`station-depths.json`): flat at the rail height (`level.y - RAIL_DROP_M`, × the interior's yScale)
+  (`CarFrame.extrude`) and the pick roof scale by it too, so cars are flat footprints top-down. It is anchored only at
+  stations with an interior, authored or generated (`station-depths.json`, decoded): flat at the rail height (`level.y - RAIL_DROP_M`, × the interior's yScale)
   along each platform track a shape rides (route serves the station, direction is the stop suffix, both track
   ends within 6 m), smoothstep ramps at a 3% average real grade (horizontal true, so 340 m for Bedford Av's
   10.2 m) to 0, and 0 everywhere else. Close stations ease from one depth to the next. Ramps get the fewest
@@ -480,20 +477,26 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
 - `generated` (`{ archetype, confidence }`) exists only on template-generated interiors (absent = hand-authored);
   generated interiors use `generated` in place of `authored` in `sources`. Their non-street levels carry
   `depthSource`: only `ee-rise` is measured, the rest are estimates (label "≈", see `levelHeightText`). The panel
-  says "Estimated layout" for them. About 260 are committed, shown
-  only under the TEMPORARY `?generated=1` until 9wc.5 labels them.
+  says "Estimated layout" for them. About 250 are committed, shown to everyone.
 - `public/data/stations/index.json` (`StationIndex`) maps each station id with an interior file to its
   `provenance` (`authored` or `generated`). The client fetches it on mount, after the startup files and not
   render-blocking, so it is outside the 60 KB startup budget and has its own cap (the build fails above 8 KB
   gzipped); a station not listed never fetches an interior, and until it loads (or if it fails, retried on the next
   focus change) no station shows an interior panel. The object's key order lists integer-like ids first; don't rely on it. `index` is not a valid station id.
-- `public/data/station-depths.json` (`StationDepthsFile`) is extracted from these files by the same build: per
-  station its anchor and, per track, `stopId`, real `railY` and the path's two ends. ODbL, with the union of the
-  interiors' credits minus the OPEN-NY note, plus its own line ("Some railY values come from E&E rises and are MTA data under
-  the OPEN-NY Terms of Use") only when a platform level's `depthSource` is `ee-rise`. It covers the authored
-  interiors only. `public/data/stations/depths-generated.json` is the same format for the generated ones, outside
-  the 60 KB budget (the build fails above 32 KB gzipped), always written (`stations: []` when nothing is
-  generated); the client fetches it only under `?generated=1`.
+- `public/data/station-depths.json` (`PackedDepthsFile`, format 2) is packed from every interior, authored and
+  generated, by the same build (`scripts/lib/depthsPack.ts`), small enough for the startup budget. Columns, one entry
+  per station: `station` (stations.json index, delta-coded), `y` (rail height = platform level y - RAIL_DROP_M, in
+  decimeters), and in whole meters along the drawn line of the stop's direction nearest the station's stations.json
+  point, from that point's projection d: the N track runs d + `a` ± `h`, the S track d - `a` + `da` ± (`h` + `dh`).
+  `tracks` overrides a stop the columns don't reproduce with its own `[y, x, z, h]` (centre in meters from the station
+  point, decoded onto the nearest line of its direction within 15 m), or `null` for no track. The encoder decodes every
+  choice and checks the runs `profileRuns` finds against the full per-track ends (`PACK_TOL_M`, 2 m; the committed file
+  is checked to 3 m by `depthsPack.test.ts`). `feedVersion` is stations.json's at packing time: on a mismatch (a stale or
+  mixed deploy) the decoder logs one error and returns no depths, so tracks stay flat and the map still loads; a
+  malformed file (bad index or delta, non-number value, override not four numbers) throws. Since ends land on a drawn line, a sibling shape that just missed the 6 m
+  match may ride too. ODbL, with the union of the interiors' credits minus the OPEN-NY note, plus its own line
+  ("Some railY values come from E&E rises and are MTA data under the OPEN-NY Terms of Use") only when a platform
+  level's `depthSource` is `ee-rise`. It depends on stations.json and shapes.json, so rerun `data:stations` after `data`.
 - Authoring uses a `[u, v]` frame aligned to the platform; the merge converts it. Guesses are marked
   `UNVERIFIED:` in the authored file's `notes`; they are not copied to the output.
 
@@ -542,14 +545,14 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
-  every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (about 58.5 KB
-  today); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
+  every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
+  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), change `public/data`. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).
-- **Station interiors are hand-authored per station.** They're merged with OSM platform
-  polygons, NY Open Data entrances, and E&E elevator/escalator data. The starter
-  stations are Bedford Av, 1 Av, 96 St (Q), and Park Pl.
+- **Station interiors are hand-authored or generated.** Bedford Av (L08) is hand-authored and wins over a generated
+  one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".
+  Both are merged with OSM platform polygons, NY Open Data entrances, and E&E elevator/escalator data.
 - **Attribution.** Credit MTA and show "© OpenStreetMap contributors". Include a
   "may not be real time" notice. Don't use the MTA logo, route bullets, or the map.
