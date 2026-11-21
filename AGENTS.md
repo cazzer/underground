@@ -33,7 +33,9 @@ via `.github/workflows/deploy.yml` (Actions to Pages).
 - `src/ui/Hud.tsx`: Tailwind overlay (title, arrivals panel)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
-  - `network.ts` sample data to routes/stations; `focus.tsx` focused-station context
+  - `network.ts` sample data to routes/stations; `focusMachine.ts` camera-driven focus
+    transitions; `pingPong.ts` triangle wave
+  - `focus.tsx` focused/dismissed-station React context (not pure)
 - `src/data/sample.ts`: sample lines and stations in lat/lon
 - `public/data/`: (planned) preprocessed static JSON
 - `scripts/`: (planned) data preprocessing
@@ -60,8 +62,11 @@ via `.github/workflows/deploy.yml` (Actions to Pages).
 - Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`).
   User rotation is disabled. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
-- Overlay markers/trains draw with `depthTest={false}` plus `renderOrder`; depth
-  precision is too coarse at map zoom for z-offsets to work.
+- Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
+  an explicit `renderOrder`: grid -1, lines 1, station fill 2, station ring 3, trains 4.
+  drei's Grid is transparent, and three.js draws all opaque objects before all transparent
+  ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
+  zoom for z-offsets to work.
 
 ## Agent model routing
 - opus: planning and architecture
