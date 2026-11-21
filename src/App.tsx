@@ -9,7 +9,7 @@ import { markedPlacement } from './lib/locate'
 import type { Insets } from './lib/framing'
 import type { ScreenRect } from './lib/interiorCamera'
 import type { Network } from './lib/network'
-import type { TrackProfile } from './lib/trackProfile'
+import type { DrawnShape } from './lib/realtime/shapeGeometry'
 import { TrainSelectionProvider } from './lib/trainSelection'
 import { Scene } from './scene/Scene'
 import { ErrorBoundary } from './ui/ErrorBoundary'
@@ -71,14 +71,14 @@ function MapView({ network, live }: MapViewProps) {
 }
 
 /** Until the network loads there are no files, so nothing reads these. */
-const NO_PROFILES: ReadonlyMap<string, TrackProfile> = new Map()
+const NO_SHAPES: ReadonlyMap<string, DrawnShape> = new Map()
 
 export function App() {
   const { load, retry } = useNetwork()
   const live = useLive(
     load.status === 'ready' ? load.files : null,
     load.status === 'ready' ? load.network.trackOffsetM : 0,
-    load.status === 'ready' ? load.network.profiles : NO_PROFILES,
+    load.status === 'ready' ? load.network.shapeById : NO_SHAPES,
   )
   return (
     <FocusProvider>

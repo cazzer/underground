@@ -12,7 +12,6 @@ import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
-import { PlatformTrackMask } from './PlatformTrackMask'
 import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
 import { StationTies } from './StationTies'
@@ -50,9 +49,8 @@ export function Scene({ network, insets, live, onLiveError, interior, panel, onI
     >
       <color attach="background" args={[theme.background]} />
       <MapGrid />
-      <SubwayLines network={network} />
+      <SubwayLines network={network} interiorStationId={interior?.stationId ?? null} />
       <StationTies network={network} />
-      {interior && <PlatformTrackMask network={network} stationId={interior.stationId} />}
       <Stations stations={network.stations} />
       <ScenePicker stations={network.stations} trainPick={trainPick} />
       {live && (

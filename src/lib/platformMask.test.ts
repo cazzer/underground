@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { NO_BANDS } from './corridors'
 import type { ShapePath } from './network'
-import { platformMaskBuffers } from './platformMask'
+import { FADE_INPUTS, maskBreaks, writePlatformFade } from './platformMask'
 import { MASK_INSET_M } from './platformSpan'
 import { EMPTY_PROFILE } from './trackProfile'
 
-/** A straight east-running path, 0..400 m, with a sunken stretch: y is -20 between 150 and 250 m. */
-function path(id: string): ShapePath {
-  const xs = [0, 100, 150, 250, 300, 400]
-  const ys = [0, 0, -20, -20, 0, 0]
+/** A straight east-running path with vertices at `xs` (its distances). */
+function path(id: string, xs: number[]): ShapePath {
   return {
     id,
     routeId: 'L',
@@ -16,54 +14,56 @@ function path(id: string): ShapePath {
     primary: true,
     points: xs.map((x) => ({ x, z: 5 })),
     cumulative: xs,
-    length: 400,
-    y: ys,
+    length: xs.at(-1)!,
+    y: xs.map(() => 0),
     profile: EMPTY_PROFILE,
-    band: xs.map(() => 0),
-    bandHalf: xs.map(() => 0),
+    bandInputs: new Float32Array(xs.length * 4),
     bands: NO_BANDS,
   }
 }
 
-const LINE = [1, 0, 0] as const
-const BG = [0, 0, 1] as const
+describe('maskBreaks', () => {
+  it('puts a vertex at both span ends and every 2 m through each ramp', () => {
+    expect(maskBreaks({ d0: 160, d1: 240 })).toEqual([160, 162, 164, 166, 168, 170, 230, 232, 234, 236, 238, 240])
+  })
 
-describe('platformMaskBuffers', () => {
-  const buffers = platformMaskBuffers([path('a'), path('b')], new Map([['a', { d0: 160, d1: 240 }]]), () => LINE, BG)
-  const vertices = Array.from({ length: buffers.positions.length / 3 }, (_, v) => ({
-    x: buffers.positions[v * 3]!,
-    y: buffers.positions[v * 3 + 1]!,
-    z: buffers.positions[v * 3 + 2]!,
-    color: [buffers.colors[v * 3]!, buffers.colors[v * 3 + 1]!, buffers.colors[v * 3 + 2]!],
-  }))
+  it('stays inside a span shorter than two ramps', () => {
+    const b = maskBreaks({ d0: 100, d1: 108 })
+    expect(Math.min(...b)).toBe(100)
+    expect(Math.max(...b)).toBe(108)
+  })
+})
 
-  it('covers exactly the span of the shapes that have one, as joined segments on the drawn line', () => {
-    expect(Math.min(...vertices.map((v) => v.x))).toBeCloseTo(160, 4)
-    expect(Math.max(...vertices.map((v) => v.x))).toBeCloseTo(240, 4)
-    for (const v of vertices) {
-      expect(v.z).toBe(5)
-      expect(v.y).toBeCloseTo(-20, 4)
+describe('writePlatformFade', () => {
+  const xs = [0, 100, ...maskBreaks({ d0: 160, d1: 240 }), 300, 400]
+  const a = path('a', xs)
+  const b = path('b', [0, 400])
+  const first = new Map([
+    ['b', 0],
+    ['a', 1],
+  ])
+  const fade = new Float32Array((1 + xs.length - 1) * FADE_INPUTS).fill(9)
+
+  it('weighs each segment end of the span shapes, and zeroes every other segment', () => {
+    writePlatformFade(fade, [a, b], first, new Map([['a', { d0: 160, d1: 240 }]]))
+    const weightAt = (d: number) => {
+      const i = xs.indexOf(d)
+      return fade[(1 + i - 1) * FADE_INPUTS + 1]!
     }
-    for (let s = 1; s < vertices.length / 2; s++) expect(vertices[2 * s]!.x).toBeCloseTo(vertices[2 * s - 1]!.x, 4)
+    expect([fade[0], fade[1]]).toEqual([0, 0])
+    expect(weightAt(100)).toBe(0)
+    expect(weightAt(160)).toBe(0)
+    expect(weightAt(160 + MASK_INSET_M)).toBe(1)
+    expect(weightAt(240 - MASK_INSET_M)).toBe(1)
+    expect(weightAt(240)).toBe(0)
+    // smoothstep(0.4), 4 m into the ramp.
+    expect(weightAt(164)).toBeCloseTo(0.352, 6)
+    // A segment's start repeats the previous segment's end, so the fade is continuous.
+    for (let i = 2; i < xs.length; i++) expect(fade[(1 + i - 1) * FADE_INPUTS]).toBe(fade[(1 + i - 2) * FADE_INPUTS + 1])
   })
 
-  it('is the line color at the platform ends and the background inside', () => {
-    const at = (x: number) => vertices.find((v) => Math.abs(v.x - x) < 1e-3)!.color
-    expect(at(160)).toEqual([...LINE])
-    expect(at(240)).toEqual([...LINE])
-    expect(at(160 + MASK_INSET_M)).toEqual([...BG])
-    expect(at(240 - MASK_INSET_M)).toEqual([...BG])
-    // Easing in between: smoothstep(0.4) of the way to the background, 4 m in.
-    const mid = at(164)
-    expect(mid[2]).toBeCloseTo(0.352, 6)
-    expect(mid[0]).toBeCloseTo(0.648, 6)
-  })
-
-  it('follows the path height between vertices, and clamps a span to the path', () => {
-    const ramp = platformMaskBuffers([path('a')], new Map([['a', { d0: -50, d1: 125 }]]), () => LINE, BG)
-    const n = ramp.positions.length
-    expect(ramp.positions[0]).toBe(0)
-    expect(ramp.positions[n - 3]).toBeCloseTo(125, 4)
-    expect(ramp.positions[n - 2]).toBeCloseTo(-10, 4)
+  it('clears everything for no station', () => {
+    writePlatformFade(fade, [a, b], first, null)
+    expect([...fade].every((v) => v === 0)).toBe(true)
   })
 })

@@ -1,9 +1,12 @@
-import type { RouteId } from '../data/schema'
+import type { RouteId, ShapeId } from '../data/schema'
 import type { ShapePath } from './network'
 import type { Ground } from './projection'
 import { miterNormals } from './trackOffset'
 
 export type Rgb = readonly [number, number, number]
+
+/** Floats per point in a band-input array (vertexBandInputs). */
+export const BAND_INPUTS = 4
 
 export interface LineBuffers {
   /** Six floats per segment: start xyz, end xyz (y from the shape's profile, `path.y`). */
@@ -11,12 +14,34 @@ export interface LineBuffers {
   /** Six floats per segment, matching `positions`. */
   colors: Float32Array
   /**
-   * Eight floats per segment, the band offset's inputs at the start then the end: the point's miter normal
-   * (right of travel) scaled by its length factor 1 / cosHalf (mx, mz), its band slot (`path.band`) and its
-   * corridor's half-width in slots (`path.bandHalf`). Route
-   * lines carry it (useLineLayer then draws them with the band offset); other line layers leave it out.
+   * Eight floats per segment: the band inputs (vertexBandInputs) of its start, then of its end. Route lines carry
+   * it (useLineLayer then draws them with the band offset); other line layers leave it out.
    */
   bands?: Float32Array
+  /** First segment of each path in the buffers, so a layer can rewrite one shape's per-segment attributes. */
+  firstSegment?: ReadonlyMap<ShapeId, number>
+}
+
+/**
+ * The band offset's inputs at each point, four floats per point: its miter normal (right of travel) scaled by its
+ * length factor 1 / cosHalf (mx, mz), its band slot and its corridor's half-width in slots (corridors.ts). The map
+ * lines (via buildLineBuffers) and the trains (trackPoint.ts) both read these, so they shift alike. A polyline
+ * with no direction (all points equal) has no normal: its miters stay 0 and it is drawn unshifted.
+ */
+export function vertexBandInputs(points: readonly Ground[], band: readonly number[], half: readonly number[]): Float32Array {
+  const out = new Float32Array(points.length * BAND_INPUTS)
+  const miters = miterNormals(points)
+  points.forEach((_, i) => {
+    const m = miters?.[i]
+    const o = i * BAND_INPUTS
+    if (m) {
+      out[o] = m.x / m.cosHalf
+      out[o + 1] = m.z / m.cosHalf
+    }
+    out[o + 2] = band[i]!
+    out[o + 3] = half[i]!
+  })
+  return out
 }
 
 /**
@@ -37,45 +62,21 @@ export function buildLineBuffers(
   const segments = sorted.reduce((n, p) => n + Math.max(p.points.length - 1, 0), 0)
   const positions = new Float32Array(segments * 6)
   const colors = new Float32Array(segments * 6)
-  const bands = new Float32Array(segments * 8)
-  let o = 0
-  let ob = 0
+  const bands = new Float32Array(segments * 2 * BAND_INPUTS)
+  const firstSegment = new Map<ShapeId, number>()
+  let seg = 0
   for (const path of sorted) {
     const [r, g, b] = colorOf(path.routeId)
-    writeBandInputs(path.points, path.band, path.bandHalf, bands, ob)
+    firstSegment.set(path.id, seg)
     for (let i = 1; i < path.points.length; i++) {
       const a = path.points[i - 1]!
       const c = path.points[i]!
-      positions.set([a.x, path.y[i - 1]!, a.z, c.x, path.y[i]!, c.z], o)
-      colors.set([r, g, b, r, g, b], o)
-      o += 6
-      ob += 8
+      positions.set([a.x, path.y[i - 1]!, a.z, c.x, path.y[i]!, c.z], seg * 6)
+      colors.set([r, g, b, r, g, b], seg * 6)
+      // A segment's two ends are consecutive points, so their inputs are contiguous.
+      bands.set(path.bandInputs.subarray((i - 1) * BAND_INPUTS, (i + 1) * BAND_INPUTS), seg * 2 * BAND_INPUTS)
+      seg++
     }
   }
-  return { positions, colors, bands }
-}
-
-/**
- * Writes the band inputs (LineBuffers.bands layout) of the polyline `points`, one segment per consecutive pair,
- * into `out` from float `offset`. Any other line layer drawn over a route line (a mask over a platform stretch,
- * say) passes its points and their slots (profileAt(path.bands.slot, d)) through this and draws with
- * useLineLayer, so it moves with the route line (`half` likewise from bands.half). A polyline with no direction
- * (all points equal) has no normal: its entries stay 0 and it is drawn unshifted.
- */
-export function writeBandInputs(
-  points: readonly Ground[],
-  band: readonly number[],
-  half: readonly number[],
-  out: Float32Array,
-  offset = 0,
-): void {
-  const miters = miterNormals(points)
-  if (!miters) return
-  for (let i = 1; i < points.length; i++) {
-    const ma = miters[i - 1]!
-    const mc = miters[i]!
-    const a = 1 / ma.cosHalf
-    const c = 1 / mc.cosHalf
-    out.set([ma.x * a, ma.z * a, band[i - 1]!, half[i - 1]!, mc.x * c, mc.z * c, band[i]!, half[i]!], offset + (i - 1) * 8)
-  }
+  return { positions, colors, bands, firstSegment }
 }

@@ -5,15 +5,15 @@ import type { StationId } from '../data/schema'
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix } from '../lib/live/consist'
-import { trackY } from '../lib/live/consistLayout'
+import { createBandView, writeBandView } from '../lib/bandOffset'
 import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
 import type { TrainPickSource } from '../lib/live/trainPick'
+import { createTrackPoint, trackPointInto } from '../lib/live/trackPoint'
 import { trainRouteId } from '../lib/live/trainRoute'
 import { interiorOpacity } from '../lib/interiorReveal'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
 import { hopDistance } from '../lib/realtime/position'
-import { pointAtDistanceInto } from '../lib/realtime/polyline'
 import { routeLineColor } from '../lib/routeColor'
 import { useTrainSelection } from '../lib/trainSelection'
 import { theme } from '../theme'
@@ -67,7 +67,9 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   const selectedSlot = useRef(-1)
   /** Each slot's dot color (shared Color objects), so the selected dot can take it without allocating. */
   const slotColors = useMemo(() => new Array<Color | null>(TRAIN_CAPACITY).fill(null), [])
-  const point = useMemo(() => ({ x: 0, z: 0 }), [])
+  const point = useMemo(createTrackPoint, [])
+  /** This frame's band view: dots, cars and picks all sit where the band line shader draws their track. */
+  const view = useMemo(createBandView, [])
   const range = useMemo(() => ({ start: 0, count: 0 }), [])
   const geometry = useMemo(
     () => ({
@@ -128,11 +130,11 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   }, [colorSlot, cars, spanCars])
 
   useLayoutEffect(() => {
-    trainPick.current = { table, consistOf: cars.consistOf, y: DOT_Y, carHeightM: cars.carHeightM }
+    trainPick.current = { table, consistOf: cars.consistOf, y: DOT_Y, carHeightM: cars.carHeightM, view }
     return () => {
       trainPick.current = null
     }
-  }, [trainPick, table, cars])
+  }, [trainPick, table, cars, view])
 
   useLayoutEffect(() => {
     const d = dots.current
@@ -167,6 +169,17 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     const now = clockNow(offsetS, perfMs)
     const localS = perfMs / 1000
     const camera = cameraDistance(state)
+    // The same view SubwayLines writes its uniforms from, so a train sits on its drawn band this frame.
+    state.camera.updateMatrixWorld()
+    writeBandView(
+      view,
+      state.camera.matrixWorldInverse.elements,
+      state.camera.projectionMatrix.elements[5]!,
+      state.size.height,
+      camera,
+      theme.bandPitchPx,
+      network.trackOffsetM,
+    )
     const mix = carMix(camera)
     const scale = screenScale(camera, trainRadiusPx(camera), DOT_MIN_METERS) * (1 - mix)
     const carsOn = mix > 0
@@ -183,9 +196,9 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
       if (!trip) continue
       const shown = stepSlot(table, i, hopDistance(trip.plan, trip.geometry, now), now, localS, dt)
       const drawn = table.drawGeometry[i]!
-      pointAtDistanceInto(drawn.line, shown, point)
-      // The track's height here: below the street where the line descends to a station.
-      const y = DOT_Y + trackY(drawn.line, drawn.profile, shown)
+      // On its band, at the track's height: below the street where the line descends to a station.
+      trackPointInto(drawn, shown, view, point)
+      const y = DOT_Y + point.y
       const k = slotScale(table, i, localS, FADE_S)
       if (k === 0 && isLeaving(table, i)) {
         writeInstanceMatrix(out, i, 0, 0, 0, 0)
@@ -206,7 +219,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
         const dx = center ? point.x - center.x : 0
         const dz = center ? point.z - center.z : 0
         if (dx * dx + dz * dz < reach * reach) {
-          cars.writeTrain(i, drawn.line, drawn.profile, shown, mix, k)
+          cars.writeTrain(i, drawn, view, shown, mix, k)
         } else cars.hide(i)
       }
     }

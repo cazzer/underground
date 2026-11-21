@@ -3,12 +3,14 @@ import type { AdaStatus, Borough, Direction, RouteId, RoutesFile, ShapeId, Shape
 import type { StationDepthsFile } from '../data/stationSchema'
 import { corridorBands, NO_BANDS, type ShapeBands } from './corridors'
 import { boundsCenter } from './framing'
+import { vertexBandInputs } from './lineBuffers'
 import { toGround, type Ground } from './projection'
 import { platformSpans, type PlatformSpan } from './platformSpan'
 import { buildPolyline } from './realtime/polyline'
 import { profileRuns } from './trackAnchors'
 import { trackLine } from './trackLine'
-import { buildTrackProfile, EMPTY_PROFILE, GRADE, profileAt, profileBreaks, resampleAt, type ProfileRun, type TrackProfile } from './trackProfile'
+import { lineBreaks } from './trackBreaks'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, profileAt, resampleAt, type ProfileRun, type TrackProfile } from './trackProfile'
 
 export interface Station {
   id: StationId
@@ -61,34 +63,10 @@ export interface ShapePath {
   y: number[]
   /** Shared with the realtime geometry, so trains ride the drawn track up and down. */
   profile: TrackProfile
-  /** Band slot of each point: profileAt(bands.slot, cumulative[i]) (0 outside shared corridors). */
-  band: number[]
-  /** Corridor half-width in slots at each point: profileAt(bands.half, cumulative[i]). */
-  bandHalf: number[]
+  /** The band offset's inputs at each point (lineBuffers.ts vertexBandInputs): miter, slot and half-width there. */
+  bandInputs: Float32Array
   /** The shape's bands along its distance (corridors.ts); NO_BANDS when it shares no corridor. */
   bands: ShapeBands
-}
-
-/** Band tapers get a vertex this often, so the eased slot change draws as a curve, not a kink. */
-export const BAND_STEP_M = 30
-/** Breaks closer than this to the previous one are dropped: the slot and half-width tapers mostly coincide. */
-const MIN_BREAK_GAP_M = 5
-
-/**
- * Where a shape's line needs vertices: the profile's ramps every 10 m (as the realtime geometry resamples them,
- * so both keep the same vertices there) and the band tapers every BAND_STEP_M.
- */
-function lineBreaks(profile: TrackProfile, bands: ShapeBands): number[] {
-  const ramps = profileBreaks(profile, 10)
-  const tapers = [...profileBreaks(bands.slot, BAND_STEP_M), ...profileBreaks(bands.half, BAND_STEP_M)].sort((a, b) => a - b)
-  const out = [...ramps]
-  let last = -Infinity
-  for (const d of tapers) {
-    if (d - last < MIN_BREAK_GAP_M) continue
-    out.push(d)
-    last = d
-  }
-  return out.sort((a, b) => a - b)
 }
 
 export interface Bounds {
@@ -107,6 +85,8 @@ export interface Network {
   routes: readonly Route[]
   routeById: ReadonlyMap<RouteId, Route>
   shapes: readonly ShapePath[]
+  /** The same paths by id; the realtime geometry builds trains' lines from them (shapeGeometry.ts). */
+  shapeById: ReadonlyMap<ShapeId, ShapePath>
   /** Covers every station and every shape point. */
   bounds: Bounds
   center: Ground
@@ -194,10 +174,14 @@ export function buildNetwork(
     }
     if (profile !== EMPTY_PROFILE) profiles.set(s.id, profile)
     const shapeBands = bands.get(s.id) ?? NO_BANDS
-    const { points, cumulative } = resampleAt(line.points, line.cumulative, lineBreaks(profile, shapeBands))
+    const spans = platformSpans([[s.id, built.kept]])
+    const { points, cumulative } = resampleAt(line.points, line.cumulative, lineBreaks(profile, shapeBands, spans, s.id))
     const y = cumulative.map((d) => profileAt(profile, d))
-    const band = cumulative.map((d) => profileAt(shapeBands.slot, d))
-    const bandHalf = cumulative.map((d) => profileAt(shapeBands.half, d))
+    const bandInputs = vertexBandInputs(
+      points,
+      cumulative.map((d) => profileAt(shapeBands.slot, d)),
+      cumulative.map((d) => profileAt(shapeBands.half, d)),
+    )
     for (const p of points) extend(bounds, p)
     return {
       id: s.id,
@@ -209,8 +193,7 @@ export function buildNetwork(
       length: cumulative.at(-1)!,
       y,
       profile,
-      band,
-      bandHalf,
+      bandInputs,
       bands: shapeBands,
     }
   })
@@ -222,6 +205,7 @@ export function buildNetwork(
     routes,
     routeById,
     shapes,
+    shapeById: new Map(shapes.map((s) => [s.id, s])),
     bounds,
     center: boundsCenter(bounds),
     trackOffsetM,

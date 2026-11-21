@@ -101,6 +101,8 @@ export function bandShift(v: BandView, x: number, y: number, z: number, mx: numb
   const tsy = e[1]! * nz - e[9]! * nx + qy * (e[2]! * nz - e[10]! * nx)
   const cross = Math.abs(tsx * nsy - tsy * nsx)
   const metersPerPx = (v.k * w * Math.hypot(tsx, tsy)) / Math.max(cross, MIN_FORESHORTEN)
+  // A view not written yet (all zeros) has no scale: nothing moves. Never the case on the GPU.
+  if (!(metersPerPx > 0)) return 0
   const split = trackSplit((2 * v.trackOffsetM) / metersPerPx, 2 * half * v.pitchPx)
   return miter * (band * v.pitchPx * metersPerPx - v.trackOffsetM * (1 - split))
 }

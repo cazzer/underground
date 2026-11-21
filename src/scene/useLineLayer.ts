@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Color, InstancedInterleavedBuffer, InterleavedBufferAttribute } from 'three'
+import { Color, InstancedBufferAttribute, InstancedInterleavedBuffer, InterleavedBufferAttribute } from 'three'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
@@ -8,7 +8,7 @@ import { buildLineBuffers, type LineBuffers, type Rgb } from '../lib/lineBuffers
 import type { Network, ShapePath } from '../lib/network'
 import { routeLineColor, type RouteLineMix } from '../lib/routeColor'
 import { theme } from '../theme'
-import { BAND_END, BAND_START, BandLineMaterial } from './bandLineMaterial'
+import { BAND_END, BAND_START, BandLineMaterial, FADE_ATTRIBUTE } from './bandLineMaterial'
 
 /** Line buffers for `paths`, each colored by its route's GTFS color under `mix`, with their band inputs. */
 export function routeLineBuffers(network: Network, paths: readonly ShapePath[], mix: RouteLineMix): LineBuffers {
@@ -31,7 +31,8 @@ export function routeLineBuffers(network: Network, paths: readonly ShapePath[], 
  * draw. Rebuilt when `buffers` changes, disposed on change and unmount. LineSegments2 sets its
  * material's resolution from the viewport (CSS pixels) before each render, so linewidth is in
  * CSS pixels at any dpr. Buffers with `bands` (route lines) draw with BandLineMaterial, which shifts each
- * segment end by its band offset on the GPU; the band uniforms are written per frame in SubwayLines.
+ * segment end by its band offset on the GPU (and fades it by its FADE_ATTRIBUTE weight); the band uniforms are
+ * written per frame in SubwayLines.
  */
 export function useLineLayer(
   buffers: LineBuffers | null,
@@ -47,6 +48,9 @@ export function useLineLayer(
       const band = new InstancedInterleavedBuffer(buffers.bands, 8, 1)
       geometry.setAttribute(BAND_START, new InterleavedBufferAttribute(band, 4, 0))
       geometry.setAttribute(BAND_END, new InterleavedBufferAttribute(band, 4, 4))
+      // Zero until a platform fade is written (SubwayLines); always present, so the shader never reads a stale
+      // default attribute value.
+      geometry.setAttribute(FADE_ATTRIBUTE, new InstancedBufferAttribute(new Float32Array(buffers.bands.length / 4), 2))
       material = new BandLineMaterial(params)
     } else {
       material = new LineMaterial(params)

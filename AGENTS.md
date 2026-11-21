@@ -79,9 +79,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; writes the band uniforms per frame at
-    priority 0); `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial with `BAND_GLSL` patched into its vertex
-    shader; `patchBandShader` throws if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it
-    for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
+    priority 0, and the loaded interior's platform fade); `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial
+    with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
+    if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
     LineSegments2, `theme.stationTieWidth`, faded out between 350 and 550 m); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
@@ -99,8 +99,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms (12
     trains, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
-    veil blends, so a copy at weight 0 renders exactly like its veiled street car; `PlatformTrackMask.tsx` fades the map track out
-    along those platforms as the interior reveals (its own small LineSegments2, not the merged lines)
+    veil blends, so a copy at weight 0 renders exactly like its veiled street car. Along those platforms the map
+    track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides;
@@ -140,7 +140,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
     `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`) and its
-    weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`); `platformMask.ts` the mask's line buffers;
+    weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`); `platformMask.ts` the platform fade (`maskBreaks`
+    adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
+    `lineBreaks`, every extra vertex a drawn line needs (ramps, band tapers, fade ramps);
     `corridors.ts` shared corridors at load (`corridorBands` gives each shape a `ShapeBands`: slot and corridor
     half-width as `TrackProfile`s. 30 m samples, other band keys within 18 m heading within 15 degrees, gaps under
     150 m filled, runs under 200 m dropped, slot = rank minus the middle; band key = short name minus a trailing X),
@@ -154,8 +156,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     per point, the direction tracks merge under 5 px apart and split by 10 px, plus the bundle's width, so they
     split only once both bundles fit); `trackOffset.ts` also exports `miterNormals`;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
-  - `lineBuffers.ts` (positions, colors, and `bands`: per segment end the miter vector (normal / cosHalf), band
-    slot and corridor half-width; `writeBandInputs` for any other layer that must move with the route lines), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
+  - `lineBuffers.ts` (positions, colors, `bands`: each segment end's band inputs from `vertexBandInputs` (miter
+    vector normal / cosHalf, slot, corridor half-width), and `firstSegment` per shape), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
     station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
@@ -202,8 +204,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     arrive on time, or cross-fade; reduced motion cross-fades). On a shape change the dot's ground point is
     projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
-  - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends, at the
-    profile's height);
+  - `trackPoint.ts` `trackPointInto`: a train's drawn point at a distance, on its route's band as the band line
+    shader draws it (vertices shifted by `bandShift`, straight between) at the profile's height. Dots, cars (and so
+    the platform copies), picks and `trainAt` all go through it, with the frame's `BandView` (LiveTrains writes it);
+  - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends, track points);
     `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice; no live layer, an outage, keeps it);
     `trainSummary.ts` route and headsign for the train panel and the notice;
     `trainStops.ts` the train's next stops (feed arrivals not yet passed, the dwell stop kept), `nyClockTime`
@@ -213,7 +217,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     panels agree
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
     (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape
-    (`consistSpanInto`, shared with picking), each on its chord (pitched on the profile, `trackY`), unfolding from the dot point (spacing and length by mix, section by the slot fade);
+    (`consistSpanInto`, shared with picking), each on its chord between two track points (pitched on the profile), unfolding from the dot point (spacing and length by mix, section by the slot fade);
     `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within about 3 camera distances
     of the view center are laid out; the rest are zeroed once
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
@@ -223,8 +227,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then the route's pattern
     that calls at the train's stop and covers most of its predicted stops (ties go to the primary)
   - `polyline.ts` cumulative length, point/heading at distance, forward-only projection
-  - `shapeGeometry.ts` each pattern's track line (`trackLine` resampled on `network.profiles`, the map's line) and
-    its stop distances, computed at load; `ShapeGeometry.profile` is the shape's profile (`EMPTY_PROFILE` when flat)
+  - `shapeGeometry.ts` each pattern's track line, the map's own (`network.shapeById`: same vertices, profile and
+    band inputs; `trackLine` only for a shape the map lacks) and its stop distances, computed at load
   - `position.ts` `planHop` (once per poll: hop, run time, arrival) and `hopDistance` (per frame, no
     allocation); `positionAlongShape` is their composition. A trip with no VehiclePosition doesn't advance
     to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
@@ -335,7 +339,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   positive `useFrame` priority (it takes over rendering).
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
-  platform track mask 2.5,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies).
@@ -353,22 +356,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then
   route_sort_order. Don't add per-route `<Line>`s.
 - Routes sharing a corridor draw as side-by-side bands `theme.bandPitchPx` apart on screen at any zoom and tilt.
-  Each shape point carries a band slot and half-width (`ShapePath.band`, `bandHalf`, from `network.bands`,
+  Each shape point carries band inputs (`ShapePath.bandInputs`: miter, slot and half-width, from `network.bands`,
   corridors.ts) and the vertex shader moves it along its miter normal by `bandShift` (`src/lib/bandOffset.ts`);
   `BAND_GLSL` in `bandLineMaterial.ts` is its GLSL twin, so change both together (`bandGlsl.test.ts` pins the GLSL
   and checks a port of it against `bandShift`; they agree only while the line object's world matrix is identity).
   Until the two direction tracks have room on screen for both bundles, the same shift pulls them onto the
-  centerline. The buffers keep the unshifted points, and no CPU code reads the shift
-  yet: trains don't follow the bands until 10b, which moves dots, cars and picks only through a `trackPointInto`
-  helper built on `bandShift`. A layer drawn over a route line (a mask) uses `writeBandInputs` and `useLineLayer` so
-  it moves with it.
+  centerline. The buffers keep the unshifted points. Trains ride the bands: dots, cars and picks are placed only
+  through `trackPointInto` (`src/lib/live/trackPoint.ts`), never `pointAtDistance` on the raw line. Anything else
+  that must sit on a route line goes through the band line material (as the platform fade does) or trackPointInto.
 - Each shape draws `trackOffsetM` to the right of its own travel direction (`trackLine` in
   `buildNetwork`), so the two directions are parallel tracks; zoomed out the pair reads as one line.
   The offset is `TRACK_OFFSET_M` (4.7 m, measured at Bedford Av); code that needs it reads `network.trackOffsetM`. Live trains ride the same `trackLine`
-  (passed through `useLive` to `buildShapeGeometries`), so dots and cars sit on their direction's track.
+  (`network.shapeById` passed through `useLive` to `buildShapeGeometries`), so dots and cars sit on their direction's track.
 - Tracks follow a vertical profile y(d) per shape (`trackProfile.ts`), and the lines and the trains share it:
-  `ShapePath.y` feeds the line buffers, `network.profiles` goes through `useLive` to `buildShapeGeometries`, and
-  dots, cars and picks add `profileAt` (never blended by interior opacity). It is anchored only at authored
+  `ShapePath.y` feeds the line buffers, the shapes go through `useLive` to `buildShapeGeometries`, and
+  dots, cars and picks take `profileAt` through trackPointInto (never blended by interior opacity). It is anchored only at authored
   interiors (`station-depths.json`): flat at the rail height (`level.y - RAIL_DROP_M`, × the interior's yScale)
   along each platform track a shape rides (route serves the station, direction is the stop suffix, both track
   ends within 6 m), smoothstep ramps at a 3% average real grade (horizontal true, so 340 m for Bedford Av's
@@ -395,8 +397,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
   toward the background after shading by `veilTint` (veil opacity × reveal × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal
-  (`PlatformTrackMask.tsx`, a background-colored copy of its platform run at 2.5, blending back to the route color
-  over the last 10 m), so only the interior's track shows there. Mezzanine guides and a
+  (the route lines' alpha times 1 − weight × reveal in the band line shader, the weight easing back to 0 over the
+  last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at 180 m (a partial fit on small screens).
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.

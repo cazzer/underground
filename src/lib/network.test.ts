@@ -180,7 +180,7 @@ function path(points: { x: number; z: number }[]): ShapePath {
     const b = points[i]!
     cumulative.push(cumulative[i - 1]! + Math.hypot(b.x - a.x, b.z - a.z))
   }
-  return { id: 's', routeId: 'r', direction: 'N', primary: true, points, cumulative, length: cumulative.at(-1) ?? 0, y: points.map(() => 0), profile: EMPTY_PROFILE, band: points.map(() => 0), bandHalf: points.map(() => 0), bands: NO_BANDS }
+  return { id: 's', routeId: 'r', direction: 'N', primary: true, points, cumulative, length: cumulative.at(-1) ?? 0, y: points.map(() => 0), profile: EMPTY_PROFILE, bandInputs: new Float32Array(points.length * 4), bands: NO_BANDS }
 }
 
 describe('stationAccess', () => {

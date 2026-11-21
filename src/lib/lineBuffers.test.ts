@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLineBuffers, type Rgb } from './lineBuffers'
+import { buildLineBuffers, vertexBandInputs, type Rgb } from './lineBuffers'
 import type { ShapePath } from './network'
 import { NO_BANDS } from './corridors'
 import { EMPTY_PROFILE } from './trackProfile'
@@ -23,8 +23,11 @@ function path(
     length: 0,
     y,
     profile: EMPTY_PROFILE,
-    band,
-    bandHalf,
+    bandInputs: vertexBandInputs(
+      points.map(([x, z]) => ({ x, z })),
+      band,
+      bandHalf,
+    ),
     bands: NO_BANDS,
   }
 }
@@ -105,8 +108,8 @@ describe('buildLineBuffers', () => {
     expected.forEach((v, i) => expect(bands[i]).toBeCloseTo(v, 6))
   })
 
-  it('leaves the band inputs of a path with no direction at zero', () => {
+  it('leaves the miter of a path with no direction at zero, so it draws unshifted', () => {
     const { bands } = buildLineBuffers([path('a', 'A', true, [[3, 3], [3, 3]], undefined, [1, 1])], ORDER, colorOf)
-    expect([...bands]).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+    expect([...bands]).toEqual([0, 0, 1, 0, 0, 0, 1, 0])
   })
 })

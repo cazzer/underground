@@ -4,7 +4,7 @@ import { clockNow } from '../lib/live/clock'
 import { deriveLiveStatus, type LiveStatus } from '../lib/live/liveStatus'
 import type { JoinStage } from '../lib/realtime/joinTrip'
 import { prepareTrips, type DropReason, type LiveTrip } from '../lib/realtime/prepareTrips'
-import type { TrackProfile } from '../lib/trackProfile'
+import type { DrawnShape } from '../lib/realtime/shapeGeometry'
 import type { NetworkFiles } from './loadNetwork'
 import { FEED_IDS, RT_URL, type FeedId } from './realtime'
 import type { ShapeId, TripPattern } from './schema'
@@ -48,15 +48,15 @@ export interface Live {
 /**
  * Live trains: loads the join data, polls the Worker, and places the trips once per snapshot.
  * With no `VITE_RT_URL` nothing is fetched and the status says so. `files` is null until the network is ready.
- * `trackOffsetM` and `profiles` are `network.trackOffsetM` and `network.profiles`, so trains ride the tracks the map draws.
+ * `trackOffsetM` and `drawn` are `network.trackOffsetM` and `network.shapeById`, so trains ride the tracks (and bands) the map draws.
  */
 export function useLive(
   files: NetworkFiles | null,
   trackOffsetM: number,
-  profiles: ReadonlyMap<ShapeId, TrackProfile>,
+  drawn: ReadonlyMap<ShapeId, DrawnShape>,
 ): Live {
   const configured = RT_URL !== null
-  const staticLoad = useRealtimeStatic(configured ? files : null, trackOffsetM, profiles)
+  const staticLoad = useRealtimeStatic(configured ? files : null, trackOffsetM, drawn)
   const feed = useRealtimeFeed(RT_URL)
   const [layerError, setLayerError] = useState<string | null>(null)
   const onLayerError = useCallback((e: Error) => setLayerError(e.message), [])

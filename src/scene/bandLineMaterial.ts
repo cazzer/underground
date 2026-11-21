@@ -11,11 +11,15 @@ import { MIN_FORESHORTEN, TRACK_MERGE_PX, TRACK_SPLIT_PX } from '../lib/bandOffs
 export const BAND_UNIFORMS = {
   bandPitchPx: { value: 0 },
   trackOffsetM: { value: 0 },
+  /** The revealed interior's opacity: segments with a platform fade weight (platformMask.ts) fade by it. */
+  platformFade: { value: 0 },
 } satisfies Record<string, IUniform<number>>
 
 /** Per-segment attribute names: (mx, mz, band, half) at the start and at the end (LineBuffers.bands). */
 export const BAND_START = 'instanceBandStart'
 export const BAND_END = 'instanceBandEnd'
+/** Per-segment platform fade weight at the start and the end (vec2); a layer without it never fades. */
+export const FADE_ATTRIBUTE = 'instanceFade'
 
 const DECLARE_ANCHOR = 'attribute vec3 instanceEnd;'
 const START_ANCHOR = 'vec4 start = modelViewMatrix * vec4( instanceStart, 1.0 );'
@@ -27,8 +31,11 @@ const glslFloat = (v: number) => v.toFixed(4)
 export const BAND_GLSL = /* glsl */ `
 uniform float bandPitchPx;
 uniform float trackOffsetM;
+uniform float platformFade;
 attribute vec4 ${BAND_START};
 attribute vec4 ${BAND_END};
+attribute vec2 ${FADE_ATTRIBUTE};
+varying float vBandFade;
 
 vec3 bandShift( vec3 p, vec4 b ) {
 	float miter = length( b.xy );
@@ -54,16 +61,33 @@ vec3 bandShift( vec3 p, vec4 b ) {
 function replaceOnce(src: string, anchor: string, by: string): string {
   const at = src.indexOf(anchor)
   if (at < 0 || src.indexOf(anchor, at + anchor.length) >= 0) {
-    throw new Error(`Band shader: LineMaterial's vertex shader no longer has exactly one "${anchor}"; update bandLineMaterial.ts`)
+    throw new Error(`Band shader: LineMaterial's shader no longer has exactly one "${anchor}"; update bandLineMaterial.ts`)
   }
   return src.slice(0, at) + by + src.slice(at + anchor.length)
 }
 
-/** LineMaterial's vertex shader with the band offset on both segment ends. Throws if three changed the anchors. */
+/**
+ * LineMaterial's vertex shader with the band offset on both segment ends and the platform fade passed on. Throws
+ * if three changed the anchors.
+ */
 export function patchBandShader(src: string): string {
   let out = replaceOnce(src, DECLARE_ANCHOR, `${DECLARE_ANCHOR}\n${BAND_GLSL}`)
   out = replaceOnce(out, START_ANCHOR, `vec4 start = modelViewMatrix * vec4( bandShift( instanceStart, ${BAND_START} ), 1.0 );`)
-  return replaceOnce(out, END_ANCHOR, `vec4 end = modelViewMatrix * vec4( bandShift( instanceEnd, ${BAND_END} ), 1.0 );`)
+  return replaceOnce(
+    out,
+    END_ANCHOR,
+    `vec4 end = modelViewMatrix * vec4( bandShift( instanceEnd, ${BAND_END} ), 1.0 );\n` +
+      `vBandFade = 1.0 - platformFade * ( position.y < 0.5 ? ${FADE_ATTRIBUTE}.x : ${FADE_ATTRIBUTE}.y );`,
+  )
+}
+
+const FRAG_DECLARE_ANCHOR = 'uniform float opacity;'
+const FRAG_COLOR_ANCHOR = 'gl_FragColor = vec4( diffuseColor.rgb, alpha );'
+
+/** LineMaterial's fragment shader with the platform fade on its alpha. Throws if three changed the anchors. */
+export function patchBandFragment(src: string): string {
+  const out = replaceOnce(src, FRAG_DECLARE_ANCHOR, `${FRAG_DECLARE_ANCHOR}\nvarying float vBandFade;`)
+  return replaceOnce(out, FRAG_COLOR_ANCHOR, 'gl_FragColor = vec4( diffuseColor.rgb, alpha * vBandFade );')
 }
 
 /** Needs the two band attributes on its geometry (useLineLayer adds them). */
@@ -71,6 +95,7 @@ export class BandLineMaterial extends LineMaterial {
   constructor(parameters?: LineMaterialParameters) {
     super(parameters)
     this.vertexShader = patchBandShader(this.vertexShader)
+    this.fragmentShader = patchBandFragment(this.fragmentShader)
     Object.assign(this.uniforms, BAND_UNIFORMS)
   }
 }

@@ -1,10 +1,9 @@
+import type { BandView } from '../bandOffset'
 import { segmentDistancePx, TRAIN_HIT_PX, type PickHit, type ScreenPoint, type ToScreen } from '../pick'
-import type { Ground } from '../projection'
-import { pointAtDistanceInto, type Polyline } from '../realtime/polyline'
-import type { TrackProfile } from '../trackProfile'
 import type { Consist } from './consist'
-import { consistSpanInto, trackY, type ConsistSpan } from './consistLayout'
+import { consistSpanInto, type ConsistSpan } from './consistLayout'
 import { isLeaving, slotScale, type SlotTable } from './slots'
+import { createTrackPoint, trackPointInto, type DrawnTrack } from './trackPoint'
 
 /** A slot faded below this scale (arriving or cross-fading) can't be picked: it is barely drawn. */
 const MIN_PICK_SCALE = 0.5
@@ -17,6 +16,8 @@ export interface TrainPickSource {
   y: number
   /** Car body height this frame at full unfold, before the slot's fade (it grows with crossScale far out). */
   carHeightM: () => number
+  /** The band view the trains were last drawn in (rewritten every frame), so picks test them where they are drawn. */
+  view: BandView
 }
 
 export interface TrainPickInput extends TrainPickSource {
@@ -26,15 +27,15 @@ export interface TrainPickInput extends TrainPickSource {
   localS: number
 }
 
-const ground: Ground = { x: 0, z: 0 }
+const point = createTrackPoint()
 const span: ConsistSpan = { cars: 0, pitch: 0, step: 0, rear: 0 }
 const prev: ScreenPoint = { x: 0, y: 0 }
 const next: ScreenPoint = { x: 0, y: 0 }
 
 /** Pixel distance from the click to the polyline through a train's car ends, Infinity if none of it is in front of the camera. */
 function consistDistancePx(
-  line: Polyline,
-  profile: TrackProfile,
+  track: DrawnTrack,
+  view: BandView,
   shown: number,
   consist: Consist,
   mixK: number,
@@ -42,13 +43,12 @@ function consistDistancePx(
   toScreen: ToScreen,
   click: ScreenPoint,
 ): number {
-  consistSpanInto(span, line.length, shown, consist, mixK)
+  consistSpanInto(span, track.line.length, shown, consist, mixK)
   let best = Infinity
   let havePrev = false
   for (let c = 0; c <= span.cars; c++) {
-    const d = span.rear + c * span.step
-    pointAtDistanceInto(line, d, ground)
-    const ok = toScreen(ground.x, y + trackY(line, profile, d), ground.z, next)
+    trackPointInto(track, span.rear + c * span.step, view, point)
+    const ok = toScreen(point.x, y + point.y, point.z, next)
     if (ok && havePrev) best = Math.min(best, segmentDistancePx(click, prev, next))
     havePrev = ok
     prev.x = next.x
@@ -59,12 +59,12 @@ function consistDistancePx(
 
 /**
  * The train drawn nearest the click, within `hitPx` of its dot or, once cars unfold (mix > 0), of the
- * chord lines through its car ends at floor and roof height, laid out exactly as writeConsist draws them (on the track's profile). Skips empty, leaving,
+ * chord lines through its car ends at floor and roof height, laid out exactly as writeConsist draws them (track points in the source's view). Skips empty, leaving,
  * not yet placed and mostly faded slots. Returns the slot. Reads the table as of the last frame; no allocation
  * beyond the result.
  */
 export function nearestTrain(src: TrainPickInput, toScreen: ToScreen, click: ScreenPoint, hitPx: number = TRAIN_HIT_PX): PickHit | null {
-  const { table, mix, localS, y } = src
+  const { table, mix, localS, y, view } = src
   let best = -1
   let bestD = Infinity
   for (let i = 0; i < table.high; i++) {
@@ -74,15 +74,14 @@ export function nearestTrain(src: TrainPickInput, toScreen: ToScreen, click: Scr
     if (Number.isNaN(shown) || !geometry || geometry.line.points.length === 0) continue
     const k = slotScale(table, i, localS)
     if (k < MIN_PICK_SCALE) continue
-    pointAtDistanceInto(geometry.line, shown, ground)
-    const dotY = y + trackY(geometry.line, geometry.profile, shown)
-    let d = toScreen(ground.x, dotY, ground.z, next) ? Math.hypot(next.x - click.x, next.y - click.y) : Infinity
+    trackPointInto(geometry, shown, view, point)
+    let d = toScreen(point.x, y + point.y, point.z, next) ? Math.hypot(next.x - click.x, next.y - click.y) : Infinity
     if (mix > 0) {
       // The floor line and the roof line, so at a tilt the whole side of a car is a target.
       const consist = src.consistOf(i)
       const roof = y + src.carHeightM() * k * Math.min(1, 4 * mix)
-      d = Math.min(d, consistDistancePx(geometry.line, geometry.profile, shown, consist, mix * k, y, toScreen, click))
-      d = Math.min(d, consistDistancePx(geometry.line, geometry.profile, shown, consist, mix * k, roof, toScreen, click))
+      d = Math.min(d, consistDistancePx(geometry, view, shown, consist, mix * k, y, toScreen, click))
+      d = Math.min(d, consistDistancePx(geometry, view, shown, consist, mix * k, roof, toScreen, click))
     }
     if (d <= hitPx && d < bestD) {
       best = i
@@ -98,14 +97,14 @@ export function trainScreenPoints(
   slot: number,
   toScreen: ToScreen,
 ): { dot: ScreenPoint; rear: ScreenPoint | null; front: ScreenPoint | null } | null {
-  const { table, mix, localS, y } = src
+  const { table, mix, localS, y, view } = src
   const shown = table.displayed[slot]
   const geometry = table.drawGeometry[slot]
   if (shown === undefined || Number.isNaN(shown) || !geometry || geometry.line.points.length === 0) return null
   const at = (distance: number): ScreenPoint | null => {
-    pointAtDistanceInto(geometry.line, distance, ground)
+    trackPointInto(geometry, distance, view, point)
     const out = { x: 0, y: 0 }
-    return toScreen(ground.x, y + trackY(geometry.line, geometry.profile, distance), ground.z, out) ? out : null
+    return toScreen(point.x, y + point.y, point.z, out) ? out : null
   }
   const dot = at(shown)
   if (!dot) return null

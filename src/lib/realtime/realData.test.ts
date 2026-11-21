@@ -166,20 +166,17 @@ describe('Bedford Av (L08): a stopped L train sits on its platform track', () =>
 
 describe('real public/data: trains ride the drawn profile', () => {
   const network = buildNetwork(stations, JSON.parse(routesRaw) as RoutesFile, shapes, TRACK_OFFSET_M, JSON.parse(depthsRaw) as StationDepthsFile, 2)
-  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, network.profiles)
+  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, network.shapeById)
 
   it('uses the same resampled line, distances and profile as the map for every pattern', () => {
     expect(network.profiles.size).toBeGreaterThan(0)
     for (const path of network.shapes) {
       const g = geometries.get(path.id)
       if (!g) continue
-      // The map adds collinear vertices along band tapers (network.ts): same curve, same distances.
-      expect(path.length, path.id).toBeCloseTo(g.line.length, 6)
-      path.points.forEach((p, i) => {
-        const { point } = pointAtDistance(g.line, path.cumulative[i]!)
-        expect(Math.hypot(point.x - p.x, point.z - p.z), `${path.id} #${i}`).toBeLessThan(1e-6)
-      })
+      expect(g.line.points, path.id).toEqual(path.points)
+      expect(g.line.cumulative, path.id).toEqual(path.cumulative)
       expect(g.profile, path.id).toBe(path.profile)
+      expect(g.bandInputs, path.id).toBe(path.bandInputs)
     }
   })
 
