@@ -64,10 +64,14 @@ export function maskSpanWeight(d: number, span: PlatformSpan): number {
   return rampWeight(d, span.d0 + MASK_INSET_M, span.d1 - MASK_INSET_M, MASK_INSET_M)
 }
 
+/** Share of the veil's dimming a lifted car keeps on the platform (weight 1), so it sits just behind the interior (pah.7.1 C). */
+export const PLATFORM_RESIDUAL_TINT = 0.2
+
 /**
- * How far a lifted car mixes toward the background, so it matches the veil it is drawn above: the veil's
- * opacity at this reveal where the car leaves the span (weight 0), none on the platform (weight 1).
+ * How far a lifted car mixes toward the background, so it matches the veil it is drawn above where it leaves the
+ * span (weight 0: the veil's opacity at this reveal) and keeps a faint `PLATFORM_RESIDUAL_TINT` of it on the
+ * platform (weight 1).
  */
 export function veilTint(reveal: number, weight: number, veilOpacity: number): number {
-  return veilOpacity * reveal * (1 - weight)
+  return veilOpacity * reveal * (1 - (1 - PLATFORM_RESIDUAL_TINT) * weight)
 }

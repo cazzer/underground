@@ -10,6 +10,7 @@ import {
   rampWeight,
   TRAIN_RAMP_M,
   trainSpanWeight,
+  PLATFORM_RESIDUAL_TINT,
   veilTint,
   type PlatformSpan,
 } from './platformSpan'
@@ -63,10 +64,10 @@ describe('span weights', () => {
     expect(rampWeight(5, 8, 2, 4)).toBeCloseTo(0.15625, 12)
   })
 
-  it('tints a car by the veil only where it leaves the platform, and not at all before the reveal', () => {
-    expect(veilTint(1, 1, 0.7)).toBe(0)
+  it('keeps a residual veil tint on the platform and the full veil where a car leaves it, and not at all before the reveal', () => {
+    expect(veilTint(1, 1, 0.7)).toBeCloseTo(PLATFORM_RESIDUAL_TINT * 0.7, 12)
     expect(veilTint(1, 0, 0.7)).toBeCloseTo(0.7, 12)
-    expect(veilTint(0.5, 0.5, 0.7)).toBeCloseTo(0.175, 12)
+    expect(veilTint(0.5, 0.5, 0.7)).toBeCloseTo(0.21, 12)
     expect(veilTint(0, 0, 0.7)).toBe(0)
   })
 })
