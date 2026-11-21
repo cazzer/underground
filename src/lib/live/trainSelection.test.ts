@@ -54,10 +54,29 @@ describe('trainSelectionReducer', () => {
     expect(s.missed).toBe(1)
   })
 
-  it('clears with a notice when the live layer goes away', () => {
-    const s = run([poll('b'), select('b'), { type: 'observe', trips: null, summarize }])
-    expect(s.key).toBeNull()
-    expect(s.notice).toEqual({ summary: 'b' })
+  const outage: Event = { type: 'observe', trips: null, summarize }
+
+  it('keeps the selection and its last trip while the live layer is gone', () => {
+    const s = run([poll('b'), select('b'), outage])
+    expect(s.key).toBe('b')
+    expect(s.lastTrip).toEqual({ key: 'b' })
+    expect(s.lastSummary).toBe('b')
+    expect(s.notice).toBeNull()
+    expect(s.missed).toBe(0)
+  })
+
+  it('does not count an outage, or a poll after it, against the train until fresh polls miss it twice', () => {
+    const s = run([poll('b'), select('b'), poll('a'), outage])
+    expect(s.missed).toBe(0)
+    const back = run([poll('b'), select('b'), outage, poll('b')], initialTrainSelection<Trip, string>())
+    expect(back.key).toBe('b')
+    expect(back.lastTrip).toEqual({ key: 'b' })
+    const missOnce = run([poll('a')], s)
+    expect(missOnce.key).toBe('b')
+    expect(missOnce.missed).toBe(1)
+    const cleared = run([poll('a'), poll('a')], s)
+    expect(cleared.key).toBeNull()
+    expect(cleared.notice).toEqual({ summary: 'b' })
   })
 
   it('reports an unknown trip with no summary', () => {

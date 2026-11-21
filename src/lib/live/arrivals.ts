@@ -101,7 +101,7 @@ export function arrivalsAt(
 }
 
 /** "Now" under 30 seconds (or already past), else whole minutes rounded down, never less than 1. */
-export function minutesText(deltaS: number): string {
+function minutesText(deltaS: number): string {
   return deltaS < NOW_UNDER_S ? 'Now' : String(Math.max(1, Math.floor(deltaS / 60)))
 }
 
