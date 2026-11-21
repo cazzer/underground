@@ -1,21 +1,25 @@
 // Dwell on real public/data: no pattern hop needs an impossible speed, and a scheduled train replayed the way the client
 // runs it (re-plan every 20 s, step every 0.5 s) holds at each stop, never jumps, never cross-fades, and arrives on time.
+// The replay is a train on the static schedule (arrivals from segments.json), not worker/fixtures polls (those are
+// single snapshots), and it covers only the no-VehiclePosition path.
+// This test gates the daily data refresh (refresh-data.yml runs the tests): a failure on chore/data-refresh means the
+// dwell rule or its cap needs another look, not that the data is wrong.
 import { describe, expect, it } from 'vitest'
 import segmentsRaw from '../../../public/data/segments.json?raw'
 import shapesRaw from '../../../public/data/shapes.json?raw'
 import stationsRaw from '../../../public/data/stations.json?raw'
 import tripIndexRaw from '../../../public/data/trip-index.json?raw'
 import { segmentKey } from '../../data/codec'
-import type { ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
+import type { SegmentsFile, ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
 import { createSlotTable, reconcileSlots, stepSlot } from '../live/slots'
-import { dwellFor, FALLBACK_SPEED_MPS, hopDistance, MIN_RUN_S, planHop } from './position'
+import { DWELL_MAX_SHARE, dwellFor, hopDistance, planHop } from './position'
 import type { LiveTrip } from './prepareTrips'
 import { buildShapeGeometries } from './shapeGeometry'
 
 const shapes = JSON.parse(shapesRaw) as ShapesFile
 const stations = JSON.parse(stationsRaw) as StationsFile
 const index = JSON.parse(tripIndexRaw) as TripIndexFile
-const segments = JSON.parse(segmentsRaw) as Record<string, number>
+const segments = (JSON.parse(segmentsRaw) as SegmentsFile).segments
 const geometries = [...buildShapeGeometries(shapes, index, stations).values()]
 
 const BASE = 1_795_228_554
@@ -27,15 +31,19 @@ const MAX_STEP_M = 50
 const STILL_M = 5
 const MIN_STILL_S = 15
 
-const runOf = (stops: readonly string[], D: readonly number[], k: number): number =>
-  segments[segmentKey(stops[k]!, stops[k + 1]!)] ?? Math.max(MIN_RUN_S, (D[k + 1]! - D[k]!) / FALLBACK_SPEED_MPS)
+/** The scheduled run time of a hop. A missing segment throws: a silent fallback would test made-up run times. */
+const runOf = (stops: readonly string[], k: number): number => {
+  const runS = segments[segmentKey(stops[k]!, stops[k + 1]!)]
+  if (runS === undefined) throw new Error(`no segment for ${stops[k]} > ${stops[k + 1]}`)
+  return runS
+}
 
 describe('dwell on every real pattern hop', () => {
   it('needs at most 25 m/s to cover each hop in its run time minus the dwell', () => {
     let hops = 0
     for (const g of geometries) {
       for (let k = 0; k + 1 < g.stops.length; k++) {
-        const runS = runOf(g.stops, g.stopDistances, k)
+        const runS = runOf(g.stops, k)
         const v = (g.stopDistances[k + 1]! - g.stopDistances[k]!) / (runS - dwellFor(runS))
         hops++
         expect(v, `${g.shapeId} hop ${k}`).toBeLessThanOrEqual(MAX_SPEED_MPS)
@@ -52,7 +60,7 @@ describe('replaying a scheduled train on every real pattern', () => {
       const n = g.stops.length
       const D = g.stopDistances
       const T = [0]
-      for (let k = 0; k + 1 < n; k++) T.push(T[k]! + runOf(g.stops, D, k))
+      for (let k = 0; k + 1 < n; k++) T.push(T[k]! + runOf(g.stops, k))
       const end = T[n - 1]!
       const table = createSlotTable(1)
       const stillFor = new Array<number>(n).fill(0)
@@ -79,7 +87,7 @@ describe('replaying a scheduled train on every real pattern', () => {
       for (let k = 1; k < n - 1; k++) {
         stopsChecked++
         // A short hop only dwells for its capped share, so ask for 15 s only where the dwell can last that long.
-        const want = Math.min(MIN_STILL_S, 0.75 * Math.min(30, 0.35 * runOf(g.stops, D, k)))
+        const want = Math.min(MIN_STILL_S, 0.75 * Math.min(30, DWELL_MAX_SHARE * runOf(g.stops, k)))
         expect(stillFor[k]!, `${g.shapeId} stop ${k} (${g.stops[k]})`).toBeGreaterThanOrEqual(want)
       }
     }
