@@ -206,9 +206,22 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
     `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
     downstream), and OSM ways have none either (join by distance)
+  - `data/stations/layout-oracle.json`: 62 station layouts (platform type, platforms, tracks, mezzanine) and 14 declined ones
+    checked by an agent against English Wikipedia (CC BY-SA 4.0, facts only, with revision ids); scoring only, not shipped
 - `scripts/`: `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge; `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)
+  - Archetype classifier (offline, nothing ships): `lib/archetype.ts` (`classifyStation`: facts to archetype,
+    params, confidence and a reason per deduction; `INTERIOR_MIN_CONFIDENCE` 0.7), `stationFacts.ts` (its input
+    types), `stationFactsCheck.ts` (drops or rejects bad geometry), `platformAxis.ts` (PCA axis, [u, v] frame),
+    `crossSection.ts` + `platformVote.ts` + `trackSpan.ts` + `platformSides.ts` + `platformFallback.ts`
+    (island/side by cross-section vote, track count, curve penalty; `platformLayout.ts` the types),
+    `mezzanineEvidence.ts`, `depth.ts` + `deepStations.ts` + `riseParse.ts` (level elevations from E&E rises,
+    a cited deep list, OSM level, then structure defaults)
+  - `lib/catalogFacts.ts` catalog to `StationFacts` (platforms go to their nearest station point; complexes
+    flagged); `lib/pathwaysTopology.ts`, `layoutOracle.ts`, `archetypeScore.ts` score it;
+    `score-archetypes.ts <feedDir>` prints the report to stdout and writes nothing. The 2021 draft NYCT
+    pathways feed it reads must never be committed, shipped, or used as a source; it refuses a dir inside the repo
 - `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`
   - `src/schema.ts` the JSON contract (types and consts only); the client re-exports it
   - `src/index.ts` routing, memo + Cache API (15 s), CORS; `cache.ts` pure memo/herd-guard

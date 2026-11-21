@@ -24,6 +24,8 @@ const WIDTH_PRIOR_M = { island: [5, 15], side: [2.5, 8] } as const
 const SPREAD_PENALTY_M = 1
 const SPREAD_CAP_M = 3
 const SPREAD_CAP = 0.5
+/** Side platforms come one per direction; a lone one puts the station below the interior bar. */
+const LONE_SIDE_CAP = 0.6
 
 function distanceToPath(p: LocalPoint, path: LocalPoint[]): number {
   let best = Infinity
@@ -92,6 +94,11 @@ export function analyzePlatforms(platforms: PlatformFact[], tracks: TrackFact[])
     if (l.kind === 'side' && edge && span.offsets.length > 0 && Math.abs(l.centerV - meanV) > 1 && edge.side === (l.centerV < meanV ? -1 : 1)) {
       deduct(ledger, 0.3, `side platform ${l.osmWays.join('+')} has its track on the side away from the other tracks`)
     }
+  }
+  const only = layouts[0]
+  if (layouts.length === 1 && only?.kind === 'side') {
+    deduct(ledger, 0.3, `platform ${only.osmWays.join('+')} is a lone side platform; the one for the other direction may be missing from the data`)
+    capAt(ledger, LONE_SIDE_CAP, 'a lone side platform')
   }
   const kinds = new Set(layouts.map((l) => l.kind))
   const platformType = kinds.size === 0 ? null : kinds.size === 2 ? 'mixed' : [...kinds][0]!

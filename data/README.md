@@ -26,6 +26,11 @@ be accurate.
   when a machine's exact location is not known, and some are plainly wrong (25 machines are over 500 m
   from their station; EL100 is at Jay St, 15 km from 149 St-Hostos). Place machines from their `serving` text, not from `lat`/`lon`.
 
+- `stations/layout-oracle.json`: 62 stations (and 14 complexes or multi-level ones the classifier should decline) with their platform type, platform and track counts and
+  whether a mezzanine exists, each with the English Wikipedia article title and revision id it was read
+  from. Used only by `scripts/score-archetypes.ts` to score the archetype classifier. The facts were checked
+  by an agent against the articles, not by a person. Facts only: no article text is copied.
+
 ## Refreshing
 
 1. `npm run data:stations:fetch -- --station L08` (needs network; Overpass can answer 502 when busy,
@@ -77,5 +82,8 @@ the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `n
   see `../docs/research/data-sources.md` §5.1 (licensing decisions included).
 - `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors,
   available under the ODbL 1.0.
+- `layout-oracle.json` holds facts read from English Wikipedia articles, which are available under
+  CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
+  No text is copied and the file is not shipped with the site.
 - The `*.authored.json` files are offered under the ODbL 1.0, because their frame is registered to
   OpenStreetMap geometry.

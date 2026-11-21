@@ -77,6 +77,12 @@ describe('stationDepths', () => {
     expect(d.platform.y).toBeCloseTo(30 * 0.3048, 3)
   })
 
+  it('reads the landing pair before "and access to" in a serving text with a second destination', () => {
+    const d = stationDepths({ ...base, equipment: [eq('EL1', 'Main St (SW corner) to mezzanine for service in both directions and access to passageway to Broadway & Main St', "50' 0in")] })
+    expect(d.mezzanine?.source).toBe('ee-rise')
+    expect(d.reasons.join('\n')).not.toMatch(/ignored for depth/)
+  })
+
   it('records, by code, a multi-landing serving text and a bad or out-of-range rise instead of throwing', () => {
     const d = stationDepths({
       ...base,
@@ -120,6 +126,14 @@ describe('stationDepths', () => {
     const el = stationDepths({ ...base, structure: 'elevated', platformLevel: 1 })
     expect(el.platform.y).toBe(4.5)
     expect(el.mezzanine).toEqual({ y: 2.25, source: 'structure-default' })
+  })
+
+  it('puts an unmeasured platform below a deeper, measured E&E mezzanine (deep stations with long elevators)', () => {
+    const d = stationDepths({ ...base, platformLevel: -2, equipment: [eq('EL1', 'street to mezzanine', "172' 9in")] })
+    expect(d.mezzanine).toEqual({ y: -172.75 * 0.3048, source: 'ee-rise' })
+    expect(d.platform.source).toBe('ee-rise')
+    expect(d.platform.y).toBeCloseTo(-172.75 * 0.3048 - 4.5, 3)
+    expect(d.reasons.join('\n')).toMatch(/platform set 4.5 m below it/)
   })
 
   it('has no mezzanine when the station has none', () => {

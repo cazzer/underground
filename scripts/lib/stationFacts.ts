@@ -49,4 +49,6 @@ export interface StationFacts {
   tracks: TrackFact[]
   equipment: EquipmentFact[]
   entrances: EntranceFact[]
+  /** Platforms that another station point is also close to (one line each); the classifier deducts 0.1 once. */
+  ambiguity?: string[]
 }

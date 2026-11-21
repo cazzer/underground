@@ -93,6 +93,7 @@ export function classifyStation(input: StationFacts): ArchetypeResult {
   if (f.structure === 'subway' && platformLevel !== null && platformLevel >= 1) deduct(0.3, `subway station but OSM level ${platformLevel} is above the street`)
   if ((f.structure === 'elevated' || f.structure === 'viaduct') && platformLevel !== null && platformLevel <= -1) deduct(0.3, `${f.structure} station but OSM level ${platformLevel} is below the street`)
   if (f.entrances.length === 0) deduct(0.2, 'no entrances')
+  if (f.ambiguity && f.ambiguity.length > 0) deduct(0.1, `platform ownership is ambiguous (${f.ambiguity.join('; ')})`)
 
   const mezz = mezzanineEvidence(f, platformLevel, analysis.layouts)
   reasons.push(mezz.reason)

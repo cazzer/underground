@@ -78,7 +78,7 @@ describe('analyzePlatforms', () => {
     const a = run(f)
     expect(a.layouts[0]!.kind).toBe('side')
     expect(a.reasons.join('\n')).toMatch(/60% of cross-sections agree on side: -0.2/)
-    expect(a.cap).toBe(1)
+    expect(a.cap).toBe(0.6) // it now reads as a lone side platform
   })
 
   it('caps the confidence when the cross-sections split below 60%', () => {
@@ -120,6 +120,13 @@ describe('analyzePlatforms', () => {
     expect(a.layouts[0]!.edges).toHaveLength(1)
     expect(a.layouts[0]!.edges[0]!.side).toBe(1)
     expect(a.reasons.join('\n')).toMatch(/put its one track on different edges; kept the right one: -0.2/)
+  })
+
+  it('penalizes a lone side platform whose partner may be missing', () => {
+    const a = run(buildStation('K', 'subway', 55, [[-14, -9]], [-6.6, -2.9, 2.9, 6.6]))
+    expect(a.layouts).toHaveLength(1)
+    expect(a.cap).toBe(0.6)
+    expect(a.reasons.join('\n')).toMatch(/lone side platform.*may be missing from the data: -0.3/)
   })
 
   it('does not read two wide polygons without tracks as side platforms', () => {

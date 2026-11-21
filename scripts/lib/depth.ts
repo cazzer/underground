@@ -31,6 +31,8 @@ const MIN_RISE_M = 1
 const MAX_RISE_M = 60
 const MIN_SEPARATION_M = 2.5
 const DOUBTFUL_MEZZANINE_PENALTY = 0.1
+/** One level under a measured mezzanine. */
+const PLATFORM_BELOW_MEZZANINE_M = 4.5
 
 /** "-2" is -2. Lists ("-1;-2"), blanks and words ("B") are null: the tag does not name one level. */
 export function parseOsmLevel(tag: string | null): number | null {
@@ -64,7 +66,9 @@ function collectRises(equipment: EquipmentFact[], reasons: string[]): Rises {
   for (const e of equipment) {
     let pair: string
     try {
-      const s = parseServing(e.serving)
+      // "... to mezzanine for service in both directions and access to passageway to Broadway": only the
+      // landing pair before "and access to" says what the machine joins.
+      const s = parseServing(e.serving.split(/ and access to /i)[0]!)
       pair = [s.from, s.to].sort().join('+')
     } catch (err) {
       reasons.push(`${e.code}: ignored for depth: ${err instanceof Error ? err.message : String(err)}`)
@@ -141,6 +145,12 @@ export function stationDepths(i: DepthInput, deepList: DeepStation[] = DEEP_STAT
   }
   if (!i.hasMezzanine) mezzanine = null
 
+  if (mezzanine?.source === 'ee-rise' && sign !== 0 && platform.source !== 'ee-rise' && platform.source !== 'deep-list' && mezzanine.y * sign > platform.y * sign - MIN_SEPARATION_M) {
+    // A measured mezzanine deeper than an unmeasured platform: the platform lies below the mezzanine.
+    const y = mezzanine.y + sign * PLATFORM_BELOW_MEZZANINE_M
+    reasons.push(`E&E puts the mezzanine at ${mezzanine.y.toFixed(1)} m, deeper than the ${platform.source} platform ${platform.y} m; platform set ${PLATFORM_BELOW_MEZZANINE_M} m below it`)
+    platform = { y, source: 'ee-rise' }
+  }
   if (mezzanine && sign !== 0) {
     // Depth below (or height above) the street, so both ends compare the same way.
     const away = mezzanine.y * sign
