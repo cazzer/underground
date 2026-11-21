@@ -21,24 +21,21 @@
     {"id":"way-906716437","level":"platform","outline":[[-31.44,-87.11],[-27.83,-88.54],[48.46,80.21],[44.91,81.67]],"tracks":[{"stopId":"F05S","path":[[-32.45,-85.61],[43.39,82.33]]}],"osmRef":"way/906716437","sources":["generated","osm"]}
   ],
   "slabs": [
-    {"id":"slab-1","level":"mezzanine","name":"Mezzanine 1","outline":[[72.58,-74.3],[98.14,-17.75],[-1.98,27.5],[-27.54,-29.05]],"sources":["generated"]},
-    {"id":"slab-2","level":"mezzanine","name":"Mezzanine 2","outline":[[46.04,70],[56.46,93.05],[32.53,103.87],[22.11,80.81]],"sources":["generated"]}
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine 1","outline":[[24.53,4.54],[32.76,22.77],[2.14,36.61],[-6.1,18.38]],"sources":["generated"]},
+    {"id":"slab-2","level":"mezzanine","name":"Mezzanine 2","outline":[[46.04,70],[56.46,93.05],[30.92,104.6],[20.5,81.54]],"sources":["generated"]}
   ],
   "connectors": [
-    {"id":"EL424","kind":"elevator","lower":{"x":72.08,"z":-72.97,"level":"mezzanine"},"upper":{"x":72.08,"z":-72.97,"level":"street"},"width":2,"sources":["nyopendata"]},
-    {"id":"st-ent-01","kind":"stair","lower":{"x":34.55,"z":102.41,"level":"mezzanine"},"upper":{"x":34.24,"z":111.94,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-02","kind":"stair","lower":{"x":29.92,"z":6.56,"level":"mezzanine"},"upper":{"x":28.65,"z":13.65,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-03","kind":"stair","lower":{"x":78.07,"z":-60.93,"level":"mezzanine"},"upper":{"x":84.03,"z":-65.9,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":20.91,"z":23.95,"level":"platform"},"upper":{"x":17.95,"z":17.39,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":4.14,"z":31.53,"level":"platform"},"upper":{"x":1.18,"z":24.97,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":39.91,"z":65.97,"level":"platform"},"upper":{"x":42.87,"z":72.53,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":23.12,"z":73.55,"level":"platform"},"upper":{"x":26.09,"z":80.12,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
+    {"id":"EL424","kind":"elevator","lower":{"x":24.03,"z":5.87,"level":"mezzanine"},"upper":{"x":24.03,"z":5.87,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":36.05,"z":101.39,"level":"mezzanine"},"upper":{"x":34.24,"z":111.94,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":22.08,"z":16.62,"level":"mezzanine"},"upper":{"x":28.65,"z":13.65,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":8.72,"z":-3.02,"level":"platform"},"upper":{"x":14.65,"z":10.1,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-8.04,"z":4.55,"level":"platform"},"upper":{"x":-2.11,"z":17.68,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":36.94,"z":59.41,"level":"platform"},"upper":{"x":42.87,"z":72.53,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":20.16,"z":66.99,"level":"platform"},"upper":{"x":26.09,"z":80.12,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
   ],
   "entrances": [
     {"id":"ent-01","x":34.24,"z":111.94,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
-    {"id":"ent-02","x":28.65,"z":13.65,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
-    {"id":"ent-03","x":84.03,"z":-65.9,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
-    {"id":"ent-04","x":72.08,"z":-72.97,"type":"Elevator","entry":true,"exit":true,"connectors":["EL424"],"sources":["nyopendata"]}
+    {"id":"ent-02","x":28.65,"z":13.65,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
   ],
   "fareLines": []
 }

@@ -21,13 +21,13 @@
     {"id":"way-425510346","level":"platform","outline":[[36.05,-77.65],[33.38,-79.14],[26.77,-68.53],[17.41,-51.1],[-28.87,34.6],[-40.07,55],[-42.24,59.59],[-38.86,61.2]],"tracks":[{"stopId":"411S","path":[[-37.37,61.51],[37.15,-76.64]]}],"osmRef":"way/425510346","sources":["generated","osm"]}
   ],
   "slabs": [
-    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-10.19,-4.46],[1.26,-25.6],[20.74,-15.05],[9.3,6.09]],"sources":["generated"]}
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-10.2,-4.47],[1.24,-25.61],[20.74,-15.05],[9.3,6.09]],"sources":["generated"]}
   ],
   "connectors": [
     {"id":"st-ent-01","kind":"stair","lower":{"x":8.39,"z":5.6,"level":"street"},"upper":{"x":6.96,"z":-1.45,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
     {"id":"st-ent-02","kind":"stair","lower":{"x":1.23,"z":-25.61,"level":"street"},"upper":{"x":3.01,"z":-18.63,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-6.16,"z":-3.41,"level":"station-house"},"upper":{"x":-9.59,"z":2.92,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":6.35,"z":3.36,"level":"station-house"},"upper":{"x":2.92,"z":9.69,"level":"platform"},"width":1.8,"sources":["generated"]}
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-6.16,"z":-3.41,"level":"station-house"},"upper":{"x":-13.01,"z":9.25,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":6.36,"z":3.36,"level":"station-house"},"upper":{"x":-0.5,"z":16.02,"level":"platform"},"width":1.8,"sources":["generated"]}
   ],
   "entrances": [
     {"id":"ent-01","x":8.39,"z":5.6,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},

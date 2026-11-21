@@ -21,13 +21,13 @@
     {"id":"way-426103099","level":"platform","outline":[[-85.78,6.46],[-86,3.91],[-84.65,3.78],[-84.71,2.64],[83.89,-20.83],[84.42,-17.16]],"tracks":[{"stopId":"711S","path":[[-84.63,7.76],[83.69,-15.57]]}],"osmRef":"way/426103099","sources":["generated","osm"]}
   ],
   "slabs": [
-    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-5.44,-10.43],[14.37,-13.19],[17.43,8.76],[-2.38,11.52]],"sources":["generated"]}
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-6.55,-18.35],[13.26,-21.11],[18.53,16.68],[-1.28,19.44]],"sources":["generated"]}
   ],
   "connectors": [
-    {"id":"st-ent-01","kind":"stair","lower":{"x":0.83,"z":20.2,"level":"street"},"upper":{"x":2.14,"z":10.38,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-02","kind":"stair","lower":{"x":10.82,"z":-24.21,"level":"street"},"upper":{"x":10.08,"z":-12.09,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-3.92,"z":-6.75,"level":"station-house"},"upper":{"x":-11.05,"z":-5.76,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-1.92,"z":7.61,"level":"station-house"},"upper":{"x":-9.05,"z":8.6,"level":"platform"},"width":1.8,"sources":["generated"]}
+    {"id":"st-ent-01","kind":"stair","lower":{"x":0.83,"z":20.2,"level":"street"},"upper":{"x":2.54,"z":13.21,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":10.82,"z":-24.21,"level":"street"},"upper":{"x":9.37,"z":-17.16,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-3.92,"z":-6.76,"level":"station-house"},"upper":{"x":-18.18,"z":-4.77,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-1.92,"z":7.61,"level":"station-house"},"upper":{"x":-16.18,"z":9.6,"level":"platform"},"width":1.8,"sources":["generated"]}
   ],
   "entrances": [
     {"id":"ent-01","x":0.83,"z":20.2,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},

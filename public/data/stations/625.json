@@ -22,7 +22,7 @@
   "slabs": [],
   "connectors": [
     {"id":"st-ent-01","kind":"stair","lower":{"x":0.98,"z":8.3,"level":"platform"},"upper":{"x":11.35,"z":5.8,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-02","kind":"stair","lower":{"x":-3.68,"z":-3.39,"level":"platform"},"upper":{"x":-17.68,"z":-19.34,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":0.19,"z":-10.39,"level":"platform"},"upper":{"x":-17.68,"z":-19.34,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
     {"id":"st-ent-03","kind":"stair","lower":{"x":18.22,"z":-22.93,"level":"platform"},"upper":{"x":31.53,"z":-23.8,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
     {"id":"st-ent-04","kind":"stair","lower":{"x":9.9,"z":-27.99,"level":"platform"},"upper":{"x":0.44,"z":-41.44,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
   ],

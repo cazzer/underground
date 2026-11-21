@@ -21,23 +21,19 @@
   ],
   "slabs": [],
   "connectors": [
-    {"id":"EL268X","kind":"elevator","lower":{"x":37.35,"z":-50.11,"level":"platform"},"upper":{"x":37.35,"z":-50.11,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-01","kind":"stair","lower":{"x":-35.28,"z":86.1,"level":"platform"},"upper":{"x":-37.82,"z":119.04,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-02","kind":"stair","lower":{"x":-49.66,"z":72.87,"level":"platform"},"upper":{"x":-61.79,"z":74.46,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-03","kind":"stair","lower":{"x":-50.13,"z":73.74,"level":"platform"},"upper":{"x":-74.49,"z":68.66,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-04","kind":"stair","lower":{"x":23.21,"z":-24.22,"level":"platform"},"upper":{"x":35.42,"z":-25.76,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-05","kind":"stair","lower":{"x":31.8,"z":-39.96,"level":"platform"},"upper":{"x":43.73,"z":-41.66,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-06","kind":"stair","lower":{"x":7.28,"z":-31.73,"level":"platform"},"upper":{"x":3.24,"z":-42.13,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-07","kind":"stair","lower":{"x":16.13,"z":-47.98,"level":"platform"},"upper":{"x":6.7,"z":-61.32,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+    {"id":"EL268X","kind":"elevator","lower":{"x":38.26,"z":-49.61,"level":"platform"},"upper":{"x":38.26,"z":-49.61,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-49.66,"z":72.87,"level":"platform"},"upper":{"x":-61.79,"z":74.46,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":23.21,"z":-24.22,"level":"platform"},"upper":{"x":35.42,"z":-25.76,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":31.8,"z":-39.96,"level":"platform"},"upper":{"x":43.73,"z":-41.66,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":7.28,"z":-31.73,"level":"platform"},"upper":{"x":3.24,"z":-42.13,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-05","kind":"stair","lower":{"x":16.13,"z":-47.98,"level":"platform"},"upper":{"x":6.7,"z":-61.32,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
   ],
   "entrances": [
-    {"id":"ent-01","x":-37.82,"z":119.04,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
-    {"id":"ent-02","x":-61.79,"z":74.46,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
-    {"id":"ent-03","x":-74.49,"z":68.66,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
-    {"id":"ent-04","x":35.42,"z":-25.76,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]},
-    {"id":"ent-05","x":43.73,"z":-41.66,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]},
-    {"id":"ent-06","x":3.24,"z":-42.13,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-06"],"sources":["nyopendata"]},
-    {"id":"ent-07","x":6.7,"z":-61.32,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-07"],"sources":["nyopendata"]}
+    {"id":"ent-01","x":-61.79,"z":74.46,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":35.42,"z":-25.76,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":43.73,"z":-41.66,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":3.24,"z":-42.13,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]},
+    {"id":"ent-05","x":6.7,"z":-61.32,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]}
   ],
   "fareLines": []
 }

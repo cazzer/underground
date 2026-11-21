@@ -21,8 +21,8 @@
   ],
   "slabs": [],
   "connectors": [
-    {"id":"EL180","kind":"elevator","lower":{"x":10.34,"z":-9.38,"level":"platform"},"upper":{"x":10.34,"z":-9.38,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
-    {"id":"EL181","kind":"elevator","lower":{"x":-15.81,"z":19.64,"level":"platform"},"upper":{"x":-15.81,"z":19.64,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL180","kind":"elevator","lower":{"x":11.1,"z":-9,"level":"platform"},"upper":{"x":11.1,"z":-9,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL181","kind":"elevator","lower":{"x":-15.74,"z":19.57,"level":"platform"},"upper":{"x":-15.74,"z":19.57,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
     {"id":"st-ent-01","kind":"stair","lower":{"x":-1.91,"z":12.74,"level":"platform"},"upper":{"x":4.29,"z":24.37,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
     {"id":"st-ent-03","kind":"stair","lower":{"x":-9.81,"z":8.63,"level":"platform"},"upper":{"x":-20.24,"z":11.11,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
     {"id":"st-ent-05","kind":"stair","lower":{"x":14.02,"z":-16.03,"level":"platform"},"upper":{"x":26.92,"z":-17.15,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},

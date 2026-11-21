@@ -26,8 +26,8 @@
   "connectors": [
     {"id":"st-ent-01","kind":"stair","lower":{"x":18.78,"z":-100.23,"level":"street"},"upper":{"x":15.47,"z":-93.83,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
     {"id":"st-ent-02","kind":"stair","lower":{"x":4.14,"z":-100.56,"level":"street"},"upper":{"x":6.49,"z":-93.75,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":1.13,"z":-72.88,"level":"station-house"},"upper":{"x":0.27,"z":-65.73,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":16.2,"z":-71.06,"level":"station-house"},"upper":{"x":15.33,"z":-63.91,"level":"platform"},"width":1.8,"sources":["generated"]}
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":1.14,"z":-72.88,"level":"station-house"},"upper":{"x":-0.58,"z":-58.58,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":16.2,"z":-71.06,"level":"station-house"},"upper":{"x":14.47,"z":-56.77,"level":"platform"},"width":1.8,"sources":["generated"]}
   ],
   "entrances": [
     {"id":"ent-01","x":18.78,"z":-100.23,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},

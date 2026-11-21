@@ -29,10 +29,10 @@
     {"id":"st-ent-02","kind":"stair","lower":{"x":72.51,"z":44.07,"level":"street"},"upper":{"x":67.02,"z":48.73,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
     {"id":"st-ent-03","kind":"stair","lower":{"x":-76.95,"z":-47.67,"level":"street"},"upper":{"x":-69.83,"z":-48.75,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
     {"id":"st-ent-04","kind":"stair","lower":{"x":-66.5,"z":-60.24,"level":"street"},"upper":{"x":-66.52,"z":-53.04,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-52.97,"z":-48.18,"level":"station-house"},"upper":{"x":-47.18,"z":-43.9,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-61.56,"z":-36.58,"level":"station-house"},"upper":{"x":-55.77,"z":-32.29,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":61.46,"z":36.47,"level":"station-house"},"upper":{"x":55.68,"z":32.19,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":52.84,"z":48.12,"level":"station-house"},"upper":{"x":47.05,"z":43.84,"level":"platform"},"width":1.8,"sources":["generated"]}
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-52.97,"z":-48.18,"level":"station-house"},"upper":{"x":-41.39,"z":-39.62,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-61.56,"z":-36.57,"level":"station-house"},"upper":{"x":-49.99,"z":-28,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":61.46,"z":36.47,"level":"station-house"},"upper":{"x":49.89,"z":27.9,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":52.84,"z":48.12,"level":"station-house"},"upper":{"x":41.26,"z":39.56,"level":"platform"},"width":1.8,"sources":["generated"]}
   ],
   "entrances": [
     {"id":"ent-01","x":69.22,"z":60.41,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},

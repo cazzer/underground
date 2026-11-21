@@ -21,29 +21,27 @@
     {"id":"way-906954527","level":"platform","outline":[[106.83,4.84],[106.98,8.52],[10.19,10.7],[-106.49,13.34],[-106.56,9.62]],"tracks":[{"stopId":"G20N","path":[[-106.6,8.07],[106.79,3.31]]}],"osmRef":"way/906954527","sources":["generated","osm"]}
   ],
   "slabs": [
-    {"id":"slab-1","level":"mezzanine","name":"Mezzanine 1","outline":[[-115.46,-10.35],[-95.47,-10.8],[-94.89,15.07],[-114.88,15.52]],"sources":["generated"]},
-    {"id":"slab-2","level":"mezzanine","name":"Mezzanine 2","outline":[[-1.74,-12.9],[40.92,-13.86],[41.5,12.01],[-1.16,12.97]],"sources":["generated"]},
-    {"id":"slab-3","level":"mezzanine","name":"Mezzanine 3","outline":[[96.41,-15.11],[121.44,-15.67],[122.02,10.2],[96.99,10.77]],"sources":["generated"]}
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine 1","outline":[[-115.46,-10.35],[-95.47,-10.8],[-94.82,18.15],[-114.81,18.6]],"sources":["generated"]},
+    {"id":"slab-2","level":"mezzanine","name":"Mezzanine 2","outline":[[-1.92,-20.9],[40.74,-21.86],[41.5,12.01],[-1.16,12.97]],"sources":["generated"]},
+    {"id":"slab-3","level":"mezzanine","name":"Mezzanine 3","outline":[[96.24,-22.58],[121.27,-23.14],[122.02,10.2],[96.99,10.77]],"sources":["generated"]}
   ],
   "connectors": [
     {"id":"st-ent-01","kind":"stair","lower":{"x":-104.98,"z":11.18,"level":"mezzanine"},"upper":{"x":-104.81,"z":18.37,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-02","kind":"stair","lower":{"x":121.51,"z":9.72,"level":"mezzanine"},"upper":{"x":180.97,"z":11.67,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-03","kind":"stair","lower":{"x":3.58,"z":-12.52,"level":"mezzanine"},"upper":{"x":-1.89,"z":-19.53,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-04","kind":"stair","lower":{"x":35.96,"z":-13.25,"level":"mezzanine"},"upper":{"x":40.71,"z":-23.22,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-05","kind":"stair","lower":{"x":120.95,"z":-15.16,"level":"mezzanine"},"upper":{"x":133.61,"z":-23.41,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-89.18,"z":-7.1,"level":"platform"},"upper":{"x":-96.38,"z":-6.94,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-88.77,"z":11.08,"level":"platform"},"upper":{"x":-95.97,"z":11.25,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":-7.85,"z":-8.93,"level":"platform"},"upper":{"x":-0.65,"z":-9.09,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":-7.44,"z":9.25,"level":"platform"},"upper":{"x":-0.25,"z":9.09,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-3-p1","kind":"stair","lower":{"x":90.29,"z":-11.12,"level":"platform"},"upper":{"x":97.49,"z":-11.28,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-3-p2","kind":"stair","lower":{"x":90.7,"z":7.05,"level":"platform"},"upper":{"x":97.9,"z":6.89,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
+    {"id":"st-ent-02","kind":"stair","lower":{"x":4.02,"z":-15.42,"level":"mezzanine"},"upper":{"x":-1.89,"z":-19.53,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":35.36,"z":-18.42,"level":"mezzanine"},"upper":{"x":40.71,"z":-23.22,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":120.77,"z":-14.37,"level":"mezzanine"},"upper":{"x":133.61,"z":-23.41,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-81.98,"z":-7.26,"level":"platform"},"upper":{"x":-96.38,"z":-6.94,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-81.58,"z":10.92,"level":"platform"},"upper":{"x":-95.97,"z":11.25,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":-15.05,"z":-8.76,"level":"platform"},"upper":{"x":-0.65,"z":-9.09,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":-14.64,"z":9.41,"level":"platform"},"upper":{"x":-0.25,"z":9.09,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-3-p1","kind":"stair","lower":{"x":83.1,"z":-10.96,"level":"platform"},"upper":{"x":97.49,"z":-11.28,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-3-p2","kind":"stair","lower":{"x":83.5,"z":7.21,"level":"platform"},"upper":{"x":97.9,"z":6.89,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
   ],
   "entrances": [
     {"id":"ent-01","x":-104.81,"z":18.37,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
-    {"id":"ent-02","x":180.97,"z":11.67,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
-    {"id":"ent-03","x":-1.89,"z":-19.53,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
-    {"id":"ent-04","x":40.71,"z":-23.22,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]},
-    {"id":"ent-05","x":133.61,"z":-23.41,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]}
+    {"id":"ent-02","x":-1.89,"z":-19.53,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":40.71,"z":-23.22,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":133.61,"z":-23.41,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]}
   ],
   "fareLines": []
 }

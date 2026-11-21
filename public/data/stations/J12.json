@@ -21,18 +21,18 @@
     {"id":"way-804714891","level":"platform","outline":[[-80.66,11.95],[78.29,-22.88],[77.77,-25.26],[-81.19,9.57]],"tracks":[{"stopId":"J12S","path":[[-79.83,12.89],[77.96,-21.49]]}],"osmRef":"way/804714891","sources":["generated","osm"]}
   ],
   "slabs": [
-    {"id":"slab-1","level":"station-house","name":"Station house 1","outline":[[-90.19,9.49],[-70.65,5.21],[-66.36,24.81],[-85.9,29.09]],"sources":["generated"]},
-    {"id":"slab-2","level":"station-house","name":"Station house 2","outline":[[67.55,-25.07],[92,-30.42],[96.29,-10.83],[71.84,-5.47]],"sources":["generated"]}
+    {"id":"slab-1","level":"station-house","name":"Station house 1","outline":[[-91.9,1.68],[-72.36,-2.6],[-66.36,24.81],[-85.9,29.09]],"sources":["generated"]},
+    {"id":"slab-2","level":"station-house","name":"Station house 2","outline":[[65.84,-32.88],[90.29,-38.24],[96.29,-10.83],[71.84,-5.47]],"sources":["generated"]}
   ],
   "connectors": [
-    {"id":"st-ent-01","kind":"stair","lower":{"x":-81.51,"z":23.11,"level":"street"},"upper":{"x":-78.08,"z":16.79,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-02","kind":"stair","lower":{"x":-78.82,"z":-6.11,"level":"street"},"upper":{"x":-77.31,"z":7.18,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-03","kind":"stair","lower":{"x":91.02,"z":-14.08,"level":"street"},"upper":{"x":84.4,"z":-16.89,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-ent-04","kind":"stair","lower":{"x":77.06,"z":-38.51,"level":"street"},"upper":{"x":79.66,"z":-27.21,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
-    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-70.94,"z":8.57,"level":"station-house"},"upper":{"x":-63.91,"z":7.03,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-68.02,"z":21.88,"level":"station-house"},"upper":{"x":-60.99,"z":20.33,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":69.22,"z":-22.14,"level":"station-house"},"upper":{"x":62.18,"z":-20.6,"level":"platform"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":72.13,"z":-8.83,"level":"station-house"},"upper":{"x":65.1,"z":-7.29,"level":"platform"},"width":1.8,"sources":["generated"]}
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-81.51,"z":23.11,"level":"street"},"upper":{"x":-79.82,"z":16.12,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-78.82,"z":-6.11,"level":"street"},"upper":{"x":-78.94,"z":1.09,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":91.02,"z":-14.08,"level":"street"},"upper":{"x":85.35,"z":-18.51,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":77.06,"z":-38.51,"level":"street"},"upper":{"x":78.74,"z":-31.51,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-70.94,"z":8.57,"level":"station-house"},"upper":{"x":-56.87,"z":5.49,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-68.02,"z":21.88,"level":"station-house"},"upper":{"x":-53.96,"z":18.79,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":69.22,"z":-22.14,"level":"station-house"},"upper":{"x":55.15,"z":-19.05,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":72.13,"z":-8.83,"level":"station-house"},"upper":{"x":58.06,"z":-5.75,"level":"platform"},"width":1.8,"sources":["generated"]}
   ],
   "entrances": [
     {"id":"ent-01","x":-81.51,"z":23.11,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
