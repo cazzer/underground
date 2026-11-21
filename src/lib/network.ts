@@ -3,10 +3,11 @@ import type { AdaStatus, Borough, Direction, RouteId, RoutesFile, ShapeId, Shape
 import type { StationDepthsFile } from '../data/stationSchema'
 import { boundsCenter } from './framing'
 import { toGround, type Ground } from './projection'
+import { platformSpans, type PlatformSpan } from './platformSpan'
 import { buildPolyline } from './realtime/polyline'
 import { profileRuns } from './trackAnchors'
 import { trackLine } from './trackLine'
-import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleForProfile, type TrackProfile } from './trackProfile'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleForProfile, type ProfileRun, type TrackProfile } from './trackProfile'
 
 export interface Station {
   id: StationId
@@ -86,6 +87,8 @@ export interface Network {
   profiles: ReadonlyMap<ShapeId, TrackProfile>
   /** Scene height of the deepest ridden platform track at each station with a depth (rail y x yScale). */
   stationTrackY: ReadonlyMap<StationId, number>
+  /** Per station with a depth, where each shape riding its platform tracks runs along them (the profile's kept runs). */
+  platformSpans: ReadonlyMap<StationId, ReadonlyMap<ShapeId, PlatformSpan>>
 }
 
 function extend(b: Bounds, p: Ground): void {
@@ -139,6 +142,7 @@ export function buildNetwork(
 
   const profiles = new Map<ShapeId, TrackProfile>()
   const stationTrackY = new Map<StationId, number>()
+  const keptRuns: [ShapeId, ProfileRun[]][] = []
   const shapes = shapesFile.shapes.map((s, i): ShapePath => {
     const { line } = lines[i]!
     const built = buildTrackProfile(runs.get(s.id) ?? [], { grade: GRADE, yScale })
@@ -148,6 +152,7 @@ export function buildNetwork(
     }
     const profile = built.profile
     // Only runs the profile kept: a dropped (overlapping) run's station isn't drawn at depth on this shape.
+    if (built.kept.length > 0) keptRuns.push([s.id, built.kept])
     for (const run of built.kept) {
       if (run.stationId === undefined) continue
       const y = run.yReal * yScale
@@ -182,6 +187,7 @@ export function buildNetwork(
     trackOffsetM,
     profiles,
     stationTrackY,
+    platformSpans: platformSpans(keptRuns),
   }
 }
 
