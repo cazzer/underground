@@ -61,8 +61,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   GTFS data drawn through `theme.routeLineMix` (mixed toward a theme color; amount 1 = mono), then
   pushed to at least 3:1 against `theme.background`.
   TEMPORARY: `?lines=a|b|c` picks the lines look until the 8x4.3 options round is decided (default b)
-  Interior tokens (`interiorStroke`, `interiorTrack`, `interiorEntrance`, `interiorFine`, the two
-  widths, `interiorDepthFade`) color the station interior.
+  Interior tokens (`interiorStroke`, `interiorTrack`, `interiorEntrance`, `interiorFine`,
+  `interiorElevator`, `interiorEscalator`, the two widths, `interiorDepthFade`) color the station interior.
+  TEMPORARY: `?machines=a|b|c` (rails and cab, plain band and box, plan symbols; default a) until the
+  9wc.8 card is decided, and the dev-only `?machinesDemo` (demo escalators and a three-level elevator at
+  Bedford Av, `src/data/machineDemo.ts`); the removal list is in `src/scene/machineLook.ts`
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
@@ -89,7 +92,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `cameraDistance.ts` helpers; `renderOrder.ts`
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
-    drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
+    drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides;
+    `machineLook.ts` TEMPORARY `?machines=` escalator/elevator look
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
   each pick (its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
@@ -120,9 +124,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     between HUD insets), `markerMatrices.ts` (incl. `writeYawMatrix`), `pick.ts` (hit radii, nearest station,
     station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
-  - `interiorGeometry.ts` interior to strong/fine line buffers; `interiorFraming.ts` bounds, focus
-    anchor (plan center, toward-camera shift, half-extent), level labels, padded hull;
-    `interiorReveal.ts` distance to interior opacity. The first two have type-only `.ts` imports
+  - `interiorGeometry.ts` interior to strong/fine line buffers (levels, outlines, entrances);
+    `interiorConnectors.ts` stairs, ramps, escalators (a zero-run one gets a 30 degree run along the
+    station axis, from its listing entrance or centered, descending toward the plan center) and elevators
+    (shaft squared to the axis, a stop at each end in that level's pass; machines take half the depth fade);
+    `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;
+    `interiorSegments.ts` the shared segment writer; `interiorFixture.ts` the tests' mini interior;
+    `interiorFraming.ts` bounds, focus anchor (plan center, toward-camera shift, half-extent), level
+    labels, padded hull; `interiorReveal.ts` distance to interior opacity. These have `.ts` imports
     because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always 180 m,
     at the current azimuth) in the screen area the header, footer and station panel leave free;
     `orbitLimits.ts` azimuth window, spring to north-up, soft pan radius, focus-point pivot
@@ -324,7 +333,8 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   `slabs` are mezzanines and other walkable floors.
 - `connectors` (stair, escalator, elevator, ramp) have `lower`/`upper` endpoints `{x, z, level}` and a
   `width`. Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
-  outages. Elevators have identical x/z at both ends.
+  outages. Elevators, and escalators from the E&E inventory, have identical x/z at both ends (the renderer
+  gives such an escalator a 30 degree run, pinned at its street entrance when one lists it).
 - `entrances` are street-level points (raw NY Open Data type, entry/exit) listing the `connectors`
   that reach them.
 - Every element has `sources` (`osm`, `nyopendata`, `authored`). The whole file is ODbL 1.0 and carries

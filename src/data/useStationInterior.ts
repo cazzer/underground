@@ -4,6 +4,7 @@ import { createInteriorCache } from './interiorCache'
 import { deriveInteriorLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
 import { hasInterior } from './interiorRegistry'
 import { loadStationInterior } from './loadStationInterior'
+import { withDemoMachines } from './machineDemo'
 
 export type { InteriorLoad } from './interiorLoad'
 
@@ -11,7 +12,12 @@ export type { InteriorLoad } from './interiorLoad'
  * One fetch per station per page load. The model is built inside the promise, so a data error
  * becomes an `error` load rather than a render crash; failures are evicted so Retry refetches.
  */
-const cache = createInteriorCache((id) => loadStationInterior(import.meta.env.BASE_URL, id).then(buildInteriorModel))
+const cache = createInteriorCache((id) =>
+  loadStationInterior(import.meta.env.BASE_URL, id)
+    // TEMPORARY (machineLook.ts): dev-only demo escalators and elevators for the 9wc.8 look card.
+    .then((i) => (import.meta.env.DEV && new URLSearchParams(window.location.search).has('machinesDemo') ? withDemoMachines(i) : i))
+    .then(buildInteriorModel),
+)
 
 /** Interior for the focused station; stations without an interior file never fetch. */
 export function useStationInterior(stationId: string | null): { load: InteriorLoad; retry: () => void } {

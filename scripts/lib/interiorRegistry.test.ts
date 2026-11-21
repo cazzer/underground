@@ -15,6 +15,7 @@ const OPTIONS = {
   railDrop: 1.1,
   entranceSize: 2.5,
   guides: true,
+  machines: { escalator: 'rails', elevator: 'cab' } as const,
   colorOf: () => [1, 1, 1] as const,
 }
 
@@ -29,13 +30,13 @@ describe('interior registry', () => {
     expect(fine.positions.length).toBeGreaterThan(0)
   })
 
-  it('L08 draws three levels and every connector: 4 strong edges per stair, 12 per elevator', () => {
+  it('L08 draws three levels and every connector: 4 strong edges per stair, 14 per elevator (look A)', () => {
     const l08 = read('L08')
     expect(l08.levels).toHaveLength(3)
     const kinds = l08.connectors.map((c) => c.kind)
     expect(kinds.filter((k) => k === 'stair')).toHaveLength(11)
     expect(kinds.filter((k) => k === 'elevator')).toHaveLength(2)
     const segments = (i: StationInterior) => buildInteriorBuffers(i, OPTIONS).strong.positions.length / 6
-    expect(segments(l08) - segments({ ...l08, connectors: [] })).toBe(11 * 4 + 2 * 12)
+    expect(segments(l08) - segments({ ...l08, connectors: [] })).toBe(11 * 4 + 2 * 14)
   })
 })

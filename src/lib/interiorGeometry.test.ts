@@ -1,92 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Connector, StationInterior } from '../data/stationSchema'
-import { buildInteriorBuffers, type Buffers, type InteriorBufferOptions, type InteriorRole } from './interiorGeometry'
-
-const ROLES: InteriorRole[] = ['outline', 'track', 'stair', 'elevator', 'entrance', 'step', 'guide', 'fare']
-
-const STAIR: Connector = {
-  id: 'ST1',
-  kind: 'stair',
-  lower: { x: 0, z: 10, level: 'mezz' },
-  upper: { x: 7, z: 10, level: 'street' },
-  width: 2,
-  sources: ['authored'],
-}
-
-const ELEVATOR: Connector = {
-  id: 'EL1',
-  kind: 'elevator',
-  lower: { x: 3, z: 0, level: 'plat' },
-  upper: { x: 3, z: 0, level: 'mezz' },
-  width: 2,
-  sources: ['authored'],
-}
-
-function fixture(connectors: Connector[] = [STAIR, ELEVATOR]): StationInterior {
-  return {
-    stationId: 'X01',
-    name: 'Fixture',
-    anchor: { lat: 40.7, lon: -73.9 },
-    license: 'ODbL-1.0',
-    attribution: [],
-    levels: [
-      { id: 'street', name: 'Street', kind: 'street', y: 0 },
-      { id: 'mezz', name: 'Mezzanine', kind: 'mezzanine', y: -4 },
-      { id: 'plat', name: 'Platform', kind: 'platform', y: -8 },
-    ],
-    platforms: [
-      {
-        id: 'P1',
-        level: 'plat',
-        outline: [
-          [-20, -3],
-          [20, -3],
-          [20, 3],
-          [-20, 3],
-        ],
-        tracks: [{ stopId: 'X01N', path: [[-25, -5], [25, -5]] }],
-        osmRef: 'way/1',
-        sources: ['osm'],
-      },
-    ],
-    slabs: [
-      {
-        id: 'S1',
-        level: 'mezz',
-        name: 'Mezzanine',
-        outline: [
-          [-5, 5],
-          [5, 5],
-          [5, 15],
-          [-5, 15],
-        ],
-        sources: ['authored'],
-      },
-    ],
-    connectors,
-    entrances: [
-      { id: 'E1', x: 9, z: 10, type: 'Stair', entry: true, exit: true, connectors: ['ST1'], sources: ['nyopendata'] },
-    ],
-    fareLines: [],
-  }
-}
-
-const opts = (over: Partial<InteriorBufferOptions> = {}): InteriorBufferOptions => ({
-  yScale: 2,
-  stepRise: 0.18,
-  railDrop: 1.1,
-  entranceSize: 2.5,
-  guides: true,
-  colorOf: (role, i) => [ROLES.indexOf(role), i, 0],
-  ...over,
-})
-
-const count = (b: Buffers) => b.positions.length / 6
-/** Segment k as [ax, ay, az, bx, by, bz]. */
-const seg = (b: Buffers, k: number) => Array.from(b.positions.subarray(k * 6, k * 6 + 6))
-const color = (b: Buffers, k: number) => Array.from(b.colors.subarray(k * 6, k * 6 + 3))
-const firstWith = (b: Buffers, role: InteriorRole, level: number) =>
-  Array.from({ length: count(b) }, (_, k) => color(b, k)).findIndex((c) => c[0] === ROLES.indexOf(role) && c[1] === level)
+import { buildInteriorBuffers } from './interiorGeometry'
+import { color, count, firstWith, fixture, opts, ROLES, seg, STAIR } from './interiorFixture'
 
 describe('buildInteriorBuffers', () => {
   const { strong, fine } = buildInteriorBuffers(fixture(), opts())
@@ -96,10 +10,10 @@ describe('buildInteriorBuffers', () => {
       expect(b.positions.length % 6).toBe(0)
       expect(b.colors.length).toBe(b.positions.length)
     }
-    // platform 4 + track 1 + slab 4 + stair 4 + elevator 12 + entrance 4
-    expect(count(strong)).toBe(29)
-    // round(4 / 0.18) - 1 = 21 steps, 4 slab guides and the 4-edge slab footprint at street level
-    expect(count(fine)).toBe(29)
+    // platform 4 + track 1 + slab 4 + stair 4 + elevator (4 shaft + 5 doored square at each end) 14 + entrance 4
+    expect(count(strong)).toBe(31)
+    // round(4 / 0.18) - 1 = 21 steps, 4 slab guides, the 4-edge slab footprint at street level, 2 × 4 cab edges
+    expect(count(fine)).toBe(37)
   })
 
   it('places the platform at its scaled level, the track at rail height and entrances at the street', () => {
@@ -141,17 +55,6 @@ describe('buildInteriorBuffers', () => {
     }
   })
 
-  it('draws elevators as a 12-edge box spanning both levels', () => {
-    const k = firstWith(strong, 'elevator', 2)
-    const box = Array.from({ length: 12 }, (_, i) => seg(strong, k + i))
-    for (const s of box) {
-      for (const x of [s[0]!, s[3]!]) expect(Math.abs(x - 3)).toBeLessThanOrEqual(1)
-      for (const z of [s[2]!, s[5]!]) expect(Math.abs(z)).toBeLessThanOrEqual(1)
-      for (const y of [s[1]!, s[4]!]) expect([-16, -8]).toContain(y)
-    }
-    expect(box.filter((s) => s[1] !== s[4])).toHaveLength(4)
-  })
-
   it('draws deeper levels first', () => {
     const platform = firstWith(strong, 'outline', 2)
     const slab = firstWith(strong, 'outline', 1)
@@ -176,7 +79,7 @@ describe('buildInteriorBuffers', () => {
   })
 
   it('skips guides when asked, and ramps get no steps', () => {
-    expect(count(buildInteriorBuffers(fixture(), opts({ guides: false })).fine)).toBe(21)
+    expect(count(buildInteriorBuffers(fixture([STAIR]), opts({ guides: false })).fine)).toBe(21)
     const ramp = buildInteriorBuffers(fixture([{ ...STAIR, kind: 'ramp' }]), opts({ guides: false }))
     expect(count(ramp.fine)).toBe(0)
     expect(count(ramp.strong)).toBe(4 + 1 + 4 + 4 + 4)
