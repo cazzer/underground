@@ -58,7 +58,11 @@ export function consistCenter(lengthM: number, shown: number, trainM: number): n
   return Math.min(Math.max(shown, trainM / 2), lengthM - trainM / 2)
 }
 
-/** Dots from this camera distance out, cars from CARS_AT in. */
+/**
+ * Dots from this camera distance out, cars from CARS_AT in. DOTS_FROM_M matches where the camera starts
+ * to tilt (DEFAULT_TILT.farDistance in tilt.ts), so the view is top-down while a train first unfolds and
+ * its body height doesn't show; writeConsist also ramps the height in, in case the two ever move apart.
+ */
 export const DOTS_FROM_M = 1400
 export const CARS_AT_M = 900
 

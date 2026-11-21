@@ -7,13 +7,10 @@ import { nearestHit } from '../lib/pickStation'
 import type { Station } from '../lib/network'
 import { theme } from '../theme'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
+import { FocusRing } from './FocusRing'
+import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
-export const MARKER_MIN_METERS = 6
-export const MARKER_Y = 0.2
-export const SEGMENTS = 24
-/** Ring inner radius as a fraction of the marker radius. */
-export const RING_INNER = 0.78
 /** Tap target radius: a pick within this many screen pixels of a station selects it. */
 const HIT_PX = 22
 /** Pointer travel (px) above which a release on a station is a pan, not a click; r3f's own miss threshold is 2.
@@ -150,6 +147,7 @@ export function Stations({ stations }: StationsProps) {
         {/* Default white material: the per-instance colors are the ring colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
+      {focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} />}
     </>
   )
 }

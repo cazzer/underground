@@ -13,7 +13,8 @@ interface Car {
   dx: number
   dz: number
   length: number
-  scale: number
+  width: number
+  height: number
 }
 
 function layout(line: Polyline, shown: number, consist = TEN, mix = 1, slot = 0, k = 1) {
@@ -31,7 +32,8 @@ function layout(line: Polyline, shown: number, consist = TEN, mix = 1, slot = 0,
       dx: length > 0 ? bodies[o + 8]! / length : 0,
       dz: length > 0 ? bodies[o + 10]! / length : 0,
       length,
-      scale: bodies[o + 5]!,
+      width: Math.hypot(bodies[o]!, bodies[o + 2]!),
+      height: bodies[o + 5]!,
     })
   }
   return { bodies, halos, cars }
@@ -85,7 +87,7 @@ describe('writeConsist', () => {
     }
   })
 
-  it('collapses to the dot point at mix = 0, keeping the body section', () => {
+  it('collapses to the dot point at mix = 0, keeping the body width', () => {
     const line = arc(100, 50)
     const dot = pointAtDistance(line, 60).point
     const { cars } = layout(line, 60, TEN, 0)
@@ -93,8 +95,14 @@ describe('writeConsist', () => {
       expect(car.x).toBeCloseTo(dot.x, 4)
       expect(car.z).toBeCloseTo(dot.z, 4)
       expect(car.length).toBe(0)
-      expect(car.scale).toBe(1)
+      expect(car.width).toBeCloseTo(1, 6)
+      expect(car.height).toBe(0)
     }
+  })
+
+  it('ramps the body height in over the first quarter of the handoff', () => {
+    const heights = [0.05, 0.125, 0.25, 0.6].map((mix) => layout(straight(1000), 500, TEN, mix).cars[0]!.height)
+    expect(heights.map((h) => +h.toFixed(6))).toEqual([0.2, 0.5, 1, 1])
   })
 
   it('shrinks to nothing at the dot point when the slot has faded (k = 0)', () => {
@@ -104,7 +112,8 @@ describe('writeConsist', () => {
     for (const car of cars) {
       expect(car.x).toBeCloseTo(dot.x, 4)
       expect(car.length).toBe(0)
-      expect(car.scale).toBe(0)
+      expect(car.width).toBe(0)
+      expect(car.height).toBe(0)
     }
     for (let c = 0; c < MAX_CARS; c++) {
       expect(halos[c * 16]).toBeCloseTo(0, 9)
@@ -143,6 +152,18 @@ describe('writeConsist', () => {
     const { bodies, halos } = layout(line, 0)
     expect(bodies.every(Number.isFinite)).toBe(true)
     expect(halos.every(Number.isFinite)).toBe(true)
+    // The chord is zero, so cars face north (0, -1): a non-negative length keeps the z column at or below 0.
+    expect(bodies[10]).toBeLessThanOrEqual(0)
+  })
+
+  it('widens car length without closing the gap between cars', () => {
+    const bodies = new Float32Array(MAX_CARS * 16)
+    const halos = new Float32Array(MAX_CARS * 16)
+    const b60: Consist = { cars: 8, pitchM: 18.3 }
+    writeConsist(bodies, halos, 0, straight(1000), 500, b60, 1, 1, 1.075, FRAME, createConsistScratch())
+    const length = Math.hypot(bodies[8]!, bodies[10]!)
+    expect(length).toBeGreaterThan(18.3 - 1.2)
+    expect(length).toBeLessThanOrEqual(18.3 - 0.6 + 1e-4)
   })
 
   it('zeroes the instances past the consist and leaves other slots alone', () => {

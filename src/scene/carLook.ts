@@ -1,6 +1,7 @@
 /**
  * TEMPORARY until the car look is picked (underground-pah.5 look round). `?cars=a|b|c` picks the car
- * body: a (default) a box, b a chamfered prism, c a flat slab. Once decided, remove together:
+ * body: a a box, b (default; the only one that reads as separate cars under the interior veil) a
+ * chamfered prism, c a flat slab. Once decided, remove together:
  * - this file: replace `carLook` with constants for the chosen body
  * - carGeometry.ts: the unchosen `section` branches (and `roofInsetM` unless b wins)
  * - AGENTS.md: the `?cars=` TEMPORARY note
@@ -22,7 +23,7 @@ const LOOKS = {
 
 export function resolveCarLook(search: string): CarLook {
   const name = new URLSearchParams(search).get('cars')
-  return name === 'b' || name === 'c' ? LOOKS[name] : LOOKS.a
+  return name === 'a' || name === 'c' ? LOOKS[name] : LOOKS.b
 }
 
 export const carLook: CarLook = resolveCarLook(window.location.search)

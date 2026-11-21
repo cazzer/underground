@@ -59,21 +59,22 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
-  TEMPORARY: `?cars=a|b|c` (box, chamfered prism, flat slab; default a) until the pah.5 look round;
+  TEMPORARY: `?cars=a|b|c` (box, chamfered prism, flat slab; default b) until the pah.5 look round;
   the removal list is in `src/scene/carLook.ts`
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; picks raycast an invisible
-    22 px hit disc per station and take the nearest);
+    22 px hit disc per station and take the nearest; `FocusRing.tsx` redraws the focused ring above the
+    trains and the veil; `markerShape.ts` the shared marker constants);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
     and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
     their instances, consists and per-frame writes; `carGeometry.ts` the shaded body; `carLook.ts` TEMPORARY);
     `cameraDistance.ts` helpers; `renderOrder.ts`
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
-    level labels, `FocusRing.tsx` focused ring above the veil); `interiorModel.ts` interior JSON to a
+    level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, arrivals panel); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
@@ -113,7 +114,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
     (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape,
-    each on its chord, unfolding from the dot point (spacing and length by mix, section by the slot fade)
+    each on its chord, unfolding from the dot point (spacing and length by mix, section by the slot fade);
+    `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within about 3 camera distances
+    of the view center are laid out; the rest are zeroed once
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
@@ -188,7 +191,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`screenScale`) so they stay legible when zoomed out.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
-  station fill 3, station ring 4, train halo 5, car halo 5.5, trains 6, cars 6.5.
+  station fill 3, station ring 4, train halo 5, car halo 5.5, trains 6, cars 6.5, focused ring 10
+  (whenever a station is focused, so a train never covers it).
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
   above the ground, and everything after it (veil, interior, focus ring) has depthTest false.
@@ -213,7 +217,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   level up, so upper levels paint over lower ones; deeper levels mix toward the background. It fades
   in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
   layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong); the
-  focused ring is redrawn above it at 10; look C uses -0.6 and -0.3. Mezzanine guides and a
+  focused ring stays above it at 10; look C uses -0.6 and -0.3. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at 180 m (a partial fit on small screens).
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.

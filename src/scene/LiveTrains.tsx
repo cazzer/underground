@@ -12,7 +12,7 @@ import { hopDistance } from '../lib/realtime/position'
 import { pointAtDistanceInto } from '../lib/realtime/polyline'
 import { routeLineColor } from '../lib/routeColor'
 import { theme } from '../theme'
-import { cameraDistance, screenScale } from './cameraDistance'
+import { cameraDistance, getControls, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
 import { TrainCars } from './TrainCars'
 import { trainRadiusPx } from './trainSize'
@@ -23,6 +23,8 @@ const DOT_MIN_METERS = 2.5
 const HALO_RATIO = 1.5
 const DOT_Y = 0.5
 const SEGMENTS = 16
+/** Cars are laid out only for trains within this many camera distances (plus a train length) of the view center. */
+const CARS_WITHIN = { distances: 3, plusM: 300 }
 
 interface LiveTrainsProps extends LiveLayer {
   network: Network
@@ -119,6 +121,8 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     const scale = screenScale(camera, trainRadiusPx(camera), DOT_MIN_METERS) * (1 - mix)
     const carsOn = mix > 0
     if (carsOn) cars.beginFrame(camera)
+    const center = getControls(state)?.target
+    const reach = camera * CARS_WITHIN.distances + CARS_WITHIN.plusM
     const out = d.instanceMatrix.array as Float32Array
 
     for (let i = 0; i < table.high; i++) {
@@ -133,7 +137,12 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
         freeSlot(table, i)
       } else {
         writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k)
-        if (carsOn) cars.writeTrain(i, table.drawGeometry[i]!.line, shown, mix, k)
+        if (!carsOn) continue
+        const dx = center ? point.x - center.x : 0
+        const dz = center ? point.z - center.z : 0
+        if (dx * dx + dz * dz < reach * reach) {
+          cars.writeTrain(i, table.drawGeometry[i]!.line, shown, mix, k)
+        } else cars.hide(i)
       }
     }
     h.instanceMatrix.array.set(out)

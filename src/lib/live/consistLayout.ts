@@ -58,7 +58,11 @@ export function writeConsist(
     const step = pitch * u
     const rear = consistCenter(line.length, shown, n * step) - (n * step) / 2
     const cross = k * frame.crossScale * widen
-    const bodyLength = u * widen * Math.max(pitch - frame.gapM, 0.5 * pitch)
+    // Height grows in over the first quarter of the handoff, so a stub of a train can't pop up at a tilt.
+    const height = cross * Math.min(1, 4 * mix)
+    // Widened too (end faces), but never past the gap's middle, so neighbouring cars can't overlap.
+    const fullLength = Math.max(pitch - frame.gapM, 0.5 * pitch)
+    const bodyLength = u * Math.min(widen * fullLength, Math.max(fullLength, pitch - 0.5 * frame.gapM))
     const haloWidth = cross * frame.widthM + 2 * u * frame.rimM
     const haloLength = step + 2 * u * frame.rimM
     let a = scratch.a
@@ -70,7 +74,7 @@ export function writeConsist(
       const uz = b.z - a.z
       const mx = (a.x + b.x) / 2
       const mz = (a.z + b.z) / 2
-      writeYawMatrix(bodies, base + c, mx, frame.y, mz, ux, uz, cross, cross, bodyLength)
+      writeYawMatrix(bodies, base + c, mx, frame.y, mz, ux, uz, cross, height, bodyLength)
       writeYawMatrix(halos, base + c, mx, frame.y, mz, ux, uz, haloWidth, 1, haloLength)
       const t = a
       a = b

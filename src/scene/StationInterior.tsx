@@ -6,7 +6,6 @@ import type { Network } from '../lib/network'
 import { interiorOpacity } from '../lib/interiorReveal'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
-import { FocusRing } from './FocusRing'
 import { interiorLook } from './interiorLook'
 import type { InteriorModel } from './interiorModel'
 import { InteriorVeil } from './InteriorVeil'
@@ -66,7 +65,6 @@ export function StationInterior({ model, network, onRevealed }: StationInteriorP
 
   return (
     <>
-      {interiorLook.veil !== 'none' && <FocusRing position={station.pos} />}
       <group ref={group} position={[model.origin.x, 0, model.origin.z]} visible={false}>
       {interiorLook.veil !== 'none' && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
