@@ -22,3 +22,15 @@ export function cameraDistance(state: RootState): number {
 export function screenScale(distance: number, px: number, minMeters: number): number {
   return Math.max(distance * px * 0.0008, minMeters)
 }
+
+/** Marker radius ramp: small enough at the city overview that dense Manhattan doesn't blob. */
+const MARKER_FAR = { distance: 40_000, px: 3 }
+const MARKER_NEAR = { distance: 4_000, px: 7 }
+
+/** Station marker radius in screen pixels for a camera distance; log-linear between the ends. */
+export function markerRadiusPx(distance: number): number {
+  if (distance >= MARKER_FAR.distance) return MARKER_FAR.px
+  if (distance <= MARKER_NEAR.distance) return MARKER_NEAR.px
+  const t = Math.log(MARKER_FAR.distance / distance) / Math.log(MARKER_FAR.distance / MARKER_NEAR.distance)
+  return MARKER_FAR.px + (MARKER_NEAR.px - MARKER_FAR.px) * t
+}
