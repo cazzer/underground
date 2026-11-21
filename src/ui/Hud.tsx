@@ -9,6 +9,7 @@ import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
 import { useTrainSelection } from '../lib/trainSelection'
 import type { LocateControls } from '../data/useLocate'
+import { PartialAccessNote, StationName } from './AccessIcon'
 import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
 import { LiveStatus } from './LiveStatus'
@@ -44,7 +45,7 @@ function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, 
     >
       <div className="flex items-start justify-between gap-3">
         <h2 ref={headingRef} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
-          {station.name}
+          <StationName name={station.name} access={station.access} context="card" />
         </h2>
         <button
           type="button"
@@ -55,6 +56,7 @@ function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, 
           ×
         </button>
       </div>
+      <PartialAccessNote access={station.access} />
       <InteriorStatus info={interior} />
       <ArrivalsList network={network} station={station} source={arrivals} status={live} />
     </aside>

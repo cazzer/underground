@@ -1,3 +1,6 @@
+import type { Borough } from '../data/schema'
+import type { StationAccessInfo } from './network'
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** "FX" → "F◆": express variants are written as the base route plus a diamond, as on signage. */
@@ -19,4 +22,33 @@ export function scheduleLabel(feedVersion: string): string {
   const day = m ? Number(m[3]) : 0
   if (!m || !month || day < 1 || day > 31) return `Schedule: ${feedVersion}`
   return `Schedule: ${month} ${day}, ${m[1]}`
+}
+
+const BOROUGHS: Record<Borough, string> = { Bx: 'Bronx', M: 'Manhattan', Bk: 'Brooklyn', Q: 'Queens', SI: 'Staten Island' }
+
+/** "Bk" → "Brooklyn". */
+export function boroughName(code: Borough): string {
+  return BOROUGHS[code]
+}
+
+/** What the access icon says: null for a station that isn't accessible (no marker is drawn for those). */
+export function accessLabel(access: StationAccessInfo): string | null {
+  if (access.status === 'full') return 'Accessible station'
+  if (access.status === 'partial') return access.note ? `Partly accessible: ${access.note}` : 'Partly accessible'
+  return null
+}
+
+/**
+ * Names whose stations lie in more than one borough; search rows show the borough under these. A name shared
+ * within one borough (every "145 St" is in Manhattan) gets none: the borough wouldn't tell them apart.
+ */
+export function multiBoroughNames(stations: readonly { name: string; borough?: Borough }[]): Set<string> {
+  const boroughs = new Map<string, Set<Borough>>()
+  for (const { name, borough } of stations) {
+    if (borough === undefined) continue
+    const seen = boroughs.get(name) ?? new Set<Borough>()
+    seen.add(borough)
+    boroughs.set(name, seen)
+  }
+  return new Set([...boroughs].filter(([, seen]) => seen.size > 1).map(([name]) => name))
 }

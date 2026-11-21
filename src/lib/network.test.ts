@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { decodeShapePoints, deltaEncode } from '../data/codec'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
 import type { StationDepthsFile } from '../data/stationSchema'
-import { buildNetwork, pointAlong, type ShapePath } from './network'
+import { buildNetwork, pointAlong, stationAccess, type ShapePath } from './network'
 import { toGround } from './projection'
 import { EMPTY_PROFILE, profileAt } from './trackProfile'
 
@@ -181,6 +181,28 @@ function path(points: { x: number; z: number }[]): ShapePath {
   }
   return { id: 's', routeId: 'r', direction: 'N', primary: true, points, cumulative, length: cumulative.at(-1) ?? 0, y: points.map(() => 0), profile: EMPTY_PROFILE }
 }
+
+describe('stationAccess', () => {
+  it('carries full and partial status, with the partial note', () => {
+    expect(stationAccess({ ada: 'full' })).toEqual({ status: 'full' })
+    expect(stationAccess({ ada: 'partial', adaPartial: { north: false, south: true, note: 'Uptown only' } })).toEqual({
+      status: 'partial',
+      note: 'Uptown only',
+    })
+  })
+
+  it('reads a station from an older file without the fields as not accessible', () => {
+    expect(stationAccess({})).toEqual({ status: 'none' })
+  })
+
+  it('reaches the render stations, borough included', () => {
+    const net = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, NO_DEPTHS, 2)
+    expect(net.stations.map((s) => [s.borough, s.access.status])).toEqual([
+      ['Bx', 'full'],
+      ['Bx', 'none'],
+    ])
+  })
+})
 
 describe('pointAlong', () => {
   it('returns the only point of a one-point path', () => {
