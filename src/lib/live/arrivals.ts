@@ -1,4 +1,4 @@
-import { FEED_IDS, type RealtimeSnapshot } from '../../data/realtime'
+import { ARRIVAL_HORIZON_S, FEED_IDS, type RealtimeSnapshot } from '../../data/realtime'
 import type { Direction, RouteId, StationId, StopId } from '../../data/schema'
 import { ghostReason } from '../realtime/filters'
 import { joinTrip } from '../realtime/joinTrip'
@@ -13,6 +13,8 @@ export const MAX_TIMES_PER_GROUP = 3
 export const PAST_GRACE_S = 30
 /** Under this many seconds away reads "Now". */
 export const NOW_UNDER_S = 30
+/** A last prediction this close to the Worker's horizon means the feed cut the list short, not that the trip ends. */
+export const HORIZON_SLACK_S = 30
 
 export interface ArrivalGroup {
   routeId: RouteId
@@ -28,6 +30,8 @@ export interface ArrivalsSource {
   snapshot: RealtimeSnapshot
   offsetS: number
   lookup: TripLookup
+  /** Consecutive failed polls. */
+  failures: number
 }
 
 export interface ArrivalOptions {
@@ -42,15 +46,17 @@ const stationOfStop = (stop: StopId): StationId => stop.slice(0, -1)
 const directionOfStop = (stop: StopId): Direction => (stop.endsWith('N') ? 'N' : 'S')
 
 /**
- * The next arrivals at `station`, grouped by route, direction and destination, groups ordered by their soonest
- * time. A trip is kept unless it is stale or has nothing ahead of it: the "unassigned" ghost rule is not
- * applied, because a scheduled train that has not been dispatched yet is still a real next arrival (at a
- * terminal it is often the only one), even though the map does not draw it. A trip that ends at this
- * station is skipped: nobody boards it.
+ * The next arrivals at `station`, grouped by route, direction and destination. A trip is kept unless it is
+ * stale or has nothing ahead of it: the "unassigned" ghost rule is not applied, because a scheduled train
+ * that has not been dispatched yet is still a real next arrival (at a terminal it is often the only one),
+ * even though the map does not draw it. A trip that ends at this station is skipped: nobody boards it.
  *
  * The destination is the last stop of the pattern the trip joins to (the feed's own arrival list is cut at
  * 30 minutes, so its last stop is not the terminal). If the join fails, the last stop the feed predicts is
- * the best name left.
+ * the best name left; when that is this station and the list runs to the horizon, the trip is kept, since
+ * it was cut short rather than ending here.
+ *
+ * Groups are ordered by direction (north first, so rows stay put between polls), then soonest time.
  */
 export function arrivalsAt(
   snapshot: RealtimeSnapshot,
@@ -71,8 +77,12 @@ export function arrivalsAt(
 
       const join = joinTrip(trip, opts.lookup, nowS)
       const shapeId = join.matched ? join.shapeId : ''
-      const terminal = opts.lookup.patterns[shapeId]?.stops.at(-1) ?? trip.arrivals.at(-1)?.[0]
-      if (terminal === undefined || stationOfStop(terminal) === station.id) continue
+      const patternTerminal = opts.lookup.patterns[shapeId]?.stops.at(-1)
+      const last = trip.arrivals.at(-1)
+      const terminal = patternTerminal ?? last?.[0]
+      if (terminal === undefined || last === undefined) continue
+      const cutShort = patternTerminal === undefined && last[1] >= snapshot.generatedAt + ARRIVAL_HORIZON_S - HORIZON_SLACK_S
+      if (stationOfStop(terminal) === station.id && !cutShort) continue
       const headsign = opts.stationName(stationOfStop(terminal))
       const routeId = trainRouteId({ trip, shapeId }, opts.routeById, opts.lookup.patterns)
       if (headsign === undefined || routeId === null) continue
@@ -88,12 +98,12 @@ export function arrivalsAt(
 
   return [...groups.values()]
     .map((g) => ({ ...g, times: g.times.toSorted((a, b) => a - b).slice(0, MAX_TIMES_PER_GROUP) }))
-    .sort((a, b) => a.times[0]! - b.times[0]! || a.routeId.localeCompare(b.routeId) || a.headsign.localeCompare(b.headsign))
+    .sort((a, b) => a.direction.localeCompare(b.direction) || a.times[0]! - b.times[0]! || a.routeId.localeCompare(b.routeId) || a.headsign.localeCompare(b.headsign))
 }
 
-/** "Now" under 30 seconds (or already past), else whole minutes, never less than 1. */
+/** "Now" under 30 seconds (or already past), else whole minutes rounded down, never less than 1. */
 function minutesText(deltaS: number): string {
-  return deltaS < NOW_UNDER_S ? 'Now' : String(Math.max(1, Math.round(deltaS / 60)))
+  return deltaS < NOW_UNDER_S ? 'Now' : String(Math.max(1, Math.floor(deltaS / 60)))
 }
 
 /** "4, 9, 15 min", or "Now, 6 min"; a lone "Now" has no unit. */

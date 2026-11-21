@@ -2,36 +2,16 @@ import { useEffect, useLayoutEffect, useRef, type Ref } from 'react'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
-import { routeChipLabel, scheduleLabel } from '../lib/labels'
+import { scheduleLabel } from '../lib/labels'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
-import type { Network, Route } from '../lib/network'
-import { routeLineColor } from '../lib/routeColor'
+import type { Network } from '../lib/network'
 import { theme } from '../theme'
 import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
 import { LiveStatus } from './LiveStatus'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
-
-interface RouteChipProps {
-  route: Route
-}
-
-/** Ink text on a route-colored border; the full name is in the tooltip and for screen readers. */
-function RouteChip({ route }: RouteChipProps) {
-  return (
-    <li
-      title={route.longName}
-      className="border-2 px-1.5 text-xs text-ink"
-      style={{ borderColor: routeLineColor(route.color, theme.routeLineMix, theme.background) }}
-    >
-      <span aria-hidden="true">{routeChipLabel(route.shortName)}</span>
-      <span className="sr-only">
-        {route.shortName}: {route.longName}
-      </span>
-    </li>
-  )
-}
+import { RouteChip } from './RouteChip'
 
 interface ArrivalsPanelProps {
   network: Network
@@ -67,7 +47,13 @@ function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, 
         {station.routeIds.map((id) => {
           const route = network.routeById.get(id)
           if (!route) throw new Error(`Station ${station.id} lists unknown route "${id}"`)
-          return <RouteChip key={id} route={route} />
+          return (
+            <RouteChip key={id} route={route} as="li">
+              <span className="sr-only">
+                {route.shortName}: {route.longName}
+              </span>
+            </RouteChip>
+          )
         })}
       </ul>
       <InteriorStatus info={interior} />
@@ -115,9 +101,13 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel }: Hu
       onPanel(null)
       return
     }
+    // The list inside changes height with every poll; only a real move of the panel reaches the scene.
+    let last: ScreenRect | null = null
     const measure = () => {
       const p = el.getBoundingClientRect()
-      onPanel({ left: p.left, top: p.top, right: p.right, bottom: p.bottom })
+      if (last && last.left === p.left && last.top === p.top && last.right === p.right && last.bottom === p.bottom) return
+      last = { left: p.left, top: p.top, right: p.right, bottom: p.bottom }
+      onPanel(last)
     }
     measure()
     const observer = new ResizeObserver(measure)

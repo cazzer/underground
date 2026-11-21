@@ -6,6 +6,12 @@ export function routeChipLabel(shortName: string): string {
   return m ? `${m[1]}◆` : shortName
 }
 
+/** "FX" → "F express": what a screen reader should say where the chip shows a diamond. */
+export function routeSpokenName(shortName: string): string {
+  const m = /^([0-9A-Z])X$/.exec(shortName)
+  return m ? `${m[1]} express` : shortName
+}
+
 /** "20261028-fall-2026-…" → "Schedule: Oct 28, 2026"; any other id is shown as is. */
 export function scheduleLabel(feedVersion: string): string {
   const m = /^(\d{4})(\d{2})(\d{2})/.exec(feedVersion)

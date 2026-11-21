@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FEED_IDS, RT_SCHEMA_VERSION, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
+import { ARRIVAL_HORIZON_S, FEED_IDS, RT_SCHEMA_VERSION, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import { lookup } from '../realtime/fixture'
 import {
   ARRIVAL_WINDOW_S,
@@ -42,7 +42,7 @@ const north = (time: number, extra: [string, number][] = []) =>
   trip('129600_1..N03R', '1', [['102N', time], ...extra])
 
 describe('arrivalsAt', () => {
-  it('groups by route, direction and destination, soonest group first, both directions', () => {
+  it('groups by route, direction and destination: north first, then soonest, both directions', () => {
     const snap = snapshot([
       north(NOW + 600),
       north(NOW + 120, [['103N', NOW + 220]]),
@@ -50,9 +50,9 @@ describe('arrivalsAt', () => {
       trip('128750_N..N70R', 'W', [['102N', NOW + 300]]),
     ])
     expect(arrivalsAt(snap, at102, NOW, opts)).toEqual([
-      { routeId: '1', direction: 'S', headsign: 'Stop 101', times: [NOW + 90] },
       { routeId: '1', direction: 'N', headsign: 'Stop 103', times: [NOW + 120, NOW + 600] },
       { routeId: 'W', direction: 'N', headsign: 'Stop 103', times: [NOW + 300] },
+      { routeId: '1', direction: 'S', headsign: 'Stop 101', times: [NOW + 90] },
     ])
   })
 
@@ -74,7 +74,7 @@ describe('arrivalsAt', () => {
     expect(arrivalsAt(snapshot([elsewhere]), at102, NOW, opts)).toEqual([])
   })
 
-  it('keeps an unassigned trip but drops a stale vehicle and a trip with nothing ahead', () => {
+  it('keeps an unassigned trip but drops a stale vehicle', () => {
     const unassigned = north(NOW + 100)
     unassigned.assigned = false
     unassigned.timestamp = null
@@ -88,6 +88,22 @@ describe('arrivalsAt', () => {
     const arriving = trip('129600_1..N03R', '1', [['102N', NOW + 60], ['103N', NOW + 160]])
     const at103 = { id: '103', stops: ['103N', '103S'] }
     expect(arrivalsAt(snapshot([arriving]), at103, NOW, opts)).toEqual([])
+  })
+
+  it('falls back to the last predicted stop when the trip id cannot be joined', () => {
+    const unjoined = trip('bogus', '1', [['102N', NOW + 60], ['103N', NOW + 160]])
+    expect(arrivalsAt(snapshot([unjoined]), at102, NOW, opts)).toEqual([
+      { routeId: '1', direction: 'N', headsign: 'Stop 103', times: [NOW + 60] },
+    ])
+  })
+
+  it('skips an unjoined trip whose predictions end here, unless they run to the horizon', () => {
+    const ends = trip('bogus', '1', [['101N', NOW + 60], ['102N', NOW + 160]])
+    const cut = trip('bogus', '1', [['101N', NOW + 60], ['102N', NOW + ARRIVAL_HORIZON_S - 10]])
+    expect(arrivalsAt(snapshot([ends]), at102, NOW, opts)).toEqual([])
+    expect(arrivalsAt(snapshot([cut]), at102, NOW, opts)).toEqual([
+      { routeId: '1', direction: 'N', headsign: 'Stop 102', times: [NOW + ARRIVAL_HORIZON_S - 10] },
+    ])
   })
 
   it('uses the feed route when known, and drops a trip whose route and shape are both unknown', () => {
@@ -104,15 +120,15 @@ describe('formatArrivalTimes', () => {
     expect(f(29)).toBe('Now')
     expect(f(-20)).toBe('Now')
   })
-  it('rounds to whole minutes, never below 1', () => {
+  it('counts whole minutes down, never below 1', () => {
     expect(f(30)).toBe('1 min')
-    expect(f(89)).toBe('1 min')
-    expect(f(90)).toBe('2 min')
-    expect(f(29 * 60 + 40)).toBe('30 min')
+    expect(f(119)).toBe('1 min')
+    expect(f(120)).toBe('2 min')
+    expect(f(29 * 60 + 40)).toBe('29 min')
   })
   it('joins several times with one unit', () => {
-    expect(f(120, 400, 900)).toBe('2, 7, 15 min')
-    expect(f(10, 400)).toBe('Now, 7 min')
+    expect(f(120, 400, 900)).toBe('2, 6, 15 min')
+    expect(f(10, 400)).toBe('Now, 6 min')
     expect(f(5, 20)).toBe('Now')
   })
 })

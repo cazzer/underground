@@ -90,8 +90,8 @@ export function useLive(files: NetworkFiles | null): Live {
   )
 
   const arrivals = useMemo<ArrivalsSource | null>(
-    () => (data && snapshot && offsetS !== null ? { snapshot, offsetS, lookup: data.lookup } : null),
-    [data, snapshot, offsetS],
+    () => (data && snapshot && offsetS !== null ? { snapshot, offsetS, lookup: data.lookup, failures: feed.failures } : null),
+    [data, snapshot, offsetS, feed.failures],
   )
 
   const debug = useMemo<LiveDebugInfo | null>(() => {
