@@ -72,6 +72,24 @@ via `.github/workflows/deploy.yml` (Actions to Pages).
 Track work in beads (`bd`). File tickets in Breakdown, not GitHub issues. Include a
 description and an acceptance criterion on create.
 
+## Review
+Every change gets a `reviewer` agent pass. When the review is critical, send the
+findings to the user as Breakdown review items and hold the merge until they decide.
+A review is critical when:
+- it finds a blocker or a should-fix,
+- the change touches deploy/CI, the data pipeline, the CORS worker, or licensing, or
+- it involves a look or feel decision.
+
+How to file:
+- Open a draft PR first so the items have a link.
+- File one inbox item per finding with `brain_write`: `nodeType: inbox_item`,
+  `sourceSystem: inbox`, `externalId: underground:pr/<n>/review/<slug>`, and metadata
+  `{source: session, action: decide, status: pending, priority, url, links}`.
+- Group nits into one item.
+- The content gives the finding with file:line, then the proposed fix.
+
+Reviews with nits only can be fixed in-loop without filing.
+
 ## Data
 Research is pending in `docs/research/data-sources.md` (MTA static GTFS, GTFS-realtime
 feeds, station geometry sources). Until it lands, use only `src/data/sample.ts`.
