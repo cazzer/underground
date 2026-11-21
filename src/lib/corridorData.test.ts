@@ -8,7 +8,7 @@ import depthsRaw from '../../public/data/station-depths.json?raw'
 import shapesRaw from '../../public/data/shapes.json?raw'
 import stationsRaw from '../../public/data/stations.json?raw'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
-import type { StationDepthsFile } from '../data/stationSchema'
+import type { PackedDepthsFile } from '../data/stationSchema'
 import { buildSegmentGrid, cellIndex, segmentDistance } from './corridorHash'
 import { bandKey } from './corridors'
 import { buildNetwork, type ShapePath } from './network'
@@ -23,7 +23,7 @@ const network = buildNetwork(
   routes,
   JSON.parse(shapesRaw) as ShapesFile,
   TRACK_OFFSET_M,
-  JSON.parse(depthsRaw) as StationDepthsFile,
+  JSON.parse(depthsRaw) as PackedDepthsFile,
   2,
 )
 const { shapes: bandedShapes } = bandNetwork(network)

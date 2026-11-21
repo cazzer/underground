@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { expectDataFile, expectDataRecord, expectStationDepths, loadNetwork, mergeStationDepths } from './loadNetwork'
+import { expectDataFile, expectDataRecord, expectStationDepths, loadNetwork } from './loadNetwork'
 
 const URL = '/underground/data/stations.json'
+const EMPTY_DEPTHS = { license: 'ODbL-1.0', attribution: [], format: 2, feedVersion: 'v1', station: [], y: [], a: [], h: [], da: [], dh: [], tracks: {} }
 
 describe('expectDataFile', () => {
   it('returns a well-formed file unchanged', () => {
@@ -39,36 +40,29 @@ describe('expectDataRecord', () => {
 
 describe('expectStationDepths', () => {
   const DEPTHS = '/underground/data/station-depths.json'
-  it('returns an ODbL file with a stations array unchanged', () => {
-    const raw = { license: 'ODbL-1.0', attribution: [], stations: [] }
-    expect(expectStationDepths(raw, DEPTHS)).toBe(raw)
+  it('returns a packed ODbL file with its columns unchanged', () => {
+    expect(expectStationDepths(EMPTY_DEPTHS, DEPTHS)).toBe(EMPTY_DEPTHS)
   })
-  it('throws, naming the url, without the license or the stations array', () => {
-    for (const raw of [null, [], { stations: [] }, { license: 'ODbL-1.0' }, { license: 'ODbL-1.0', stations: {} }]) {
+  it('throws, naming the url, without the license, the format, a column or the overrides', () => {
+    const { a: _a, ...noColumn } = EMPTY_DEPTHS
+    for (const raw of [
+      null,
+      [],
+      { ...EMPTY_DEPTHS, license: 'CC0' },
+      { ...EMPTY_DEPTHS, format: 1 },
+      noColumn,
+      { ...EMPTY_DEPTHS, h: {} },
+      { ...EMPTY_DEPTHS, tracks: null },
+      // the per-track format this replaced
+      { license: 'ODbL-1.0', attribution: [], stations: [] },
+    ]) {
       expect(() => expectStationDepths(raw, DEPTHS)).toThrow(`${DEPTHS}: not a station-depths file`)
     }
   })
 })
 
-describe('mergeStationDepths', () => {
-  const station = (stationId: string, railY: number) => ({
-    stationId,
-    anchor: { lat: 40.7, lon: -73.9 },
-    tracks: [{ stopId: `${stationId}N`, railY, ends: [[0, 0], [1, 0]] as [[number, number], [number, number]] }],
-  })
-  it('adds the new stations sorted by id, keeps the base entry for a shared one, and unions the credits', () => {
-    const base = { license: 'ODbL-1.0' as const, attribution: ['© OpenStreetMap contributors'], stations: [station('L08', -10)] }
-    const extra = { license: 'ODbL-1.0' as const, attribution: ['© OpenStreetMap contributors', 'MTA'], stations: [station('A01', 6), station('L08', -3)] }
-    const { depths, shadowed } = mergeStationDepths(base, extra)
-    expect(depths.stations.map((s) => [s.stationId, s.tracks[0]!.railY])).toEqual([['A01', 6], ['L08', -10]])
-    expect(depths.attribution).toEqual(['© OpenStreetMap contributors', 'MTA'])
-    expect(shadowed).toEqual(['L08'])
-  })
-})
-
 const FILES: Record<string, unknown> = {
-  'station-depths': { license: 'ODbL-1.0', attribution: [], stations: [] },
-  'depths-generated': { license: 'ODbL-1.0', attribution: [], stations: [] },
+  'station-depths': EMPTY_DEPTHS,
   stations: {
     feedVersion: 'v1',
     stations: [{ id: '101', name: 'A', lat: 40.8, lon: -73.9, stops: [], routes: ['1'] }],
@@ -127,21 +121,6 @@ describe('loadNetwork', () => {
     await expect(loadNetwork('/underground/', 0, 2, new AbortController().signal)).rejects.toThrow(
       /^\/underground\/data\/routes\.json: invalid JSON/,
     )
-  })
-
-  it('fetches stations/depths-generated.json only with generatedDepths, and a failure there only logs', async () => {
-    const plain = stubFetch()
-    await loadNetwork('/underground/', 0, 2, new AbortController().signal)
-    expect(plain.mock.calls.map(([url]) => url)).not.toContain('/underground/data/stations/depths-generated.json')
-    const flagged = stubFetch()
-    await loadNetwork('/underground/', 0, 2, new AbortController().signal, { generatedDepths: true })
-    expect(flagged.mock.calls.map(([url]) => url)).toContain('/underground/data/stations/depths-generated.json')
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    stubFetch({ name: 'depths-generated', respond: () => new Response('nope', { status: 404 }) })
-    const { network } = await loadNetwork('/underground/', 0, 2, new AbortController().signal, { generatedDepths: true })
-    expect(network.stations).toHaveLength(1)
-    expect(error).toHaveBeenCalledOnce()
-    error.mockRestore()
   })
 
   it('rejects with the AbortError when aborted', async () => {

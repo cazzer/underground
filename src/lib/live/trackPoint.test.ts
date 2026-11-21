@@ -90,3 +90,21 @@ describe('trackPointInto', () => {
     for (let c = 0; c < 4; c++) expect(bodies[c * 16 + 12]).toBeCloseTo(shift, 3)
   })
 })
+
+describe('trackPointInto on a coarsely sampled ramp', () => {
+  it("puts the train on the drawn chord, not the ideal ease, so it never floats off its line", () => {
+    const profile = buildTrackProfile([{ d0: 600, d1: 800, yReal: -10.2 }], { grade: GRADE, yScale: 2 }).profile
+    // Only the profile's knots as vertices: the chord between them strays far from the ease.
+    const xs = [0, ...profile.d, 1400]
+    const line = buildPolyline(xs.map((x) => ({ x, z: 0 })))
+    const track: DrawnTrack = { line, profile, bandInputs: new Float32Array(xs.length * 4) }
+    const view = { ...createBandView(), depth: 0.5 }
+    const p = createTrackPoint()
+    for (let i = 1; i < xs.length; i++) {
+      const [a, b] = [xs[i - 1]!, xs[i]!]
+      const d = (a + b) / 2
+      const chord = ((profileAt(profile, a) + profileAt(profile, b)) / 2) * 0.5
+      expect(trackPointInto(track, d, view, p).y).toBeCloseTo(chord, 9)
+    }
+  })
+})

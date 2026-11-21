@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { ShapesFile, StationsFile } from '../../src/data/schema.ts'
-import type { StationDepthsFile, StationIndex, StationInterior } from '../../src/data/stationSchema.ts'
+import type { StationIndex, StationInterior } from '../../src/data/stationSchema.ts'
 import { buildPolyline } from '../../src/lib/realtime/polyline.ts'
 import { profileRuns } from '../../src/lib/trackAnchors.ts'
 import { trackLine } from '../../src/lib/trackLine.ts'
@@ -16,6 +16,7 @@ import { generateStations } from './generate.ts'
 import { CATALOG_FILES, generatorCatalog, generatorLines } from './generatorInputs.ts'
 import type { CatalogFileName } from './generatorInputs.ts'
 import { toStableJson } from './stableJson.ts'
+import { buildStationDepths } from './stationDepths.ts'
 import { NOT_INTERIOR_FILES } from './stationIndex.ts'
 import type { AuthoredStation, StationSources } from './stationInputs.ts'
 import { buildStationInterior } from './stationMerge.ts'
@@ -64,7 +65,7 @@ describe('generated station interiors', () => {
   })
 
   it(`puts at least ${MATCHED_SHARE * 100}% of generated tracks on a map shape of their direction`, () => {
-    const depths = json(new URL('depths-generated.json', OUT)) as StationDepthsFile
+    const depths = buildStationDepths(generatedIds.map((id) => json(new URL(`${id}.json`, OUT)) as StationInterior))
     const shapes = (json(new URL('shapes.json', DATA)) as ShapesFile).shapes
     const stations = (json(new URL('stations.json', DATA)) as StationsFile).stations
     const { unmatched } = profileRuns(

@@ -6,12 +6,11 @@ import type { ShapeId, StationId } from '../data/schema'
 import type { ShapeBands } from './corridors'
 import { maskBreaks } from './platformMask'
 import type { PlatformSpan } from './platformSpan'
+import { rampBreaks } from './rampSampling'
 import { profileAt, profileBreaks, type TrackProfile } from './trackProfile'
 
 /** Band tapers get a vertex this often, so the eased slot change draws as a curve, not a kink. */
 export const BAND_STEP_M = 30
-/** Ramps get one every this far (as the realtime geometry once resampled them). */
-const RAMP_STEP_M = 10
 /** Taper breaks closer than this to the previous one are dropped: the slot and half-width tapers mostly coincide. */
 const MIN_BREAK_GAP_M = 5
 /**
@@ -27,7 +26,7 @@ export function lineBreaks(
   spans: ReadonlyMap<StationId, ReadonlyMap<ShapeId, PlatformSpan>>,
   id: ShapeId,
 ): number[] {
-  const out = profileBreaks(profile, RAMP_STEP_M)
+  const out = rampBreaks(profile)
   for (const byShape of spans.values()) {
     const span = byShape.get(id)
     if (span) out.push(...maskBreaks(span))
