@@ -123,8 +123,83 @@ All five are ADA-accessible in `39hk-dx4f`.
   - Don't claim the data is accurate. Citing MTA as the source is fine.
   - The terms state no rate limits or caching rules.
 - **MTA IP** ([licensing-info](https://www.mta.info/developers/licensing-info)): logos, maps, and symbols need a license; it's free for free apps. Avoid the official route bullets and the map. Using hex colors from `routes.txt` is probably fine (UNVERIFIED).
-- **NY Open Data:** attribute to "Metropolitan Transportation Authority", linking `https://www.mta.info/open-data`. License terms are UNVERIFIED.
+- **NY Open Data:** attribute to "Metropolitan Transportation Authority", linking `https://www.mta.info/open-data`. The terms are in §5.1.
 - **OSM ODbL** (UNVERIFIED for 2026): show "© OpenStreetMap contributors". A committed derived database, such as extracted platform polygons, must be offered under ODbL; add a LICENSE note next to those files. Extract once at build time rather than querying Overpass from the app.
+
+### 5.1 Station catalog datasets and licensing decisions
+
+`npm run data:catalog:fetch` pins four data.ny.gov datasets, plus OSM platform and track ways, into
+`data/stations/catalog/` (sizes and counts: `data/README.md`). The `license` field in each dataset's
+view metadata (`https://data.ny.gov/api/views/<id>.json`) is **not set** for any of them, so the
+governing terms are the site-wide OPEN-NY Terms of Use. Rows updated are as of the 2026-11-21 fetch.
+
+| Dataset | Title | License field | Attribution | Rows updated | Overview PDF, "Limitations of Data Use" |
+|---|---|---|---|---|---|
+| `39hk-dx4f` | MTA Subway Stations | none | Metropolitan Transportation Authority, `https://www.mta.info/open-data` | 2026-11-21 | "There are no limitations on the data at this time." |
+| `i9wp-a4ja` | MTA Subway Entrances and Exits: 2024 | none | same | 2025-12-05 | "None." |
+| `94fv-bak7` | MTA Subway Elevator and Escalator Asset Inventory | none | same | 2026-11-21 (daily) | "There are no limitations on the data at this time." |
+| `vkng-7ivg` | MTA Subway and Rail Station Envelopes | none | same | 2025-08-26 | "There are no limitations on the data at this time." It says the polygons are "for informational purposes only" |
+
+The four overview PDFs (read 2026-11-21 from data.ny.gov) state no usage limit that conflicts with our use.
+Two data-quality notes from them matter for the catalog: the E&E "X Coordinate" and "Y Coordinate"
+are "the center of the subway station if the exact location of the subway elevator or escalator
+asset is not known", and the entrances dataset is "a point-in-time dataset as of August 2024" with
+one December 2025 update for F/M service changes.
+
+**OPEN-NY Terms of Use** (PDF at `https://data.ny.gov/download/77gx-ii52/application/pdf`, "LAST
+MODIFIED: March 8, 2013", read 2026-11-21):
+- The preamble says the terms "do not contain restrictions requiring members of the public to use
+  attribution, to re-post the license terms with any re-uses of the data, to impose share-alike or
+  technical restrictions, nor require the public to obtain pre-approval before re-use of the data".
+  The one guard is lawful use: "Keep your re-uses lawful."
+- Grant: "The State grants you a non-exclusive, revocable license to use the Content contained on
+  this website in a manner consistent with the Terms of Use." Content may carry logos and marks that
+  are not licensed; do not remove proprietary rights notices.
+- Disclaimer: the State "does not assume legal liability or responsibility for the accuracy,
+  timeliness, completeness, or quality of the Content" and "makes no warranty, express or implied".
+  It also does not vouch for the Content "after it has been downloaded", nor for "any analyses or
+  re-uses".
+- Indemnity: the user agrees "to defend, indemnify and hold harmless the State" against claims
+  "arising out of or in any way connected with your access to or use of the OPEN-NY website".
+- Termination: the State may "terminate your access to OPEN-NY for any reason, without notice";
+  "all licenses and other rights granted to you ... will immediately cease". It may also require
+  a user, by written notice, to stop using Content it believes is used unlawfully or in breach of the
+  Terms of Use.
+- Public Participation, scoped by its opening sentence ("To the extent OPEN-NY activates a module or
+  forum for public comment or the uploading of Content or other information from members of the
+  general public, the following provisions concerning acceptable use apply"): "You must not create
+  accounts with OPEN-NY or access the site through unauthorized means, including but not limited to,
+  by using an automated device, script, bot, spider, crawler or scraper."
+
+Not pinned:
+- **DOS Track LRS** (`dyuj-5if7`) is a file geodatabase download only and needs GDAL, so it is not
+  in the catalog. OSM `railway=subway` ways are the track source (Staten Island Railway is tagged the
+  same way).
+- The 2021 draft NYCT GTFS-Pathways feed must never be added: the MTA says not to use it in
+  public-facing applications.
+
+The OSM parts (`osm-platforms.json`, `osm-tracks.json`) are © OpenStreetMap contributors under the
+ODbL 1.0 (§5 above). Each way keeps its OSM id; `baseTimestamp` is the Overpass database time. The
+fetch uses `out geom` without `meta`, so contributor names and ids are never downloaded. Tracks drop
+the operator "New York City Transit Authority" (nearly every track has it) and keep any other value;
+the fetch throws on a nearby track with no `operator` tag, so a missing one is never read as NYCT.
+`network` is kept raw where present (95% of tracks have none). Platforms keep both raw, so PATH
+platforms stay identifiable.
+
+**Decisions (the user, 2026-11-21)**
+- (a) Whole-file ODbL station outputs may contain OPEN-NY rows. We ship them with a split attribution
+  line: the OSM-derived parts are ODbL, and the MTA-sourced elements are NY Open Data under the
+  OPEN-NY Terms of Use. The attribution line itself lands with the 9wc.2 schema change.
+- (b) OPEN-NY governs the pinned data.ny.gov extracts. The MTA developer terms (§5) stay in force for
+  the realtime feeds and GTFS, and the "may not be real time" and no-endorsement notices stay
+  everywhere.
+- (c) The hand-run SODA scripts stay. This is our reading, not settled law. First, the Public
+  Participation bullets apply "to the extent OPEN-NY activates a module or forum for public comment
+  or the uploading of Content", so they govern those features, not downloading Content. Second, the
+  SODA API is data.ny.gov's documented programmatic interface, so it is not an "unauthorized means"
+  either. The scripts are run by hand, make 12 SODA requests (view metadata, `count(*)` and rows for
+  each of four datasets) plus one Overpass request, send a descriptive `User-Agent`, and never run in
+  CI or from the site.
 
 ## 6. Static-hosting fit and pipeline
 
@@ -153,7 +228,7 @@ That totals about 170 KB raw, or about 35 KB gzipped. Refresh it with a schedule
 ## Gaps / UNVERIFIED
 - The exact feed publish interval; polling aliased it, and 5–10 s is what was observed.
 - What VehiclePosition `timestamp` means.
-- The OSM ODbL wording, Cloudflare limits, NY Open Data terms, and the Project Subway NYC license.
+- The OSM ODbL wording, Cloudflare limits, and the Project Subway NYC license.
 - The MTA terms were read through WebFetch summaries, because curl is blocked by Akamai.
 - OSM coverage beyond the 5 stations surveyed.
 - Whether 1 Av has a mezzanine, and whether Park Pl's `level=1` is correct.

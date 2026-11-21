@@ -10,7 +10,7 @@ export function epochToIso(seconds: unknown, path: string): string {
   return new Date(finite(seconds, path) * 1000).toISOString()
 }
 
-function num(v: unknown, path: string): number {
+export function num(v: unknown, path: string): number {
   const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v
   return finite(n, path)
 }
@@ -48,20 +48,22 @@ export function trimOverpassWays(json: unknown, ids: number[]): { baseTimestamp:
   return { baseTimestamp, ways }
 }
 
+/** One i9wp-a4ja row; `at` names it in errors. Coordinates are parsed exactly as the source gives them. */
+export function entranceRow(r: unknown, at: string): EntranceRow {
+  const row = record(r, at)
+  return {
+    type: text(row.entrance_type, `${at}.entrance_type`),
+    entry: yesNo(row.entry_allowed, `${at}.entry_allowed`),
+    exit: yesNo(row.exit_allowed, `${at}.exit_allowed`),
+    lat: num(row.entrance_latitude, `${at}.entrance_latitude`),
+    lon: num(row.entrance_longitude, `${at}.entrance_longitude`),
+  }
+}
+
 /** SODA i9wp-a4ja rows, sorted by lat then lon. */
 export function trimEntrances(rows: unknown): EntranceRow[] {
   return list(rows, 'entrances')
-    .map((r, i) => {
-      const at = `entrances[${i}]`
-      const row = record(r, at)
-      return {
-        type: text(row.entrance_type, `${at}.entrance_type`),
-        entry: yesNo(row.entry_allowed, `${at}.entry_allowed`),
-        exit: yesNo(row.exit_allowed, `${at}.exit_allowed`),
-        lat: num(row.entrance_latitude, `${at}.entrance_latitude`),
-        lon: num(row.entrance_longitude, `${at}.entrance_longitude`),
-      }
-    })
+    .map((r, i) => entranceRow(r, `entrances[${i}]`))
     .sort((a, b) => a.lat - b.lat || a.lon - b.lon)
 }
 

@@ -29,6 +29,8 @@ so dev and preview serve under that path.
   into `public/data/stations/*.json`. Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
   pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`.
+- `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
+  `data/stations/catalog/`. Review the diff. `data:stations` stays offline and never reads it.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -171,8 +173,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
-- `scripts/`: `build-data.ts`, `build-stations.ts` and `fetch-station-sources.ts` (the only IO) and pure
-  transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station merge
+  - `data/stations/catalog/`: citywide pinned extracts (stations, entrances, equipment, envelopes,
+    osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
+    `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
+    downstream), and OSM ways have none either (join by distance)
+- `scripts/`: `build-data.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
+  (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
+  merge; `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)
 - `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`
   - `src/schema.ts` the JSON contract (types and consts only); the client re-exports it
   - `src/index.ts` routing, memo + Cache API (15 s), CORS; `cache.ts` pure memo/herd-guard

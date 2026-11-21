@@ -16,3 +16,6 @@ coverage
 
 # GTFS zips are inputs only, never committed
 *.zip
+
+# Half-written catalog files from an interrupted data:catalog:fetch
+data/stations/catalog/*.tmp
