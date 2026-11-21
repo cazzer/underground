@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useFocus } from '../lib/focus'
-import { network } from '../lib/network'
+import type { Network } from '../lib/network'
+import { routeLineColor } from '../lib/routeColor'
 import { theme } from '../theme'
 import { Attribution } from './Attribution'
 
@@ -11,18 +12,14 @@ const PLACEHOLDER_ARRIVALS = [
   { line: 'L1', destination: 'Battery Park', minutes: 9 },
 ]
 
-function lineColor(lineId: string): string {
-  const route = network.routes.find((r) => r.id === lineId)
-  return theme.lines[(route?.colorIndex ?? 0) % theme.lines.length] ?? theme.ink
-}
-
 interface ArrivalsPanelProps {
+  network: Network
   stationId: string
   onClose: () => void
 }
 
-function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
-  const station = network.stations.find((s) => s.id === stationId)
+function ArrivalsPanel({ network, stationId, onClose }: ArrivalsPanelProps) {
+  const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   return (
     <aside
@@ -40,13 +37,23 @@ function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
           ×
         </button>
       </div>
-      <div className="mt-1 flex gap-1.5">
-        {station.lineIds.map((id) => (
-          <span key={id} className="border px-1.5 text-xs" style={{ borderColor: lineColor(id), color: lineColor(id) }}>
-            {id}
-          </span>
-        ))}
-      </div>
+      <ul aria-label="Routes" className="mt-1 flex flex-wrap gap-1.5">
+        {station.routeIds.map((id) => {
+          const route = network.routeById.get(id)
+          if (!route) throw new Error(`Station ${station.id} lists unknown route "${id}"`)
+          const color = routeLineColor(route.color, theme.routeLineMix)
+          return (
+            <li
+              key={id}
+              title={route.longName}
+              className="border px-1.5 text-xs"
+              style={{ borderColor: color, color }}
+            >
+              {route.shortName}
+            </li>
+          )
+        })}
+      </ul>
       <p className="mt-3 text-xs uppercase tracking-widest text-ink-dim">Arrivals (placeholder)</p>
       <ul className="mt-1 divide-y divide-edge/30 text-sm">
         {PLACEHOLDER_ARRIVALS.map((a) => (
@@ -62,7 +69,11 @@ function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
   )
 }
 
-export function Hud() {
+interface HudProps {
+  network: Network
+}
+
+export function Hud({ network }: HudProps) {
   const { focusedId, dismiss } = useFocus()
 
   useEffect(() => {
@@ -78,12 +89,12 @@ export function Hud() {
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
       <header>
         <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
-        <p className="text-xs text-ink-dim">sample data / theme: {theme.name}</p>
+        <p className="text-xs text-ink-dim">feed {network.feedVersion} / theme: {theme.name}</p>
       </header>
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
       <div className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <Attribution />
-        {focusedId && <ArrivalsPanel stationId={focusedId} onClose={dismiss} />}
+        {focusedId && <ArrivalsPanel network={network} stationId={focusedId} onClose={dismiss} />}
       </div>
     </div>
   )
