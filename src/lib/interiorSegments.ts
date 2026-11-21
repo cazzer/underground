@@ -1,6 +1,6 @@
 /**
  * Segment writer shared by the interior geometry modules.
- * Type-only imports with .ts paths: scripts/lib/interiorRegistry.test.ts (nodenext) loads this file.
+ * Type-only imports with .ts paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
  */
 import type { LocalPoint } from '../data/stationSchema.ts'
 

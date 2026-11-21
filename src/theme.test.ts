@@ -163,9 +163,11 @@ describe('interior machine tokens', () => {
     }
   })
 
-  it('stay apart from the stroke, track and entrance under simulated deuteranopia and protanopia', async () => {
+  it('stay apart from the stroke, track, entrance and each other under simulated deuteranopia and protanopia', async () => {
     for (const t of Object.values(await themes())) {
       for (const [mode, m] of Object.entries(CVD)) {
+        const machines = oklabDistance(simulateCvd(t.interiorElevator, m), simulateCvd(t.interiorEscalator, m))
+        expect(machines, `${t.name} ${mode} elevator ${t.interiorElevator} vs escalator ${t.interiorEscalator}`).toBeGreaterThanOrEqual(MIN_CVD_DISTANCE)
         for (const [name, token] of [['elevator', t.interiorElevator], ['escalator', t.interiorEscalator]] as const) {
           for (const [other, color] of [['stroke', t.interiorStroke], ['track', t.interiorTrack], ['entrance', t.interiorEntrance]] as const) {
             const d = oklabDistance(simulateCvd(token, m), simulateCvd(color, m))

@@ -1,8 +1,9 @@
 /**
  * Station interior (public/data/stations/<id>.json) to LineSegments2 buffers.
- * `.ts` import paths: scripts/lib/interiorRegistry.test.ts (nodenext) loads this file.
+ * `.ts` import paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
  */
 import type { LocalPoint, StationInterior } from '../data/stationSchema.ts'
+import { spreadBanks } from './escalatorBanks.ts'
 import { stationAxis } from './interiorAxis.ts'
 import { interiorBounds } from './interiorFraming.ts'
 import {
@@ -63,8 +64,7 @@ export function buildInteriorBuffers(
 
   // Also throws for an interior with nothing to draw, so it becomes an error load.
   const bounds = interiorBounds(interior)
-  const entrances = new Map<string, LocalPoint>()
-  for (const e of interior.entrances) for (const id of e.connectors) entrances.set(id, [e.x, e.z])
+  const anchors = spreadBanks(interior.connectors, interior.entrances)
   const ctx: ConnectorContext = {
     strong,
     fine,
@@ -74,7 +74,7 @@ export function buildInteriorBuffers(
     colorOf,
     axis: stationAxis(interior),
     center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
-    entranceOf: (id) => entrances.get(id),
+    anchorOf: (id) => anchors.get(id),
     machines: opts.machines,
   }
 

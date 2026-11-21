@@ -1,5 +1,5 @@
 /**
- * The plan direction a station runs in. Type-only imports with .ts paths: scripts/lib/interiorRegistry.test.ts
+ * The plan direction a station runs in. Type-only imports with .ts paths: scripts/lib/stationOutputs.test.ts
  * (nodenext) loads this file.
  */
 import type { LocalPoint, StationInterior } from '../data/stationSchema.ts'

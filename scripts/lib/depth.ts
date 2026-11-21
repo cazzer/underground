@@ -1,12 +1,13 @@
 /** Level elevations relative to the street (0, negative below) from the best evidence available:
  *  E&E rises, then a published depth, then the OSM `level` tag, then a default for the structure. */
+import type { DepthSource } from '../../src/data/stationSchema.ts'
 import { DEEP_STATIONS } from './deepStations.ts'
 import type { DeepStation } from './deepStations.ts'
 import { parseRise } from './riseParse.ts'
 import type { EquipmentFact, Structure } from './stationFacts.ts'
 import { parseServing } from './stationSources.ts'
 
-export type DepthSource = 'ee-rise' | 'deep-list' | 'osm-level' | 'structure-default'
+export type { DepthSource }
 export interface LevelDepth {
   y: number
   source: DepthSource
