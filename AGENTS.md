@@ -46,21 +46,24 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 ## Directory map
 - `src/main.tsx`, `src/App.tsx`, `src/index.css`: entry, root layout, Tailwind + theme CSS vars
 - `src/theme.ts`: all colors, line widths, fonts; presets selected by `?theme=`. Route colors are
-  GTFS data drawn through `theme.routeLineMix` (mixed toward a theme color; amount 1 = mono).
+  GTFS data drawn through `theme.routeLineMix` (mixed toward a theme color; amount 1 = mono), then
+  pushed to at least 3:1 against `theme.background`.
   TEMPORARY: `?lines=a|b|c` picks the lines look until the 8x4.3 options round is decided (default b)
 - `src/scene/`: the r3f scene
-  - `Scene.tsx` canvas and grid; `CameraRig.tsx` MapControls, fit-to-city framing, zoom-driven tilt,
-    fly-to, auto focus, interrupted-fly-to focus hold
+  - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
+    HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
-    temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes, picked by instanceId);
+    temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; picks raycast an invisible
+    22 px hit disc per station and take the nearest);
     `Trains.tsx` (instanced dots); `cameraDistance.ts` helpers; `renderOrder.ts`
 - `src/ui/Hud.tsx`: Tailwind overlay (title, arrivals panel); `LoadStatus.tsx` loading/error panel
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
-  - `lineBuffers.ts`, `routeColor.ts`, `framing.ts`, `markerMatrices.ts`: pure render helpers;
-    `pingPong.ts` triangle wave
+  - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
+    between HUD insets), `markerMatrices.ts`, `pickStation.ts`: pure render helpers; `labels.ts`
+    HUD text (route chips, schedule date); `pingPong.ts` triangle wave
   - `focus.tsx` focused/dismissed-station React context (not pure). In dev only it exposes
     `window.__underground.select(stationId)` for screenshots and Playwright checks
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
