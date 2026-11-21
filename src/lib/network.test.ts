@@ -38,7 +38,7 @@ function shapesFile(): ShapesFile {
 }
 
 describe('buildNetwork', () => {
-  const net = buildNetwork(stationsFile(), routesFile(), shapesFile())
+  const net = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0)
 
   it('decodes and projects shape points', () => {
     const shape = shapesFile().shapes[0]!
@@ -78,24 +78,39 @@ describe('buildNetwork', () => {
   })
 
   it('throws on mismatched feed versions', () => {
-    expect(() => buildNetwork(stationsFile(), { ...routesFile(), feedVersion: 'v2' }, shapesFile())).toThrow(/v2/)
+    expect(() => buildNetwork(stationsFile(), { ...routesFile(), feedVersion: 'v2' }, shapesFile(), 0)).toThrow(/v2/)
   })
 
   it('throws on a shape with an unknown route', () => {
     const shapes = shapesFile()
     shapes.shapes[0]!.routeId = 'X'
-    expect(() => buildNetwork(stationsFile(), routesFile(), shapes)).toThrow(/unknown route "X"/)
+    expect(() => buildNetwork(stationsFile(), routesFile(), shapes, 0)).toThrow(/unknown route "X"/)
   })
 
   it('throws on a shape with one point', () => {
     const shapes = shapesFile()
     shapes.shapes[0]!.lat = [4070000]
     shapes.shapes[0]!.lon = [-7400000]
-    expect(() => buildNetwork(stationsFile(), routesFile(), shapes)).toThrow(/1 point/)
+    expect(() => buildNetwork(stationsFile(), routesFile(), shapes, 0)).toThrow(/1 point/)
   })
 
   it('throws without stations', () => {
-    expect(() => buildNetwork({ feedVersion: FV, stations: [] }, routesFile(), shapesFile())).toThrow(/no stations/)
+    expect(() => buildNetwork({ feedVersion: FV, stations: [] }, routesFile(), shapesFile(), 0)).toThrow(/no stations/)
+  })
+})
+
+describe('buildNetwork track offset', () => {
+  it('moves shape points right of travel and measures length on the offset path', () => {
+    const plain = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0).shapes[0]!
+    const shifted = buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7).shapes[0]!
+    const [a, b] = [plain.points[0]!, plain.points[1]!]
+    const len = Math.hypot(b.x - a.x, b.z - a.z)
+    // Right normal of tangent (tx, tz) is (-tz, tx).
+    expect(shifted.points[0]!.x).toBeCloseTo(a.x - ((b.z - a.z) / len) * 4.7)
+    expect(shifted.points[0]!.z).toBeCloseTo(a.z + ((b.x - a.x) / len) * 4.7)
+    expect(shifted.points).toHaveLength(plain.points.length)
+    expect(shifted.cumulative.at(-1)).toBe(shifted.length)
+    expect(buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7).trackOffsetM).toBe(4.7)
   })
 })
 
