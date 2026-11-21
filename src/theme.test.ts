@@ -96,3 +96,24 @@ describe('trainSelectedRim', () => {
     }
   })
 })
+
+describe('interior machine tokens', () => {
+  it('read at 3:1 on the background and stand apart from the other interior tokens, statusError and each other', async () => {
+    for (const t of Object.values(await themes())) {
+      const others = [
+        ['stroke', t.interiorStroke],
+        ['track', t.interiorTrack],
+        ['entrance', t.interiorEntrance],
+        ['fine', t.interiorFine],
+        ['statusError', t.statusError],
+      ] as const
+      for (const [name, token] of [['elevator', t.interiorElevator], ['escalator', t.interiorEscalator]] as const) {
+        expect(contrastRatio(token, t.background), `${t.name} ${name}`).toBeGreaterThanOrEqual(3)
+        for (const [other, color] of others) {
+          expect(oklabDistance(token, color), `${t.name} ${name} ${token} vs ${other} ${color}`).toBeGreaterThanOrEqual(0.1)
+        }
+      }
+      expect(oklabDistance(t.interiorElevator, t.interiorEscalator), t.name).toBeGreaterThanOrEqual(0.1)
+    }
+  })
+})

@@ -42,11 +42,17 @@ export interface Theme {
   panelBorder: string
   fontSans: string
   fontMono: string
-  /** Station interior: outlines, stairs, elevators; track centerlines; street entrances; steps, guides, fare lines. */
+  /** Station interior: outlines and stairs; track centerlines; street entrances; steps, guides, fare lines. */
   interiorStroke: string
   interiorTrack: string
   interiorEntrance: string
   interiorFine: string
+  /**
+   * Station interior machines: elevators and escalators. Each is at least 3:1 on the background and
+   * apart from the other interior tokens and statusError, which 9wc.5 will use for outages (theme.test.ts).
+   */
+  interiorElevator: string
+  interiorEscalator: string
   /** Interior line widths in screen pixels (strong and fine strokes). */
   interiorLineWidth: number
   interiorFineWidth: number
@@ -88,6 +94,8 @@ export const THEMES = {
     interiorTrack: '#5ce1ff',
     interiorEntrance: '#ffd166',
     interiorFine: '#8fb4de',
+    interiorElevator: '#c38cff',
+    interiorEscalator: '#7cf5a6',
     interiorLineWidth: 1.5,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,
@@ -123,6 +131,8 @@ export const THEMES = {
     interiorTrack: '#a63d2f',
     interiorEntrance: '#a63d2f',
     interiorFine: '#8a8370',
+    interiorElevator: '#1d6f8f',
+    interiorEscalator: '#4a7a2a',
     interiorLineWidth: 1.25,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,
@@ -158,6 +168,8 @@ export const THEMES = {
     interiorTrack: '#eaffef',
     interiorEntrance: '#ffffff',
     interiorFine: '#1f9940',
+    interiorElevator: '#ff66cc',
+    interiorEscalator: '#ffd84a',
     interiorLineWidth: 1.5,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,

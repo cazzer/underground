@@ -7,6 +7,7 @@ import { mixHex } from '../lib/routeColor'
 import { ISO_POLAR } from '../lib/tilt'
 import { theme } from '../theme'
 import { interiorLook } from './interiorLook'
+import { machineLook } from './machineLook'
 
 /** A station interior, ready to draw: group origin, merged line buffers, labels, camera target. */
 export interface InteriorModel {
@@ -26,7 +27,8 @@ export interface InteriorModel {
 const ROLE_TOKEN: Record<InteriorRole, string> = {
   outline: theme.interiorStroke,
   stair: theme.interiorStroke,
-  elevator: theme.interiorStroke,
+  elevator: theme.interiorElevator,
+  escalator: machineLook.escalatorAccent ? theme.interiorEscalator : theme.interiorStroke,
   track: theme.interiorTrack,
   entrance: theme.interiorEntrance,
   step: theme.interiorFine,
@@ -81,6 +83,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     railDrop: 1.1,
     entranceSize: 2.5,
     guides: interiorLook.guides,
+    machines: machineLook.style,
     colorOf,
   })
   // Throws for an interior with nothing to draw, so it becomes an error load.
