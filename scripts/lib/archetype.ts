@@ -8,7 +8,7 @@ import { toUV } from './platformAxis.ts'
 import { analyzePlatforms } from './platformSides.ts'
 import type { LayoutAnalysis, PlatformLayout } from './platformSides.ts'
 import type { StationFacts } from './stationFacts.ts'
-import { geometryProblems } from './stationFactsCheck.ts'
+import { cleanGeometry } from './stationFactsCheck.ts'
 import type { LocalPoint } from '../../src/data/stationSchema.ts'
 import { toLatLon } from '../../src/lib/projection.ts'
 import type { LatLon } from '../../src/lib/projection.ts'
@@ -65,15 +65,15 @@ function entranceSides(f: StationFacts, a: LayoutAnalysis): (-1 | 1)[] {
   return ([-1, 1] as const).filter((s) => sides.has(s))
 }
 
-export function classifyStation(f: StationFacts): ArchetypeResult {
-  if (f.platforms.length === 0) return unknown(0, ['no platform polygons'])
-  const problems = geometryProblems(f)
-  if (problems.length > 0) return unknown(0, problems.map((p) => `bad geometry: ${p}`))
+export function classifyStation(input: StationFacts): ArchetypeResult {
+  if (input.platforms.length === 0) return unknown(0, ['no platform polygons'])
+  const { facts: f, fatal, dropped } = cleanGeometry(input)
+  if (fatal.length > 0) return unknown(0, [...fatal, ...dropped].map((p) => `bad geometry: ${p}`))
   if (f.complex) return unknown(0.2, ['station complex: platforms and levels are shared with other stations'])
 
   const tagged = f.platforms.map((p) => ({ tag: p.levelTag, level: parseOsmLevel(p.levelTag) }))
   const levels = [...new Set(tagged.flatMap((t) => (t.level === null ? [] : [t.level])))]
-  const reasons: string[] = []
+  const reasons: string[] = dropped.map((d) => `bad geometry: ${d}`)
   const odd = tagged.filter((t) => t.tag !== null && t.level === null)
   if (odd.length > 0) reasons.push(`OSM level ${odd.map((t) => JSON.stringify(t.tag)).join(', ')} does not name one level; ignored`)
   if (levels.length > 1) return unknown(0.3, [...reasons, `platforms are on ${levels.length} different OSM levels (${levels.join(', ')}): multi-level layout`])
@@ -99,6 +99,7 @@ export function classifyStation(f: StationFacts): ArchetypeResult {
   penalty += mezz.penalty
   const depths = stationDepths({ stationId: f.stationId, structure: f.structure, hasMezzanine: mezz.value, platformLevel, equipment: f.equipment })
   reasons.push(...depths.reasons)
+  penalty += depths.penalty
   const sides = entranceSides(f, analysis)
   const params: ArchetypeParams = {
     platformType: analysis.platformType,

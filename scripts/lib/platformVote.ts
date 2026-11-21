@@ -10,6 +10,8 @@ const EDGE_OUTSIDE_M = 5
 const AGREE_PENALTY_BELOW = 0.8
 const AGREE_CAP_BELOW = 0.6
 const AGREE_CAP = 0.4
+/** A platform left out of the layout puts the whole station below the interior bar. */
+const MISSING_PLATFORM_CAP = 0.6
 /** Platforms of one physical platform split end to end: v-ranges overlap and u-ranges come this close. */
 const SPLIT_JOIN_GAP_M = 5
 
@@ -83,8 +85,9 @@ function mostCommon(xs: string[]): string {
 
 /** One layout per platform group. A group that yields none costs 0.3 and is named. `spreadM` is the
  *  largest range of any layout's center across the cuts it was read from (0 for a straight platform). */
-export function buildLayouts(ways: number[], rings: UV[][], recs: SectionRec[], groups: Groups, ledger: Ledger): { layouts: PlatformLayout[]; spreadM: number } {
+export function buildLayouts(ways: number[], rings: UV[][], recs: SectionRec[], groups: Groups, ledger: Ledger): { layouts: PlatformLayout[]; spreadM: number; keptGroups: Set<number> } {
   const layouts: PlatformLayout[] = []
+  const keptGroups = new Set<number>()
   let spreadM = 0
   for (const g of new Set(ways.map((_, i) => groups.find(i)))) {
     const members = ways.map((_, i) => i).filter((i) => groups.find(i) === g)
@@ -97,6 +100,7 @@ export function buildLayouts(ways: number[], rings: UV[][], recs: SectionRec[], 
         ? 'has no track beside either edge (orphan)'
         : mine.length === 0 ? 'is not reached by any cross-section' : 'has a track drawn inside it at every cut'
       deduct(ledger, 0.3, `${name} ${why} and is left out of the layout`)
+      capAt(ledger, MISSING_PLATFORM_CAP, `${name} is missing from the layout`)
       continue
     }
     const islands = valid.filter((r) => r.kind === 'island').length
@@ -115,6 +119,7 @@ export function buildLayouts(ways: number[], rings: UV[][], recs: SectionRec[], 
       deduct(ledger, 0.2, `${name}: cross-sections put its one track on different edges; kept the ${keep > 0 ? 'right' : 'left'} one`)
       edges = edges.filter((e) => e.side === keep)
     }
+    keptGroups.add(g)
     const centers = agreeing.map((r) => (r.v0 + r.v1) / 2)
     spreadM = Math.max(spreadM, range(centers)[1] - range(centers)[0])
     layouts.push({
@@ -126,5 +131,5 @@ export function buildLayouts(ways: number[], rings: UV[][], recs: SectionRec[], 
       edges,
     })
   }
-  return { layouts, spreadM }
+  return { layouts, spreadM, keptGroups }
 }

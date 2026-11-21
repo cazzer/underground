@@ -14,8 +14,8 @@ describe('a platform that ends up in no layout costs 0.3 and is named', () => {
   it('a polygon covering its own trackbed', () => {
     const r = classifyStation(sub('A1', [[-10, 0], [3.5, 7.5]], [-1.85, 1.85]))
     expect(reasonsOf(r)).toMatch(/platform 1000 has a track drawn inside it at every cut and is left out of the layout: -0.3/)
-    expect(r.confidence).toBeLessThanOrEqual(0.7)
-    expect(r.params!.platforms.map((l) => l.osmWays)).toEqual([[1001]])
+    expect(r.confidence).toBeLessThan(INTERIOR_MIN_CONFIDENCE)
+    expect(reasonsOf(r)).toMatch(/platform 1000 is missing from the layout; confidence capped at 0.6/)
   })
 
   it('a stub platform past the end of an island is sampled by its own cuts, not ignored', () => {
@@ -43,6 +43,15 @@ describe('track count does not depend on platform length or stagger', () => {
     const r = classifyStation(sub('B3', [[-14, -9, -75, 75], [9, 14, -40, 40]], [-6.6, -2.9, 2.9, 6.6]))
     expect(r.params!.trackCount).toBe(4)
     expect(r.params!.trackOffsetsV.map((v) => Math.round(v * 10) / 10)).toEqual([-6.6, -2.9, 2.9, 6.6])
+  })
+})
+
+describe('track count ignores platforms that are not in the layout', () => {
+  it('a stray untracked polygon does not pull another line track into the count', () => {
+    const r = classifyStation(sub('T1', [[-3, 3], [30, 34]], [-4.7, 4.7, 18]))
+    expect(r.params!.trackCount).toBe(2)
+    expect(r.params!.platforms.map((l) => l.osmWays)).toEqual([[1000]])
+    expect(r.confidence).toBeLessThan(INTERIOR_MIN_CONFIDENCE)
   })
 })
 
@@ -123,13 +132,21 @@ describe('bad geometry', () => {
     expect(reasonsOf(r)).not.toMatch(/axis|within 60 m/)
   })
 
-  it('a one-point track and a NaN entrance are named', () => {
+  it('a one-point track and a NaN entrance are dropped and named; the rest is still classified', () => {
     const f = fx.bedfordAv()
-    f.tracks[0]!.path = [[0, 0]]
+    f.tracks.push({ ref: 'BAD', source: 'osm', path: [[0, 0]] })
     f.entrances[0]!.at = [Number.NaN, 1]
-    const text = reasonsOf(classifyStation(f))
-    expect(text).toMatch(/track L08N: path has fewer than 2 points/)
-    expect(text).toMatch(/entrance 0: non-finite position/)
+    const r = classifyStation(f)
+    expect(reasonsOf(r)).toMatch(/dropped track BAD: path has fewer than 2 points/)
+    expect(reasonsOf(r)).toMatch(/dropped entrance 0: non-finite position/)
+    expect(r.archetype).toBe('cut-cover-mezzanine')
+    expect(r.params!.trackCount).toBe(2)
+  })
+
+  it('still fails the station on a bad platform ring, listing dropped tracks too', () => {
+    const f = withPlatform([[0, 0], [1, 0], [Number.NaN, 2]])
+    f.tracks[0]!.path = []
+    expect(reasonsOf(classifyStation(f))).toMatch(/platform way 77: outline has a non-finite point[\s\S]*dropped track L08N/)
   })
 })
 

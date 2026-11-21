@@ -15,6 +15,8 @@ export interface DepthResult {
   platform: LevelDepth
   mezzanine: LevelDepth | null
   reasons: string[]
+  /** Confidence to subtract for a doubtful mezzanine (0 when fine). */
+  penalty: number
 }
 export interface DepthInput {
   stationId: string
@@ -28,6 +30,7 @@ const LEVEL_M = 4.5
 const MIN_RISE_M = 1
 const MAX_RISE_M = 60
 const MIN_SEPARATION_M = 2.5
+const DOUBTFUL_MEZZANINE_PENALTY = 0.1
 
 /** "-2" is -2. Lists ("-1;-2"), blanks and words ("B") are null: the tag does not name one level. */
 export function parseOsmLevel(tag: string | null): number | null {
@@ -104,6 +107,7 @@ function defaultDepths(structure: Structure, hasMezzanine: boolean): { platform:
 
 export function stationDepths(i: DepthInput, deepList: DeepStation[] = DEEP_STATIONS): DepthResult {
   const reasons: string[] = []
+  let penalty = 0
   const sign = signOf(i.structure)
   const defaults = defaultDepths(i.structure, i.hasMezzanine)
   const rises = sign === 0 ? { streetPlatform: [], streetMezzanine: [], mezzaninePlatform: [] } : collectRises(i.equipment, reasons)
@@ -144,7 +148,11 @@ export function stationDepths(i: DepthInput, deepList: DeepStation[] = DEEP_STAT
     if (away < MIN_SEPARATION_M || away > platformAway - MIN_SEPARATION_M) {
       reasons.push(`mezzanine ${mezzanine.y} m is not ${MIN_SEPARATION_M} m from both the street and the platform ${platform.y} m; set to half the platform depth`)
       mezzanine = { y: platform.y / 2, source: 'structure-default' }
+      if (Math.abs(mezzanine.y) < MIN_SEPARATION_M) {
+        penalty = DOUBTFUL_MEZZANINE_PENALTY
+        reasons.push(`platform ${platform.y} m is too shallow to fit a mezzanine ${MIN_SEPARATION_M} m from both street and platform; the mezzanine is doubtful: -${DOUBTFUL_MEZZANINE_PENALTY}`)
+      }
     }
   }
-  return { platform, mezzanine, reasons }
+  return { platform, mezzanine, reasons, penalty }
 }

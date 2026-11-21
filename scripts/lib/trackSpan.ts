@@ -2,7 +2,7 @@
  *  One v-window covers every platform at every cut (their outermost edges plus a margin), so platforms of
  *  different length or stagger do not change which tracks count. A 4-track station with side platforms
  *  counts the express tracks between them, which no platform touches. */
-import type { Section } from './crossSection.ts'
+import type { Section, SectionInterval } from './crossSection.ts'
 
 const MARGIN_M = 5
 
@@ -14,8 +14,10 @@ export interface TrackSpan {
   spreadM: number
 }
 
-export function trackSpan(sections: Section[]): TrackSpan {
-  const withPlatforms = sections.filter((s) => s.intervals.length > 0)
+/** `keep` says which intervals belong to platforms in the layout; a stray polygon must not widen the window. */
+export function trackSpan(sections: Section[], keep: (iv: SectionInterval) => boolean): TrackSpan {
+  const kept = sections.map((s) => ({ ...s, intervals: s.intervals.filter(keep) }))
+  const withPlatforms = kept.filter((s) => s.intervals.length > 0)
   if (withPlatforms.length === 0) return { count: 0, offsets: [], spreadM: 0 }
   const lo = Math.min(...withPlatforms.flatMap((s) => s.intervals.map((i) => i.v0))) - MARGIN_M
   const hi = Math.max(...withPlatforms.flatMap((s) => s.intervals.map((i) => i.v1))) + MARGIN_M
