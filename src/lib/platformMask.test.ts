@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { NO_BANDS } from './corridors'
 import type { ShapePath } from './network'
 import { platformMaskBuffers } from './platformMask'
 import { MASK_INSET_M } from './platformSpan'
@@ -18,6 +19,9 @@ function path(id: string): ShapePath {
     length: 400,
     y: ys,
     profile: EMPTY_PROFILE,
+    band: xs.map(() => 0),
+    bandHalf: xs.map(() => 0),
+    bands: NO_BANDS,
   }
 }
 

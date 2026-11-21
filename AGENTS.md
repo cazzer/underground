@@ -73,11 +73,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   TEMPORARY: `?access=a|b|c` (plain glyph, filled badge, text pill; default a) until the epz look card is
   decided; the `accessBadge`/`accessBadgeInk` tokens serve B; the removal list is in `src/ui/accessLook.ts`
+  `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal)
-  - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `StationTies.tsx` a thin vertical tie
+  - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; writes the band uniforms per frame at
+    priority 0); `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial with `BAND_GLSL` patched into its vertex
+    shader; `patchBandShader` throws if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it
+    for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
     LineSegments2, `theme.stationTieWidth`, faded out between 350 and 550 m); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
@@ -126,7 +130,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   coarse pointer), shown while a station is focused until the first turn of the session (`src/lib/orbitTurned.ts`)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
-  - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
+  - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds, band slots resampled
+    every 30 m along tapers);
     `trackLine.ts` a shape's drawn track (decode, project, `dropSpurs` removes out-and-back tips of
     160°+ turns, then offset); `trackOffset.ts` `offsetPolyline` (miter joins, capped at 2× on sharp
     bends) plus the `TRACK_OFFSET_M` constant (4.7 m). Both use explicit `.ts` imports because a scripts/
@@ -136,8 +141,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
     `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`) and its
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`); `platformMask.ts` the mask's line buffers;
+    `corridors.ts` shared corridors at load (`corridorBands` gives each shape a `ShapeBands`: slot and corridor
+    half-width as `TrackProfile`s. 30 m samples, other band keys within 18 m heading within 15 degrees, gaps under
+    150 m filled, runs under 200 m dropped, slot = rank minus the middle; band key = short name minus a trailing X),
+    over `corridorHash.ts` (flat segment grid grouped by band rank, then line), `corridorSearch.ts` (per-sample
+    neighbour masks; a same-route line on the same track copies an earlier one's samples), `corridorOrient.ts` (one
+    sign per corridor run, by union-find with parity over side-by-side runs: same heading same sign, opposite
+    heading opposite, heaviest first) and `corridorProfile.ts` (blips under 200 m dropped, changes within 300 m
+    eased as one; a join eases before the change, a leave after). About 45-60 ms cold in desktop Chrome;
+    `corridorData.test.ts` checks it on the real data (slots at stations, no clashes, no swaps);
+    `bandOffset.ts` the band offset formula (`bandShift`, `BandView`, `writeBandView`; pitch fades out 25 to 80 km;
+    per point, the direction tracks merge under 5 px apart and split by 10 px, plus the bundle's width, so they
+    split only once both bundles fit); `trackOffset.ts` also exports `miterNormals`;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
-  - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
+  - `lineBuffers.ts` (positions, colors, and `bands`: per segment end the miter vector (normal / cosHalf), band
+    slot and corridor half-width; `writeBandInputs` for any other layer that must move with the route lines), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
     station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
@@ -334,6 +352,16 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - All route shapes draw as one merged `LineSegments2` (one draw call, per-vertex colors in linear
   space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then
   route_sort_order. Don't add per-route `<Line>`s.
+- Routes sharing a corridor draw as side-by-side bands `theme.bandPitchPx` apart on screen at any zoom and tilt.
+  Each shape point carries a band slot and half-width (`ShapePath.band`, `bandHalf`, from `network.bands`,
+  corridors.ts) and the vertex shader moves it along its miter normal by `bandShift` (`src/lib/bandOffset.ts`);
+  `BAND_GLSL` in `bandLineMaterial.ts` is its GLSL twin, so change both together (`bandGlsl.test.ts` pins the GLSL
+  and checks a port of it against `bandShift`; they agree only while the line object's world matrix is identity).
+  Until the two direction tracks have room on screen for both bundles, the same shift pulls them onto the
+  centerline. The buffers keep the unshifted points, and no CPU code reads the shift
+  yet: trains don't follow the bands until 10b, which moves dots, cars and picks only through a `trackPointInto`
+  helper built on `bandShift`. A layer drawn over a route line (a mask) uses `writeBandInputs` and `useLineLayer` so
+  it moves with it.
 - Each shape draws `trackOffsetM` to the right of its own travel direction (`trackLine` in
   `buildNetwork`), so the two directions are parallel tracks; zoomed out the pair reads as one line.
   The offset is `TRACK_OFFSET_M` (4.7 m, measured at Bedford Av); code that needs it reads `network.trackOffsetM`. Live trains ride the same `trackLine`

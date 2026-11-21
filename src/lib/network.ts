@@ -1,13 +1,14 @@
 /** public/data → render model: projected stations, routes, and shape paths. Pure. */
 import type { AdaStatus, Borough, Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
 import type { StationDepthsFile } from '../data/stationSchema'
+import { corridorBands, NO_BANDS, type ShapeBands } from './corridors'
 import { boundsCenter } from './framing'
 import { toGround, type Ground } from './projection'
 import { platformSpans, type PlatformSpan } from './platformSpan'
 import { buildPolyline } from './realtime/polyline'
 import { profileRuns } from './trackAnchors'
 import { trackLine } from './trackLine'
-import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleForProfile, type ProfileRun, type TrackProfile } from './trackProfile'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, profileAt, profileBreaks, resampleAt, type ProfileRun, type TrackProfile } from './trackProfile'
 
 export interface Station {
   id: StationId
@@ -50,7 +51,7 @@ export interface ShapePath {
   primary: boolean
   /**
    * `trackLine`: spurs dropped, `trackOffsetM` right of travel, so the directions are parallel tracks; then
-   * resampled along the profile's ramps (collinear points, the ground path is unchanged).
+   * resampled along the profile's ramps and the band's tapers (collinear points, the ground path is unchanged).
    */
   points: Ground[]
   /** Cumulative distance (meters) at each point; last entry is the total length. */
@@ -60,6 +61,34 @@ export interface ShapePath {
   y: number[]
   /** Shared with the realtime geometry, so trains ride the drawn track up and down. */
   profile: TrackProfile
+  /** Band slot of each point: profileAt(bands.slot, cumulative[i]) (0 outside shared corridors). */
+  band: number[]
+  /** Corridor half-width in slots at each point: profileAt(bands.half, cumulative[i]). */
+  bandHalf: number[]
+  /** The shape's bands along its distance (corridors.ts); NO_BANDS when it shares no corridor. */
+  bands: ShapeBands
+}
+
+/** Band tapers get a vertex this often, so the eased slot change draws as a curve, not a kink. */
+export const BAND_STEP_M = 30
+/** Breaks closer than this to the previous one are dropped: the slot and half-width tapers mostly coincide. */
+const MIN_BREAK_GAP_M = 5
+
+/**
+ * Where a shape's line needs vertices: the profile's ramps every 10 m (as the realtime geometry resamples them,
+ * so both keep the same vertices there) and the band tapers every BAND_STEP_M.
+ */
+function lineBreaks(profile: TrackProfile, bands: ShapeBands): number[] {
+  const ramps = profileBreaks(profile, 10)
+  const tapers = [...profileBreaks(bands.slot, BAND_STEP_M), ...profileBreaks(bands.half, BAND_STEP_M)].sort((a, b) => a - b)
+  const out = [...ramps]
+  let last = -Infinity
+  for (const d of tapers) {
+    if (d - last < MIN_BREAK_GAP_M) continue
+    out.push(d)
+    last = d
+  }
+  return out.sort((a, b) => a - b)
 }
 
 export interface Bounds {
@@ -89,6 +118,8 @@ export interface Network {
   stationTrackY: ReadonlyMap<StationId, number>
   /** Per station with a depth, where each shape riding its platform tracks runs along them (the profile's kept runs). */
   platformSpans: ReadonlyMap<StationId, ReadonlyMap<ShapeId, PlatformSpan>>
+  /** Bands of each shape that shares a corridor (corridors.ts); trains will read them here. */
+  bands: ReadonlyMap<ShapeId, ShapeBands>
 }
 
 function extend(b: Bounds, p: Ground): void {
@@ -101,7 +132,8 @@ function extend(b: Bounds, p: Ground): void {
 /**
  * `trackOffsetM` moves every shape that far right of its own travel direction (see trackLine.ts). Each shape
  * that stops at a station in `depths` descends to that station's rails (y scaled by `yScale`, the interior's
- * vertical exaggeration); the rest stay at 0. Warns about authored tracks no shape rides.
+ * vertical exaggeration); the rest stay at 0. Routes sharing a corridor get band slots (corridors.ts). Warns
+ * about authored tracks no shape rides.
  */
 export function buildNetwork(
   stationsFile: StationsFile,
@@ -137,6 +169,7 @@ export function buildNetwork(
     if (points.length < 2) throw new Error(`Shape ${s.id} has ${points.length} point(s); needs at least 2`)
     return { id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(points) }
   })
+  const bands = corridorBands(lines, routes)
   const { runs, unmatched } = profileRuns(depths, stations, lines)
   for (const stopId of unmatched) console.warn(`Track depth: no shape rides the ${stopId} platform track; it stays at street level`)
 
@@ -160,7 +193,11 @@ export function buildNetwork(
       stationTrackY.set(run.stationId, deepest === undefined ? y : Math.min(deepest, y))
     }
     if (profile !== EMPTY_PROFILE) profiles.set(s.id, profile)
-    const { points, cumulative, y } = resampleForProfile(line.points, line.cumulative, profile)
+    const shapeBands = bands.get(s.id) ?? NO_BANDS
+    const { points, cumulative } = resampleAt(line.points, line.cumulative, lineBreaks(profile, shapeBands))
+    const y = cumulative.map((d) => profileAt(profile, d))
+    const band = cumulative.map((d) => profileAt(shapeBands.slot, d))
+    const bandHalf = cumulative.map((d) => profileAt(shapeBands.half, d))
     for (const p of points) extend(bounds, p)
     return {
       id: s.id,
@@ -172,6 +209,9 @@ export function buildNetwork(
       length: cumulative.at(-1)!,
       y,
       profile,
+      band,
+      bandHalf,
+      bands: shapeBands,
     }
   })
 
@@ -188,6 +228,7 @@ export function buildNetwork(
     profiles,
     stationTrackY,
     platformSpans: platformSpans(keptRuns),
+    bands,
   }
 }
 

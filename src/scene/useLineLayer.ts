@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Color } from 'three'
+import { Color, InstancedInterleavedBuffer, InterleavedBufferAttribute } from 'three'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
@@ -8,8 +8,9 @@ import { buildLineBuffers, type LineBuffers, type Rgb } from '../lib/lineBuffers
 import type { Network, ShapePath } from '../lib/network'
 import { routeLineColor, type RouteLineMix } from '../lib/routeColor'
 import { theme } from '../theme'
+import { BAND_END, BAND_START, BandLineMaterial } from './bandLineMaterial'
 
-/** Line buffers for `paths`, each colored by its route's GTFS color under `mix`. */
+/** Line buffers for `paths`, each colored by its route's GTFS color under `mix`, with their band inputs. */
 export function routeLineBuffers(network: Network, paths: readonly ShapePath[], mix: RouteLineMix): LineBuffers {
   const order = new Map(network.routes.map((r, i) => [r.id, i]))
   const colors = new Map<RouteId, Rgb>()
@@ -29,7 +30,8 @@ export function routeLineBuffers(network: Network, paths: readonly ShapePath[], 
  * One merged LineSegments2 (a single draw call) for `buffers`; null when there is nothing to
  * draw. Rebuilt when `buffers` changes, disposed on change and unmount. LineSegments2 sets its
  * material's resolution from the viewport (CSS pixels) before each render, so linewidth is in
- * CSS pixels at any dpr.
+ * CSS pixels at any dpr. Buffers with `bands` (route lines) draw with BandLineMaterial, which shifts each
+ * segment end by its band offset on the GPU; the band uniforms are written per frame in SubwayLines.
  */
 export function useLineLayer(
   buffers: LineBuffers | null,
@@ -39,13 +41,16 @@ export function useLineLayer(
   const lines = useMemo(() => {
     if (!buffers || buffers.positions.length === 0) return null
     const geometry = new LineSegmentsGeometry().setPositions(buffers.positions).setColors(buffers.colors)
-    const material = new LineMaterial({
-      vertexColors: true,
-      linewidth,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-    })
+    const params = { vertexColors: true, linewidth, transparent: true, depthTest: false, depthWrite: false }
+    let material: LineMaterial
+    if (buffers.bands) {
+      const band = new InstancedInterleavedBuffer(buffers.bands, 8, 1)
+      geometry.setAttribute(BAND_START, new InterleavedBufferAttribute(band, 4, 0))
+      geometry.setAttribute(BAND_END, new InterleavedBufferAttribute(band, 4, 4))
+      material = new BandLineMaterial(params)
+    } else {
+      material = new LineMaterial(params)
+    }
     const l = new LineSegments2(geometry, material)
     l.renderOrder = renderOrder
     return l

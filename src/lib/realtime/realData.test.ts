@@ -173,8 +173,12 @@ describe('real public/data: trains ride the drawn profile', () => {
     for (const path of network.shapes) {
       const g = geometries.get(path.id)
       if (!g) continue
-      expect(g.line.points, path.id).toEqual(path.points)
-      expect(g.line.cumulative, path.id).toEqual(path.cumulative)
+      // The map adds collinear vertices along band tapers (network.ts): same curve, same distances.
+      expect(path.length, path.id).toBeCloseTo(g.line.length, 6)
+      path.points.forEach((p, i) => {
+        const { point } = pointAtDistance(g.line, path.cumulative[i]!)
+        expect(Math.hypot(point.x - p.x, point.z - p.z), `${path.id} #${i}`).toBeLessThan(1e-6)
+      })
       expect(g.profile, path.id).toBe(path.profile)
     }
   })
