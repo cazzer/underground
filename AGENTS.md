@@ -79,7 +79,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
     LineSegments2, `theme.stationTieWidth`, faded out between 350 and 550 m); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
-    instance is zeroed, so it has no marker; `markerShape.ts` the marker constants);
+    instance is scaled to 0, so it has no marker; `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a

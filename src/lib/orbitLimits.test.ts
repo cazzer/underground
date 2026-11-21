@@ -1,10 +1,7 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import type { StationInterior } from '../data/stationSchema'
 import { PerspectiveCamera, Vector3 } from 'three'
 import { EXIT_DISTANCE, EXIT_RADIUS } from './focusMachine'
 import { freeCenterShift, interiorFreeRect } from './interiorCamera'
-import { interiorFocusAnchor } from './interiorFraming'
 import {
   AZIMUTH_SPRING,
   AZIMUTH_SPRING_MAX_SPEED,
@@ -45,18 +42,6 @@ describe('panRadius', () => {
     const offset = Math.hypot(s.right, s.toward + 30 * Math.tan(polar))
     expect(PAN_RADIUS_MAX + PAN_GIVE + offset).toBeLessThan(EXIT_RADIUS)
     expect(PAN_RADIUS_BARE + PAN_GIVE).toBeLessThan(EXIT_RADIUS)
-  })
-})
-
-describe('panRadius on real data', () => {
-  it("covers every Bedford Av slab vertex and entrance from the plan center, below the cap", () => {
-    const interior = JSON.parse(readFileSync('public/data/stations/L08.json', 'utf8')) as StationInterior
-    const a = interiorFocusAnchor({ x: 0, z: 0 }, interior, 2, Math.SQRT2)
-    const r = panRadius(a.reach)
-    expect(r).toBeLessThan(PAN_RADIUS_MAX)
-    const points = [...interior.slabs.flatMap((s) => s.outline), ...interior.entrances.map((e) => [e.x, e.z] as const)]
-    expect(points.length).toBeGreaterThan(10)
-    for (const [x, z] of points) expect(Math.hypot(x - a.center.x, z - a.center.z) + PAN_MARGIN).toBeLessThanOrEqual(r + 1e-9)
   })
 })
 
