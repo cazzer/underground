@@ -77,10 +77,8 @@ export function compactFeed(message: Message, now: number): { trips: RealtimeTri
     if (entity.isDeleted) continue
     const tuId = entity.tripUpdate?.trip?.tripId
     const vpId = entity.vehicle?.trip?.tripId
-    if ((entity.tripUpdate || entity.vehicle) && !tuId && !vpId) {
-      droppedEntities++
-      continue
-    }
+    // Counted once per entity, even when its other half survives.
+    if ((entity.tripUpdate && !tuId) || (entity.vehicle && !vpId)) droppedEntities++
     if (entity.tripUpdate && tuId) {
       const slot = joined.get(tuId) ?? {}
       slot.tu ??= entity.tripUpdate
@@ -104,8 +102,12 @@ function buildFeed(outcome: FeedOutcome, now: number): FeedSnapshot {
   if (!outcome.ok) return failedFeed(outcome.error)
   const headerTimestamp = toSeconds(outcome.message.header?.timestamp)
   if (headerTimestamp === null) return failedFeed('missing header timestamp')
-  const { trips, droppedEntities } = compactFeed(outcome.message, now)
-  return { headerTimestamp, error: null, stale: now - headerTimestamp > STALE_AFTER_S, droppedEntities, trips }
+  try {
+    const { trips, droppedEntities } = compactFeed(outcome.message, now)
+    return { headerTimestamp, error: null, stale: now - headerTimestamp > STALE_AFTER_S, droppedEntities, trips }
+  } catch (e) {
+    return failedFeed(`transform failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`)
+  }
 }
 
 export function buildSnapshot(outcomes: Record<FeedId, FeedOutcome>, now: number): RealtimeSnapshot {

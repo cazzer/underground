@@ -1,13 +1,14 @@
+import { TTL_MS, cacheDecision, type CacheDecision, type Memo } from './cache'
 import { PREFLIGHT_HEADERS, corsHeaders } from './cors'
-import { RT_SCHEMA_VERSION, FEED_IDS } from './schema'
+import { RT_SCHEMA_VERSION, FEED_IDS, type RealtimeSnapshot } from './schema'
 import { buildSnapshot } from './transform'
 import { fetchAllFeeds } from './upstream'
 
-const TTL_S = 15
-type CacheState = 'memory' | 'edge' | 'miss'
+type CacheState = CacheDecision | 'edge' | 'miss'
 
-// Holds resolved strings only: Workers can hang on promises shared across requests.
-let memo: { body: string; expiresAt: number } | null = null
+// Resolved values only: Workers can hang on promises shared across requests.
+let memo: Memo | null = null
+let refreshingSince: number | null = null
 
 function respond(body: string, state: CacheState, origin: string | null): Response {
   return new Response(body, {
@@ -20,50 +21,69 @@ function respond(body: string, state: CacheState, origin: string | null): Respon
   })
 }
 
-async function serveRealtime(request: Request, ctx: ExecutionContext, origin: string | null): Promise<Response> {
-  const now = Date.now()
-  if (memo && now < memo.expiresAt) return respond(memo.body, 'memory', origin)
-
-  const cacheKey = new Request(new URL(`/rt?v=${RT_SCHEMA_VERSION}`, request.url))
-  const cached = await caches.default.match(cacheKey)
-  if (cached) {
-    const body = await cached.text()
-    const ageMs = (Number(cached.headers.get('age')) || 0) * 1000
-    memo = { body, expiresAt: now + Math.max(0, TTL_S * 1000 - ageMs) }
-    return respond(body, 'edge', origin)
-  }
-
-  const outcomes = await fetchAllFeeds()
-  // Taken after the fetches: Workers' clock only advances on I/O.
-  const snapshot = buildSnapshot(outcomes, Math.floor(Date.now() / 1000))
-  const body = JSON.stringify(snapshot)
-  memo = { body, expiresAt: Date.now() + TTL_S * 1000 }
-  ctx.waitUntil(
-    caches.default
-      .put(
-        cacheKey,
-        new Response(body, {
-          headers: {
-            'content-type': 'application/json; charset=utf-8',
-            'cache-control': `public, max-age=${TTL_S}`,
-          },
-        }),
-      )
-      .catch(console.error),
-  )
+function logMiss(request: Request, snapshot: RealtimeSnapshot): void {
+  const feeds = FEED_IDS.map((id) => ({ id, ...snapshot.feeds[id] }))
   // Read by Workers Logs to check "at most one upstream fetch per 15 s per colo".
   console.log(
     JSON.stringify({
       event: 'rt-miss',
       colo: request.cf?.colo,
-      errors: FEED_IDS.flatMap((id) => {
-        const error = snapshot.feeds[id].error
-        return error === null ? [] : [{ feed: id, error }]
-      }),
-      dropped: FEED_IDS.reduce((sum, id) => sum + snapshot.feeds[id].droppedEntities, 0),
+      errors: feeds.flatMap((f) => (f.error === null ? [] : [{ feed: f.id, error: f.error }])),
+      dropped: feeds.reduce((sum, f) => sum + f.droppedEntities, 0),
+      emptyRoute: feeds.reduce((sum, f) => sum + f.trips.filter((t) => t.route === '').length, 0),
     }),
   )
-  return respond(body, 'miss', origin)
+}
+
+async function readEdge(cacheKey: Request, now: number): Promise<Memo | null> {
+  const cached = await caches.default.match(cacheKey)
+  if (!cached) return null
+  // Expiry comes from our own header, not Age.
+  const expiresAt = Number(cached.headers.get('x-rt-expires'))
+  return expiresAt > now ? { body: await cached.text(), expiresAt } : null
+}
+
+async function refresh(request: Request, ctx: ExecutionContext): Promise<{ memo: Memo; state: 'edge' | 'miss' }> {
+  const cacheKey = new Request(new URL(`/rt?v=${RT_SCHEMA_VERSION}`, request.url))
+  const edge = await readEdge(cacheKey, Date.now())
+  if (edge) return { memo: edge, state: 'edge' }
+
+  const outcomes = await fetchAllFeeds()
+  // Taken after the fetches: Workers' clock only advances on I/O.
+  const snapshot = buildSnapshot(outcomes, Math.floor(Date.now() / 1000))
+  const fresh: Memo = { body: JSON.stringify(snapshot), expiresAt: Date.now() + TTL_MS }
+  ctx.waitUntil(
+    caches.default
+      .put(
+        cacheKey,
+        new Response(fresh.body, {
+          headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': `public, max-age=${TTL_MS / 1000}`,
+            'x-rt-expires': String(fresh.expiresAt),
+          },
+        }),
+      )
+      .catch(console.error),
+  )
+  logMiss(request, snapshot)
+  return { memo: fresh, state: 'miss' }
+}
+
+async function serveRealtime(request: Request, ctx: ExecutionContext, origin: string | null): Promise<Response> {
+  const now = Date.now()
+  const decision = cacheDecision(now, memo, refreshingSince)
+  if (decision !== 'refresh' && memo) return respond(memo.body, decision, origin)
+
+  // Claimed synchronously, before any await, so concurrent requests see it.
+  refreshingSince = now
+  try {
+    const result = await refresh(request, ctx)
+    memo = result.memo
+    return respond(result.memo.body, result.state, origin)
+  } finally {
+    if (refreshingSince === now) refreshingSince = null
+  }
 }
 
 export default {

@@ -34,6 +34,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Root `npm test` does not run worker tests; the `worker` CI job does.
 - Deploying the Worker is manual (`wrangler deploy`, needs the user's Cloudflare login).
   Agents never deploy.
+- The Worker's Cache API layer is a no-op on workers.dev; edge caching needs a custom
+  domain (tracked in 8x4.5). The per-isolate memo and upstream `cf.cacheTtl` still apply.
 - The client finds the Worker through `VITE_RT_URL` (copy `.env.example` to `.env.local`).
 
 ## Directory map
@@ -56,7 +58,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `scripts/`: `build-data.ts` (the only IO) and pure transforms in `scripts/lib/`, tests colocated
 - `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`
   - `src/schema.ts` the JSON contract (types and consts only); the client re-exports it
-  - `src/index.ts` routing, memo + Cache API (15 s), CORS; `upstream.ts` feed fetches
+  - `src/index.ts` routing, memo + Cache API (15 s), CORS; `cache.ts` pure memo/herd-guard
+    decision; `upstream.ts` feed fetches
   - `src/transform.ts` pure decode-to-snapshot logic; `cors.ts` allowed origins
   - `src/gen/` generated protobufjs decoder (`npm run gen`); never hand-edit
   - `proto/subway-rt.proto` trimmed subset of gtfs-realtime + nyct-subway

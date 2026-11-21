@@ -192,6 +192,15 @@ describe('compactFeed', () => {
     expect(trips.map((t) => t.tripId)).toEqual(['ok'])
   })
 
+  it('counts a TripUpdate without trip_id as dropped even when its vehicle survives', () => {
+    const { trips, droppedEntities } = compactFeed(
+      { entity: [{ tripUpdate: { trip: {} }, vehicle: { trip: { tripId: 'v1', routeId: 'L' }, stopId: 'L01N' } }] },
+      0,
+    )
+    expect(droppedEntities).toBe(1)
+    expect(trips.map((t) => t.tripId)).toEqual(['v1'])
+  })
+
   it('skips deleted entities', () => {
     const { trips } = compactFeed({ entity: [{ isDeleted: true, tripUpdate: { trip: { tripId: 'gone' } } }] }, 0)
     expect(trips).toEqual([])
@@ -218,6 +227,24 @@ describe('buildSnapshot', () => {
     )
     expect(snap.feeds.l).toMatchObject({ stale: true, error: null })
     expect(snap.feeds.g).toMatchObject({ error: 'missing header timestamp', stale: true, headerTimestamp: null })
+  })
+
+  it('turns a transform throw into that feed\'s error and keeps the others', () => {
+    const exploding: Message = {
+      header: { timestamp: L_HEADER },
+      get entity(): never {
+        throw new Error('boom')
+      },
+    }
+    const snap = buildSnapshot(outcomes({ g: { ok: true, message: exploding } }), L_HEADER + 15)
+    expect(snap.feeds.g).toEqual({
+      headerTimestamp: null,
+      error: 'transform failed: boom',
+      stale: true,
+      droppedEntities: 0,
+      trips: [],
+    })
+    expect(snap.feeds.l.error).toBeNull()
   })
 
   it('has one key per feed, the schema version, and the given generatedAt', () => {
