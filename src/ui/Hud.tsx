@@ -27,7 +27,7 @@ function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
   return (
     <aside
       aria-label={`Arrivals at ${station.name}`}
-      className="pointer-events-auto w-72 max-w-full border border-edge bg-panel p-4 text-ink backdrop-blur-sm"
+      className="pointer-events-auto max-h-full min-h-0 w-72 max-w-full overflow-auto border border-edge bg-panel p-4 text-ink backdrop-blur-sm sm:shrink-0"
     >
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-lg leading-tight">{station.name}</h2>
@@ -80,9 +80,10 @@ export function Hud() {
         <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
         <p className="text-xs text-ink-dim">sample data / theme: {theme.name}</p>
       </header>
-      <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-end sm:justify-between sm:gap-4">
-        {focusedId && <ArrivalsPanel stationId={focusedId} onClose={dismiss} />}
+      {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
+      <div className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <Attribution />
+        {focusedId && <ArrivalsPanel stationId={focusedId} onClose={dismiss} />}
       </div>
     </div>
   )

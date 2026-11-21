@@ -56,7 +56,7 @@ export const THEMES = {
     stationFocus: '#a63d2f',
     train: '#2b2b2b',
     ink: '#2b2b2b',
-    inkDim: '#76705f',
+    inkDim: '#6b6655',
     panel: 'rgba(243, 239, 228, 0.9)',
     panelBorder: '#2b2b2b',
     fontSans: '"Iowan Old Style", "Palatino Linotype", Georgia, serif',
