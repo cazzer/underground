@@ -79,6 +79,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
+    `cameraFlight.ts` its fly-to destinations (interior, bare station, point), `flushMotion` and the landing turn;
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
     shapes arrive, then eases them in over 300 ms (`BandView.ease`: offset and split blend linearly from unbanded, so no fold); writes the shared `BandView` (Scene owns it; LiveTrains reads
@@ -189,7 +190,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     decimal, "+" above the street, and any other is "≈ −9 m", signed whole meters), padded hull; `interiorFade.ts` per-level fade share by distance from the street level;
     `interiorReveal.ts` distance to interior opacity. These have `.ts` imports
     because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always `LANDING_DISTANCE`, the tilt's
-    near distance, at the current azimuth) in the screen area the header, footer and station panel leave free;
+    near distance) in the screen area the header, footer and station panel leave free, at the current azimuth, or
+    on a portrait free area (`landingAzimuth`, ground height ≥ 1.5× width: phones) turned at most 90° so the
+    platforms (`stationAxis`, `InteriorModel.axis`) run up the screen;
     `orbitLimits.ts` azimuth cap by tilt, short-way spring to north-up, soft pan radius, focus-point pivot;
     `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`)
   - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
@@ -363,7 +366,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   focused (focus engages inside 1100 m within 140 m of a station and drops past 1400 m or 350 m away,
   `focusMachine.ts`): |azimuth| is capped by tilt, rising from 0 top-down to π at tiltT 0.67 and a full spin
   (azimuth bounds ±Infinity) from there, and the turn pivots on the focus point
-  (the interior's mid-depth center at the middle of the free area, or the view center for a bare station).
+  (the interior's mid-depth center, or a bare station's point, at the middle of the free area).
   The focus point pans within the interior's reach (farthest outline vertex or entrance from its plan
   center) + 20 m (100 m of a bare station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`), so
   on a phone a drag can bring every part of the interior to the free area at any angle. The pan clamp applies
@@ -453,8 +456,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (the route lines' alpha times 1 − weight × reveal in the band line shader, the weight easing back to 0 over the
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
-  beside the station panel at the tilt's near distance, in full 3D (a partial fit on small screens); a bare
-  station lands at the same distance.
+  beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run up
+  the screen); a bare station lands at the same distance with its point in the free area above the panel. Both
+  retarget mid-flight when the interior or the panel's final size arrives.
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.
 
 ## Station interior format
