@@ -118,10 +118,11 @@ export function buildNetwork(
     if (points.length < 2) throw new Error(`Shape ${s.id} has ${points.length} point(s); needs at least 2`)
     return { id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(points) }
   })
-  const { runs, unmatched, stationRailY } = profileRuns(depths, stations, lines)
+  const { runs, unmatched } = profileRuns(depths, stations, lines)
   for (const stopId of unmatched) console.warn(`Track depth: no shape rides the ${stopId} platform track; it stays at street level`)
 
   const profiles = new Map<ShapeId, TrackProfile>()
+  const stationTrackY = new Map<StationId, number>()
   const shapes = shapesFile.shapes.map((s, i): ShapePath => {
     const { line } = lines[i]!
     const built = buildTrackProfile(runs.get(s.id) ?? [], { grade: GRADE, yScale })
@@ -130,6 +131,13 @@ export function buildNetwork(
       console.warn(`Track depth: shape ${s.id} eases ${from.yReal} m to ${to.yReal} m at a ${(grade * 100).toFixed(1)}% grade`)
     }
     const profile = built.profile
+    // Only runs the profile kept: a dropped (overlapping) run's station isn't drawn at depth on this shape.
+    for (const run of built.kept) {
+      if (run.stationId === undefined) continue
+      const y = run.yReal * yScale
+      const deepest = stationTrackY.get(run.stationId)
+      stationTrackY.set(run.stationId, deepest === undefined ? y : Math.min(deepest, y))
+    }
     if (profile !== EMPTY_PROFILE) profiles.set(s.id, profile)
     const { points, cumulative, y } = resampleForProfile(line.points, line.cumulative, profile)
     for (const p of points) extend(bounds, p)
@@ -157,7 +165,7 @@ export function buildNetwork(
     center: boundsCenter(bounds),
     trackOffsetM,
     profiles,
-    stationTrackY: new Map([...stationRailY].map(([id, y]) => [id, y * yScale])),
+    stationTrackY,
   }
 }
 

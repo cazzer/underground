@@ -5,7 +5,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
-import { checkBudget, GZIP_BUDGET_BYTES, renderedFile } from './lib/budget.ts'
+import { checkBudget, committedGzip, GZIP_BUDGET_BYTES, renderedFile } from './lib/budget.ts'
 import { buildStationDepths } from './lib/stationDepths.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
 import { toStableJson } from './lib/stableJson.ts'
@@ -15,8 +15,6 @@ const OUT_DIR = new URL('../public/data/stations/', import.meta.url)
 const DATA_DIR = new URL('../public/data/', import.meta.url)
 const DEPTHS = 'station-depths.json'
 const SUFFIX = '.authored.json'
-/** The client fetches station-depths.json on every load, so it stays small. */
-const DEPTHS_GZIP_BUDGET_BYTES = 4_096
 
 function readJson<T>(url: URL): T {
   return JSON.parse(readFileSync(url, 'utf8')) as T
@@ -43,15 +41,8 @@ function main(): void {
     return buildStationInterior(authored, sources)
   })
   const depths = renderedFile(DEPTHS, toStableJson(buildStationDepths(interiors), 2))
-  if (depths.gzip > DEPTHS_GZIP_BUDGET_BYTES) {
-    throw new Error(`${DEPTHS} is ${depths.gzip} B gzipped, over the ${DEPTHS_GZIP_BUDGET_BYTES} B budget`)
-  }
-  // It also counts toward the shared public/data budget with the GTFS files.
-  const others: Record<string, number> = {}
-  for (const name of readdirSync(DATA_DIR)) {
-    if (name.endsWith('.json') && name !== DEPTHS) others[name] = gzipSync(readFileSync(new URL(name, DATA_DIR)), { level: 9 }).length
-  }
-  const total = checkBudget([depths], others)
+  // The client loads station-depths.json up front, so it shares the 60 KB budget with the GTFS files (the one limit).
+  const total = checkBudget([depths], committedGzip(DATA_DIR, new Set([DEPTHS])))
   mkdirSync(OUT_DIR, { recursive: true })
   for (const interior of interiors) {
     const json = toStableJson(interior, 2)
@@ -59,7 +50,7 @@ function main(): void {
     console.log(`stations/${interior.stationId}.json: ${Buffer.byteLength(json)} bytes (${gzipSync(json).length} gzipped)`)
   }
   writeFileSync(new URL(DEPTHS, DATA_DIR), depths.text)
-  console.log(`${DEPTHS}: ${depths.raw} bytes (${depths.gzip} gzipped, budget ${DEPTHS_GZIP_BUDGET_BYTES})`)
+  console.log(`${DEPTHS}: ${depths.raw} bytes (${depths.gzip} gzipped)`)
   console.log(`public/data total gzip: ${total} B (budget ${GZIP_BUDGET_BYTES} B)`)
 }
 

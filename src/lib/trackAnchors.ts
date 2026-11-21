@@ -30,8 +30,6 @@ export interface AnchoredRuns {
   runs: Map<ShapeId, ProfileRun[]>
   /** Authored tracks no shape rides (wrong data, or the shapes moved); their stations keep street-level tracks. */
   unmatched: StopId[]
-  /** Real rail height of each station's deepest track that some shape rides. */
-  stationRailY: Map<StationId, number>
 }
 
 const START = { segment: 0, t: 0 }
@@ -39,7 +37,7 @@ const START = { segment: 0, t: 0 }
 /**
  * A shape rides a track when its route serves the track's station, its direction is the stop id's suffix
  * (L08N is northbound), and both track ends project onto its line within MATCH_TOL_M. The run spans the two
- * projected distances. Shapes passing the station once (all of them today) project correctly from the start.
+ * projected distances, tagged with the station. Shapes passing the station once (all of them today) project correctly from the start.
  */
 export function profileRuns(
   depths: StationDepthsFile,
@@ -49,7 +47,6 @@ export function profileRuns(
   const routesAt = new Map(stations.map((s) => [s.id, new Set(s.routeIds)]))
   const runs = new Map<ShapeId, ProfileRun[]>()
   const unmatched: StopId[] = []
-  const stationRailY = new Map<StationId, number>()
   for (const station of depths.stations) {
     const routes = routesAt.get(station.stationId)
     const origin = toGround(station.anchor)
@@ -66,6 +63,7 @@ export function profileRuns(
           d0: Math.min(hitA.distance, hitB.distance),
           d1: Math.max(hitA.distance, hitB.distance),
           yReal: track.railY,
+          stationId: station.stationId,
         }
         const list = runs.get(shape.id)
         if (list) list.push(run)
@@ -73,8 +71,7 @@ export function profileRuns(
         matched = true
       }
       if (!matched) unmatched.push(track.stopId)
-      else stationRailY.set(station.stationId, Math.min(track.railY, stationRailY.get(station.stationId) ?? 0))
     }
   }
-  return { runs, unmatched, stationRailY }
+  return { runs, unmatched }
 }

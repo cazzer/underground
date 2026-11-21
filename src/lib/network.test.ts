@@ -128,22 +128,25 @@ describe('buildNetwork track profile', () => {
     }
   })
 
+  // Platform tracks laid along the shape's first segment, [from, to] meters around the point nearest `anchor`.
+  const [a, b] = decodeShapePoints(shapesFile().shapes[0]!).map((p) => toGround(p))
+  const anchor = { lat: 40.725, lon: -74.05 }
+  const g = toGround(anchor)
+  const len = Math.hypot(b!.x - a!.x, b!.z - a!.z)
+  const [ux, uz] = [(b!.x - a!.x) / len, (b!.z - a!.z) / len]
+  const t = (g.x - a!.x) * ux + (g.z - a!.z) * uz
+  const end = (s: number): [number, number] => [a!.x + ux * (t + s) - g.x, a!.z + uz * (t + s) - g.z]
+  const station = (stationId: string, railY: number, from: number, to: number, stops = [stationId + 'N']) => ({
+    stationId,
+    anchor,
+    tracks: stops.map((stopId) => ({ stopId, railY, ends: [end(from), end(to)] as [[number, number], [number, number]] })),
+  })
+  const build = (...stations: ReturnType<typeof station>[]) =>
+    buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, { ...NO_DEPTHS, stations }, 2)
+
   it('descends a shape to a station depth it rides, scaled by yScale, and warns about a track nobody rides', () => {
-    // A 100 m platform track laid along the middle of the shape's first segment.
-    const [a, b] = decodeShapePoints(shapesFile().shapes[0]!).map((p) => toGround(p))
-    const anchor = { lat: 40.725, lon: -74.05 }
-    const g = toGround(anchor)
-    const len = Math.hypot(b!.x - a!.x, b!.z - a!.z)
-    const [ux, uz] = [(b!.x - a!.x) / len, (b!.z - a!.z) / len]
-    const t = (g.x - a!.x) * ux + (g.z - a!.z) * uz
-    const end = (s: number): [number, number] => [a!.x + ux * (t + s) - g.x, a!.z + uz * (t + s) - g.z]
-    const ends: [[number, number], [number, number]] = [end(-50), end(50)]
-    const depths: StationDepthsFile = {
-      ...NO_DEPTHS,
-      stations: [{ stationId: '101', anchor, tracks: [{ stopId: '101N', railY: -10.2, ends }, { stopId: '101S', railY: -10.2, ends }] }],
-    }
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const net = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, depths, 2)
+    const net = build(station('101', -10.2, -50, 50, ['101N', '101S']))
     const shape = net.shapes[0]!
     expect(net.stationTrackY).toEqual(new Map([['101', -20.4]]))
     expect(warn).toHaveBeenCalledTimes(1)
@@ -154,6 +157,18 @@ describe('buildNetwork track profile', () => {
     expect(shape.y.at(-1)).toBe(0)
     expect(Math.min(...shape.y)).toBeCloseTo(-20.4, 9)
     shape.y.forEach((y, i) => expect(y).toBe(profileAt(shape.profile, shape.cumulative[i]!)))
+  })
+
+  it('takes an elevated station at its own height, not clamped to the street', () => {
+    expect(build(station('101', 6, -50, 50)).stationTrackY).toEqual(new Map([['101', 12]]))
+  })
+
+  it('gives no tie depth to a station whose run the profile dropped as overlapping', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const net = build(station('101', -10, -50, 50), station('102', -6, 0, 100))
+    expect(net.stationTrackY).toEqual(new Map([['101', -20]]))
+    expect(warn.mock.calls.some(([m]) => /overlapping/.test(String(m)))).toBe(true)
+    warn.mockRestore()
   })
 })
 

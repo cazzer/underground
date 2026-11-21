@@ -9,9 +9,12 @@ import { cameraDistance } from './cameraDistance'
 import { MARKER_Y } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
-/** Full strength up close, gone by FADE_END: top-down the ties shrink to points anyway. */
-const FADE_START = 1500
-const FADE_END = 3000
+/**
+ * Full strength up close, gone by FADE_END. Farther out the tie is only a few pixels long, a stray tick under
+ * the ring rather than a connection: at 600 m it is shorter on screen than the ring radius.
+ */
+const FADE_START = 350
+const FADE_END = 550
 
 interface StationTiesProps {
   network: Network
@@ -20,7 +23,8 @@ interface StationTiesProps {
 /**
  * A thin vertical tie from each street-level station marker down to its platform tracks, for stations whose
  * tracks descend to a station depth (network.stationTrackY), so a tilted view shows which sunken line the
- * marker belongs to. One merged LineSegments2; it fades out toward the city view.
+ * marker belongs to. It drops straight down from the GTFS station point, which sits between the tracks: right
+ * for island platforms, roughly right for side platforms. One merged LineSegments2, faded out by distance.
  */
 export function StationTies({ network }: StationTiesProps) {
   const lines = useMemo(() => {
@@ -33,7 +37,7 @@ export function StationTies({ network }: StationTiesProps) {
     if (positions.length === 0) return null
     const material = new LineMaterial({
       color: theme.stationStroke,
-      linewidth: theme.interiorFineWidth,
+      linewidth: theme.stationTieWidth,
       transparent: true,
       depthTest: false,
       depthWrite: false,

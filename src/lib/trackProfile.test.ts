@@ -71,6 +71,16 @@ describe('buildTrackProfile / profileAt', () => {
     expect(steep).toEqual([{ from: a, to: b, grade: expect.closeTo(0.15, 12) }])
   })
 
+  it('gives touching runs a finite grade: a step is reported, a level join is not', () => {
+    const a = { d0: 1000, d1: 1100, yReal: -10 }
+    const step = buildTrackProfile([a, { d0: 1100, d1: 1200, yReal: -8 }], OPTS)
+    expect(step.steep).toHaveLength(1)
+    expect(step.steep[0]!.grade).toBe(2)
+    expect([...step.profile.y].every(Number.isFinite)).toBe(true)
+    expect(Number.isFinite(profileAt(step.profile, 1100))).toBe(true)
+    expect(buildTrackProfile([a, { d0: 1100, d1: 1200, yReal: -10 }], OPTS).steep).toEqual([])
+  })
+
   it('climbs to the street between runs far apart', () => {
     const { profile } = buildTrackProfile(
       [
@@ -87,6 +97,7 @@ describe('buildTrackProfile / profileAt', () => {
     const late = { d0: 1050, d1: 1200, yReal: -4 }
     const { profile, dropped } = buildTrackProfile([{ d0: 1000, d1: 1100, yReal: -10 }, late], OPTS)
     expect(dropped).toEqual([late])
+    expect(buildTrackProfile([{ d0: 1000, d1: 1100, yReal: -10 }, late], OPTS).kept).toEqual([{ d0: 1000, d1: 1100, yReal: -10 }])
     const alone = buildTrackProfile([{ d0: 1000, d1: 1100, yReal: -10 }], OPTS).profile
     expect(profile).toEqual(alone)
   })

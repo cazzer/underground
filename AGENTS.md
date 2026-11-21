@@ -33,7 +33,7 @@ so dev and preview serve under that path.
   with the pinned catalog and exceptions, prints the gzip total against the budget.
 - `npm run data:stations`: merge `data/stations/*.authored.json` with the pinned `*.sources.json`
   into `public/data/stations/*.json`, and extract `public/data/station-depths.json` (each platform track's
-  ends and rail height; fails above 4 KB gzipped). Offline.
+  ends and rail height; it counts toward the shared 60 KB budget). Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
   pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
@@ -80,7 +80,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `orbitLook.ts` TEMPORARY `?orbit=` override
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
-    LineSegments2, faded out between 1.5 and 3 km); `LineHighlight.tsx` holds the
+    LineSegments2, `theme.stationTieWidth`, faded out between 350 and 550 m); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; `FocusRing.tsx` redraws the focused ring above the
     trains and the veil; `markerShape.ts` the shared marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
@@ -408,7 +408,9 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
-  into `public/data/*.json` (about 57 KB gzipped; the build fails above 60 KB).
+  into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
+  every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (about 58.5 KB
+  today); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data` changes
   `public/data`. The workflow runs typecheck, tests, and build before pushing, but the

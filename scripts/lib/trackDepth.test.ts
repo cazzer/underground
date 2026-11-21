@@ -30,8 +30,8 @@ const { runs, unmatched } = profileRuns(
 )
 const drawn = new Map(
   lines.map(({ id, line }) => {
-    const { profile } = buildTrackProfile(runs.get(id) ?? [], { grade: GRADE, yScale: Y_SCALE })
-    return [id, { profile, ...resampleForProfile(line.points, line.cumulative, profile) }]
+    const { profile, dropped, steep } = buildTrackProfile(runs.get(id) ?? [], { grade: GRADE, yScale: Y_SCALE })
+    return [id, { profile, dropped, steep, ...resampleForProfile(line.points, line.cumulative, profile) }]
   }),
 )
 
@@ -96,6 +96,13 @@ describe('Bedford Av (L08) track depth', () => {
       expect(profileAt(line.profile, at.distance), rider.id).toBeCloseTo(-20.4, 9)
       expect(line.y[0], rider.id).toBe(0)
       expect(line.y.at(-1), rider.id).toBe(0)
+    }
+  })
+
+  it('has no overlapping runs and no merged ease steeper than 2x GRADE on any shape, for every station', () => {
+    for (const [id, line] of drawn) {
+      expect(line.dropped, id).toEqual([])
+      expect(line.steep, id).toEqual([])
     }
   })
 

@@ -23,13 +23,13 @@ const stations = [{ id: 'L08', routeIds: ['L'] }]
 
 describe('profileRuns', () => {
   it('anchors a shape running 1 m beside the track to its two projected ends', () => {
-    const { runs, unmatched, stationRailY } = profileRuns(depths, stations, [shape()])
+    const { runs, unmatched } = profileRuns(depths, stations, [shape()])
     expect(unmatched).toEqual([])
-    expect(stationRailY).toEqual(new Map([['L08', -10.2]]))
     const [run] = runs.get('L..N')!
     expect(run!.d0).toBeCloseTo(915, 9)
     expect(run!.d1).toBeCloseTo(1085, 9)
     expect(run!.yReal).toBe(-10.2)
+    expect(run!.stationId).toBe('L08')
   })
 
   it('orders the run even when the shape runs against the authored direction', () => {
@@ -55,7 +55,6 @@ describe('profileRuns', () => {
     const { runs, unmatched } = profileRuns(depths, st, [s])
     expect(runs.size).toBe(0)
     expect(unmatched).toEqual(['L08N'])
-    expect(profileRuns(depths, st, [s]).stationRailY.size).toBe(0)
   })
 
   it('matches only the direction its stop suffix names', () => {
@@ -66,6 +65,6 @@ describe('profileRuns', () => {
     const both = [shape(), shape({ id: 'L..S', direction: 'S' })]
     expect([...profileRuns(withSuffix('L08S'), stations, both).runs.keys()]).toEqual(['L..S'])
     // A stop id without an N/S suffix names neither direction.
-    expect(profileRuns(withSuffix('L08'), stations, both)).toEqual({ runs: new Map(), unmatched: ['L08'], stationRailY: new Map() })
+    expect(profileRuns(withSuffix('L08'), stations, both)).toEqual({ runs: new Map(), unmatched: ['L08'] })
   })
 })

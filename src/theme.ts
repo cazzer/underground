@@ -17,6 +17,8 @@ export interface Theme {
   stationFill: string
   stationStroke: string
   stationFocus: string
+  /** The vertical tie from a station marker down to its sunken platform tracks (StationTies.tsx), CSS px. */
+  stationTieWidth: number
   train: string
   /** "You are here" marker and its accuracy disc; at least 3:1 on the background and distinct from the focus and train colors (theme.test.ts). */
   here: string
@@ -79,6 +81,7 @@ export const THEMES = {
     stationFill: '#0b2147',
     stationStroke: '#ffffff',
     stationFocus: '#ffd166',
+    stationTieWidth: 1,
     train: '#ffffff',
     here: '#5ce1ff',
     hereAccuracyOpacity: 0.15,
@@ -116,6 +119,7 @@ export const THEMES = {
     stationFill: '#f3efe4',
     stationStroke: '#2b2b2b',
     stationFocus: '#a63d2f',
+    stationTieWidth: 1,
     train: '#2b2b2b',
     here: '#c71f7a',
     hereAccuracyOpacity: 0.15,
@@ -153,6 +157,7 @@ export const THEMES = {
     stationFill: '#000000',
     stationStroke: '#33ff66',
     stationFocus: '#ffffff',
+    stationTieWidth: 1,
     train: '#eaffef',
     here: '#5ce1ff',
     hereAccuracyOpacity: 0.15,

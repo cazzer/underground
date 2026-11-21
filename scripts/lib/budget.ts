@@ -1,4 +1,9 @@
-/** The gzip budget of public/data/*.json (shared by scripts/build-data.ts and scripts/build-access.ts). */
+/**
+ * The gzip budget of the top-level public/data/*.json the client loads up front (GTFS files and
+ * station-depths.json), shared by build-data.ts, build-access.ts and build-stations.ts: the one size limit.
+ * Per-station interiors (public/data/stations/) load on focus and don't count.
+ */
+import { readdirSync, readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
 export const GZIP_BUDGET_BYTES = 60_000
@@ -8,6 +13,22 @@ export interface RenderedFile {
   text: string
   raw: number
   gzip: number
+}
+
+/** Gzip sizes of the committed top-level *.json in `dir` except `exclude` (the files being rebuilt); {} if `dir` is missing. */
+export function committedGzip(dir: URL, exclude: ReadonlySet<string>): Record<string, number> {
+  let names: string[]
+  try {
+    names = readdirSync(dir)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {}
+    throw err
+  }
+  const out: Record<string, number> = {}
+  for (const name of names.sort()) {
+    if (name.endsWith('.json') && !exclude.has(name)) out[name] = gzipSync(readFileSync(new URL(name, dir)), { level: 9 }).length
+  }
+  return out
 }
 
 export function renderedFile(name: string, text: string): RenderedFile {

@@ -10,15 +10,14 @@
  *
  *  Everything is built in memory first; nothing is written if a build step throws or the
  *  gzipped total is over budget. */
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { gzipSync } from 'node:zlib'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { unzipSync } from 'fflate'
 import { readFeed } from './lib/gtfs.ts'
 import { buildRoutes, buildStations, buildTransfers } from './lib/network.ts'
 import { addAccess } from './lib/stationAccess.ts'
 import { readAccessExceptions, readCatalogStations } from './lib/accessInputs.ts'
-import { GZIP_BUDGET_BYTES, checkBudget, renderedFile } from './lib/budget.ts'
+import { GZIP_BUDGET_BYTES, checkBudget, committedGzip, renderedFile } from './lib/budget.ts'
 import { buildSegments } from './lib/segments.ts'
 import { buildShapes } from './lib/shapes.ts'
 import { toStableJson } from './lib/stableJson.ts'
@@ -54,24 +53,6 @@ function decodeTables(zip: Uint8Array): Record<string, string> {
   return Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, decoder.decode(bytes)]))
 }
 
-/**
- * Gzip sizes of the other top-level public/data JSON the client loads up front (station-depths.json, written by
- * data:stations), so the budget covers the real total. Per-station interiors (stations/) load on focus and don't count.
- */
-function committedOthers(built: ReadonlySet<string>): Record<string, number> {
-  const others: Record<string, number> = {}
-  let names: string[] = []
-  try {
-    names = readdirSync(OUT_DIR)
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
-  }
-  for (const name of names) {
-    if (name.endsWith('.json') && !built.has(name)) others[name] = gzipSync(readFileSync(new URL(name, OUT_DIR)), { level: 9 }).length
-  }
-  return others
-}
-
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { zip: { type: 'string' } }, strict: true })
   const feed = readFeed(decodeTables(await loadZip(values.zip ?? process.env.GTFS_ZIP)))
@@ -92,7 +73,8 @@ async function main(): Promise<void> {
   ]
 
   const rendered = outputs.map(([name, value, lineDepth]) => renderedFile(name, toStableJson(value, lineDepth)))
-  const others = committedOthers(new Set(rendered.map((f) => f.name)))
+  // station-depths.json (data:stations) counts too: the shared budget covers everything loaded up front.
+  const others = committedGzip(OUT_DIR, new Set(rendered.map((f) => f.name)))
   const totalGzip = checkBudget(rendered, others)
 
   mkdirSync(OUT_DIR, { recursive: true })

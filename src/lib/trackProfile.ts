@@ -3,6 +3,7 @@
  * side, 0 everywhere else. The map lines and the live trains both read it, so trains ride the drawn track. Pure.
  * Type-only `.ts` import because scripts/lib/trackDepth.test.ts loads this file in Node.
  */
+import type { StationId } from '../data/schema.ts'
 import type { Ground } from './projection.ts'
 
 /** Knots sorted by distance; between two knots y eases with smoothstep, outside them it holds the end value. */
@@ -21,6 +22,8 @@ export interface ProfileRun {
   d0: number
   d1: number
   yReal: number
+  /** The station whose platform track this is, when it comes from one (trackAnchors.ts). */
+  stationId?: StationId
 }
 
 export interface ProfileOptions {
@@ -30,8 +33,13 @@ export interface ProfileOptions {
   yScale: number
 }
 
+/** Touching runs (no gap) still get a finite grade for the report: it is measured over at least this far. */
+const MIN_EASE_M = 1
+
 export interface BuiltProfile {
   profile: TrackProfile
+  /** The runs the profile is anchored to, sorted by distance (runs at the street, yReal 0, are skipped). */
+  kept: ProfileRun[]
   /** Runs dropped because they overlap an earlier one (two stations claiming the same stretch of a shape). */
   dropped: ProfileRun[]
   /** Eases between two close runs steeper than twice the grade on average (real rise over run). */
@@ -53,7 +61,7 @@ export function buildTrackProfile(runs: readonly ProfileRun[], opts: ProfileOpti
     if (last && r.d0 < last.d1) dropped.push(r)
     else kept.push(r)
   }
-  if (kept.length === 0) return { profile: EMPTY_PROFILE, dropped, steep: [] }
+  if (kept.length === 0) return { profile: EMPTY_PROFILE, kept, dropped, steep: [] }
   const steep: BuiltProfile['steep'] = []
 
   const d: number[] = []
@@ -67,7 +75,7 @@ export function buildTrackProfile(runs: readonly ProfileRun[], opts: ProfileOpti
     const prev = kept[i - 1]
     const merged = prev !== undefined && prev.d1 + rampOf(prev) > r.d0 - rampOf(r)
     if (prev && merged) {
-      const grade = Math.abs(r.yReal - prev.yReal) / (r.d0 - prev.d1)
+      const grade = Math.abs(r.yReal - prev.yReal) / Math.max(r.d0 - prev.d1, MIN_EASE_M)
       if (grade > 2 * opts.grade) steep.push({ from: prev, to: r, grade })
     }
     if (prev && !merged) knot(prev.d1 + rampOf(prev), 0)
@@ -77,7 +85,7 @@ export function buildTrackProfile(runs: readonly ProfileRun[], opts: ProfileOpti
   })
   const last = kept.at(-1)!
   knot(last.d1 + rampOf(last), 0)
-  return { profile: { d: Float64Array.from(d), y: Float64Array.from(y) }, dropped, steep }
+  return { profile: { d: Float64Array.from(d), y: Float64Array.from(y) }, kept, dropped, steep }
 }
 
 /** y at distance `distance` along the shape: smoothstep between the knots around it. No allocation. */
