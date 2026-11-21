@@ -119,7 +119,7 @@ describe('landingAzimuth', () => {
   const deskFree = interiorFreeRect(viewport, insets, { left: 1136, top: 628, right: 1424, bottom: 884 })
   const deg = (r: number) => (r * 180) / Math.PI
   /** Screen direction of a plan vector at azimuth θ: [right, toward the camera] components. */
-  const onScreen = (v: readonly [number, number], theta: number) => [
+  const onScreen = (v: readonly [number, number], theta: number): [number, number] => [
     v[0] * Math.cos(theta) - v[1] * Math.sin(theta),
     v[0] * Math.sin(theta) + v[1] * Math.cos(theta),
   ]
