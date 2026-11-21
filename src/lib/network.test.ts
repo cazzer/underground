@@ -8,7 +8,7 @@ import { toGround } from './projection'
 import { EMPTY_PROFILE, profileAt } from './trackProfile'
 
 const FV = 'v1'
-const NO_DEPTHS: PackedDepthsFile = { license: 'ODbL-1.0', attribution: [], format: 2, station: [], y: [], a: [], h: [], da: [], dh: [], tracks: {} }
+const NO_DEPTHS: PackedDepthsFile = { license: 'ODbL-1.0', attribution: [], format: 2, feedVersion: FV, station: [], y: [], a: [], h: [], da: [], dh: [], tracks: {} }
 
 function stationsFile(): StationsFile {
   return {

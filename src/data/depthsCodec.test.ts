@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { toGround } from '../lib/projection'
 import { buildPolyline } from '../lib/realtime/polyline'
 import type { AnchorShape } from '../lib/trackAnchors'
-import { CENTRE_MATCH_M, decodeStationDepths, STATION_MATCH_M, type DepthsStation } from './depthsCodec'
+import { CENTRE_MATCH_M, decodeStationDepths, STATION_MATCH_M, type DepthsStation, type DepthsStations } from './depthsCodec'
 import type { PackedDepthsFile } from './stationSchema'
 
 const anchor = { lat: 40.72, lon: -73.95 }
@@ -14,12 +14,14 @@ const shapes: AnchorShape[] = [
 ]
 const other: DepthsStation = { id: 'A01', lat: 40.8, lon: -73.9, stops: ['A01N', 'A01S'], routes: ['A'] }
 const station: DepthsStation = { id: 'L08', ...anchor, stops: ['L08N', 'L08S'], routes: ['L'] }
-const stations = [other, station]
+const FEED = 'fall-2026'
+const stations: DepthsStations = { feedVersion: FEED, stations: [other, station] }
 
 const file = (over: Partial<PackedDepthsFile> = {}): PackedDepthsFile => ({
   license: 'ODbL-1.0',
   attribution: ['© OpenStreetMap contributors'],
   format: 2,
+  feedVersion: FEED,
   station: [1],
   y: [-102],
   a: [10],
@@ -67,14 +69,42 @@ describe('decodeStationDepths', () => {
     expect(decodeStationDepths(file(), stations, [shapes[0]!]).missed).toEqual(['L08S'])
     expect(decodeStationDepths(file(), stations, shapes.map((s) => ({ ...s, routeId: 'G' }))).missed).toEqual(['L08N', 'L08S'])
     const far: DepthsStation = { ...station, ...{ lat: anchor.lat + (STATION_MATCH_M + 10) / 111_000 } }
-    expect(decodeStationDepths(file(), [other, far], shapes).missed).toEqual(['L08N', 'L08S'])
+    expect(decodeStationDepths(file(), { feedVersion: FEED, stations: [other, far] }, shapes).missed).toEqual(['L08N', 'L08S'])
     const offCentre = decodeStationDepths(file({ tracks: { L08N: [-102, 0, CENTRE_MATCH_M + 5, 20] } }), stations, shapes)
     expect(offCentre.missed).toEqual(['L08N'])
   })
 
   it('throws on columns of different lengths, an index outside stations.json, or an override of no listed station', () => {
     expect(() => decodeStationDepths(file({ h: [] }), stations, shapes)).toThrow(/column h has 0 entries, not 1/)
-    expect(() => decodeStationDepths(file({ station: [2] }), stations, shapes)).toThrow(/index 2 is outside/)
+    expect(() => decodeStationDepths(file({ station: [2] }), stations, shapes)).toThrow(/index 2 is outside stations.json/)
     expect(() => decodeStationDepths(file({ tracks: { A01N: null } }), stations, shapes)).toThrow(/A01N/)
+  })
+
+  const bad = (over: Record<string, unknown>) => file(over as Partial<PackedDepthsFile>)
+  it.each([
+    ['a non-integer index', bad({ station: [0.5] }), /station entry 0 is not an integer/],
+    ['a negative first index', bad({ station: [-1] }), /first station index -1 is negative/],
+    ['a later delta below 1', bad({ station: [1, 0], y: [0, 0], a: [0, 0], h: [0, 0], da: [0, 0], dh: [0, 0] }), /station delta 0 at entry 1 is below 1/],
+    ['an index past the station count', bad({ station: [0, 2], y: [0, 0], a: [0, 0], h: [0, 0], da: [0, 0], dh: [0, 0] }), /index 2 is outside stations.json \(2 stations\)/],
+    ['a non-number column value', bad({ a: ['10'] }), /column a entry 0 is not a number/],
+    ['a null column value', bad({ dh: [null] }), /column dh entry 0 is not a number/],
+    ['an override of three values', bad({ tracks: { L08N: [-102, 0, 0] } }), /override L08N is not four numbers/],
+    ['an override of five values', bad({ tracks: { L08N: [-102, 0, 0, 20, 1] } }), /override L08N is not four numbers/],
+    ['an override with a string', bad({ tracks: { L08N: [-102, 0, '0', 20] } }), /override L08N is not four numbers/],
+  ])('throws on %s', (_name, f, message) => {
+    expect(() => decodeStationDepths(f, stations, shapes)).toThrow(message)
+  })
+
+  it('logs one error and decodes no depths, never throwing, when packed for another stations.json', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Even a file that would otherwise be malformed: the stale index is the first thing wrong with it.
+    for (const f of [file({ feedVersion: 'spring-2026' }), bad({ feedVersion: 'spring-2026', station: [9] })]) {
+      const out = decodeStationDepths(f, stations, shapes)
+      expect(out.depths.stations).toEqual([])
+      expect(out.missed).toEqual([])
+    }
+    expect(error).toHaveBeenCalledTimes(2)
+    expect(String(error.mock.calls[0]![0])).toMatch(/"spring-2026", not stations.json's "fall-2026"/)
+    error.mockRestore()
   })
 })

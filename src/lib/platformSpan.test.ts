@@ -84,7 +84,7 @@ describe('Bedford Av (L08) platform spans, committed data', () => {
   const spans = network.platformSpans.get('L08')!
   const lines = shapesFile.shapes.map((s) => ({ id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(trackLine(s, TRACK_OFFSET_M)) }))
   // The decoded track (ends on the drawn line) gives the spans; the authored one is what they must stay near.
-  const depth = decodeStationDepths(packed, stationsFile.stations, lines).depths.stations.find((s) => s.stationId === 'L08')!
+  const depth = decodeStationDepths(packed, stationsFile, lines).depths.stations.find((s) => s.stationId === 'L08')!
   const anchor = toGround(depth.anchor)
   const authoredAnchor = toGround(l08.anchor)
 

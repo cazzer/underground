@@ -157,6 +157,8 @@ export interface PackedDepthsFile {
   /** Union of the interiors' credits, OSM first. */
   attribution: string[]
   format: 2
+  /** stations.json's feedVersion when packed: the indexes below only mean anything against that build. */
+  feedVersion: string
   /** One entry per station, in stations.json order: its index there, minus the previous entry's (the first is its index). */
   station: number[]
   /** Columns parallel to `station`. Rail y, decimeters relative to the street (negative below). */

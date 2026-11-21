@@ -19,13 +19,14 @@ import { RAIL_DROP_M } from '../../src/lib/interiorGeometry.ts'
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
 const shapes = (readJson('../../public/data/shapes.json') as ShapesFile).shapes
-const stations = (readJson('../../public/data/stations.json') as StationsFile).stations
+const stationsFile = readJson('../../public/data/stations.json') as StationsFile
+const stations = stationsFile.stations
 const l08 = readJson('../../public/data/stations/L08.json') as StationInterior
 const Y_SCALE = 2
 
 const lines = shapes.map((s) => ({ id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(trackLine(s, TRACK_OFFSET_M)) }))
 // Bedford Av only: the committed depths decoded the way network.ts does, keeping its one station.
-const decoded = decodeStationDepths(readJson('../../public/data/station-depths.json') as PackedDepthsFile, stations, lines).depths
+const decoded = decodeStationDepths(readJson('../../public/data/station-depths.json') as PackedDepthsFile, stationsFile, lines).depths
 const depths: StationDepthsFile = { ...decoded, stations: decoded.stations.filter((s) => s.stationId === 'L08') }
 const { runs, unmatched } = profileRuns(
   depths,

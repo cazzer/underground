@@ -11,7 +11,7 @@ import type { StationInterior } from '../src/data/stationSchema.ts'
 import { TRACK_OFFSET_M } from '../src/lib/trackOffset.ts'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
 import { checkBudget, checkIndexCap, committedGzip, GZIP_BUDGET_BYTES, INDEX_GZIP_CAP_BYTES, renderedFile } from './lib/budget.ts'
-import { drawnLines, packStationDepths, renderPackedDepths } from './lib/depthsPack.ts'
+import { drawnLines, PACK_TOL_M, packStationDepths, renderPackedDepths } from './lib/depthsPack.ts'
 import { generateStations } from './lib/generate.ts'
 import { CATALOG_FILES, generatorCatalog, generatorLines } from './lib/generatorInputs.ts'
 import { buildStationDepths } from './lib/stationDepths.ts'
@@ -75,12 +75,15 @@ function main(): void {
   const interiors = [...authoredInteriors, ...generatedInteriors]
 
   // Every interior's depths load up front, packed against the stations and drawn lines the client builds.
-  const packed = packStationDepths(buildStationDepths(interiors), stationsFile.stations, drawnLines(shapesFile.shapes, TRACK_OFFSET_M))
+  const packed = packStationDepths(buildStationDepths(interiors), stationsFile, drawnLines(shapesFile.shapes, TRACK_OFFSET_M))
   // The client never warns about these (they are packed as no track); this is where they show.
   if (packed.notRidden.length > 0) {
     console.warn(`WARNING: station-depths: no drawn line rides ${packed.notRidden.length} interior track(s); the map keeps them at street level: ${packed.notRidden.join(', ')}`)
   }
-  for (const { stopId, errorM } of packed.inexact) console.warn(`WARNING: station-depths: ${stopId} packs ${errorM.toFixed(1)} m off its runs`)
+  if (packed.inexact.length > 0) {
+    const list = packed.inexact.map(({ stopId, errorM }) => `${stopId} ${errorM.toFixed(1)} m`).join(', ')
+    throw new Error(`station-depths: ${packed.inexact.length} track(s) pack more than ${PACK_TOL_M} m off their runs (${list}). Nothing written.`)
+  }
   console.log(`station-depths: ${packed.file.station.length} stations, ${packed.split.length} track(s) packed on their own: ${packed.split.join(', ')}`)
   const depths = renderedFile(DEPTHS, renderPackedDepths(packed.file))
   // index.json is fetched right after startup (not render-blocking, no waiting for a first focus), so it

@@ -87,16 +87,52 @@ export function runTrack(stopId: StopId, yDm: number, run: LineRun, origin: Grou
 
 const COLUMNS = ['y', 'a', 'h', 'da', 'dh'] as const
 
-/** Throws on a file that doesn't fit `stations` (columns of different lengths, an index out of range, a stray override). */
-export function decodeStationDepths(
-  file: PackedDepthsFile,
-  stations: readonly DepthsStation[],
-  shapes: readonly AnchorShape[],
-): DecodedDepths {
+/** The stations.json the file was packed against: its build and its stations, in order. */
+export interface DepthsStations {
+  feedVersion: string
+  stations: readonly DepthsStation[]
+}
+
+const fail = (why: string): Error => new Error(`station-depths: ${why}`)
+
+/** Throws on a malformed file: columns of different lengths or with a non-number, a bad index or delta, a bad override. */
+function checkShape(file: PackedDepthsFile, count: number): void {
   const n = file.station.length
   for (const key of COLUMNS) {
-    if (file[key].length !== n) throw new Error(`station-depths: column ${key} has ${file[key].length} entries, not ${n}`)
+    if (file[key].length !== n) throw fail(`column ${key} has ${file[key].length} entries, not ${n}`)
+    const bad = file[key].findIndex((v) => typeof v !== 'number' || !Number.isFinite(v))
+    if (bad >= 0) throw fail(`column ${key} entry ${bad} is not a number`)
   }
+  let index = -1
+  file.station.forEach((d, k) => {
+    if (!Number.isInteger(d)) throw fail(`station entry ${k} is not an integer`)
+    if (k === 0 ? d < 0 : d < 1) throw fail(k === 0 ? `first station index ${d} is negative` : `station delta ${d} at entry ${k} is below 1`)
+    index = k === 0 ? d : index + d
+    if (index >= count) throw fail(`station index ${index} is outside stations.json (${count} stations)`)
+  })
+  for (const [stopId, v] of Object.entries(file.tracks)) {
+    if (v === null) continue
+    if (!Array.isArray(v) || v.length !== 4 || v.some((x) => typeof x !== 'number' || !Number.isFinite(x))) {
+      throw fail(`override ${stopId} is not four numbers`)
+    }
+  }
+}
+
+/**
+ * Throws on a malformed file (see checkShape, and an override of no listed station). A file packed against another
+ * stations.json (its feedVersion differs: a stale or mixed deploy) logs one error and decodes to no depths, so the
+ * tracks stay at street level and the map still loads.
+ */
+export function decodeStationDepths(file: PackedDepthsFile, stationsFile: DepthsStations, shapes: readonly AnchorShape[]): DecodedDepths {
+  const { stations } = stationsFile
+  if (file.feedVersion !== stationsFile.feedVersion) {
+    console.error(
+      `station-depths.json was packed for feed ${JSON.stringify(file.feedVersion)}, not stations.json's ${JSON.stringify(stationsFile.feedVersion)}; tracks stay at street level`,
+    )
+    return { depths: { license: file.license, attribution: file.attribution, stations: [] }, missed: [] }
+  }
+  checkShape(file, stations.length)
+  const n = file.station.length
   const byRoute = linesByRouteDirection(shapes)
   const used = new Set<StopId>()
   const missed: StopId[] = []
@@ -104,8 +140,7 @@ export function decodeStationDepths(
   let index = -1
   for (let k = 0; k < n; k++) {
     index = k === 0 ? file.station[0]! : index + file.station[k]!
-    const station = stations[index]
-    if (!station) throw new Error(`station-depths: station index ${index} is outside stations.json`)
+    const station = stations[index]!
     const origin = toGround(station)
     const cols = [file.a[k]!, file.h[k]!, file.da[k]!, file.dh[k]!] as const
     const tracks: TrackDepth[] = []
@@ -121,6 +156,6 @@ export function decodeStationDepths(
     out.push({ stationId: station.id, anchor: { lat: station.lat, lon: station.lon }, tracks })
   }
   const stray = Object.keys(file.tracks).filter((s) => !used.has(s))
-  if (stray.length > 0) throw new Error(`station-depths: overrides for stops of no listed station: ${stray.join(', ')}`)
+  if (stray.length > 0) throw fail(`overrides for stops of no listed station: ${stray.join(', ')}`)
   return { depths: { license: file.license, attribution: file.attribution, stations: out }, missed }
 }

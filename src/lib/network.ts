@@ -183,7 +183,7 @@ export function buildNetwork(
     if (points.length < 2) throw new Error(`Shape ${s.id} has ${points.length} point(s); needs at least 2`)
     return { id: s.id, routeId: s.routeId, direction: s.direction, primary: s.primary, line: buildPolyline(points) }
   })
-  const decoded = decodeStationDepths(depths, stationsFile.stations, lines)
+  const decoded = decodeStationDepths(depths, stationsFile, lines)
   const { runs, unmatched } = profileRuns(decoded.depths, stations, lines)
   // The build packs only tracks a shape rides and prints the rest (npm run data:stations), so this stays quiet
   // unless the files are out of step; then it is one line, not one per track.

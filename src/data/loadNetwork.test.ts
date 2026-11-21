@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { expectDataFile, expectDataRecord, expectStationDepths, loadNetwork } from './loadNetwork'
 
 const URL = '/underground/data/stations.json'
-const EMPTY_DEPTHS = { license: 'ODbL-1.0', attribution: [], format: 2, station: [], y: [], a: [], h: [], da: [], dh: [], tracks: {} }
+const EMPTY_DEPTHS = { license: 'ODbL-1.0', attribution: [], format: 2, feedVersion: 'v1', station: [], y: [], a: [], h: [], da: [], dh: [], tracks: {} }
 
 describe('expectDataFile', () => {
   it('returns a well-formed file unchanged', () => {

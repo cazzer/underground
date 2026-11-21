@@ -7,7 +7,7 @@
 import type { Shape, StopId } from '../../src/data/schema.ts'
 import type { PackedDepthsFile, PackedTrack, StationDepth, StationDepthsFile, TrackDepth } from '../../src/data/stationSchema.ts'
 import {
-  columnRun, linesByRouteDirection, nearestLine, overrideRun, runTrack, STATION_MATCH_M, stopLines, type DepthsStation, type LineRun,
+  columnRun, linesByRouteDirection, nearestLine, overrideRun, runTrack, STATION_MATCH_M, stopLines, type DepthsStations, type LineRun,
 } from '../../src/data/depthsCodec.ts'
 import { toGround, type Ground } from '../../src/lib/projection.ts'
 import { buildPolyline, pointAtDistance, projectForward } from '../../src/lib/realtime/polyline.ts'
@@ -97,10 +97,11 @@ function cheapestColumn(y: number, n: Along, s: Along, prevH: number, fits: (col
 
 export function packStationDepths(
   full: StationDepthsFile,
-  stations: readonly DepthsStation[],
+  stationsFile: DepthsStations,
   shapes: readonly AnchorShape[],
   tolM: number = PACK_TOL_M,
 ): PackResult {
+  const { stations } = stationsFile
   const indexOf = new Map(stations.map((s, i) => [s.id, i]))
   const anchorStations: AnchorStation[] = stations.map((s) => ({ id: s.id, routeIds: s.routes }))
   const byRoute = linesByRouteDirection(shapes)
@@ -178,6 +179,7 @@ export function packStationDepths(
     license: full.license,
     attribution: full.attribution,
     format: 2,
+    feedVersion: stationsFile.feedVersion,
     station: entries.map((e, k) => (k === 0 ? e.index : e.index - entries[k - 1]!.index)),
     y: col(0),
     a: col(1),

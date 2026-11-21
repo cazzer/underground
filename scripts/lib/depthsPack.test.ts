@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { decodeStationDepths, type DepthsStation } from '../../src/data/depthsCodec.ts'
+import { decodeStationDepths, type DepthsStations } from '../../src/data/depthsCodec.ts'
 import type { ShapesFile, StationsFile } from '../../src/data/schema.ts'
 import type { PackedDepthsFile, StationDepthsFile, StationInterior, TrackDepth } from '../../src/data/stationSchema.ts'
 import { toGround } from '../../src/lib/projection.ts'
@@ -19,7 +19,7 @@ describe('packStationDepths', () => {
     { id: 'L..N', routeId: 'L', direction: 'N', line: buildPolyline([{ x: g.x - 1000, z: g.z + 2 }, { x: g.x + 1000, z: g.z + 2 }]) },
     { id: 'L..S', routeId: 'L', direction: 'S', line: buildPolyline([{ x: g.x + 1000, z: g.z - 2 }, { x: g.x - 1000, z: g.z - 2 }]) },
   ]
-  const stations: DepthsStation[] = [{ id: 'L08', ...anchor, stops: ['L08N', 'L08S'], routes: ['L'] }]
+  const stations: DepthsStations = { feedVersion: 'v1', stations: [{ id: 'L08', ...anchor, stops: ['L08N', 'L08S'], routes: ['L'] }] }
   const track = (stopId: string, x0: number, x1: number, z: number, railY = -10.2): TrackDepth => ({ stopId, railY, ends: [[x0, z], [x1, z]] })
   const full = (...tracks: TrackDepth[]): StationDepthsFile => ({ license: 'ODbL-1.0', attribution: ['OSM'], stations: [{ stationId: 'L08', anchor, tracks }] })
   const roundTrip = (depths: StationDepthsFile) => {
@@ -37,7 +37,7 @@ describe('packStationDepths', () => {
 
   it('packs mirrored tracks into one column with da and dh at 0', () => {
     const { file, split, notRidden } = roundTrip(full(track('L08N', -70, 90, 3), track('L08S', 90, -70, -3)))
-    expect([file.station, file.y, file.a, file.h, file.da, file.dh]).toEqual([[0], [-102], [10], [80], [0], [0]])
+    expect([file.feedVersion, file.station, file.y, file.a, file.h, file.da, file.dh]).toEqual(['v1', [0], [-102], [10], [80], [0], [0]])
     expect(file.tracks).toEqual({})
     expect([split, notRidden]).toEqual([[], []])
   })
@@ -69,7 +69,8 @@ describe('the committed station-depths.json', () => {
   const interiors = readdirSync(dir)
     .filter((f) => f.endsWith('.json') && !NOT_INTERIOR_FILES.has(f))
     .map((f) => json(new URL(f, dir)) as StationInterior)
-  const stations = (json(new URL('stations.json', data)) as StationsFile).stations
+  const stationsFile = json(new URL('stations.json', data)) as StationsFile
+  const stations = stationsFile.stations
   const lines = drawnLines((json(new URL('shapes.json', data)) as ShapesFile).shapes, TRACK_OFFSET_M)
   const anchorStations = stations.map((s) => ({ id: s.id, routeIds: s.routes }))
   const full = buildStationDepths(interiors)
@@ -77,14 +78,14 @@ describe('the committed station-depths.json', () => {
 
   it('is fresh: packing every committed interior reproduces it (rerun npm run data:stations if not)', () => {
     expect(interiors.some((i) => i.generated)).toBe(true)
-    expect(renderPackedDepths(packStationDepths(full, stations, lines).file)).toBe(text)
+    expect(renderPackedDepths(packStationDepths(full, stationsFile, lines).file)).toBe(text)
   })
 
   // Equivalence with the per-track format the interiors give: every run profileRuns finds from the full ends is
   // there after decoding, its ends within 3 m and its height within 0.05 m (decimeters, rounded). A decoded track can also pick up a sibling
   // shape the full ends just missed (its ends now lie on a drawn line); those extras must still build cleanly.
   it('decodes to the runs of the full format within 3 m, and every shape still profiles without drops or steep eases', () => {
-    const decoded = decodeStationDepths(JSON.parse(text) as PackedDepthsFile, stations, lines)
+    const decoded = decodeStationDepths(JSON.parse(text) as PackedDepthsFile, stationsFile, lines)
     expect(decoded.missed).toEqual([])
     const want = profileRuns(full, anchorStations, lines)
     const got = profileRuns(decoded.depths, anchorStations, lines)
