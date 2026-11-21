@@ -1,5 +1,5 @@
 import { FEED_IDS, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
-import type { ShapeId } from '../../data/schema'
+import type { ShapeId, StopId } from '../../data/schema'
 import { GHOST, ghostReason, type GhostReason } from './filters'
 import { joinTrip, type JoinResult, type JoinStage } from './joinTrip'
 import { planHop, type HopPlan, type PlanFailure } from './position'
@@ -25,10 +25,33 @@ export interface LiveTrip {
   plan: HopPlan
   /** The last stop the train was seen at, carried to the next poll. */
   visit: StopVisit | null
+  /**
+   * The trip's own first stop: its shape's first when the join found its own pattern, else (a short turn on the
+   * route's primary, say) the first stop it was seen at, carried across polls.
+   */
+  origin: StopId | null
 }
 
 /** What a trip carries from one poll to the next. */
-export type TripMemory = Pick<LiveTrip, 'shapeId' | 'visit'>
+export type TripMemory = Pick<LiveTrip, 'shapeId' | 'visit' | 'origin'>
+
+/** A trip missing from this many polls in a row (a feed gap, a ghost-filter blip) still keeps its memory. */
+export const MEMORY_TTL_POLLS = 1
+
+export interface CarriedMemory extends TripMemory {
+  /** Polls in a row the trip has been missing. */
+  missedPolls: number
+}
+
+/** The memory to pass the next poll: this poll's trips, plus last poll's for trips missing up to the TTL. */
+export function carryMemory(previous: ReadonlyMap<string, CarriedMemory>, trips: readonly LiveTrip[]): Map<string, CarriedMemory> {
+  const out = new Map<string, CarriedMemory>()
+  for (const t of trips) out.set(t.key, { shapeId: t.shapeId, visit: t.visit, origin: t.origin, missedPolls: 0 })
+  for (const [key, m] of previous) {
+    if (!out.has(key) && m.missedPolls < MEMORY_TTL_POLLS) out.set(key, { ...m, missedPolls: m.missedPolls + 1 })
+  }
+  return out
+}
 
 export interface PreparedTrips {
   trips: LiveTrip[]
@@ -87,6 +110,10 @@ export function prepareTrips(
       if (!geometry) throw new Error(`no geometry for joined shape ${join.shapeId}`)
 
       const visit = nextVisit(before?.visit ?? null, trip, feed, snapshot.feeds[feed].headerTimestamp)
+      const origin =
+        join.stage === 'primary'
+          ? (before?.origin ?? (trip.status === 'STOPPED_AT' ? trip.stopId : (trip.arrivals[0]?.[0] ?? null)))
+          : geometry.stops[0]!
       const plan = planHop({
         geometry,
         status: trip.status,
@@ -95,6 +122,7 @@ export function prepareTrips(
         segments: data.segments,
         now,
         visit,
+        origin,
       })
       if ('ok' in plan) {
         dropped[plan.reason]++
@@ -104,7 +132,7 @@ export function prepareTrips(
         dropped['not-departed']++
         continue
       }
-      trips.push({ key, feed, trip, shapeId: join.shapeId, stage: join.stage, geometry, plan, visit })
+      trips.push({ key, feed, trip, shapeId: join.shapeId, stage: join.stage, geometry, plan, visit, origin })
     }
   }
   return { trips, dropped }

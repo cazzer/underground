@@ -21,6 +21,7 @@ The static data those trips need, cut from `public/data` (feed version `20261028
 supplements`) so schedule refreshes can't move the test: the shapes the trips join to, the primary shape of each
 of their routes and directions, every shape of their routes with one of their trip origins (origins trimmed to
 those), the stations on those shapes, and the segments between their stops. The replay gives the same numbers
-on it as on the full `public/data`.
+on it as on the full `public/data`. It is written one entry per line (a shape, a pattern, a station, a segment),
+so a re-cut reads as a diff.
 
 Both are MTA data (realtime through the Worker; static GTFS); see `docs/research/data-sources.md` for terms.

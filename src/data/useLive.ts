@@ -3,7 +3,7 @@ import type { ArrivalsSource } from '../lib/live/arrivals'
 import { clockNow } from '../lib/live/clock'
 import { deriveLiveStatus, type LiveStatus } from '../lib/live/liveStatus'
 import type { JoinStage } from '../lib/realtime/joinTrip'
-import { prepareTrips, type DropReason, type LiveTrip, type TripMemory } from '../lib/realtime/prepareTrips'
+import { carryMemory, prepareTrips, type CarriedMemory, type DropReason, type LiveTrip } from '../lib/realtime/prepareTrips'
 import type { DrawnShapes } from './loadRealtimeStatic'
 import type { NetworkFiles } from './loadNetwork'
 import { FEED_IDS, RT_URL, type FeedId } from './realtime'
@@ -68,9 +68,9 @@ export function useLive(
     if (!configured) console.info('Live trains off: VITE_RT_URL is not set (copy .env.example to .env.local)')
   }, [configured])
 
-  // Last poll's trips: a fallback join that is a tie keeps its shape instead of flapping, and a trip's last stop
-  // carries into its next plan.
-  const previousTrips = useRef<ReadonlyMap<string, TripMemory>>(new Map())
+  // Trip memory from the last polls (kept one poll for a trip that drops out): a fallback join that is a tie keeps
+  // its shape instead of flapping, and a trip's last stop and origin carry into its next plan.
+  const previousTrips = useRef<ReadonlyMap<string, CarriedMemory>>(new Map())
 
   const { snapshot, offsetS } = feed
   const data = staticLoad.status === 'ready' ? staticLoad.data : null
@@ -80,7 +80,7 @@ export function useLive(
     try {
       const now = clockNow(offsetS, started)
       const result = prepareTrips(snapshot, data, now, previousTrips.current)
-      previousTrips.current = new Map(result.trips.map((t) => [t.key, { shapeId: t.shapeId, visit: t.visit }]))
+      previousTrips.current = carryMemory(previousTrips.current, result.trips)
       return { ok: true as const, ...result, ms: performance.now() - started, now }
     } catch (err) {
       console.error('Failed to place live trips', err)

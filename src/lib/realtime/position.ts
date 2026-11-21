@@ -30,6 +30,8 @@ export interface PositionInput {
   now: number
   /** The last stop the train was seen at (see stopVisit.ts); caps a late prediction for the hop leaving it. */
   visit?: StopVisit | null
+  /** The trip's own first stop, where it lays over; defaults to the shape's first stop. */
+  origin?: StopId | null
 }
 
 export type PositionResult =
@@ -150,10 +152,12 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
     segments[segmentKey(stops[hop.from]!, stops[hop.to]!)] ??
     Math.max(MIN_RUN_S, (D[hop.to]! - D[hop.from]!) / FALLBACK_SPEED_MPS)
   const dwellS = dwellFor(runS)
-  // Not from the origin stop: a train laying over there has no schedule to keep.
+  // Never capped leaving the trip's own origin: a train laying over there has no schedule to keep. It may still
+  // be held there (the floor), and a short turn joined to a longer pattern starts mid-shape, hence `origin`.
+  const fromOrigin = stops[hop.from] === (input.origin ?? stops[0])
   const arriveAt =
-    hop.arriveAt !== null && hop.from !== hop.to && hop.from > 0 && input.visit
-      ? capArrival(hop.arriveAt, stops[hop.from]!, runS, dwellS, input.visit)
+    hop.arriveAt !== null && hop.from !== hop.to && input.visit
+      ? capArrival(hop.arriveAt, stops[hop.from]!, runS, dwellS, input.visit, !fromOrigin)
       : hop.arriveAt
   return {
     from: hop.from,

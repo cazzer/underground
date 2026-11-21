@@ -65,8 +65,8 @@ const northbound: ShapeGeometry = {
 // A 100 s hop, 30 s of it dwelling at the origin.
 const SEGMENTS = { '101N>102N': 100, '102N>103N': 100 }
 
-function plan(status: VehicleStatus, stopId: string, arrivals: Arrival[], visit: StopVisit | null): HopPlan {
-  const p = planHop({ geometry: northbound, status, stopId, arrivals, segments: SEGMENTS, now: NOW, visit })
+function plan(status: VehicleStatus, stopId: string, arrivals: Arrival[], visit: StopVisit | null, origin?: string): HopPlan {
+  const p = planHop({ geometry: northbound, status, stopId, arrivals, segments: SEGMENTS, now: NOW, visit, origin })
   if ('ok' in p) throw new Error(p.reason)
   return p
 }
@@ -108,5 +108,21 @@ describe('planHop caps a late prediction with the schedule from the last stop', 
     expect(plan('IN_TRANSIT_TO', '103N', [['103N', NOW + 80]], null).arriveAt).toBe(NOW + 80)
     // Laid over at the origin since long ago: the layover says nothing about when it leaves.
     expect(plan('IN_TRANSIT_TO', '102N', [['102N', NOW + 80]], elsewhere).arriveAt).toBe(NOW + 80)
+  })
+
+  it('still holds a train at its origin while the poll has it there, so a held terminal departure does not run', () => {
+    // At the terminal 101N, there until NOW + 50 by the feed; predicted at 102N at NOW + 60, which can't be.
+    const held: StopVisit = { stopId: '101N', arrivedAt: NOW - 900, leftAfter: NOW + 50, here: true }
+    const p = plan('STOPPED_AT', '101N', [['101N', NOW + 50], ['102N', NOW + 60]], held)
+    expect(p.arriveAt).toBe(NOW + 50 + 70)
+    expect(p.capped).toBe(true)
+  })
+
+  it('takes the trip’s own origin, not the shape’s first stop: a short turn laying over mid-shape is not capped', () => {
+    // A short turn from 102N joined to the full pattern, laid over there ten minutes; the feed says 103N at NOW + 80.
+    const layover: StopVisit = { stopId: '102N', arrivedAt: NOW - 600, leftAfter: null, here: false }
+    expect(plan('STOPPED_AT', '102N', [['103N', NOW + 80]], layover, '102N').arriveAt).toBe(NOW + 80)
+    // The same visit on a trip that started at 101N is a train that has been at 102N far too long: capped.
+    expect(plan('STOPPED_AT', '102N', [['103N', NOW + 80]], layover).arriveAt).toBe(NOW + 80 - MAX_PULL_IN_S)
   })
 })

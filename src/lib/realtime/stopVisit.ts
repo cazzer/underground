@@ -74,10 +74,19 @@ export const MAX_PULL_IN_S = 45
  * prediction is capped by the schedule: no later than the arrival there plus the run (arrival to arrival), nor
  * than `leftAfter` plus the run less the dwell, plus the slack; never more than `MAX_PULL_IN_S` sooner.
  */
-export function capArrival(predicted: number, fromStop: StopId, runS: number, dwellS: number, visit: StopVisit): number {
+export function capArrival(
+  predicted: number,
+  fromStop: StopId,
+  runS: number,
+  dwellS: number,
+  visit: StopVisit,
+  /** False leaving the trip's origin: only the floor for a train still there applies. */
+  mayCap: boolean,
+): number {
   if (visit.stopId !== fromStop) return predicted
   const departed = visit.leftAfter === null ? -Infinity : visit.leftAfter + runS - dwellS
   if (visit.here) return Math.max(predicted, departed)
+  if (!mayCap) return predicted
   const bound = Math.max(visit.arrivedAt + runS, departed) + SCHEDULE_CAP_SLACK_S
   return Math.max(Math.min(predicted, bound), predicted - MAX_PULL_IN_S)
 }

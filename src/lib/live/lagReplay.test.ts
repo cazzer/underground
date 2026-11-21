@@ -9,7 +9,7 @@ import { FEED_IDS, type FeedId, type RealtimeSnapshot } from '../../data/realtim
 import type { ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
 import { pointAtDistance } from '../realtime/polyline'
 import { hopDistance } from '../realtime/position'
-import { prepareTrips, type LiveTrip, type StaticRealtimeData, type TripMemory } from '../realtime/prepareTrips'
+import { carryMemory, prepareTrips, type CarriedMemory, type LiveTrip, type StaticRealtimeData } from '../realtime/prepareTrips'
 import { buildShapeGeometries, type ShapeGeometry } from '../realtime/shapeGeometry'
 import { buildTripLookup } from '../realtime/tripLookup'
 import { TRACK_OFFSET_M } from '../trackOffset'
@@ -122,7 +122,7 @@ function replay(): Replay {
     d: new Float64Array(TRAIN_CAPACITY),
     g: new Array<ShapeGeometry | null>(TRAIN_CAPACITY).fill(null),
   }
-  let previous: ReadonlyMap<string, TripMemory> = new Map()
+  let previous: ReadonlyMap<string, CarriedMemory> = new Map()
   let offset: number | null = null
   let next = 0
   let maxStepM = 0
@@ -137,7 +137,7 @@ function replay(): Replay {
       const p = polls[next++]!
       offset = updateClockOffset(offset, p.snapshot.generatedAt, (p.receivedAt - perf0) * 1000)
       const { trips } = prepareTrips(p.snapshot, data, clockNow(offset, perfMs), previous)
-      previous = new Map(trips.map((t) => [t.key, t]))
+      previous = carryMemory(previous, trips)
       held = stillAtPlatform(next - 1, trips)
       reconcileSlots(table, trips, localS, { dataNow: clockNow(offset, perfMs), reducedMotion: false })
       for (const t of trips) if (!firstDrawn.has(t.key)) firstDrawn.set(t.key, wall)
