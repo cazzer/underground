@@ -12,7 +12,7 @@ export interface TiltOptions {
 
 export const DEFAULT_TILT: TiltOptions = {
   farDistance: 1400,
-  nearDistance: 180,
+  nearDistance: 400,
   maxPolar: ISO_POLAR,
 }
 

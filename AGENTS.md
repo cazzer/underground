@@ -235,10 +235,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     the arrival's clock minute minus the current one (not floor of seconds), so adjacent rows and both
     panels agree
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
-    (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape
+    (dots from 2400 m, cars by 1600 m, so a train is a flat footprint before the camera tips) and `carsReach`; `consistLayout.ts` `writeConsist`: cars end to end along the shape
     (`consistSpanInto`, shared with picking), each on its chord between two track points (pitched on the profile), unfolding from the dot point (spacing and length by mix, section by the slot fade);
-    `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within about 3 camera distances
-    of the view center are laid out; the rest are zeroed once
+    `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within `carsReach` of the view center
+    ((1 + 2 × tilt) camera distances plus 300 m, so 1 top-down and 3 at full tilt) are laid out; the rest are zeroed once
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
@@ -358,6 +358,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`): `ISO_POLAR × tiltT(d)`. The same
   `tiltT` is `depthFactor`, the one parameter for every drawn depth (track profile, car height, ties, interior
   levels, veil, level labels), so depth only shows as the camera tips: 0 top-down, 1 (the authored ×yScale) fully tilted.
+  The zoom stages, by camera distance: above 2400 m dots and station markers; 2400 to 1600 m dots unfold
+  into flat true-length footprints; the tilt runs from 1400 m (top-down) to 400 m (isometric, `nearDistance`);
+  1100 to 800 m the interior fades in as a flat plan (depth 0.05 to 0.40); 800 to 400 m the levels
+  separate and the veil and labels come in; at 400 m everything is full 3D.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
   focused: a full spin (azimuth bounds ±Infinity inside EXIT_DISTANCE), and the turn pivots on the focus point
   (the interior's mid-depth center at the middle of the free area, or the view center for a bare station).
@@ -437,7 +441,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   level up, so upper levels paint over lower ones; levels farther from the street (in level count; deeper, or
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
-  in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
+  in between 1100 m and 800 m (`interiorReveal.ts`), as a flat plan while the camera is still nearly top-down. A background-colored veil (render order 7) dims every street
   layer, live trains included, in one draw call, at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
   level labels show by `labelOpacity` (gated between depth 0.3 and 0.6); the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms

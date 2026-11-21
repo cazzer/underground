@@ -1,9 +1,10 @@
-import { DEFAULT_TILT } from './tilt'
-
-/** Fully revealed at the distance where the camera becomes fully isometric. */
-export const REVEAL_NEAR = DEFAULT_TILT.nearDistance
+/**
+ * The interior fades in as a flat plan between these camera distances, while the camera is still nearly top-down
+ * (tilt 1400 to 400 m; depth is about 0.05 at 1100 m and 0.4 at 800 m), so the levels only separate afterwards.
+ */
+export const REVEAL_NEAR = 800
 /** Hidden at or beyond this camera distance. */
-export const REVEAL_FAR = 320
+export const REVEAL_FAR = 1100
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
 

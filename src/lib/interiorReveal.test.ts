@@ -1,24 +1,25 @@
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_TILT, depthFactor } from './tilt'
 import { interiorOpacity, labelOpacity, LABELS_FROM_DEPTH, LABELS_FULL_DEPTH, REVEAL_FAR, REVEAL_NEAR, veilWeight } from './interiorReveal'
 
 describe('interiorOpacity', () => {
   it('is hidden at and beyond the far distance', () => {
-    expect(REVEAL_FAR).toBe(320)
-    expect(interiorOpacity(320)).toBe(0)
-    expect(interiorOpacity(1000)).toBe(0)
+    expect(REVEAL_FAR).toBe(1100)
+    expect(interiorOpacity(1100)).toBe(0)
+    expect(interiorOpacity(3000)).toBe(0)
   })
 
   it('is fully shown from the full-tilt distance in', () => {
-    expect(REVEAL_NEAR).toBe(180)
-    for (const d of [180, 40, 0]) expect(interiorOpacity(d)).toBe(1)
+    expect(REVEAL_NEAR).toBe(800)
+    for (const d of [800, 400, 40, 0]) expect(interiorOpacity(d)).toBe(1)
   })
 
   it('is half at the log midpoint', () => {
-    expect(interiorOpacity(Math.sqrt(180 * 320))).toBeCloseTo(0.5)
+    expect(interiorOpacity(Math.sqrt(800 * 1100))).toBeCloseTo(0.5)
   })
 
   it('decreases strictly across the fade', () => {
-    const values = [200, 230, 260, 290, 310].map(interiorOpacity)
+    const values = [820, 880, 940, 1000, 1080].map(interiorOpacity)
     for (let i = 1; i < values.length; i++) expect(values[i]!).toBeLessThan(values[i - 1]!)
   })
 
@@ -44,5 +45,20 @@ describe('labelOpacity', () => {
     expect(labelOpacity(1, LABELS_FULL_DEPTH)).toBe(1)
     expect(labelOpacity(0.3, 1)).toBeCloseTo(0.3, 9)
     expect(labelOpacity(0, 1)).toBe(0)
+  })
+})
+
+describe('stage invariants', () => {
+  it('the plan is fully in while the camera is still nearly top-down, so the levels separate afterwards', () => {
+    expect(interiorOpacity(REVEAL_NEAR)).toBe(1)
+    expect(depthFactor(REVEAL_NEAR)).toBeLessThan(0.45)
+    expect(depthFactor(REVEAL_FAR)).toBeLessThan(0.06)
+  })
+
+  it('depth and the reveal are both full at the landing distance', () => {
+    const landing = DEFAULT_TILT.nearDistance
+    expect(landing).toBe(400)
+    expect(depthFactor(landing)).toBe(1)
+    expect(interiorOpacity(landing)).toBe(1)
   })
 })
