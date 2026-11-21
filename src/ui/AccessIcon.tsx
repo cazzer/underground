@@ -1,6 +1,5 @@
 import { accessLabel } from '../lib/labels'
 import type { StationAccessInfo } from '../lib/network'
-import { accessLook } from './accessLook'
 
 interface AccessGlyphProps {
   className: string
@@ -37,30 +36,6 @@ function AccessIcon({ access, context }: AccessIconProps) {
   const partial = access.status === 'partial'
   const partly = partial && context === 'row' && <span className="text-xs text-ink-dim">partly</span>
 
-  if (accessLook === 'b') {
-    const badge = partial ? 'border border-access-badge text-access-badge' : 'bg-access-badge text-access-badge-ink'
-    return (
-      <span aria-hidden="true" className="ml-1 inline-flex items-center gap-1 align-[-0.15em]">
-        <span className={`inline-flex size-[1.05em] items-center justify-center ${badge}`}>
-          <AccessGlyph className="size-[0.8em]" />
-        </span>
-        {partly}
-      </span>
-    )
-  }
-  if (accessLook === 'c') {
-    return (
-      <span
-        aria-hidden="true"
-        className={`ml-1 inline-flex items-center gap-1 border-2 px-1.5 align-[0.1em] text-xs ${
-          partial ? 'border-ink-dim text-ink-dim' : 'border-ink text-ink'
-        }`}
-      >
-        <AccessGlyph className="size-[1.1em]" />
-        {partial ? 'Partly' : 'Accessible'}
-      </span>
-    )
-  }
   return (
     <span aria-hidden="true" className="ml-1 inline-flex items-baseline gap-1">
       <AccessGlyph className={`size-[0.9em] ${partial ? 'text-ink-dim' : 'text-ink'}`} />

@@ -84,8 +84,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   with `provenance: 'generated'` count as not listed and `stations/depths-generated.json` is never fetched; with
   it, that file joins the startup fetch batch (its failure only logs) and its depths merge into the track
   profiles. The removal list is in `src/data/generatedLook.ts`
-  TEMPORARY: `?access=a|b|c` (plain glyph, filled badge, text pill; default a) until the epz look card is
-  decided; the `accessBadge`/`accessBadgeInk` tokens serve B; the removal list is in `src/ui/accessLook.ts`
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
