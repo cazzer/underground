@@ -10,7 +10,8 @@
  *
  *  Everything is built in memory first; nothing is written if a build step throws or the
  *  gzipped total is over budget. */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { gzipSync } from 'node:zlib'
 import { parseArgs } from 'node:util'
 import { unzipSync } from 'fflate'
 import { readFeed } from './lib/gtfs.ts'
@@ -53,6 +54,24 @@ function decodeTables(zip: Uint8Array): Record<string, string> {
   return Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, decoder.decode(bytes)]))
 }
 
+/**
+ * Gzip sizes of the other top-level public/data JSON the client loads up front (station-depths.json, written by
+ * data:stations), so the budget covers the real total. Per-station interiors (stations/) load on focus and don't count.
+ */
+function committedOthers(built: ReadonlySet<string>): Record<string, number> {
+  const others: Record<string, number> = {}
+  let names: string[] = []
+  try {
+    names = readdirSync(OUT_DIR)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+  }
+  for (const name of names) {
+    if (name.endsWith('.json') && !built.has(name)) others[name] = gzipSync(readFileSync(new URL(name, OUT_DIR)), { level: 9 }).length
+  }
+  return others
+}
+
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { zip: { type: 'string' } }, strict: true })
   const feed = readFeed(decodeTables(await loadZip(values.zip ?? process.env.GTFS_ZIP)))
@@ -73,12 +92,16 @@ async function main(): Promise<void> {
   ]
 
   const rendered = outputs.map(([name, value, lineDepth]) => renderedFile(name, toStableJson(value, lineDepth)))
-  const totalGzip = checkBudget(rendered)
+  const others = committedOthers(new Set(rendered.map((f) => f.name)))
+  const totalGzip = checkBudget(rendered, others)
 
   mkdirSync(OUT_DIR, { recursive: true })
   for (const f of rendered) writeFileSync(new URL(f.name, OUT_DIR), f.text)
 
-  console.table(rendered.map((f) => ({ file: f.name, 'raw B': f.raw, 'gzip B': f.gzip })))
+  console.table([
+    ...rendered.map((f) => ({ file: f.name, 'raw B': f.raw, 'gzip B': f.gzip })),
+    ...Object.entries(others).map(([file, gzip]) => ({ file: `${file} (committed)`, 'raw B': null, 'gzip B': gzip })),
+  ])
   console.log(`Total gzip: ${totalGzip} B (budget ${GZIP_BUDGET_BYTES} B)`)
   console.log(`Skipped: ${skippedSegments} non-positive segment samples, ${skippedNoShape} trips without a shape`)
 }

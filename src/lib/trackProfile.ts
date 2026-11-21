@@ -34,6 +34,8 @@ export interface BuiltProfile {
   profile: TrackProfile
   /** Runs dropped because they overlap an earlier one (two stations claiming the same stretch of a shape). */
   dropped: ProfileRun[]
+  /** Eases between two close runs steeper than twice the grade on average (real rise over run). */
+  steep: { from: ProfileRun; to: ProfileRun; grade: number }[]
 }
 
 /**
@@ -51,7 +53,8 @@ export function buildTrackProfile(runs: readonly ProfileRun[], opts: ProfileOpti
     if (last && r.d0 < last.d1) dropped.push(r)
     else kept.push(r)
   }
-  if (kept.length === 0) return { profile: EMPTY_PROFILE, dropped }
+  if (kept.length === 0) return { profile: EMPTY_PROFILE, dropped, steep: [] }
+  const steep: BuiltProfile['steep'] = []
 
   const d: number[] = []
   const y: number[] = []
@@ -63,6 +66,10 @@ export function buildTrackProfile(runs: readonly ProfileRun[], opts: ProfileOpti
   kept.forEach((r, i) => {
     const prev = kept[i - 1]
     const merged = prev !== undefined && prev.d1 + rampOf(prev) > r.d0 - rampOf(r)
+    if (prev && merged) {
+      const grade = Math.abs(r.yReal - prev.yReal) / (r.d0 - prev.d1)
+      if (grade > 2 * opts.grade) steep.push({ from: prev, to: r, grade })
+    }
     if (prev && !merged) knot(prev.d1 + rampOf(prev), 0)
     if (!merged) knot(r.d0 - rampOf(r), 0)
     knot(r.d0, r.yReal * opts.yScale)
@@ -70,7 +77,7 @@ export function buildTrackProfile(runs: readonly ProfileRun[], opts: ProfileOpti
   })
   const last = kept.at(-1)!
   knot(last.d1 + rampOf(last), 0)
-  return { profile: { d: Float64Array.from(d), y: Float64Array.from(y) }, dropped }
+  return { profile: { d: Float64Array.from(d), y: Float64Array.from(y) }, dropped, steep }
 }
 
 /** y at distance `distance` along the shape: smoothstep between the knots around it. No allocation. */

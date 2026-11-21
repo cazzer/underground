@@ -1,6 +1,6 @@
 import { Grid } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, type Mesh, type ShaderMaterial } from 'three'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
@@ -18,6 +18,13 @@ export function MapGrid() {
     [],
   )
   const lastFade = useRef(-1)
+
+  // drei's grid material writes depth along its lines (it only discards empty pixels), which would cut slashes
+  // through the depth-tested train cars wherever the track runs below the street. It draws first, so it needs none.
+  useLayoutEffect(() => {
+    const m = mesh.current
+    if (m) (m.material as ShaderMaterial).depthWrite = false
+  }, [])
 
   useFrame((state) => {
     const m = mesh.current

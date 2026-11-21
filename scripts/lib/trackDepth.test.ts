@@ -70,7 +70,9 @@ describe('Bedford Av (L08) track depth', () => {
     expect(railY).toBeCloseTo(-20.4, 9)
   })
 
-  it.each(['L08N', 'L08S'])('draws %s on the interior rails: within 1.75 m in 3D, level to 1 cm', (stopId) => {
+  // Fall 2026: the drawn L runs 0.85 m to 1.65 m beside each platform track (trackAlignment.test.ts) and exactly
+  // at rail height. The horizontal bound leaves room for shape refreshes, still well inside MATCH_TOL_M (6 m).
+  it.each(['L08N', 'L08S'])('draws %s on the interior rails: within 3 m across, level to 1 cm', (stopId) => {
     const path = tracks.find((t) => t.stopId === stopId)!.path
     const [first, last] = [path[0]!, path.at(-1)!]
     for (const rider of riders(stopId)) {
@@ -81,7 +83,7 @@ describe('Bedford Av (L08) track depth', () => {
         const hit = nearestDrawn(p, line)
         const label = `${rider.id} at t = ${t}`
         expect(Math.abs(hit.y - railY), label).toBeLessThan(0.01)
-        expect(Math.hypot(hit.offsetM, hit.y - railY), label).toBeLessThanOrEqual(1.75)
+        expect(hit.offsetM, label).toBeLessThanOrEqual(3)
       }
     }
   })

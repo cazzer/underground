@@ -68,6 +68,8 @@ export interface Network {
   trackOffsetM: number
   /** Vertical profile of each shape anchored at a station depth (others are flat at 0); realtime reads it here. */
   profiles: ReadonlyMap<ShapeId, TrackProfile>
+  /** Scene height of the deepest ridden platform track at each station with a depth (rail y x yScale). */
+  stationTrackY: ReadonlyMap<StationId, number>
 }
 
 function extend(b: Bounds, p: Ground): void {
@@ -116,7 +118,7 @@ export function buildNetwork(
     if (points.length < 2) throw new Error(`Shape ${s.id} has ${points.length} point(s); needs at least 2`)
     return { id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(points) }
   })
-  const { runs, unmatched } = profileRuns(depths, stations, lines)
+  const { runs, unmatched, stationRailY } = profileRuns(depths, stations, lines)
   for (const stopId of unmatched) console.warn(`Track depth: no shape rides the ${stopId} platform track; it stays at street level`)
 
   const profiles = new Map<ShapeId, TrackProfile>()
@@ -124,6 +126,9 @@ export function buildNetwork(
     const { line } = lines[i]!
     const built = buildTrackProfile(runs.get(s.id) ?? [], { grade: GRADE, yScale })
     if (built.dropped.length > 0) console.warn(`Track depth: shape ${s.id} has overlapping platform runs; dropped`, built.dropped)
+    for (const { from, to, grade } of built.steep) {
+      console.warn(`Track depth: shape ${s.id} eases ${from.yReal} m to ${to.yReal} m at a ${(grade * 100).toFixed(1)}% grade`)
+    }
     const profile = built.profile
     if (profile !== EMPTY_PROFILE) profiles.set(s.id, profile)
     const { points, cumulative, y } = resampleForProfile(line.points, line.cumulative, profile)
@@ -152,6 +157,7 @@ export function buildNetwork(
     center: boundsCenter(bounds),
     trackOffsetM,
     profiles,
+    stationTrackY: new Map([...stationRailY].map(([id, y]) => [id, y * yScale])),
   }
 }
 
