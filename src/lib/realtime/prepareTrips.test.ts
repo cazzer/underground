@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { FEED_IDS, RT_SCHEMA_VERSION, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import { geometries, lookup, segments } from './fixture'
 import { hopDistance, positionAlongShape } from './position'
-import { prepareTrips } from './prepareTrips'
+import { SCHEDULE_CAP_SLACK_S } from './stopVisit'
+import { carryMemory, MEMORY_TTL_POLLS, prepareTrips, type LiveTrip } from './prepareTrips'
 
 const NOW = 1_795_228_554
 
@@ -99,5 +100,67 @@ describe('prepareTrips plans', () => {
       if (!placed.ok) throw new Error('unexpected failure')
       expect(hopDistance(t.plan, t.geometry, NOW + 7)).toBe(placed.distance)
     }
+  })
+})
+
+describe('prepareTrips across polls', () => {
+  it('carries the last stop into the next poll and caps a late prediction with the schedule from it', () => {
+    const data = { lookup, geometries, segments }
+    // At 102N since NOW - 20 (a 100 s hop to 103N), seen there as of the NOW header; then in transit, with the
+    // feed still saying 103N at NOW + 130.
+    const stopped = trip('129900_1..N03R', '1', { status: 'STOPPED_AT', timestamp: NOW - 20, arrivals: [['102N', NOW - 20], ['103N', NOW + 150]] })
+    const first = prepareTrips(snapshot({ '1234567': [stopped] }), data, NOW)
+    expect(first.trips[0]!.visit).toEqual({ stopId: '102N', arrivedAt: NOW - 20, leftAfter: NOW, here: true })
+    expect(first.trips[0]!.plan.arriveAt).toBe(NOW + 150) // still at the platform: not capped
+    const moving = trip('129900_1..N03R', '1', { stopId: '103N', timestamp: NOW + 15, arrivals: [['103N', NOW + 130]] })
+    const later = prepareTrips(snapshot({ '1234567': [moving] }), data, NOW + 20, new Map(first.trips.map((t) => [t.key, t])))
+    expect(later.trips[0]!.visit).toEqual({ ...first.trips[0]!.visit, here: false })
+    expect(later.trips[0]!.plan.arriveAt).toBe(NOW + 80 + SCHEDULE_CAP_SLACK_S)
+    // Without the previous poll there is nothing to cap it with.
+    expect(prepareTrips(snapshot({ '1234567': [moving] }), data, NOW + 20).trips[0]!.plan.arriveAt).toBe(NOW + 130)
+  })
+})
+
+describe('carryMemory', () => {
+  const data = { lookup, geometries, segments }
+  const stopped = trip('129900_1..N03R', '1', { status: 'STOPPED_AT', timestamp: NOW - 20, arrivals: [['102N', NOW - 20], ['103N', NOW + 150]] })
+  const moving = trip('129900_1..N03R', '1', { stopId: '103N', timestamp: NOW + 55, arrivals: [['103N', NOW + 130]] })
+  const none: LiveTrip[] = []
+
+  it(`keeps a trip's memory through ${MEMORY_TTL_POLLS} poll without it, so its last stop still caps the next plan`, () => {
+    const first = prepareTrips(snapshot({ '1234567': [stopped] }), data, NOW)
+    const gap = carryMemory(carryMemory(new Map(), first.trips), none)
+    expect(gap.get('1234567:129900_1..N03R')).toMatchObject({ visit: { stopId: '102N' }, missedPolls: 1 })
+    const back = prepareTrips(snapshot({ '1234567': [moving] }), data, NOW + 40, gap)
+    expect(back.trips[0]!.plan.capped).toBe(true)
+    expect(carryMemory(gap, back.trips).get('1234567:129900_1..N03R')!.missedPolls).toBe(0)
+  })
+
+  it('drops the memory of a trip missing for longer', () => {
+    const first = prepareTrips(snapshot({ '1234567': [stopped] }), data, NOW)
+    let memory = carryMemory(new Map(), first.trips)
+    for (let k = 0; k <= MEMORY_TTL_POLLS; k++) memory = carryMemory(memory, none)
+    expect(memory.size).toBe(0)
+  })
+})
+
+describe('trip origin', () => {
+  const data = { lookup, geometries, segments }
+
+  it('is the shape’s first stop when the join found the trip’s own pattern', () => {
+    const { trips } = prepareTrips(snapshot({ '1234567': [trip('129900_1..N03R', '1')] }), data, NOW)
+    expect(trips[0]!.stage).toBe('path')
+    expect(trips[0]!.origin).toBe('101N')
+  })
+
+  it('on the route’s primary fallback is where the trip was first seen, kept across polls', () => {
+    // An origin no static trip has and no path code: a short turn the fallback puts on the full pattern.
+    const first = trip('099999_1..N', '1', { stopId: '102N', arrivals: [['102N', NOW + 30], ['103N', NOW + 130]] })
+    const a = prepareTrips(snapshot({ '1234567': [first] }), data, NOW)
+    expect(a.trips[0]!.stage).toBe('primary')
+    expect(a.trips[0]!.origin).toBe('102N')
+    const later = trip('099999_1..N', '1', { stopId: '103N', arrivals: [['103N', NOW + 100]] })
+    const b = prepareTrips(snapshot({ '1234567': [later] }), data, NOW + 40, carryMemory(new Map(), a.trips))
+    expect(b.trips[0]!.origin).toBe('102N')
   })
 })

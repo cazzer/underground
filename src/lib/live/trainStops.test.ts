@@ -155,7 +155,7 @@ describe('stopEtaSpoken', () => {
 })
 
 describe('deriveTrainStopsView', () => {
-  const status = (kind: LiveStatusKind): LiveStatus => ({ kind, label: kind, detail: null })
+  const status = (kind: LiveStatusKind): LiveStatus => ({ kind, label: kind, detail: null, updatedAt: null })
   const stops: TrainStop[] = [{ stopId: 'L08N', name: 'Bedford Av', time: NOW, standing: false }]
   it('says connecting until there is a snapshot', () => {
     expect(deriveTrainStopsView(status('connecting'), null, false)).toEqual({ kind: 'message', text: 'Connecting to live times' })

@@ -4,6 +4,7 @@ import type { StopId } from '../../data/schema'
 import type { Ground } from '../projection'
 import { pointAtDistance } from './polyline'
 import type { ShapeGeometry } from './shapeGeometry'
+import { capArrival, type StopVisit } from './stopVisit'
 
 /** Run time guess (m/s) for a stop pair missing from segments.json. */
 export const FALLBACK_SPEED_MPS = 8
@@ -27,6 +28,10 @@ export interface PositionInput {
   segments: Readonly<Record<string, number>>
   /** epoch seconds, may be fractional */
   now: number
+  /** The last stop the train was seen at (see stopVisit.ts); caps a late prediction for the hop leaving it. */
+  visit?: StopVisit | null
+  /** The trip's own first stop, where it lays over; defaults to the shape's first stop. */
+  origin?: StopId | null
 }
 
 export type PositionResult =
@@ -76,6 +81,8 @@ export interface HopPlan {
   minFraction: number
   /** Seconds until the origin stop's predicted time when the train hasn't left it (not STOPPED_AT); else null. */
   departsInS: number | null
+  /** `arriveAt` comes from the visit to the last stop (stopVisit.ts), not the feed's prediction; counted in `?debug`. */
+  capped: boolean
 }
 
 export interface PlanFailure {
@@ -144,15 +151,24 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
   const runS =
     segments[segmentKey(stops[hop.from]!, stops[hop.to]!)] ??
     Math.max(MIN_RUN_S, (D[hop.to]! - D[hop.from]!) / FALLBACK_SPEED_MPS)
+  const dwellS = dwellFor(runS)
+  // Never capped leaving the trip's own origin: a train laying over there has no schedule to keep. It may still
+  // be held there (the floor), and a short turn joined to a longer pattern starts mid-shape, hence `origin`.
+  const fromOrigin = stops[hop.from] === (input.origin ?? stops[0])
+  const arriveAt =
+    hop.arriveAt !== null && hop.from !== hop.to && input.visit
+      ? capArrival(hop.arriveAt, stops[hop.from]!, runS, dwellS, input.visit, !fromOrigin)
+      : hop.arriveAt
   return {
     from: hop.from,
     to: hop.to,
-    arriveAt: hop.arriveAt,
+    arriveAt,
     runS,
-    dwellS: dwellFor(runS),
+    dwellS,
     fixedFraction: hop.fraction ?? null,
     minFraction: hop.fraction === undefined && status === 'INCOMING_AT' ? INCOMING_MIN_FRACTION : 0,
     departsInS: hop.departsInS,
+    capped: arriveAt !== hop.arriveAt,
   }
 }
 

@@ -3,13 +3,14 @@ import type { ArrivalsSource } from '../lib/live/arrivals'
 import { clockNow } from '../lib/live/clock'
 import { deriveLiveStatus, type LiveStatus } from '../lib/live/liveStatus'
 import type { JoinStage } from '../lib/realtime/joinTrip'
-import { prepareTrips, type DropReason, type LiveTrip } from '../lib/realtime/prepareTrips'
+import { carryMemory, prepareTrips, type CarriedMemory, type DropReason, type LiveTrip } from '../lib/realtime/prepareTrips'
 import type { DrawnShapes } from './loadRealtimeStatic'
 import type { NetworkFiles } from './loadNetwork'
 import { FEED_IDS, RT_URL, type FeedId } from './realtime'
 import type { ShapeId, TripPattern } from './schema'
 import { useRealtimeFeed } from './useRealtimeFeed'
 import { useRealtimeStatic } from './useRealtimeStatic'
+import { useOnline } from './useOnline'
 
 /** What the scene draws: this poll's placed trips, and the clock to evaluate them against. */
 export interface LiveLayer {
@@ -23,6 +24,8 @@ export interface LiveDebugInfo {
   drawn: number
   dropped: Record<DropReason, number>
   stages: Record<JoinStage, number>
+  /** Drawn trips whose arrival comes from the schedule from their last stop, not the feed's prediction. */
+  capped: number
   perFeed: Record<FeedId, { trips: number; stale: boolean; error: string | null }>
   cache: string | null
   prepareMs: number
@@ -65,8 +68,9 @@ export function useLive(
     if (!configured) console.info('Live trains off: VITE_RT_URL is not set (copy .env.example to .env.local)')
   }, [configured])
 
-  // Where each trip was placed last poll, so a fallback join that is a tie keeps its shape instead of flapping.
-  const previousShapes = useRef<ReadonlyMap<string, ShapeId>>(new Map())
+  // Trip memory from the last polls (kept one poll for a trip that drops out): a fallback join that is a tie keeps
+  // its shape instead of flapping, and a trip's last stop and origin carry into its next plan.
+  const previousTrips = useRef<ReadonlyMap<string, CarriedMemory>>(new Map())
 
   const { snapshot, offsetS } = feed
   const data = staticLoad.status === 'ready' ? staticLoad.data : null
@@ -75,8 +79,8 @@ export function useLive(
     const started = performance.now()
     try {
       const now = clockNow(offsetS, started)
-      const result = prepareTrips(snapshot, data, now, previousShapes.current)
-      previousShapes.current = new Map(result.trips.map((t) => [t.key, t.shapeId]))
+      const result = prepareTrips(snapshot, data, now, previousTrips.current)
+      previousTrips.current = carryMemory(previousTrips.current, result.trips)
       return { ok: true as const, ...result, ms: performance.now() - started, now }
     } catch (err) {
       console.error('Failed to place live trips', err)
@@ -111,6 +115,7 @@ export function useLive(
       drawn: placed.trips.length,
       dropped: placed.dropped,
       stages,
+      capped: placed.trips.filter((t) => t.plan.capped).length,
       perFeed,
       cache: feed.cache,
       prepareMs: placed.ms,
@@ -123,6 +128,7 @@ export function useLive(
 
   const staticError = staticLoad.status === 'error' ? staticLoad.message : null
   const fatalError = staticError ?? prepareError ?? layerError
+  const online = useOnline()
   const status = deriveLiveStatus({
     configured,
     fatal: fatalError !== null,
@@ -132,6 +138,7 @@ export function useLive(
     schemaMismatch: feed.schemaMismatch,
     // Re-evaluated whenever a poll lands, so the age check needs no timer of its own.
     nowS: offsetS === null ? 0 : clockNow(offsetS, performance.now()),
+    online,
   })
 
   return { status, layer, debug, arrivals, technical: fatalError ?? feed.lastError, onLayerError }

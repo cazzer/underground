@@ -52,3 +52,10 @@ export function multiBoroughNames(stations: readonly { name: string; borough?: B
   }
   return new Set([...boroughs].filter(([, seen]) => seen.size > 1).map(([name]) => name))
 }
+
+const UPDATED_FORMAT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
+
+/** "updated 2:41 PM" in New York time (the feed's), for data that may be out of date. */
+export function updatedLabel(epochS: number): string {
+  return `updated ${UPDATED_FORMAT.format(new Date(epochS * 1000))}`
+}

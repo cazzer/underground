@@ -219,8 +219,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `liveStatus.ts` `deriveLiveStatus` for the HUD (off/connecting/live/stale/error; one failed poll with
     a snapshot is not shown, two show a delay while trains stay drawn; technical text never appears)
   - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
-    poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, glide to
-    arrive on time, or cross-fade; reduced motion cross-fades). On a shape change the dot's ground point is
+    poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, a smoothstep-eased
+    glide sized from the gap at 60 m/s catch-up within 3-10 s that a new poll continues on its curve rather than
+    restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change the dot's ground point is
     projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
   - `trackPoint.ts` `trackPointInto`: a train's drawn point at a distance, on its route's band as the band line
@@ -252,11 +253,22 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     allocation); `positionAlongShape` is their composition. A trip with no VehiclePosition doesn't advance
     to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
     first `dwellFor(runS)` (30 s, at most 35% of the hop) of every hop is held at its origin stop: the train
-    leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status
+    leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status. The predicted arrival is
+    capped by the schedule from the trip's last stop (`capArrival` in `stopVisit.ts`): MTA final-approach
+    predictions run about 40 s late
+  - `stopVisit.ts` `nextVisit`: the last stop a train was seen at (STOPPED_AT time; `here` and `leftAfter` on the
+    1234567 and L feeds, whose STOPPED_AT ends on departure), carried across polls. `capArrival`: a train still
+    `here` never leaves before `leftAfter`; once gone, arrival = min(prediction, schedule from the stop + 6 s),
+    pulled in by at most 45 s; never capped leaving the trip's own origin (`LiveTrip.origin`: the shape's first stop,
+    or for a primary-fallback join the first stop seen), though the `here` floor applies there. `?debug` counts
+    capped plans
   - `smoothing.ts` smoothDistance: per-frame ease that never goes backward
   - `filters.ts` ghostReason: unassigned, stale vehicle, no future arrival
-  - `prepareTrips.ts` per poll: filter, join, plan; returns live trips (each with its `HopPlan`) and
-    per-reason drop counts
+  - `prepareTrips.ts` per poll: filter, join, plan; returns live trips (each with its `HopPlan` and `visit`) and
+    per-reason drop counts. Takes the trip memory `carryMemory` builds (shape for join ties, visit and origin for
+    the cap), which keeps a trip missing from one poll
+- `src/test-fixtures/`: `rt-polls.json` (18 recorded `/rt` polls trimmed to 21 trips) and `rt-static.json` (their
+  static subset), which `src/lib/live/lagReplay.test.ts` replays to bound lag both ways and early departures
 - `src/data/loadNetwork.ts` fetches stations/routes/shapes/station-depths JSON and validates their outer shape (a
   missing depths file fails the load like the others); `depthsCodec.ts` (pure, `.ts` imports for the scripts'
   encoder) decodes the packed depths in `buildNetwork` against stations.json and the drawn lines into the per-track

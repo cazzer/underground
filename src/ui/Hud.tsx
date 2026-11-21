@@ -192,8 +192,10 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
       <header ref={header} className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl tracking-[0.2em] uppercase sm:tracking-[0.3em]">underground</h1>
-          <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)}</p>
-          <LiveStatus status={live} />
+          <p className="flex flex-wrap items-center gap-x-2 text-xs text-ink-dim">
+            <span>{scheduleLabel(network.feedVersion)}</span>
+            <LiveStatus status={live} />
+          </p>
           <LocateStatus state={locate.state} onClear={onClearLocation} />
           <OrbitHint />
           <p role="status" aria-live="polite" className="sr-only">
