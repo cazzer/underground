@@ -18,6 +18,9 @@ import { SegmentWriter, type Buffers, type InteriorRole, type Rgb } from './inte
 export type { Buffers, InteriorRole, Rgb } from './interiorSegments.ts'
 export type { MachineStyle } from './interiorConnectors.ts'
 
+/** Estimated drop from the platform edge to the rail head, meters: where the interior draws its tracks. */
+export const RAIL_DROP_M = 1.1
+
 export interface InteriorBufferOptions {
   /** Vertical exaggeration; x/z are never scaled. */
   yScale: number

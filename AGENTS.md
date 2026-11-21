@@ -32,7 +32,8 @@ so dev and preview serve under that path.
 - `npm run data:access`: offline; reruns the borough/ADA join on the committed `public/data/stations.json`
   with the pinned catalog and exceptions, prints the gzip total against the budget.
 - `npm run data:stations`: merge `data/stations/*.authored.json` with the pinned `*.sources.json`
-  into `public/data/stations/*.json`. Offline.
+  into `public/data/stations/*.json`, and extract `public/data/station-depths.json` (each platform track's
+  ends and rail height; it counts toward the shared 60 KB budget). Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
   pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
@@ -77,7 +78,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `useStationOrbit.ts` the focused-station orbit (azimuth window per frame, pan-radius clamp);
     `orbitLook.ts` TEMPORARY `?orbit=` override
-  - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
+  - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `StationTies.tsx` a thin vertical tie
+    from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
+    LineSegments2, `theme.stationTieWidth`, faded out between 350 and 550 m); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; `FocusRing.tsx` redraws the focused ring above the
     trains and the veil; `markerShape.ts` the shared marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
@@ -119,9 +122,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     160°+ turns, then offset); `trackOffset.ts` `offsetPolyline` (miter joins, capped at 2× on sharp
     bends) plus the `TRACK_OFFSET_M` constant (4.7 m). Both use explicit `.ts` imports because a scripts/
     test loads them;
+    `trackProfile.ts` a shape's vertical profile (knots, `profileAt`, `resampleForProfile`) and
+    `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
+    `.ts` imports for `scripts/lib/trackDepth.test.ts`;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
-    between HUD insets), `markerMatrices.ts` (incl. `writeYawMatrix`), `pick.ts` (hit radii, nearest station,
+    between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
     station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
   - `interiorGeometry.ts` interior to strong/fine line buffers (levels, outlines, entrances);
@@ -163,7 +169,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     arrive on time, or cross-fade; reduced motion cross-fades). On a shape change the dot's ground point is
     projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
-  - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends);
+  - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends, at the
+    profile's height);
     `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice; no live layer, an outage, keeps it);
     `trainSummary.ts` route and headsign for the train panel and the notice;
     `trainStops.ts` the train's next stops (feed arrivals not yet passed, the dwell stop kept), `nyClockTime`
@@ -173,7 +180,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     panels agree
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
     (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape
-    (`consistSpanInto`, shared with picking), each on its chord, unfolding from the dot point (spacing and length by mix, section by the slot fade);
+    (`consistSpanInto`, shared with picking), each on its chord (pitched on the profile, `trackY`), unfolding from the dot point (spacing and length by mix, section by the slot fade);
     `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within about 3 camera distances
     of the view center are laid out; the rest are zeroed once
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
@@ -183,7 +190,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then the route's pattern
     that calls at the train's stop and covers most of its predicted stops (ties go to the primary)
   - `polyline.ts` cumulative length, point/heading at distance, forward-only projection
-  - `shapeGeometry.ts` each pattern's track line (`trackLine`, the map's offset line) and its stop distances, computed at load
+  - `shapeGeometry.ts` each pattern's track line (`trackLine` resampled on `network.profiles`, the map's line) and
+    its stop distances, computed at load; `ShapeGeometry.profile` is the shape's profile (`EMPTY_PROFILE` when flat)
   - `position.ts` `planHop` (once per poll: hop, run time, arrival) and `hopDistance` (per frame, no
     allocation); `positionAlongShape` is their composition. A trip with no VehiclePosition doesn't advance
     to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
@@ -193,8 +201,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `filters.ts` ghostReason: unassigned, stale vehicle, no future arrival
   - `prepareTrips.ts` per poll: filter, join, plan; returns live trips (each with its `HopPlan`) and
     per-reason drop counts
-- `src/data/loadNetwork.ts` fetches stations/routes/shapes JSON and validates their outer shape;
-  `useNetwork.ts` is the loading/error/ready hook (ready also carries the raw `files` the realtime join needs); it passes `TRACK_OFFSET_M` to `buildNetwork`
+- `src/data/loadNetwork.ts` fetches stations/routes/shapes/station-depths JSON and validates their outer shape (a
+  missing depths file fails the load like the others);
+  `useNetwork.ts` is the loading/error/ready hook (ready also carries the raw `files` the realtime join needs); it passes
+  `TRACK_OFFSET_M` and `interiorLook.yScale` to `buildNetwork`
 - `src/data/useLive.ts` composes live trains for `App`: `useRealtimeStatic` (trip-index + segments, only when
   `RT_URL` is set), `useRealtimeFeed` (one request at a time; a hidden tab aborts and stops polling, becoming
   visible polls at once), `prepareTrips` once per snapshot, and `deriveLiveStatus`. `realtimeFetch.ts` fetches and
@@ -212,7 +222,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and `adaPartial` on the 8 partial stations, from 39hk-dx4f via `scripts/lib/stationAccess.ts`); `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
-- `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`
+- `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`, and
+  `StationDepthsFile` for `public/data/station-depths.json`
 - `public/data/`: preprocessed static JSON (generated; `npm run data`, `npm run data:stations`)
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
@@ -285,14 +296,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   drei's `update()` at -1; the pivot and pan clamp at -0.5), not as changing props. Never use a
   positive `useFrame` priority (it takes over rendering).
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
-  an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
+  an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   you-are-here reticle 6.55, focused ring 10
   (whenever a station is focused, so a train never covers it).
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
-  above the ground, and everything after it (veil, interior, focus ring) has depthTest false.
+  (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior, focus ring) has depthTest false.
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
@@ -303,6 +314,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `buildNetwork`), so the two directions are parallel tracks; zoomed out the pair reads as one line.
   The offset is `TRACK_OFFSET_M` (4.7 m, measured at Bedford Av); code that needs it reads `network.trackOffsetM`. Live trains ride the same `trackLine`
   (passed through `useLive` to `buildShapeGeometries`), so dots and cars sit on their direction's track.
+- Tracks follow a vertical profile y(d) per shape (`trackProfile.ts`), and the lines and the trains share it:
+  `ShapePath.y` feeds the line buffers, `network.profiles` goes through `useLive` to `buildShapeGeometries`, and
+  dots, cars and picks add `profileAt` (never blended by interior opacity). It is anchored only at authored
+  interiors (`station-depths.json`): flat at the rail height (`level.y - RAIL_DROP_M`, × the interior's yScale)
+  along each platform track a shape rides (route serves the station, direction is the stop suffix, both track
+  ends within 6 m), smoothstep ramps at a 3% average real grade (horizontal true, so 340 m for Bedford Av's
+  10.2 m) to 0, and 0 everywhere else. Close stations ease from one depth to the next. Ramps are resampled every
+  10 m, so the line and the trains (same distances) agree. Top-down nothing moves.
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
 - Picking is screen space, on click only: `ScenePicker` listens on the canvas (never stopping or
   preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),
@@ -339,6 +358,9 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   that reach them.
 - Every element has `sources` (`osm`, `nyopendata`, `authored`). The whole file is ODbL 1.0 and carries
   `attribution`.
+- `public/data/station-depths.json` (`StationDepthsFile`) is extracted from these files by the same build: per
+  station its anchor and, per track, `stopId`, real `railY` and the path's two ends. ODbL, with the union of the
+  interiors' credits.
 - Authoring uses a `[u, v]` frame aligned to the platform; the merge converts it. Guesses are marked
   `UNVERIFIED:` in the authored file's `notes`; they are not copied to the output.
 
@@ -386,7 +408,9 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
-  into `public/data/*.json` (about 57 KB gzipped; the build fails above 60 KB).
+  into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
+  every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (about 58.5 KB
+  today); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data` changes
   `public/data`. The workflow runs typecheck, tests, and build before pushing, but the

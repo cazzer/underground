@@ -22,7 +22,7 @@ describe('buildShapeGeometries', () => {
 
   it('runs on the offset track line the map draws, with the stops projected onto it', () => {
     const shape = shapes.shapes.find((s) => s.id === '1..N03R')!
-    const g = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M).get('1..N03R')!
+    const g = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, new Map()).get('1..N03R')!
     const centered = geometries.get('1..N03R')!
     expect(g.line.points).toEqual(trackLine(shape, TRACK_OFFSET_M))
     // A straight shape: the track is beside it, so each stop is just as far along and 4.7 m to the side.
@@ -61,7 +61,7 @@ describe('buildShapeGeometries', () => {
       ...index,
       patterns: { 'H..N01R': { routeId: 'H', direction: 'N', stops: ['AN', 'BN', 'CN'] } },
     }
-    const g = buildShapeGeometries({ feedVersion: shapes.feedVersion, shapes: [hairpin] }, idx, st, 0).get('H..N01R')!
+    const g = buildShapeGeometries({ feedVersion: shapes.feedVersion, shapes: [hairpin] }, idx, st, 0, new Map()).get('H..N01R')!
 
     const globalC = projectForward(g.line, toGround(st.stations[2]!), { segment: 0, t: 0 })
     expect(globalC.distance).toBeLessThan(50) // what an unconstrained projection would choose
@@ -78,10 +78,10 @@ describe('buildShapeGeometries', () => {
       ...index,
       patterns: { '1..N03R': { routeId: '1', direction: 'N', stops: ['101N', 'Z99N'] } },
     }
-    expect(() => buildShapeGeometries(shapes, idx, stations, 0)).toThrow(/Z99N/)
+    expect(() => buildShapeGeometries(shapes, idx, stations, 0, new Map())).toThrow(/Z99N/)
   })
 
   it('throws when a pattern has no shape', () => {
-    expect(() => buildShapeGeometries({ feedVersion: 'x', shapes: [] }, index, stations, 0)).toThrow(/no shape/)
+    expect(() => buildShapeGeometries({ feedVersion: 'x', shapes: [] }, index, stations, 0, new Map())).toThrow(/no shape/)
   })
 })

@@ -4,6 +4,7 @@ import { geometries } from '../realtime/fixture'
 import { pointAtDistance } from '../realtime/polyline'
 import type { LiveTrip } from '../realtime/prepareTrips'
 import type { ShapeGeometry } from '../realtime/shapeGeometry'
+import { buildTrackProfile, GRADE } from '../trackProfile'
 import { consistFor } from './consist'
 import { createSlotTable, type SlotTable } from './slots'
 import { nearestTrain, trainScreenPoints, type TrainPickInput } from './trainPick'
@@ -63,7 +64,32 @@ function near(along: number, east = 0): { x: number; y: number } {
   return { x: p.x + east, y: p.z }
 }
 
+/** An oblique view, 1 px per meter: screen y is south, minus height (things below the street draw lower). */
+const oblique: ToScreen = (x, y, z, out) => {
+  out.x = x
+  out.y = z - y
+  return true
+}
+/** The northbound shape descending to a platform run at 900..1100 m, 10 m down drawn x2 (y = -20). */
+const DEEP: ShapeGeometry = {
+  ...NORTH,
+  profile: buildTrackProfile([{ d0: 900, d1: 1100, yReal: -10 }], { grade: GRADE, yScale: 2 }).profile,
+}
+
 describe('nearestTrain', () => {
+  it('hits a train where it is drawn below the street, not where it would be at street level', () => {
+    const t = createSlotTable(4)
+    place(t, 0, 'a', DEEP, 1000)
+    const ground = near(0)
+    const drawn = { x: ground.x, y: ground.y + 19.5 }
+    expect(nearestTrain(input(t, 0), oblique, drawn)).toEqual({ index: 0, distancePx: expect.closeTo(0, 6) })
+    expect(nearestTrain(input(t, 0), oblique, { x: ground.x, y: ground.y - 0.5 })).toBeNull()
+    // The car chords too: 70 m back is still on the platform run.
+    const rear = near(-70)
+    expect(nearestTrain(input(t, 1), oblique, { x: rear.x + 5, y: rear.y + 19.5 })?.index).toBe(0)
+    expect(trainScreenPoints(input(t, 0), 0, oblique)?.dot.y).toBeCloseTo(drawn.y, 6)
+  })
+
   it('hits a dot within the radius and misses beyond it', () => {
     const t = createSlotTable(4)
     place(t, 0, 'a', NORTH, 1000)

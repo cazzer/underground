@@ -1,14 +1,19 @@
 /** Builds public/data/stations/<id>.json from data/stations/<id>.authored.json plus the pinned
- *  data/stations/<id>.sources.json. Offline: the network is only used by fetch-station-sources.ts.
+ *  data/stations/<id>.sources.json, and public/data/station-depths.json (every platform track's ends and rail
+ *  height) from those interiors. Offline: the network is only used by fetch-station-sources.ts.
  *  The only IO here; the merge is scripts/lib/stationMerge.ts. Everything is built in memory first. */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
+import { checkBudget, committedGzip, GZIP_BUDGET_BYTES, renderedFile } from './lib/budget.ts'
+import { buildStationDepths } from './lib/stationDepths.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
 import { toStableJson } from './lib/stableJson.ts'
 
 const IN_DIR = new URL('../data/stations/', import.meta.url)
 const OUT_DIR = new URL('../public/data/stations/', import.meta.url)
+const DATA_DIR = new URL('../public/data/', import.meta.url)
+const DEPTHS = 'station-depths.json'
 const SUFFIX = '.authored.json'
 
 function readJson<T>(url: URL): T {
@@ -21,7 +26,7 @@ function main(): void {
     .map((f) => f.slice(0, -SUFFIX.length))
     .sort()
   if (ids.length === 0) throw new Error(`No *${SUFFIX} files in ${IN_DIR.pathname}`)
-  const outputs = ids.map((id): [string, string] => {
+  const interiors = ids.map((id) => {
     const authored = readJson<AuthoredStation>(new URL(`${id}${SUFFIX}`, IN_DIR))
     if (authored.stationId !== id) throw new Error(`${id}${SUFFIX}: stationId is ${JSON.stringify(authored.stationId)}`)
     const sourcesUrl = new URL(`${id}.sources.json`, IN_DIR)
@@ -33,13 +38,20 @@ function main(): void {
       throw new Error(`Missing ${id}.sources.json: run npm run data:stations:fetch -- --station ${id}`)
     }
     if (sources.stationId !== id) throw new Error(`${id}.sources.json: stationId is ${JSON.stringify(sources.stationId)}`)
-    return [`${id}.json`, toStableJson(buildStationInterior(authored, sources), 2)]
+    return buildStationInterior(authored, sources)
   })
+  const depths = renderedFile(DEPTHS, toStableJson(buildStationDepths(interiors), 2))
+  // The client loads station-depths.json up front, so it shares the 60 KB budget with the GTFS files (the one limit).
+  const total = checkBudget([depths], committedGzip(DATA_DIR, new Set([DEPTHS])))
   mkdirSync(OUT_DIR, { recursive: true })
-  for (const [name, json] of outputs) {
-    writeFileSync(new URL(name, OUT_DIR), json)
-    console.log(`stations/${name}: ${Buffer.byteLength(json)} bytes (${gzipSync(json).length} gzipped)`)
+  for (const interior of interiors) {
+    const json = toStableJson(interior, 2)
+    writeFileSync(new URL(`${interior.stationId}.json`, OUT_DIR), json)
+    console.log(`stations/${interior.stationId}.json: ${Buffer.byteLength(json)} bytes (${gzipSync(json).length} gzipped)`)
   }
+  writeFileSync(new URL(DEPTHS, DATA_DIR), depths.text)
+  console.log(`${DEPTHS}: ${depths.raw} bytes (${depths.gzip} gzipped)`)
+  console.log(`public/data total gzip: ${total} B (budget ${GZIP_BUDGET_BYTES} B)`)
 }
 
 main()

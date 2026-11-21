@@ -1,6 +1,7 @@
-import { writeYawMatrix } from '../markerMatrices'
+import { writeChordMatrix } from '../markerMatrices'
 import type { Ground } from '../projection'
 import { pointAtDistanceInto, type Polyline } from '../realtime/polyline'
+import { profileAt, type TrackProfile } from '../trackProfile'
 import { consistCenter, MAX_CARS, type Consist } from './consist'
 
 /** Per-frame sizes shared by every train. */
@@ -13,7 +14,7 @@ export interface CarFrame {
   widthM: number
   /** At least 1: enlarges the body section (width and height) so a far train stays a few pixels wide. */
   crossScale: number
-  /** Height of the car floor and its halo. */
+  /** Height of the car floor and its halo above the track (the profile's y). */
   y: number
 }
 
@@ -40,6 +41,11 @@ export function consistSpanInto(out: ConsistSpan, lineLength: number, shown: num
   return out
 }
 
+/** The track's height at `distance`, clamped to the line like pointAtDistanceInto, so a car end's y matches its ground point. */
+export function trackY(line: Polyline, profile: TrackProfile, distance: number): number {
+  return profileAt(profile, Math.min(Math.max(distance, 0), line.length))
+}
+
 /** Reused per-frame state: the chord ends of the car being written, and the train's span. */
 export interface ConsistScratch {
   a: Ground
@@ -54,7 +60,8 @@ export function createConsistScratch(): ConsistScratch {
 /**
  * Writes one train's car bodies and halos at instances `slot * MAX_CARS + c`. The cars are laid end to end
  * along `line` around the consist center, each at its chord's midpoint facing along the chord, so a curve
- * bends the train and no car leaves the line. `mix * k` (each 0..1) scales spacing and car length around the
+ * bends the train and no car leaves the line. Chord ends sit at the track's height (`profile`), so on a ramp
+ * each car (and its halo) pitches with the track. `mix * k` (each 0..1) scales spacing and car length around the
  * center, so at mix = 0 the train collapses to the dot's point; `k` (the slot's fade) also scales the body
  * section, so a fading train shrinks to nothing while the handoff keeps it legible. Car geometry is unit
  * length along z at full width and height; the halo is a unit plane. `widen` (about 1) enlarges one train's
@@ -66,6 +73,7 @@ export function writeConsist(
   halos: Float32Array,
   slot: number,
   line: Polyline,
+  profile: TrackProfile,
   shown: number,
   consist: Consist,
   mix: number,
@@ -90,17 +98,23 @@ export function writeConsist(
     let a = scratch.a
     let b = scratch.b
     pointAtDistanceInto(line, rear, a)
+    let ya = trackY(line, profile, rear)
     for (let c = 0; c < n; c++) {
-      pointAtDistanceInto(line, rear + (c + 1) * step, b)
+      const d = rear + (c + 1) * step
+      pointAtDistanceInto(line, d, b)
+      const yb = trackY(line, profile, d)
       const ux = b.x - a.x
+      const uy = yb - ya
       const uz = b.z - a.z
       const mx = (a.x + b.x) / 2
+      const my = (ya + yb) / 2 + frame.y
       const mz = (a.z + b.z) / 2
-      writeYawMatrix(bodies, base + c, mx, frame.y, mz, ux, uz, cross, height, bodyLength)
-      writeYawMatrix(halos, base + c, mx, frame.y, mz, ux, uz, haloWidth, 1, haloLength)
+      writeChordMatrix(bodies, base + c, mx, my, mz, ux, uy, uz, cross, height, bodyLength)
+      writeChordMatrix(halos, base + c, mx, my, mz, ux, uy, uz, haloWidth, 1, haloLength)
       const t = a
       a = b
       b = t
+      ya = yb
     }
   }
   clearCars(bodies, halos, slot, n)

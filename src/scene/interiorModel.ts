@@ -1,7 +1,7 @@
 import { Color } from 'three'
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
-import { buildInteriorBuffers, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
+import { buildInteriorBuffers, RAIL_DROP_M, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
 import { toGround, type Ground } from '../lib/projection'
 import { mixHex } from '../lib/routeColor'
 import { ISO_POLAR } from '../lib/tilt'
@@ -81,7 +81,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const { strong, fine } = buildInteriorBuffers(interior, {
     yScale,
     stepRise: 0.18,
-    railDrop: 1.1,
+    railDrop: RAIL_DROP_M,
     entranceSize: 2.5,
     guides: interiorLook.guides,
     machines: machineLook.style,

@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { INTERIOR_STATION_IDS } from '../../src/data/interiorRegistry.ts'
 import type { StationInterior } from '../../src/data/stationSchema.ts'
-import { buildInteriorBuffers } from '../../src/lib/interiorGeometry.ts'
+import { buildInteriorBuffers, RAIL_DROP_M } from '../../src/lib/interiorGeometry.ts'
 
 const dir = new URL('../../public/data/stations/', import.meta.url)
 const files = readdirSync(dir).filter((f) => f.endsWith('.json'))
@@ -12,7 +12,7 @@ const read = (id: string) => JSON.parse(readFileSync(new URL(`${id}.json`, dir),
 const OPTIONS = {
   yScale: 2,
   stepRise: 0.18,
-  railDrop: 1.1,
+  railDrop: RAIL_DROP_M,
   entranceSize: 2.5,
   guides: true,
   machines: { escalator: 'rails', elevator: 'cab' } as const,

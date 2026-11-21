@@ -1,12 +1,14 @@
 /**
  * Draw order of the transparent overlay layers. All use depthTest false except the train car bodies,
  * which test and write depth so a far car can't paint over a near one at iso tilt (nothing earlier
- * writes depth above the ground). three.js draws every opaque object before every transparent one,
+ * writes depth: the grid has depthWrite off, since cars can run below the street). three.js draws every opaque object before every transparent one,
  * so these only sort within the transparent list.
  */
 export const RENDER_ORDER = {
   grid: -1,
   lines: 1,
+  // From a station marker down to its sunken platform tracks, under the marker disc.
+  stationTie: 1.5,
   lineFocus: 2,
   stationFill: 3,
   stationRing: 4,

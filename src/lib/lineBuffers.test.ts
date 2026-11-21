@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { buildLineBuffers, type Rgb } from './lineBuffers'
 import type { ShapePath } from './network'
+import { EMPTY_PROFILE } from './trackProfile'
 
-function path(id: string, routeId: string, primary: boolean, points: [number, number][]): ShapePath {
+function path(id: string, routeId: string, primary: boolean, points: [number, number][], y = points.map(() => 0)): ShapePath {
   return {
     id,
     routeId,
@@ -11,6 +12,8 @@ function path(id: string, routeId: string, primary: boolean, points: [number, nu
     points: points.map(([x, z]) => ({ x, z })),
     cumulative: [],
     length: 0,
+    y,
+    profile: EMPTY_PROFILE,
   }
 }
 
@@ -42,6 +45,11 @@ describe('buildLineBuffers', () => {
   it('writes consecutive points as segment endpoints at y = 0', () => {
     const { positions } = buildLineBuffers([path('a', 'A', true, [[0, 1], [2, 3], [4, 5]])], ORDER, colorOf)
     expect([...positions]).toEqual([0, 0, 1, 2, 0, 3, 2, 0, 3, 4, 0, 5])
+  })
+
+  it("takes each endpoint's height from the path's profile heights", () => {
+    const { positions } = buildLineBuffers([path('a', 'A', true, [[0, 1], [2, 3], [4, 5]], [0, -6.5, -20.4])], ORDER, colorOf)
+    expect([...positions]).toEqual([0, 0, 1, 2, -6.5, 3, 2, -6.5, 3, 4, -20.4, 5].map(Math.fround))
   })
 
   it('gives a two-point path one segment', () => {

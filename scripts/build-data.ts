@@ -17,7 +17,7 @@ import { readFeed } from './lib/gtfs.ts'
 import { buildRoutes, buildStations, buildTransfers } from './lib/network.ts'
 import { addAccess } from './lib/stationAccess.ts'
 import { readAccessExceptions, readCatalogStations } from './lib/accessInputs.ts'
-import { GZIP_BUDGET_BYTES, checkBudget, renderedFile } from './lib/budget.ts'
+import { GZIP_BUDGET_BYTES, checkBudget, committedGzip, renderedFile } from './lib/budget.ts'
 import { buildSegments } from './lib/segments.ts'
 import { buildShapes } from './lib/shapes.ts'
 import { toStableJson } from './lib/stableJson.ts'
@@ -73,12 +73,17 @@ async function main(): Promise<void> {
   ]
 
   const rendered = outputs.map(([name, value, lineDepth]) => renderedFile(name, toStableJson(value, lineDepth)))
-  const totalGzip = checkBudget(rendered)
+  // station-depths.json (data:stations) counts too: the shared budget covers everything loaded up front.
+  const others = committedGzip(OUT_DIR, new Set(rendered.map((f) => f.name)))
+  const totalGzip = checkBudget(rendered, others)
 
   mkdirSync(OUT_DIR, { recursive: true })
   for (const f of rendered) writeFileSync(new URL(f.name, OUT_DIR), f.text)
 
-  console.table(rendered.map((f) => ({ file: f.name, 'raw B': f.raw, 'gzip B': f.gzip })))
+  console.table([
+    ...rendered.map((f) => ({ file: f.name, 'raw B': f.raw, 'gzip B': f.gzip })),
+    ...Object.entries(others).map(([file, gzip]) => ({ file: `${file} (committed)`, 'raw B': null, 'gzip B': gzip })),
+  ])
   console.log(`Total gzip: ${totalGzip} B (budget ${GZIP_BUDGET_BYTES} B)`)
   console.log(`Skipped: ${skippedSegments} non-positive segment samples, ${skippedNoShape} trips without a shape`)
 }

@@ -1,4 +1,4 @@
-import type { Ground } from '../projection'
+import type { Ground } from '../projection.ts'
 
 export interface Polyline {
   points: readonly Ground[]

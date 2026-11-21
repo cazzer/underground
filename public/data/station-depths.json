@@ -1,0 +1,7 @@
+{
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov"],
+  "stations": [
+    {"stationId":"L08","anchor":{"lat":40.717398,"lon":-73.95701},"tracks":[{"stopId":"L08N","railY":-10.2,"ends":[[-62.5,-57.8],[68.49,50.56]]},{"stopId":"L08S","railY":-10.2,"ends":[[-68.49,-50.56],[62.5,57.8]]}]}
+  ]
+}
