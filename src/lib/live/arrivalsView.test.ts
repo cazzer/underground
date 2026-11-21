@@ -4,7 +4,7 @@ import { deriveArrivalsView, sectionsByDirection } from './arrivalsView'
 import type { StationFeedHealth } from './feedHealth'
 import type { LiveStatus, LiveStatusKind } from './liveStatus'
 
-const status = (kind: LiveStatusKind): LiveStatus => ({ kind, label: kind, detail: null })
+const status = (kind: LiveStatusKind): LiveStatus => ({ kind, label: kind, detail: null, updatedAt: null })
 const group = (direction: 'N' | 'S', routeId = 'L'): ArrivalGroup => ({ routeId, direction, headsign: '8 Av', times: [100] })
 const ok: StationFeedHealth = { unavailable: [], delayed: false }
 const view = (s: LiveStatusKind, groups: ArrivalGroup[] | null, health: StationFeedHealth | null = ok) =>
