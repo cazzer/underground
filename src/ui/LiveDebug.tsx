@@ -2,6 +2,8 @@ import type { LiveDebugInfo } from '../data/useLive'
 
 interface LiveDebugProps {
   debug: LiveDebugInfo | null
+  /** The technical cause behind an error or delay state. */
+  technical: string | null
 }
 
 const enabled = import.meta.env.DEV && new URLSearchParams(window.location.search).has('debug')
@@ -9,9 +11,15 @@ const enabled = import.meta.env.DEV && new URLSearchParams(window.location.searc
 const fixed = (n: number, digits = 1): string => n.toFixed(digits)
 
 /** Dev-only `?debug` overlay: what the last poll did. Updates per poll, never per frame. */
-export function LiveDebug({ debug }: LiveDebugProps) {
+export function LiveDebug({ debug, technical }: LiveDebugProps) {
   if (!enabled) return null
-  if (!debug) return <aside className="pointer-events-none fixed top-4 right-4 border border-edge bg-panel p-2 font-mono text-[10px] text-ink">no snapshot</aside>
+  if (!debug) {
+    return (
+      <aside className="pointer-events-none fixed top-4 right-4 max-w-64 border border-edge bg-panel p-2 font-mono text-[10px] text-ink">
+        no snapshot{technical && ` (${technical})`}
+      </aside>
+    )
+  }
   const dropped = Object.entries(debug.dropped).filter(([, n]) => n > 0)
   return (
     <aside
@@ -32,6 +40,7 @@ export function LiveDebug({ debug }: LiveDebugProps) {
       <p>
         cache {debug.cache ?? 'n/a'} / age {fixed(debug.ageS)} s / skew {fixed(debug.skewS)} s
       </p>
+      {technical && <p>error {technical}</p>}
       <p>
         offset {fixed(debug.offsetS, 2)} / prepare {fixed(debug.prepareMs)} ms / failures {debug.failures}
       </p>

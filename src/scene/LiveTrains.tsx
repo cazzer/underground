@@ -3,20 +3,18 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { CircleGeometry, Color, DynamicDrawUsage, type InstancedMesh } from 'three'
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
-import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, TRAIN_CAPACITY } from '../lib/live/slots'
+import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
 import { trainRouteId } from '../lib/live/trainRoute'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
 import { hopDistance } from '../lib/realtime/position'
 import { pointAtDistanceInto } from '../lib/realtime/polyline'
 import { routeLineColor } from '../lib/routeColor'
-import { smoothDistance } from '../lib/realtime/smoothing'
 import { theme } from '../theme'
-import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
+import { cameraDistance, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
+import { trainRadiusPx } from './trainSize'
 
-/** Dot radius relative to station markers, so dots never outsize stations at the overview. */
-const DOT_TO_MARKER = 0.5
 const DOT_MIN_METERS = 2.5
 /** The background-colored disc behind each dot, as a multiple of the dot's radius, so a dot stays visible on its own line. */
 const HALO_RATIO = 1.5
@@ -46,8 +44,11 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
   )
   const colors = useMemo(
     () => ({
+      // A mono theme (terminal) draws every line one color, so route colors would vanish into the lines: use the train color.
       byRoute: new Map(
-        network.routes.map((r) => [r.id, new Color(routeLineColor(r.color, theme.routeLineMix, theme.background))]),
+        theme.routeLineMix.amount >= 1
+          ? []
+          : network.routes.map((r) => [r.id, new Color(routeLineColor(r.color, theme.routeLineMix, theme.background))]),
       ),
       fallback: new Color(theme.train),
     }),
@@ -87,11 +88,15 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
   useLayoutEffect(() => {
     const d = dots.current
     if (!d) return
-    const { needsColor, overflow } = reconcileSlots(table, trips, performance.now() / 1000)
+    const perfMs = performance.now()
+    const { needsColor, overflow } = reconcileSlots(table, trips, perfMs / 1000, {
+      dataNow: clockNow(offsetS, perfMs),
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    })
     for (const i of needsColor) colorSlot(d, i)
     if (needsColor.length > 0) d.instanceColor!.needsUpdate = true
     if (overflow > 0) console.warn(`Live trains: ${overflow} trips over the ${TRAIN_CAPACITY}-slot capacity are not drawn`)
-  }, [trips, table, colorSlot])
+  }, [trips, offsetS, table, colorSlot])
 
   useFrame((state, dt) => {
     const d = dots.current
@@ -101,15 +106,13 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     const now = clockNow(offsetS, perfMs)
     const localS = perfMs / 1000
     const camera = cameraDistance(state)
-    const scale = screenScale(camera, markerRadiusPx(camera) * DOT_TO_MARKER, DOT_MIN_METERS)
+    const scale = screenScale(camera, trainRadiusPx(camera), DOT_MIN_METERS)
     const out = d.instanceMatrix.array as Float32Array
 
     for (let i = 0; i < table.high; i++) {
       const trip = table.trips[i]
       if (!trip) continue
-      const prev = table.displayed[i]!
-      const shown = smoothDistance(Number.isNaN(prev) ? null : prev, hopDistance(trip.plan, trip.geometry, now), dt)
-      table.displayed[i] = shown
+      const shown = stepSlot(table, i, hopDistance(trip.plan, trip.geometry, now), now, localS, dt)
       pointAtDistanceInto(trip.geometry.line, shown, point)
       const k = slotScale(table, i, localS, FADE_S)
       if (k === 0 && isLeaving(table, i)) {
@@ -121,8 +124,12 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     }
     h.instanceMatrix.array.set(out)
     d.count = h.count = table.high
-    d.instanceMatrix.needsUpdate = true
-    h.instanceMatrix.needsUpdate = true
+    // Upload only the slots in use.
+    for (const m of [d, h]) {
+      m.instanceMatrix.clearUpdateRanges()
+      m.instanceMatrix.addUpdateRange(0, table.high * 16)
+      m.instanceMatrix.needsUpdate = true
+    }
   })
 
   return (

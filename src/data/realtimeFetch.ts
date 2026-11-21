@@ -3,12 +3,15 @@ import { FEED_IDS, RT_SCHEMA_VERSION, type RealtimeSnapshot } from './realtime'
 /** Per-request timeout; a hung Worker counts as a failed poll. */
 export const FETCH_TIMEOUT_MS = 10_000
 
+/** The Worker speaks a different snapshot version than this build: a reload (new build) fixes it, retrying won't. */
+export class SchemaMismatchError extends Error {}
+
 /** Checks the outer shape of a snapshot: version, a numeric `generatedAt`, and every feed. Trips are trusted. */
 export function parseSnapshot(raw: unknown): RealtimeSnapshot {
   if (typeof raw !== 'object' || raw === null) throw new Error('realtime response is not an object')
   const r = raw as Record<string, unknown>
   if (r.version !== RT_SCHEMA_VERSION) {
-    throw new Error(`realtime schema v${String(r.version)}, client expects v${RT_SCHEMA_VERSION}; reload`)
+    throw new SchemaMismatchError(`realtime schema v${String(r.version)}, client expects v${RT_SCHEMA_VERSION}; reload`)
   }
   if (typeof r.generatedAt !== 'number' || !Number.isFinite(r.generatedAt)) {
     throw new Error('realtime response has no generatedAt')
@@ -43,7 +46,7 @@ export type FetchResult =
       /** X-Rt-Cache; null when the browser hides it (not CORS-exposed by the Worker). */
       cache: string | null
     }
-  | { ok: false; warming: boolean; error: string; retryAfterS: number | null }
+  | { ok: false; warming: boolean; schemaMismatch: boolean; error: string; retryAfterS: number | null }
 
 /**
  * One poll. Failures come back as `ok: false` (never thrown) with a message for the HUD and logs;
@@ -51,9 +54,10 @@ export type FetchResult =
  * filling its cache and is flagged `warming`. Retry-After is read when the browser exposes it.
  */
 export async function fetchSnapshot(url: string, signal: AbortSignal): Promise<FetchResult> {
-  const fail = (error: string, warming = false, retryAfterS: number | null = null): FetchResult => ({
+  const fail = (error: string, warming = false, retryAfterS: number | null = null, schemaMismatch = false): FetchResult => ({
     ok: false,
     warming,
+    schemaMismatch,
     error,
     retryAfterS,
   })
@@ -74,6 +78,6 @@ export async function fetchSnapshot(url: string, signal: AbortSignal): Promise<F
   } catch (err) {
     if (signal.aborted) throw err
     if (err instanceof DOMException && err.name === 'TimeoutError') return fail(`timeout after ${FETCH_TIMEOUT_MS / 1000} s`)
-    return fail(err instanceof Error ? err.message : String(err))
+    return fail(err instanceof Error ? err.message : String(err), false, null, err instanceof SchemaMismatchError)
   }
 }

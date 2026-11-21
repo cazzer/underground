@@ -60,7 +60,7 @@ describe('fetchSnapshot', () => {
 
   it('flags a 503 warming body, with its Retry-After', async () => {
     stub(() => new Response('{"error":"warming"}', { status: 503, headers: { 'Retry-After': '2' } }))
-    expect(await fetchSnapshot('http://w/rt', signal())).toEqual({ ok: false, warming: true, error: 'HTTP 503 warming', retryAfterS: 2 })
+    expect(await fetchSnapshot('http://w/rt', signal())).toEqual({ ok: false, warming: true, schemaMismatch: false, error: 'HTTP 503 warming', retryAfterS: 2 })
   })
 
   it('reports other statuses and unparseable bodies as failures, never throws', async () => {
@@ -68,6 +68,11 @@ describe('fetchSnapshot', () => {
     expect(await fetchSnapshot('http://w/rt', signal())).toMatchObject({ ok: false, warming: false, error: 'HTTP 500' })
     stub(() => new Response('{not json'))
     expect(await fetchSnapshot('http://w/rt', signal())).toMatchObject({ ok: false })
+  })
+
+  it('flags a schema version mismatch', async () => {
+    stub(() => new Response(JSON.stringify({ ...valid(), version: 2 })))
+    expect(await fetchSnapshot('http://w/rt', signal())).toMatchObject({ ok: false, schemaMismatch: true })
   })
 
   it('reports a network error as a failure', async () => {

@@ -23,6 +23,10 @@ describe('nextDelayMs', () => {
     expect(nextDelayMs({ kind: 'error', retryAfterS: 1, failures: 3 }, mid)).toBe(8000)
   })
 
+  it('caps Retry-After at five minutes', () => {
+    expect(nextDelayMs({ kind: 'error', retryAfterS: 3600, failures: 1 }, mid)).toBe(300_000)
+  })
+
   it('retries a warming Worker after a second unless told otherwise', () => {
     expect(nextDelayMs({ kind: 'warming', retryAfterS: null, warmings: 1 }, mid)).toBe(1000)
     expect(nextDelayMs({ kind: 'warming', retryAfterS: 5, warmings: 2 }, mid)).toBe(5000)

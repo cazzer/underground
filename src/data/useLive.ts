@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { clockNow } from '../lib/live/clock'
 import { deriveLiveStatus, type LiveStatus } from '../lib/live/liveStatus'
 import type { JoinStage } from '../lib/realtime/joinTrip'
@@ -35,6 +35,8 @@ export interface Live {
   status: LiveStatus
   layer: LiveLayer | null
   debug: LiveDebugInfo | null
+  /** The technical cause behind a failed or fatal state, for `?debug` (it is already in the console). */
+  technical: string | null
   /** For the error boundary around the live layer: a render crash shows in the HUD instead of blanking the map. */
   onLayerError: (error: Error) => void
 }
@@ -49,6 +51,10 @@ export function useLive(files: NetworkFiles | null): Live {
   const feed = useRealtimeFeed(RT_URL)
   const [layerError, setLayerError] = useState<string | null>(null)
   const onLayerError = useCallback((e: Error) => setLayerError(e.message), [])
+
+  useEffect(() => {
+    if (!configured) console.info('Live trains off: VITE_RT_URL is not set (copy .env.example to .env.local)')
+  }, [configured])
 
   const { snapshot, offsetS } = feed
   const data = staticLoad.status === 'ready' ? staticLoad.data : null
@@ -97,17 +103,18 @@ export function useLive(files: NetworkFiles | null): Live {
     }
   }, [placed, snapshot, offsetS, feed.cache, feed.failures])
 
+  const staticError = staticLoad.status === 'error' ? staticLoad.message : null
+  const fatalError = staticError ?? prepareError ?? layerError
   const status = deriveLiveStatus({
     configured,
-    staticError: staticLoad.status === 'error' ? staticLoad.message : null,
-    prepareError,
-    layerError,
+    fatal: fatalError !== null,
+    staticReady: staticLoad.status === 'ready',
     snapshot,
     failures: feed.failures,
-    lastError: feed.lastError,
+    schemaMismatch: feed.schemaMismatch,
     // Re-evaluated whenever a poll lands, so the age check needs no timer of its own.
     nowS: offsetS === null ? 0 : clockNow(offsetS, performance.now()),
   })
 
-  return { status, layer, debug, onLayerError }
+  return { status, layer, debug, technical: fatalError ?? feed.lastError, onLayerError }
 }

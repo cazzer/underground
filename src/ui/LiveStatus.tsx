@@ -14,12 +14,17 @@ const TONE: Record<LiveStatusKind, string> = {
   off: 'text-ink-dim',
 }
 
-/** Live-trains state for the HUD header. The region stays mounted, so changes are announced politely. */
+/**
+ * Live-trains state for the HUD. Only the label is in the live region, so a screen reader hears
+ * state changes and not the delayed-lines detail beside it (that stays readable in the page).
+ */
 export function LiveStatus({ status }: LiveStatusProps) {
   return (
-    <p role="status" aria-live="polite" className={`mt-1 text-xs ${TONE[status.kind]}`}>
-      <span aria-hidden="true">{GLYPH[status.kind]} </span>
-      {status.label}
+    <p className={`mt-1 text-xs ${TONE[status.kind]}`}>
+      <span role="status" aria-live="polite">
+        <span aria-hidden="true">{GLYPH[status.kind]} </span>
+        {status.label}
+      </span>
       {status.detail && <span className="text-ink-dim"> ({status.detail})</span>}
     </p>
   )

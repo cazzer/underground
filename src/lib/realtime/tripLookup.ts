@@ -17,6 +17,8 @@ export interface TripLookup {
   keys: ReadonlyMap<ServiceId, ReadonlyMap<string, readonly ShapeId[]>>
   /** `${routeId}|${direction}` → primary shape */
   primary: ReadonlyMap<string, ShapeId>
+  /** `${routeId}|${direction}` → every pattern shape of that route and direction (the primary is one of them), by id */
+  patternsOf: ReadonlyMap<string, readonly ShapeId[]>
 }
 
 export function primaryKey(route: string, direction: string): string {
@@ -49,11 +51,18 @@ export function buildTripLookup(index: TripIndexFile, shapes: ShapesFile): TripL
   }
   const primary = new Map<string, ShapeId>()
   for (const s of shapes.shapes) if (s.primary) primary.set(primaryKey(s.routeId, s.direction), s.id)
+  const patternsOf = new Map<string, ShapeId[]>()
+  for (const shapeId of Object.keys(index.patterns).sort()) {
+    const pattern = index.patterns[shapeId]!
+    const key = primaryKey(pattern.routeId, pattern.direction)
+    patternsOf.set(key, [...(patternsOf.get(key) ?? []), shapeId])
+  }
   return {
     patterns: index.patterns,
     calendar: index.calendar,
     exceptions: index.calendarExceptions,
     keys,
     primary,
+    patternsOf,
   }
 }

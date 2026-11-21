@@ -13,49 +13,56 @@ function snapshot(stale: FeedId[] = [], generatedAt = NOW): RealtimeSnapshot {
 
 const base: LiveStatusInput = {
   configured: true,
-  staticError: null,
-  prepareError: null,
-  layerError: null,
+  fatal: false,
+  staticReady: true,
   snapshot: snapshot(),
   failures: 0,
-  lastError: null,
+  schemaMismatch: false,
   nowS: NOW,
 }
 const status = (over: Partial<LiveStatusInput>) => deriveLiveStatus({ ...base, ...over })
 
 describe('deriveLiveStatus', () => {
   it('is off when no source is configured, whatever else is set', () => {
-    expect(status({ configured: false, staticError: 'x' })).toEqual({
+    expect(status({ configured: false, fatal: true })).toEqual({
       kind: 'off',
       label: 'Live trains off',
-      detail: 'No realtime source configured',
+      detail: 'Not available yet',
     })
   })
 
-  it('reports static, prepare and layer errors as unavailable, in that order', () => {
-    expect(status({ staticError: 'a', prepareError: 'b', layerError: 'c' })).toMatchObject({ kind: 'error', detail: 'a' })
-    expect(status({ prepareError: 'b', layerError: 'c' })).toMatchObject({ detail: 'b' })
-    expect(status({ layerError: 'c' })).toMatchObject({ label: 'Live trains unavailable', detail: 'c' })
-  })
-
-  it('does not flip to error on one failed poll while a snapshot exists', () => {
-    expect(status({ failures: 1, lastError: 'HTTP 500' }).kind).toBe('live')
-  })
-
-  it('errors on two failures in a row, or one with no snapshot', () => {
-    expect(status({ failures: 2, lastError: 'HTTP 500' })).toEqual({
+  it('says to reload after a fatal error, without technical detail', () => {
+    expect(status({ fatal: true, schemaMismatch: true })).toEqual({
       kind: 'error',
-      label: 'Live data delayed, retrying',
-      detail: 'HTTP 500',
-    })
-    expect(status({ failures: 1, snapshot: null, lastError: 'HTTP 500' })).toMatchObject({
-      kind: 'error',
-      label: 'Live data unavailable, retrying',
+      label: 'Live trains unavailable, reload to retry',
+      detail: null,
     })
   })
 
-  it('is connecting before the first snapshot', () => {
+  it('offers an update, not a retry, on a schema mismatch', () => {
+    expect(status({ schemaMismatch: true, failures: 3 })).toEqual({ kind: 'error', label: 'Update available, reload', detail: null })
+  })
+
+  it('does not change on one failed poll while a snapshot exists', () => {
+    expect(status({ failures: 1 }).kind).toBe('live')
+  })
+
+  it('shows a delay, not an error, when polls keep failing but trains are still drawn', () => {
+    expect(status({ failures: 2 })).toEqual({ kind: 'stale', label: 'Live data delayed', detail: null })
+    expect(status({ failures: 9 }).kind).toBe('stale')
+  })
+
+  it('is an error only when there is no snapshot to show', () => {
+    expect(status({ snapshot: null, failures: 1 })).toEqual({
+      kind: 'error',
+      label: 'Live trains unavailable, retrying',
+      detail: null,
+    })
+  })
+
+  it('is connecting before the first snapshot and while the join data loads', () => {
     expect(status({ snapshot: null }).kind).toBe('connecting')
+    expect(status({ staticReady: false }).kind).toBe('connecting')
   })
 
   it('names the delayed feeds in feed order', () => {
@@ -72,7 +79,7 @@ describe('deriveLiveStatus', () => {
   })
 
   it('is live otherwise', () => {
-    expect(status({})).toEqual({ kind: 'live', label: 'Live', detail: null })
+    expect(status({})).toEqual({ kind: 'live', label: 'Live trains', detail: null })
   })
 })
 

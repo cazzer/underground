@@ -151,6 +151,12 @@ describe('planHop and hopDistance', () => {
     const plan = planHop(input)
     if ('ok' in plan) throw new Error(`unexpected ${plan.reason}`)
     expect(hopDistance(plan, northbound, NOW)).toBe(ok(positionAlongShape(input)).distance)
+    // With a VehiclePosition the hop doesn't depend on `now`, so a later frame matches a fresh call.
+    if (status !== null) {
+      for (const k of [7, 40, 400]) {
+        expect(hopDistance(plan, northbound, NOW + k), `NOW+${k}`).toBe(ok(positionAlongShape({ ...input, now: NOW + k })).distance)
+      }
+    }
   })
 
   it('advances with time without re-planning', () => {
@@ -166,5 +172,27 @@ describe('planHop and hopDistance', () => {
     const base = { geometry: northbound, segments: SEGMENTS, now: NOW }
     expect(planHop({ ...base, status: 'IN_TRANSIT_TO', stopId: 'Z99N', arrivals: [] })).toEqual({ ok: false, reason: 'off-pattern' })
     expect(planHop({ ...base, status: 'IN_TRANSIT_TO', stopId: '103N', arrivals: [] })).toEqual({ ok: false, reason: 'no-arrival' })
+  })
+})
+
+describe('STOPPED_AT with no prediction for the next stop', () => {
+  const stops = ['A', 'B', 'C', 'D', 'E', 'F'].map((s) => `${s}N`)
+  const line = buildPolyline(stops.map((_, i) => ({ x: 0, z: -i * 1000 })))
+  const long: ShapeGeometry = { shapeId: 'L..N', line, stops, stopDistances: stops.map((_, i) => i * 1000), maxStopOffsetM: 0 }
+  const plan = (stopId: string, arrivals: Arrival[]) =>
+    planHop({ geometry: long, status: 'STOPPED_AT', stopId, arrivals, segments: {}, now: NOW })
+
+  it('uses the arrivals when the next stop is skipped', () => {
+    // At B (index 1) but the train's first prediction is E (index 4): it is on the hop D -> E.
+    const p = plan('BN', [['EN', NOW + 40], ['FN', NOW + 100]])
+    if ('ok' in p) throw new Error('unexpected failure')
+    expect([p.from, p.to]).toEqual([3, 4])
+  })
+  it('still holds at the terminal and when there are no later arrivals', () => {
+    for (const [stop, arrivals] of [['FN', [['EN', NOW + 40]]], ['BN', []], ['BN', [['AN', NOW + 40]]]] as [string, Arrival[]][]) {
+      const p = plan(stop, arrivals)
+      if ('ok' in p) throw new Error('unexpected failure')
+      expect([p.from, p.to, p.fixedFraction]).toEqual([long.stops.indexOf(stop), long.stops.indexOf(stop), 0])
+    }
   })
 })

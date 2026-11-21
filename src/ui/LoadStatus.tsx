@@ -38,6 +38,18 @@ interface CrashProps {
   message: string
 }
 
+function ReloadButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => window.location.reload()}
+      className="mt-3 min-h-11 cursor-pointer border border-edge px-4 hover:bg-edge/20 focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      Reload
+    </button>
+  )
+}
+
 /** The scene crashed while rendering: say so (as an alert) and offer the only fix, a reload. */
 export function SceneCrash({ message }: CrashProps) {
   return (
@@ -45,25 +57,27 @@ export function SceneCrash({ message }: CrashProps) {
       <div role="alert" className={`${PANEL} max-w-md`}>
         <p>The map stopped working. Reload the page to try again.</p>
         <p className="mt-2 font-mono text-xs break-all text-ink-dim">{message}</p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="mt-3 min-h-11 cursor-pointer border border-edge px-4 hover:bg-edge/20 focus-visible:outline-2 focus-visible:outline-focus"
-        >
-          Reload
-        </button>
+        <ReloadButton />
       </div>
     </div>
   )
 }
 
+interface HudCrashProps extends CrashProps {
+  /** Called on mount: the HUD never reported its insets, so the scene (which waits for them) must not wait forever. */
+  onMounted: () => void
+}
+
 /** Stands in for the HUD after it crashes, so the required attribution is never lost. */
-export function HudCrash({ message }: CrashProps) {
+export function HudCrash({ message, onMounted }: HudCrashProps) {
+  useEffect(onMounted, [onMounted])
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
-      <p role="alert" className={`${PANEL} pointer-events-auto w-fit max-w-md`}>
-        The panels stopped working: {message}
-      </p>
+      <div role="alert" className={`${PANEL} pointer-events-auto w-fit max-w-md`}>
+        <p>The panels stopped working. Reload the page to try again.</p>
+        <p className="mt-2 font-mono text-xs break-all text-ink-dim">{message}</p>
+        <ReloadButton />
+      </div>
       <Attribution />
     </div>
   )

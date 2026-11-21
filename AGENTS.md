@@ -56,7 +56,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; picks raycast an invisible
     22 px hit disc per station and take the nearest);
-    `LiveTrains.tsx` (instanced dots plus a background-colored halo; stable per-trip slots, fades in
+    `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
     and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map);
     `cameraDistance.ts` helpers; `renderOrder.ts`
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, arrivals panel); `LoadStatus.tsx` loading/error panel
@@ -78,13 +78,16 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     can't move it back), never reads the device clock; `SNAPSHOT_MAX_AGE_S` (120) drops old data
   - `backoff.ts` poll delay (20 s; jittered exponential backoff on failure; Retry-After; "warming" 503s)
   - `liveStatus.ts` `deriveLiveStatus` for the HUD (off/connecting/live/stale/error; one failed poll with
-    a snapshot is not shown, two are)
-  - `slots.ts` stable instance slots keyed by trip, fade in/out; `trainRoute.ts` dot color route
+    a snapshot is not shown, two show a delay while trains stay drawn; technical text never appears)
+  - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
+    poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, glide to
+    arrive on time, or cross-fade; reduced motion cross-fades); `trainRoute.ts` dot color route
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
   - `tripLookup.ts` trip-index to per-service trip-key maps and primary shapes
-  - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then primary
+  - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then the route's pattern
+    that calls at the train's stop and covers most of its predicted stops (ties go to the primary)
   - `polyline.ts` cumulative length, point/heading at distance, forward-only projection
   - `shapeGeometry.ts` stop distances along each shape, computed at load
   - `position.ts` `planHop` (once per poll: hop, run time, arrival) and `hopDistance` (per frame, no

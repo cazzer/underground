@@ -4,6 +4,7 @@ import shapesRaw from '../../../public/data/shapes.json?raw'
 import stationsRaw from '../../../public/data/stations.json?raw'
 import tripIndexRaw from '../../../public/data/trip-index.json?raw'
 import type { ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
+import { joinTrip } from './joinTrip'
 import { buildShapeGeometries } from './shapeGeometry'
 import { buildTripLookup } from './tripLookup'
 
@@ -34,5 +35,36 @@ describe('real public/data', () => {
     expect(lookup.keys.size).toBe(Object.keys(index.origins).length)
     expect(lookup.primary.size).toBeGreaterThan(0)
     for (const shapeId of lookup.primary.values()) expect(index.patterns[shapeId]).toBeDefined()
+  })
+})
+
+describe('primary fallback join on real data', () => {
+  const lookup = buildTripLookup(index, shapes)
+  const NOW = 1_795_228_554
+  /** Predictions at the tail of `shapeId`'s stops, for a trip no static key matches (so it takes the fallback). */
+  const tailOf = (shapeId: string, n: number) =>
+    index.patterns[shapeId]!.stops.slice(-n).map((s, i) => [s, NOW + 60 * (i + 1)] as [string, number])
+  const joined = (tripId: string, route: string, arrivals: [string, number][]) => {
+    const r = joinTrip({ tripId, route, startDate: '20000101', stopId: arrivals[0]![0], arrivals }, lookup, NOW)
+    if (!r.matched) throw new Error(r.reason)
+    return r
+  }
+
+  it('picks a pattern that calls at every predicted stop when the primary misses some', () => {
+    const arrivals = tailOf('A..S05R', 4)
+    expect(index.patterns['A..S58R']!.stops).not.toContain(arrivals[3]![0])
+    const r = joined('999999_A..S', 'A', arrivals)
+    expect(r.stage).toBe('primary')
+    const stops = index.patterns[r.shapeId]!.stops
+    for (const [s] of arrivals) expect(stops).toContain(s)
+  })
+
+  it('keeps the primary when it covers the predicted stops as well as any other pattern', () => {
+    expect(joined('999999_D..S', 'D', tailOf('D..S07R', 5)).shapeId).toBe('D..S07R')
+  })
+
+  it('falls back to the primary when nothing is predicted', () => {
+    const r = joinTrip({ tripId: '999999_D..S', route: 'D', startDate: '20000101', stopId: null, arrivals: [] }, lookup, NOW)
+    expect(r).toEqual({ matched: true, shapeId: 'D..S07R', stage: 'primary' })
   })
 })

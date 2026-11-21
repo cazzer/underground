@@ -84,13 +84,28 @@ function chooseHop(input: PositionInput): Hop | PlanFailure {
   const arrivalAt = (stop: StopId): number | undefined => arrivals.find((a) => a[0] === stop)?.[1]
   const atOrigin = (tN: number): Hop => ({ from: 0, to: 0, arriveAt: null, departsInS: tN - now, fraction: 0 })
 
+  // The next stop after `after` with a prediction, from the feed-ordered arrivals; null when there is none.
+  const fromArrivals = (after: number): Hop | null => {
+    const onPattern = arrivals.filter((a) => stops.indexOf(a[0]) > after)
+    if (onPattern.length === 0) return null
+    const upcoming = onPattern.find((a) => a[1] >= now)
+    if (!upcoming) {
+      const j = stops.indexOf(onPattern[onPattern.length - 1]![0])
+      return { from: Math.max(j - 1, 0), to: j, arriveAt: null, departsInS: null, fraction: 1 }
+    }
+    const j = stops.indexOf(upcoming[0])
+    return j === 0 ? atOrigin(upcoming[1]) : { from: j - 1, to: j, arriveAt: upcoming[1], departsInS: null }
+  }
+
   if (status === 'STOPPED_AT') {
     const k = stopId === null ? -1 : stops.indexOf(stopId)
     if (k < 0) return { ok: false, reason: 'off-pattern' }
     const next = stops[k + 1]
     const tN = next === undefined ? undefined : arrivalAt(next)
-    if (tN === undefined) return { from: k, to: k, arriveAt: null, departsInS: null, fraction: 0 }
-    return { from: k, to: k + 1, arriveAt: tN, departsInS: null }
+    if (tN !== undefined) return { from: k, to: k + 1, arriveAt: tN, departsInS: null }
+    // Hold only at the terminal. With a next stop but no prediction for it (an express on a local pattern,
+    // or a VehiclePosition that lags the train), the arrivals say where the train has got to.
+    return (next !== undefined && fromArrivals(k)) || { from: k, to: k, arriveAt: null, departsInS: null, fraction: 0 }
   }
 
   if (status === 'IN_TRANSIT_TO' || status === 'INCOMING_AT') {
@@ -102,15 +117,7 @@ function chooseHop(input: PositionInput): Hop | PlanFailure {
   }
 
   // No VehiclePosition: infer the next stop from the feed-ordered arrivals.
-  const onPattern = arrivals.filter((a) => stops.includes(a[0]))
-  if (onPattern.length === 0) return { ok: false, reason: 'off-pattern' }
-  const upcoming = onPattern.find((a) => a[1] >= now)
-  if (!upcoming) {
-    const j = stops.indexOf(onPattern[onPattern.length - 1]![0])
-    return { from: Math.max(j - 1, 0), to: j, arriveAt: null, departsInS: null, fraction: 1 }
-  }
-  const j = stops.indexOf(upcoming[0])
-  return j === 0 ? atOrigin(upcoming[1]) : { from: j - 1, to: j, arriveAt: upcoming[1], departsInS: null }
+  return fromArrivals(-1) ?? { ok: false, reason: 'off-pattern' }
 }
 
 /**
