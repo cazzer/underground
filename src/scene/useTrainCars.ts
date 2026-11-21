@@ -7,8 +7,7 @@ import { TRAIN_CAPACITY } from '../lib/live/slots'
 import type { Polyline } from '../lib/realtime/polyline'
 import { theme } from '../theme'
 import { screenScale } from './cameraDistance'
-import { createCarBodyGeometry, createCarHaloGeometry } from './carGeometry'
-import { carLook } from './carLook'
+import { CAR_HEIGHT_M, CAR_WIDTH_M, createCarBodyGeometry, createCarHaloGeometry } from './carGeometry'
 
 export const CAR_CAPACITY = TRAIN_CAPACITY * MAX_CARS
 const CAR_Y = 0.5
@@ -71,7 +70,7 @@ export function useTrainCars(): TrainCarsLayer {
   const rims = useRef<InstancedMesh>(null)
   const geometry = useMemo(
     () => ({
-      body: createCarBodyGeometry(carLook, theme.trainCarSideShade, theme.trainCarEndShade),
+      body: createCarBodyGeometry(theme.trainCarSideShade, theme.trainCarEndShade),
       halo: createCarHaloGeometry(),
     }),
     [],
@@ -87,7 +86,7 @@ export function useTrainCars(): TrainCarsLayer {
 
   const layer = useMemo((): Omit<TrainCarsLayer, 'bodies' | 'halos' | 'rims' | 'geometry'> => {
     const consists = new Array<Consist>(TRAIN_CAPACITY).fill(DEFAULT_CONSIST)
-    const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: carLook.widthM, crossScale: 1, y: CAR_Y }
+    const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: CAR_WIDTH_M, crossScale: 1, y: CAR_Y }
     const gapFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM, y: CAR_Y + SELECTED_LIFT_M }
     const rimFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM + SELECTED_RIM.minM }
     /** writeConsist writes bodies with the footprints; the rim's bodies land here and are never drawn. */
@@ -144,13 +143,13 @@ export function useTrainCars(): TrainCarsLayer {
         if (selected >= 0) dirty[selected] = 1
         selected = i
       },
-      carHeightM: () => carLook.heightM * frame.crossScale,
+      carHeightM: () => CAR_HEIGHT_M * frame.crossScale,
       beginFrame(cameraDistance) {
         frame.gapM = gapFrame.gapM = rimFrame.gapM = screenScale(cameraDistance, GAP.px, GAP.minM)
         frame.rimM = screenScale(cameraDistance, RIM.px, RIM.minM)
         gapFrame.rimM = screenScale(cameraDistance, SELECTED_GAP.px, SELECTED_GAP.minM)
         rimFrame.rimM = gapFrame.rimM + screenScale(cameraDistance, SELECTED_RIM.px, SELECTED_RIM.minM)
-        frame.crossScale = screenScale(cameraDistance, MIN_WIDTH_PX, carLook.widthM) / carLook.widthM
+        frame.crossScale = screenScale(cameraDistance, MIN_WIDTH_PX, CAR_WIDTH_M) / CAR_WIDTH_M
         gapFrame.crossScale = rimFrame.crossScale = frame.crossScale
       },
       writeTrain(i, line, shown, mix, k) {
