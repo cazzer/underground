@@ -18,6 +18,9 @@ export interface Theme {
   stationStroke: string
   stationFocus: string
   train: string
+  /** Train car shading: linear multipliers of the car color on its sides and ends (the roof is 1). */
+  trainCarSideShade: number
+  trainCarEndShade: number
   /** Live-trains state in the HUD: connected, delayed, failed. Each is at least 4.5:1 on the background (theme.test.ts). */
   statusLive: string
   statusWarn: string
@@ -56,6 +59,8 @@ export const THEMES = {
     stationStroke: '#ffffff',
     stationFocus: '#ffd166',
     train: '#ffffff',
+    trainCarSideShade: 0.55,
+    trainCarEndShade: 0.75,
     statusLive: '#7cf5a6',
     statusWarn: '#ffd166',
     statusError: '#ff6b6b',
@@ -85,6 +90,8 @@ export const THEMES = {
     stationStroke: '#2b2b2b',
     stationFocus: '#a63d2f',
     train: '#2b2b2b',
+    trainCarSideShade: 0.6,
+    trainCarEndShade: 0.8,
     statusLive: '#2f6b3a',
     statusWarn: '#8a5a00',
     statusError: '#a63d2f',
@@ -114,6 +121,8 @@ export const THEMES = {
     stationStroke: '#33ff66',
     stationFocus: '#ffffff',
     train: '#eaffef',
+    trainCarSideShade: 0.45,
+    trainCarEndShade: 0.7,
     statusLive: '#33ff66',
     statusWarn: '#ffff66',
     statusError: '#ff5555',

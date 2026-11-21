@@ -58,6 +58,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
+  Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
+  TEMPORARY: `?cars=a|b|c` (box, chamfered prism, flat slab; default a) until the pah.5 look round;
+  the removal list is in `src/scene/carLook.ts`
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold
@@ -65,7 +68,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; picks raycast an invisible
     22 px hit disc per station and take the nearest);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
-    and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map);
+    and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
+    dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
+    their instances, consists and per-frame writes; `carGeometry.ts` the shaded body; `carLook.ts` TEMPORARY);
     `cameraDistance.ts` helpers; `renderOrder.ts`
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
     level labels, `FocusRing.tsx` focused ring above the veil); `interiorModel.ts` interior JSON to a
@@ -84,7 +89,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     test loads them;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
-    between HUD insets), `markerMatrices.ts`, `pickStation.ts`: pure render helpers; `labels.ts`
+    between HUD insets), `markerMatrices.ts` (incl. `writeYawMatrix`), `pickStation.ts`: pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
   - `interiorGeometry.ts` interior to strong/fine line buffers; `interiorFraming.ts` bounds, camera
     target, level labels, padded hull; `interiorReveal.ts` distance to interior opacity. The first
@@ -106,6 +111,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     arrive on time, or cross-fade; reduced motion cross-fades). On a shape change the dot's ground point is
     projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
+  - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
+    (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape,
+    each on its chord, unfolding from the dot point (spacing and length by mix, section by the slot fade)
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
@@ -180,7 +188,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`screenScale`) so they stay legible when zoomed out.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
-  station fill 3, station ring 4, train halo 5, trains 6.
+  station fill 3, station ring 4, train halo 5, car halo 5.5, trains 6, cars 6.5.
+  The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
+  tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
+  above the ground, and everything after it (veil, interior, focus ring) has depthTest false.
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
@@ -194,7 +205,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?tracks=a|b|off` (4.7 m, measured at Bedford Av; 3 m; off = one line; default a); the
   removal list is in `src/data/trackLook.ts`
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
-- Live train dots are instanced too, with per-slot colors (`routeLineColor` like the lines). Their per-frame
+- Live train dots and cars are instanced too, with per-slot colors (`routeLineColor` like the lines; car
+  instance `slot * MAX_CARS + c`). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
 - The station interior is a group at `toGround(anchor)` with depths drawn ×2 (x/z true; labels give
   real depths). Two merged `LineSegments2` (fine, then strong strokes) are built from the deepest
