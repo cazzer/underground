@@ -9,7 +9,7 @@ import type { ShapesFile, StationsFile, StopId, TripIndexFile } from '../../src/
 import type { StationInterior } from '../../src/data/stationSchema.ts'
 import { toGround, type Ground } from '../../src/lib/projection.ts'
 import { dropSpurs, trackLine } from '../../src/lib/trackLine.ts'
-import { MITER_LIMIT, TRACK_OFFSETS } from '../../src/lib/trackOffset.ts'
+import { MITER_LIMIT, TRACK_OFFSET_M } from '../../src/lib/trackOffset.ts'
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
 const shapes = (readJson('../../public/data/shapes.json') as ShapesFile).shapes
@@ -19,7 +19,7 @@ const stationOfStop = new Map<StopId, { id: string; pos: Ground }>()
 for (const st of (readJson('../../public/data/stations.json') as StationsFile).stations) {
   for (const stop of st.stops) stationOfStop.set(stop, { id: st.id, pos: toGround(st) })
 }
-const D = TRACK_OFFSETS.a
+const D = TRACK_OFFSET_M
 
 function nearestOnPolyline(p: Ground, line: readonly Ground[]): Ground {
   let best = { x: line[0]!.x, z: line[0]!.z }
@@ -40,7 +40,7 @@ function nearestOnPolyline(p: Ground, line: readonly Ground[]): Ground {
 const dist = (a: Ground, b: Ground) => Math.hypot(a.x - b.x, a.z - b.z)
 const lerp = (a: Ground, b: Ground, t: number): Ground => ({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t })
 
-// Measured with ?tracks=a: the offset L sits 1.25 m from each platform track at its middle, and
+// Measured at 4.7 m: the offset L sits 1.25 m from each platform track at its middle, and
 // 0.85 m to 1.65 m along the 170 m track, because the projected L runs 1.25 m NE of the anchor
 // axis with a bearing 0.27 degrees off the platform's.
 describe('Bedford Av (L08) track alignment', () => {

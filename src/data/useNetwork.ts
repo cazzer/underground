@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Network } from '../lib/network'
 import { loadNetwork, type NetworkFiles } from './loadNetwork'
-import { trackOffsetM } from './trackLook'
+import { TRACK_OFFSET_M } from '../lib/trackOffset'
 
 export type NetworkLoad =
   | { status: 'loading' }
@@ -15,7 +15,7 @@ export function useNetwork(): { load: NetworkLoad; retry: () => void } {
 
   useEffect(() => {
     const controller = new AbortController()
-    loadNetwork(import.meta.env.BASE_URL, trackOffsetM, controller.signal).then(
+    loadNetwork(import.meta.env.BASE_URL, TRACK_OFFSET_M, controller.signal).then(
       ({ network, files }) => {
         if (!controller.signal.aborted) setLoad({ status: 'ready', network, files })
       },
