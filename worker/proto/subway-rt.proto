@@ -1,0 +1,35 @@
+// Subset of two upstream definitions, trimmed to the fields the Worker reads:
+//  - gtfs-realtime.proto (Apache-2.0, https://github.com/google/transit)
+//  - nyct-subway.proto (https://api.mta.info/GTFS-RT-NYCT.pdf, MTA)
+// Every `required` is relaxed to `optional` (wire-compatible) so decoding never
+// throws on fields we ignore. nyct_trip_descriptor is a plain field 1001, which
+// is identical on the wire to the upstream extension.
+syntax = "proto2";
+package transit_realtime;
+message FeedMessage { optional FeedHeader header = 1; repeated FeedEntity entity = 2; }
+message FeedHeader { optional string gtfs_realtime_version = 1; optional uint64 timestamp = 3; }
+message FeedEntity { optional string id = 1; optional bool is_deleted = 2; optional TripUpdate trip_update = 3; optional VehiclePosition vehicle = 4; }
+message TripUpdate {
+  optional TripDescriptor trip = 1;
+  message StopTimeEvent { optional int64 time = 2; }
+  message StopTimeUpdate { optional uint32 stop_sequence = 1; optional string stop_id = 4; optional StopTimeEvent arrival = 2; optional StopTimeEvent departure = 3; }
+  repeated StopTimeUpdate stop_time_update = 2;
+  optional uint64 timestamp = 4;
+}
+message VehiclePosition {
+  optional TripDescriptor trip = 1;
+  optional uint32 current_stop_sequence = 3;
+  optional string stop_id = 7;
+  enum VehicleStopStatus { INCOMING_AT = 0; STOPPED_AT = 1; IN_TRANSIT_TO = 2; }
+  optional VehicleStopStatus current_status = 4;
+  optional uint64 timestamp = 5;
+}
+message TripDescriptor {
+  optional string trip_id = 1; optional string start_time = 2; optional string start_date = 3; optional string route_id = 5;
+  optional NyctTripDescriptor nyct_trip_descriptor = 1001;
+}
+message NyctTripDescriptor {
+  optional string train_id = 1; optional bool is_assigned = 2;
+  enum Direction { NORTH = 1; EAST = 2; SOUTH = 3; WEST = 4; }
+  optional Direction direction = 3;
+}

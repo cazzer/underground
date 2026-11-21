@@ -28,6 +28,25 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  # Own lockfile and deps; does not gate the Pages deploy. Deploying the Worker is manual.
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # Generated decoder must match proto/subway-rt.proto.
+      - run: npm run gen && git diff --exit-code -- src/gen
+
   build:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest

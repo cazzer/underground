@@ -1,0 +1,23 @@
+{
+  "name": "underground-rt",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "gen": "pbjs -t static-module -w esm --no-create --no-encode --no-verify --no-convert --no-delimited --no-typeurl --no-service --null-defaults -d -o src/gen/subway-rt.js proto/subway-rt.proto"
+  },
+  "dependencies": {
+    "protobufjs": "8.8.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261121.1",
+    "@types/node": "22.20.5",
+    "protobufjs-cli": "2.7.1",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1",
+    "wrangler": "4.166.0"
+  }
+}
