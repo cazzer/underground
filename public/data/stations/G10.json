@@ -35,7 +35,7 @@
     {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-57.96,"z":-37.87,"level":"platform"},"upper":{"x":-70.94,"z":-44.09,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
     {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-65.82,"z":-21.46,"level":"platform"},"upper":{"x":-78.81,"z":-27.68,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
     {"id":"st-slab-2-p1","kind":"stair","lower":{"x":24.91,"z":1.83,"level":"platform"},"upper":{"x":11.93,"z":-4.39,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
-    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":-25.16,"z":-1.97,"level":"platform"},"upper":{"x":-12.17,"z":4.25,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":17.05,"z":18.25,"level":"platform"},"upper":{"x":4.06,"z":12.03,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
     {"id":"st-slab-3-p1","kind":"stair","lower":{"x":57.46,"z":17.44,"level":"platform"},"upper":{"x":70.44,"z":23.66,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
     {"id":"st-slab-3-p2","kind":"stair","lower":{"x":49.6,"z":33.84,"level":"platform"},"upper":{"x":62.58,"z":40.06,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
   ],
