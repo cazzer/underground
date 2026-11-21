@@ -201,7 +201,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`). The window closes to 0 toward top-down, and
   dropping focus (zoom out, close the panel) springs the view back to north-up, so the city and
   top-down views are always north-up. `enableRotate` stays on; the azimuth window alone stops a turn
-  (toggling it mid-gesture applies a stale rotate start). Markers and dots rescale with distance
+  (toggling it mid-gesture applies a stale rotate start), and `rotateSpeed` is 0 while unfocused so
+  drift can't replay when the window opens. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
 - Every `on*` handler passed to `MapControls` (today `onStart`) stays referentially
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,

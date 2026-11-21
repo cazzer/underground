@@ -85,6 +85,10 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     // enableRotate stays on: OrbitControls seeds a rotate only when it is on at gesture start, so
     // toggling it mid-gesture applied a stale start (a pinch into a station swung the view). The
     // window alone holds the angle when unfocused (min = max) and top-down (0).
+    // Safe mid-gesture: OrbitControls updates rotateStart on every move whatever the speed, so no
+    // stale start; and at 0 no sphericalDelta accumulates while the window is shut, so a drifting
+    // pinch can't replay as a turn once focus opens the window.
+    c.rotateSpeed = inp.focused ? 1 : 0
     c.minAzimuthAngle = b.min
     c.maxAzimuthAngle = b.max
   }, -2)
