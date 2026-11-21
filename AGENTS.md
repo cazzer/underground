@@ -134,8 +134,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `interiorConnectors.ts` stairs, ramps, escalators (a zero-run one gets a 30 degree run along the
     station axis, from its listing entrance when it sits on it, else centered, descending toward the plan
     center) and elevators (shaft squared to the axis, a stop at each end in that level's pass; machines take
-    half the depth fade); `escalatorBanks.ts` `spreadBanks`: zero-run escalators sharing a point sit side by
-    side across the axis in id order (a connector listed by two entrances throws);
+    half the depth fade); `escalatorBanks.ts` `spreadBanks`: zero-run escalators within 0.5 m of each other sit
+    side by side across the axis in id order (one listed by two entrances throws);
     `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;
     `interiorSegments.ts` the shared segment writer; `interiorFixture.ts` the tests' mini interior;
     `interiorFraming.ts` bounds, focus anchor (plan center, toward-camera shift, half-extent), level

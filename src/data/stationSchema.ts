@@ -115,7 +115,10 @@ export interface Entrance {
   type: string
   entry: boolean
   exit: boolean
-  /** Connectors whose upper end is this entrance; at least one, sorted. */
+  /**
+   * Connectors whose end on the street is at this entrance (an escalator moved by an authored `at` may sit
+   * off it); at least one, sorted. A connector is listed by at most one entrance.
+   */
   connectors: string[]
   sources: InteriorSource[]
 }

@@ -33,8 +33,8 @@ export interface ConnectorContext {
 
 /**
  * Where an escalator with no plan run of its own is laid. `point` is shared by its whole bank;
- * `lateral` (meters) moves it across the station axis, toward the axis turned 90 degrees clockwise
- * in plan (south for an east axis).
+ * `lateral` (meters) moves it across the station axis along the axis's fixed clockwise normal in plan
+ * (south for an east axis), whichever way the run descends. A bank's id order runs along that normal.
  */
 export interface RunAnchor {
   point: LocalPoint

@@ -14,49 +14,54 @@ const ESCALATORS: Record<string, Connector['travel'] | null> = {
   'st-platform-east': null,
 }
 
-/** Bank escalators sit on the entrance point, as the station build places a listed inventory machine. */
-const BANK: Entrance = {
-  id: 'demo-bank',
-  x: -68,
-  z: -40,
-  type: 'Escalator',
-  entry: true,
-  exit: true,
-  connectors: ['ES-DEMO-B1', 'ES-DEMO-B2'],
-  sources: ['authored'],
-}
-
-const bankEscalator = (id: string, travel: Connector['travel']): Connector => ({
-  id,
-  kind: 'escalator',
-  lower: { x: BANK.x, z: BANK.z, level: 'mezzanine' },
-  upper: { x: BANK.x, z: BANK.z, level: 'street' },
-  width: 1.2,
-  travel,
-  sources: ['authored'],
-})
-
-const ADDED: Connector[] = [
-  bankEscalator('ES-DEMO-B1', 'up'),
-  bankEscalator('ES-DEMO-B2', 'down'),
-  {
-    id: 'ES-DEMO',
+/**
+ * Built per call, not at module scope: top-level calls are not tree-shaken, and the demo must not
+ * reach the production bundle.
+ */
+function demoAdditions(): { connectors: Connector[]; entrances: Entrance[] } {
+  // Bank escalators sit on the entrance point, as the station build places a listed inventory machine.
+  const bank: Entrance = {
+    id: 'demo-bank',
+    x: -68,
+    z: -40,
+    type: 'Escalator',
+    entry: true,
+    exit: true,
+    connectors: ['ES-DEMO-B1', 'ES-DEMO-B2'],
+    sources: ['authored'],
+  }
+  const bankEscalator = (id: string, travel: Connector['travel']): Connector => ({
+    id,
     kind: 'escalator',
-    lower: { x: 52, z: 43, level: 'mezzanine' },
-    upper: { x: 52, z: 43, level: 'street' },
+    lower: { x: bank.x, z: bank.z, level: 'mezzanine' },
+    upper: { x: bank.x, z: bank.z, level: 'street' },
     width: 1.2,
-    travel: 'down',
+    travel,
     sources: ['authored'],
-  },
-  {
-    id: 'EL-DEMO',
-    kind: 'elevator',
-    lower: { x: 30, z: 24.84, level: 'platform' },
-    upper: { x: 30, z: 24.84, level: 'street' },
-    width: 2,
-    sources: ['authored'],
-  },
-]
+  })
+  const connectors: Connector[] = [
+    bankEscalator('ES-DEMO-B1', 'up'),
+    bankEscalator('ES-DEMO-B2', 'down'),
+    {
+      id: 'ES-DEMO',
+      kind: 'escalator',
+      lower: { x: 52, z: 43, level: 'mezzanine' },
+      upper: { x: 52, z: 43, level: 'street' },
+      width: 1.2,
+      travel: 'down',
+      sources: ['authored'],
+    },
+    {
+      id: 'EL-DEMO',
+      kind: 'elevator',
+      lower: { x: 30, z: 24.84, level: 'platform' },
+      upper: { x: 30, z: 24.84, level: 'street' },
+      width: 2,
+      sources: ['authored'],
+    },
+  ]
+  return { connectors, entrances: [bank] }
+}
 
 export function withDemoMachines(interior: StationInterior): StationInterior {
   if (interior.stationId !== DEMO_STATION) return interior
@@ -65,9 +70,10 @@ export function withDemoMachines(interior: StationInterior): StationInterior {
     const travel = ESCALATORS[c.id]
     return { ...c, kind: 'escalator', width: 1.2, ...(travel ? { travel } : {}) }
   })
+  const added = demoAdditions()
   return {
     ...interior,
-    connectors: [...connectors, ...ADDED].sort((a, b) => a.id.localeCompare(b.id)),
-    entrances: [...interior.entrances, BANK],
+    connectors: [...connectors, ...added.connectors].sort((a, b) => a.id.localeCompare(b.id)),
+    entrances: [...interior.entrances, ...added.entrances],
   }
 }
