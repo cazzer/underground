@@ -13,8 +13,8 @@ export const MIN_SLAB_M = 20
 export const MIN_PLATFORM_OVERLAP_M = 10
 /** Across the station, a slab covers every platform plus this margin. */
 const SLAB_SIDE_M = 2
-/** Margin around an entrance a machine sits at. */
-const MACHINE_MARGIN_M = 1
+/** A slab reaches out under the sidewalk toward its own entrances, at most this far past the platforms. */
+export const SLAB_SIDE_MAX_M = 10
 
 export interface SlabPlan {
   id: string
@@ -36,11 +36,28 @@ export function inSlab(s: SlabPlan, p: FramePoint, inset = 0): boolean {
   return p[0] >= s.uRange[0] + inset && p[0] <= s.uRange[1] - inset && p[1] >= s.vRange[0] + inset && p[1] <= s.vRange[1] - inset
 }
 
-/** Clusters entrances by u (split at gaps over CLUSTER_GAP_M); each cluster's u-span, clamped to the platforms
- *  plus SLAB_OVERHANG_M and at least MIN_SLAB_M long, is one slab. Across, a slab spans every platform plus
- *  SLAB_SIDE_M, and it overlaps each platform by MIN_PLATFORM_OVERLAP_M. Entrances a machine sits at (`machineAt`) are always inside their slab. Slabs that end up
- *  overlapping are merged. No entrances: one slab at the middle of the platforms. */
-export function mezzanineSlabs(ctx: TemplateCtx, entrances: readonly FramePoint[], machineAt: ReadonlySet<number>): SlabPlan[] {
+/** The point of the slab (shrunk by `inset`) nearest `p`. */
+export function nearestInSlab(s: SlabPlan, p: FramePoint, inset = 0): FramePoint {
+  const c = (lo: number, hi: number, x: number): number => Math.max(lo + inset, Math.min(hi - inset, x))
+  return [c(s.uRange[0], s.uRange[1], p[0]), c(s.vRange[0], s.vRange[1], p[1])]
+}
+
+/** Plan distance from `p` to the slab rectangle (0 inside). */
+export const slabDistance = (s: SlabPlan, p: FramePoint): number => {
+  const q = nearestInSlab(s, p)
+  return Math.hypot(q[0] - p[0], q[1] - p[1])
+}
+
+export function nearestSlab(slabs: readonly SlabPlan[], p: FramePoint): SlabPlan | undefined {
+  return [...slabs].sort((a, b) => slabDistance(a, p) - slabDistance(b, p) || (a.id < b.id ? -1 : 1))[0]
+}
+
+/** Clusters entrances by u (split at gaps over CLUSTER_GAP_M); each cluster's u-span, at least MIN_SLAB_M long
+ *  and overlapping each platform by MIN_PLATFORM_OVERLAP_M, clamped to the platforms plus SLAB_OVERHANG_M, is one
+ *  slab. Across, a slab spans every platform plus SLAB_SIDE_M, widened toward its own entrances by at most
+ *  SLAB_SIDE_MAX_M past the platforms (a mezzanine reaches under the sidewalk). Slabs that end up overlapping are merged.
+ *  No entrances: one slab at the middle of the platforms. */
+export function mezzanineSlabs(ctx: TemplateCtx, entrances: readonly FramePoint[]): SlabPlan[] {
   const [p0, p1] = ctx.uSpan
   const lo = p0 - SLAB_OVERHANG_M
   const hi = p1 + SLAB_OVERHANG_M
@@ -72,13 +89,10 @@ export function mezzanineSlabs(ctx: TemplateCtx, entrances: readonly FramePoint[
       a = Math.min(a, p.uRange[1] - MIN_PLATFORM_OVERLAP_M)
       b = Math.max(b, p.uRange[0] + MIN_PLATFORM_OVERLAP_M)
     }
-    const s: SlabPlan = { id: '', uRange: [a, b], vRange: [v0, v1], entrances: members }
-    for (const i of members.filter((m) => machineAt.has(m))) {
-      const [u, v] = entrances[i]!
-      s.uRange = [Math.min(s.uRange[0], u - MACHINE_MARGIN_M), Math.max(s.uRange[1], u + MACHINE_MARGIN_M)]
-      s.vRange = [Math.min(s.vRange[0], v - MACHINE_MARGIN_M), Math.max(s.vRange[1], v + MACHINE_MARGIN_M)]
-    }
-    return s
+    const vs = members.map((i) => entrances[i]![1])
+    const w0 = Math.max(v0 - (SLAB_SIDE_MAX_M - SLAB_SIDE_M), Math.min(v0, ...vs))
+    const w1 = Math.min(v1 + (SLAB_SIDE_MAX_M - SLAB_SIDE_M), Math.max(v1, ...vs))
+    return { id: '', uRange: [Math.max(lo, a), Math.min(hi, b)], vRange: [w0, w1], entrances: members }
   })
   const merged: SlabPlan[] = []
   for (const s of raw) {

@@ -85,7 +85,8 @@ export function fixtureCatalog(spec: FixtureSpec): { catalog: GeneratorCatalog; 
 }
 
 /** Island under a mezzanine (OSM level -2): stairs at both ends, a street elevator with its entrance, a
- *  mezzanine-platform elevator, and rows the merge can't take. */
+ *  mezzanine-platform elevator, and rows the merge can't take (street to street, three landings, an escalator
+ *  entrance with no escalator). */
 export const islandCutCover = (northSide: -1 | 1 = 1): FixtureSpec => ({
   id: 'T10',
   structure: 'Subway',
@@ -97,7 +98,7 @@ export const islandCutCover = (northSide: -1 | 1 = 1): FixtureSpec => ({
   entrances: [
     { type: 'Stair', at: [-62, -14] },
     { type: 'Stair', at: [-64, 14] },
-    { type: 'Elevator', at: [-55, 13] },
+    { type: 'Elevator', at: [-55, 10] },
     { type: 'Stair', at: [62, -14] },
     { type: 'Stair', at: [64, 14] },
     { type: 'Escalator', at: [58, 14] },
@@ -105,7 +106,7 @@ export const islandCutCover = (northSide: -1 | 1 = 1): FixtureSpec => ({
   equipment: [
     { code: 'EL1', kind: 'elevator', serving: 'Main St (NE corner) to mezzanine for service in both directions', at: [-50, 20] },
     { code: 'EL2', kind: 'elevator', serving: 'mezzanine to platform for service in both directions' },
-    { code: 'ES8', kind: 'escalator', serving: 'upper mezzanine to lower mezzanine' },
+    { code: 'ES8', kind: 'escalator', serving: 'Main St (NE corner) to Broadway (SW corner)' },
     { code: 'EL9', kind: 'elevator', serving: 'Main St to mezzanine to platform' },
   ],
 })

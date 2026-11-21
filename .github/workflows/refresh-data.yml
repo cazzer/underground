@@ -5,7 +5,7 @@ name: Refresh GTFS data
 # to create and approve pull requests".
 #
 # Two jobs so the write token never sits next to npm:
-#   generate  read-only; runs npm (data, typecheck, test, build); uploads public/data
+#   generate  read-only; runs npm (data, data:stations, typecheck, test, build); uploads public/data
 #   publish   write token; never runs npm; commits the artifact and opens/updates the PR
 #
 # GitHub disables scheduled workflows after 60 days without repo activity; re-enable
@@ -67,6 +67,11 @@ jobs:
 
       - name: Regenerate public/data
         run: npm run data 2>&1 | tee "$RUNNER_TEMP/data.log"
+
+      # Generated station interiors are built from the shapes and stations just written; without this a
+      # shape change leaves them stale and generatedOutputs.test.ts fails. Writes only under public/data/.
+      - name: Regenerate station interiors
+        run: npm run data:stations 2>&1 | tee -a "$RUNNER_TEMP/data.log"
 
       - name: Check for changes
         id: diff

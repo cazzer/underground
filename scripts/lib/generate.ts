@@ -7,6 +7,7 @@ import { buildAllFacts } from './catalogFacts.ts'
 import type { OsmCatalogWay } from './catalogTypes.ts'
 import { buildStationInterior } from './stationMerge.ts'
 import { markGenerated } from './stationProvenance.ts'
+import { parseServing } from './stationSources.ts'
 import type { GeneratedStation } from './stationInputs.ts'
 import type { TemplateInputs } from './templates/build.ts'
 import { makeCtx } from './templates/context.ts'
@@ -24,6 +25,23 @@ const TEMPLATES: Partial<Record<Archetype, Template>> = {
   'elevated-3-track': elevated,
   'cut-cover-mezzanine': cutCover,
   'shallow-per-direction': shallow,
+}
+
+const NAMED_MEZZANINE = /\b(upper|lower|intermediate) mezzanine|\bconcourse\b|\bbalcony\b/i
+
+/** Why a station's E&E rows describe more than one mezzanine level (a template has one), or null. */
+export function multiLevelReason(equipment: readonly { code: string; serving: string }[]): string | null {
+  for (const e of equipment) {
+    const named = NAMED_MEZZANINE.exec(e.serving)
+    if (named) return `multi-level: ${e.code} names a ${named[0].toLowerCase()}; needs hand authoring`
+    try {
+      const s = parseServing(e.serving)
+      if (s.from === 'mezzanine' && s.to === 'mezzanine') return `multi-level: ${e.code} joins two mezzanines; needs hand authoring`
+    } catch {
+      // Unparsable serving texts are dropped row by row (machines.ts), not a reason to skip the station.
+    }
+  }
+  return null
 }
 
 export interface GenerateResult {
@@ -46,6 +64,11 @@ export function generateStations(catalog: GeneratorCatalog, lines: MapTrackLines
     const result = classifyStation(f)
     const template = TEMPLATES[result.archetype]
     if (!template || !result.params || result.confidence < INTERIOR_MIN_CONFIDENCE || result.archetype === 'unknown') continue
+    const multi = multiLevelReason(f.equipment)
+    if (multi) {
+      out.skipped.push({ stationId: f.stationId, reason: multi })
+      continue
+    }
     const log: string[] = []
     try {
       const ctx = makeCtx(rows.get(f.stationId)!, { archetype: result.archetype, confidence: result.confidence, params: result.params }, platformWays)

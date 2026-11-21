@@ -65,8 +65,12 @@ ways, N/S tracks matched to the map's direction lines, one mezzanine slab per cl
 `at` for every elevator and escalator) and a `StationSources` slice of the catalog. Nothing of it is written to
 `data/`. Source rows the merge can't take are left out of the slice and printed: E&E serving texts with more than
 one " to ", machines joining two levels of one kind (mezzanine to mezzanine), elevator or escalator entrances with
-no machine of their kind, duplicate entrance points, and entrance rows over 200 m from every platform. Every
-position the template places is a guess (the output carries `generated` and per-level `depthSource`).
+no machine of their kind, duplicate entrance points, entrance rows over 200 m from every platform, and entrances
+whose street stair would run more than 20 m (or finds no free landing within it). Stations listed in
+`scripts/lib/deepArchetype.ts`, or with an E&E rise over 60 ft, are deep and get no generated interior; so do
+multi-level stations (E&E rows naming an upper, lower or intermediate mezzanine, a concourse or balcony, or joining
+two mezzanines), which need hand authoring. Every position the template places is a guess (the output carries
+`generated` and per-level `depthSource`).
 
 ## Refreshing the catalog
 

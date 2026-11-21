@@ -2,18 +2,20 @@
  *  machines, slabs and stairs, and returns the same AuthoredStation + StationSources pair a hand-authored
  *  station has, plus its provenance. Rows the merge can't take are dropped from the slice and named in the
  *  notes and `log`. Pure. */
-import type { Level, LevelId } from '../../../src/data/stationSchema.ts'
+import type { Level, LevelId, LevelKind } from '../../../src/data/stationSchema.ts'
 import type { DepthSource } from '../depth.ts'
 import { distanceToRing } from '../stationGeometry.ts'
 import type { OsmCatalogWay } from '../catalogTypes.ts'
-import type { AuthoredStation, GeneratedStation } from '../stationInputs.ts'
+import type { AuthoredStation, EquipmentRow, FramePoint, GeneratedStation } from '../stationInputs.ts'
 import type { TemplateCtx } from './context.ts'
-import { MACHINE_ENTRANCE_TYPES, machineOverrides, planMachines } from './machines.ts'
+import { machineOverrides } from './machineSites.ts'
+import type { MachineSites } from './machineSites.ts'
+import { MACHINE_ENTRANCE_TYPES, planMachines } from './machines.ts'
 import type { PlanEntrance } from './machines.ts'
-import { mezzanineSlabs, slabOutline } from './slabs.ts'
+import { mezzanineSlabs, slabDistance, slabOutline } from './slabs.ts'
 import { sliceSources } from './slice.ts'
 import type { GeneratorCatalog } from './slice.ts'
-import { levelStairs, streetStairs } from './stairs.ts'
+import { levelStairs, maxStreetRun, streetStairs } from './stairs.ts'
 import { assignTracks } from './tracks.ts'
 import type { MapTrackLines } from './tracks.ts'
 
@@ -36,26 +38,25 @@ export const FAR_ENTRANCE_M = 200
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
-export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inputs: TemplateInputs, log: string[]): GeneratedStation {
-  const wayIds = ctx.platforms.flatMap((p) => p.ways.map((w) => w.id)).sort((a, b) => a - b)
-  const slice = sliceSources(inputs.catalog, ctx.row, wayIds)
-  const dropped = [...slice.dropped]
-  const kinds = new Set([levels.street, levels.mezzanine, levels.platform].flatMap((l) => (l ? [l.kind] : [])))
-
-  const all: PlanEntrance[] = []
-  for (const row of slice.sources.entrances.rows) {
-    const at = ctx.uv(row.lat, row.lon)
-    const away = Math.min(...ctx.platforms.flatMap((p) => p.ways.map((w) => distanceToRing(at, w.ring))))
-    if (away > FAR_ENTRANCE_M) dropped.push(`entrance row ${row.lat},${row.lon} (${row.type}): ${away.toFixed(0)} m from every platform`)
-    else all.push({ id: '', row, at })
-  }
-  const machines = planMachines(ctx, slice.sources.equipment.rows, all, kinds)
+/** Machines, entrances, slabs and stairs for one set of candidate entrances. `unplaced` lists the entrances whose
+ *  street stair found no landing. */
+function planLayout(
+  ctx: TemplateCtx,
+  levels: TemplateLevels,
+  candidates: readonly PlanEntrance[],
+  rows: readonly EquipmentRow[],
+  kinds: ReadonlySet<LevelKind>,
+  platformFor: MachineSites['platformFor'],
+  log: string[],
+) {
+  const dropped: string[] = []
+  const machines = planMachines(ctx, rows, candidates, kinds)
   dropped.push(...machines.dropped)
   // An elevator or escalator entrance with no machine of its kind can't be linked (checkEntranceLinks).
   const linked = new Set(machines.plans.flatMap((p) => (p.entrance === undefined ? [] : [p.entrance])))
   const keptIndex = new Map<number, number>()
   const entrances: PlanEntrance[] = []
-  all.forEach((e, i) => {
+  candidates.forEach((e, i) => {
     if (MACHINE_ENTRANCE_TYPES.has(e.row.type) && !linked.has(i)) {
       dropped.push(`entrance row ${e.row.lat},${e.row.lon} (${e.row.type}): no ${e.row.type.toLowerCase()} in the E&E rows reaches the street here`)
       return
@@ -64,16 +65,51 @@ export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inpu
     entrances.push({ ...e, id: `ent-${pad(entrances.length + 1)}` })
   })
   const plans = machines.plans.map((p) => (p.entrance === undefined ? p : { ...p, entrance: keptIndex.get(p.entrance)! }))
+  const slabs = levels.mezzanine ? mezzanineSlabs(ctx, entrances.map((e) => e.at)) : []
+  const { overrides: equipment, notes: machineNotes } = machineOverrides(ctx, plans, entrances, { slabs, platformFor })
+  const street = streetStairs(ctx, entrances, slabs, levels, log)
+  const connectors = [...street.connectors, ...(levels.mezzanine ? levelStairs(ctx, slabs, levels.mezzanine, levels.platform) : [])]
+  return { dropped, entrances, plans, slabs, equipment, machineNotes, connectors, unplaced: street.unplaced }
+}
 
+export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inputs: TemplateInputs, log: string[]): GeneratedStation {
+  const wayIds = ctx.platforms.flatMap((p) => p.ways.map((w) => w.id)).sort((a, b) => a - b)
+  const slice = sliceSources(inputs.catalog, ctx.row, wayIds)
+  const dropped = [...slice.dropped]
+  const kinds = new Set([levels.street, levels.mezzanine, levels.platform].flatMap((l) => (l ? [l.kind] : [])))
+
+  const toPlatform = (at: FramePoint): number => Math.min(...ctx.platforms.flatMap((p) => p.ways.map((w) => distanceToRing(at, w.ring))))
+  const located: PlanEntrance[] = []
+  for (const row of slice.sources.entrances.rows) {
+    const at = ctx.uv(row.lat, row.lon)
+    const away = toPlatform(at)
+    if (away > FAR_ENTRANCE_M) dropped.push(`entrance row ${row.lat},${row.lon} (${row.type}): ${away.toFixed(0)} m from every platform`)
+    else located.push({ id: '', row, at })
+  }
+  // A stair's run is capped, so an entrance farther than the cap from where its stair would land (its slab, or the
+  // platform without a mezzanine) is left out; a machine entrance may be that close to either.
+  const reach = maxStreetRun((levels.mezzanine ?? levels.platform).y)
+  const provisional = levels.mezzanine ? mezzanineSlabs(ctx, located.map((e) => e.at)) : []
+  const toSlab = (at: FramePoint): number => Math.min(Infinity, ...provisional.map((sl) => slabDistance(sl, at)))
+  const all = located.filter((e) => {
+    const away = MACHINE_ENTRANCE_TYPES.has(e.row.type) ? Math.min(toSlab(e.at), toPlatform(e.at)) : levels.mezzanine ? toSlab(e.at) : toPlatform(e.at)
+    if (away <= reach) return true
+    dropped.push(`entrance row ${e.row.lat},${e.row.lon} (${e.row.type}): ${away.toFixed(0)} m from where its ${MACHINE_ENTRANCE_TYPES.has(e.row.type) ? 'machine' : 'stair'} could land (cap ${reach.toFixed(0)} m)`)
+    return false
+  })
   const { tracks, swapped } = assignTracks(ctx, inputs.lines, inputs.trackWays)
   const platformFor = { N: tracks.find((t) => t.stopId.endsWith('N'))!.platform, S: tracks.find((t) => t.stopId.endsWith('S'))!.platform }
-  const atEntrance = new Set(plans.filter((p) => p.entrance !== undefined && !p.kinds.includes('platform')).map((p) => p.entrance!))
-  const slabs = levels.mezzanine ? mezzanineSlabs(ctx, entrances.map((e) => e.at), atEntrance) : []
-  const equipment = machineOverrides(ctx, plans, entrances, { slabs, platformFor })
-  const connectors = [
-    ...streetStairs(ctx, entrances, slabs, levels, log),
-    ...(levels.mezzanine ? levelStairs(ctx, slabs, levels.mezzanine, levels.platform) : []),
-  ]
+  // An entrance whose stair finds no free landing within the cap is left out, and the layout is redone without it.
+  let candidates = all
+  let layout = planLayout(ctx, levels, candidates, slice.sources.equipment.rows, kinds, platformFor, log)
+  while (layout.unplaced.length > 0) {
+    for (const e of layout.unplaced) dropped.push(`entrance row ${e.row.lat},${e.row.lon} (${e.row.type}): its stair finds no free landing within ${reach.toFixed(0)} m`)
+    const gone = new Set(layout.unplaced.map((e) => e.row))
+    candidates = candidates.filter((e) => !gone.has(e.row))
+    layout = planLayout(ctx, levels, candidates, slice.sources.equipment.rows, kinds, platformFor, log)
+  }
+  dropped.push(...layout.dropped)
+  const { entrances, plans, slabs, equipment, machineNotes, connectors } = layout
 
   const platforms = ctx.platforms.flatMap((p) => {
     // A platform split into several OSM ways keeps its tracks on the longest one, so each stop has one track.
@@ -88,12 +124,14 @@ export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inpu
   })
   const slabName = levels.mezzanine?.name ?? 'Mezzanine'
   for (const d of dropped) log.push(`${ctx.stationId} dropped ${d}`)
+  for (const n of machineNotes) log.push(`${ctx.stationId} UNVERIFIED ${n}`)
   const notes = [
     `Generated from the ${ctx.archetype} template (confidence ${ctx.confidence.toFixed(2)}); not hand-checked.`,
     `Frame: u along bearing ${ctx.bearingDeg.toFixed(1)} deg (the platforms' axis) from the platforms' center, v to its right.`,
     `Tracks: ${swapped ? 'N on the +v side' : 'N on the -v side'}, chosen by the map's direction lines.`,
     'UNVERIFIED: slab extents, stair positions and runs, and machine positions are template guesses.',
     ...tracks.flatMap((t) => (t.note ? [`UNVERIFIED: ${t.note}`] : [])),
+    ...machineNotes.map((n) => `UNVERIFIED: ${n}`),
     ...dropped.map((d) => `Dropped: ${d}`),
   ]
   const authored: AuthoredStation = {

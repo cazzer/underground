@@ -26,7 +26,7 @@ const rows: Row[] = [
   { name: 'Livonia Av, elevated 2 tracks', facts: fx.livoniaAv(), archetype: 'elevated-2-track', platformType: 'island', tracks: 2, reason: /elevated with 2 tracks/ },
   { name: '40 St-Lowery St, 3 tracks, two sides', facts: fx.fortiethStLowery(), archetype: 'elevated-3-track', platformType: 'side', tracks: 3, reason: /elevated with 3 tracks/ },
   { name: '61 St-Woodside, 3 tracks, island and side', facts: fx.sixtyFirstStWoodside(), archetype: 'elevated-3-track', platformType: 'mixed', tracks: 3, reason: /elevated with 3 tracks/ },
-  { name: '191 St, deep from an E&E rise', facts: fx.oneNinetyFirstSt(), archetype: 'deep', platformType: 'island', tracks: 2, reason: /below the street \(ee-rise\)/ },
+  { name: '191 St, deep from an E&E rise', facts: fx.oneNinetyFirstSt(), archetype: 'deep', platformType: 'island', tracks: 2, reason: /EL1 rises 55\.0 m, over 18\.3 m \(60 ft\)/ },
   { name: 'Avenue H, open cut, side platforms, 4 tracks', facts: fx.avenueH(), archetype: 'open-air', platformType: 'side', tracks: 4, reason: /open-air archetype/ },
 ]
 
@@ -56,6 +56,20 @@ describe('classifyStation on a station of each archetype', () => {
     expect(p.perDirectionEntrances).toBe(true)
     expect(p.platforms.map((l) => l.edges.map((e) => e.trackRef))).toEqual([['T1'], ['T4']])
     expect(p.platforms.map((l) => l.edges.map((e) => e.side))).toEqual([[1], [-1]])
+  })
+
+  it('calls a pinned deep station deep whatever its geometry, so no template is used', () => {
+    const r = classifyStation({ ...fx.bedfordAv(), stationId: '231' })
+    expect(r.archetype).toBe('deep')
+    expect(reasonsOf(r)).toMatch(/deep station \(docs\/research\/station-modeling\.md archetypes table\)/)
+  })
+
+  it('calls any station with an E&E rise over 60 ft deep, elevated ones too', () => {
+    const tall = fx.livoniaAv()
+    tall.equipment = [fx.equipmentFact('EL9', 'street to platform for service in both directions', "61' - 0in")]
+    expect(classifyStation(tall).archetype).toBe('deep')
+    tall.equipment = [fx.equipmentFact('EL9', 'street to platform for service in both directions', "59' - 0in")]
+    expect(classifyStation(tall).archetype).toBe('elevated-2-track')
   })
 
   it('puts 191 St 55 m down, from the E&E rise', () => {

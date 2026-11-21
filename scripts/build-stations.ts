@@ -4,7 +4,7 @@
  *  public/data/stations/index.json (which stations have an interior), and public/data/station-depths.json (every platform track's ends and rail
  *  height) from the authored interiors; public/data/stations/depths-generated.json is the same for the generated ones. Offline: the network is only used by fetch-station-sources.ts.
  *  The only IO here; the merge is scripts/lib/stationMerge.ts. Everything is built in memory first. */
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import type { StationInterior } from '../src/data/stationSchema.ts'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
@@ -15,7 +15,7 @@ import {
 import { generateStations } from './lib/generate.ts'
 import { CATALOG_FILES, generatorCatalog, generatorLines } from './lib/generatorInputs.ts'
 import { buildStationDepths } from './lib/stationDepths.ts'
-import { buildStationIndex, GENERATED_DEPTHS_FILE, INDEX_FILE } from './lib/stationIndex.ts'
+import { buildStationIndex, GENERATED_DEPTHS_FILE, INDEX_FILE, NOT_INTERIOR_FILES } from './lib/stationIndex.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
 import { markGenerated } from './lib/stationProvenance.ts'
 import { toStableJson } from './lib/stableJson.ts'
@@ -86,9 +86,23 @@ function main(): void {
   const total = checkBudget([depths], committedGzip(DATA_DIR, new Set([DEPTHS])))
   const files = interiors.map((interior) => ({ id: interior.stationId, json: toStableJson(interior, 2) }))
   mkdirSync(OUT_DIR, { recursive: true })
+  const generatedIds = new Set(generatedInteriors.map((i) => i.stationId))
+  let generatedRaw = 0
+  let generatedGzip = 0
   for (const { id, json } of files) {
     writeFileSync(new URL(`${id}.json`, OUT_DIR), json)
-    console.log(`stations/${id}.json: ${Buffer.byteLength(json)} bytes (${gzipSync(json).length} gzipped)`)
+    const [raw, gz] = [Buffer.byteLength(json), gzipSync(json).length]
+    if (!generatedIds.has(id)) console.log(`stations/${id}.json: ${raw} bytes (${gz} gzipped)`)
+    generatedRaw += generatedIds.has(id) ? raw : 0
+    generatedGzip += generatedIds.has(id) ? gz : 0
+  }
+  console.log(`stations/: ${generatedIds.size} generated interiors, ${generatedRaw} bytes (${generatedGzip} gzipped, each loads on focus)`)
+  // A station that is no longer generated (or authored) loses its file, so the index and the files agree.
+  const written = new Set(files.map((f) => `${f.id}.json`))
+  for (const name of readdirSync(OUT_DIR)) {
+    if (!name.endsWith('.json') || written.has(name) || NOT_INTERIOR_FILES.has(name)) continue
+    rmSync(new URL(name, OUT_DIR))
+    console.log(`stations/${name}: removed (no interior any more)`)
   }
   writeFileSync(new URL(INDEX, OUT_DIR), index.text)
   console.log(`stations/${INDEX}: ${index.raw} bytes (${index.gzip} gzipped, cap ${INDEX_GZIP_CAP_BYTES})`)

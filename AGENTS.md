@@ -261,15 +261,20 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `crossSection.ts` + `platformVote.ts` + `trackSpan.ts` + `platformSides.ts` + `platformFallback.ts`
     (island/side by cross-section vote, track count, curve penalty; `platformLayout.ts` the types),
     `mezzanineEvidence.ts`, `depth.ts` + `deepStations.ts` + `riseParse.ts` (level elevations from E&E rises,
-    a cited deep list, OSM level, then structure defaults)
+    a cited deep list, OSM level, then structure defaults), `deepArchetype.ts` (`PINNED_DEEP`, the stations always
+    called `deep`, and the 60 ft E&E rise above which any station is: no template, no generated interior)
   - Station generator: `lib/generate.ts` (`generateStations`: classify, dispatch to a template, validate with the
-    merge; a throw skips the station with its reason; the 3 mixed island/side cut-cover stations are skipped) and
+    merge; a throw skips the station with its reason; multi-level stations, whose E&E rows name an upper, lower or
+    intermediate mezzanine, a concourse or balcony, or join two mezzanines, are skipped for hand authoring) and
     `lib/generatorInputs.ts` (parsed catalog files, shapes and stations to its inputs). `lib/templates/`:
     `context.ts` (frame from the classifier's anchor and bearing, platforms in it), `slice.ts` (the in-memory
     `StationSources` cut from the catalog; never written), `tracks.ts` (`mapTrackLines`; N/S on the two outermost
     platform-edge tracks by the map's direction lines; paths are the OSM way clipped to the platform and 6 m of the
-    map line), `slabs.ts` (one rectangle per entrance cluster), `stairs.ts`, `machines.ts` (E&E rows the merge can
-    take, entrance links, `at` overrides), `build.ts` (assembly, dropped rows in notes and the log), `subway.ts`
+    map line), `slabs.ts` (one rectangle per entrance cluster, within the platforms plus 15 m along and 10 m
+    across), `stairs.ts` (street stairs capped at 20 m of plan run, one per landing; slab-to-platform stairs sized
+    for the drawn rise), `machines.ts` (E&E rows the merge can take, entrance links), `machineSites.ts` (`at`
+    overrides; machines of one level pair at one site bank width + 0.3 m apart), `build.ts` (assembly; entrances
+    whose stair can't land within the cap are dropped; dropped rows in notes and the log), `subway.ts`
     (`cutCover`, `shallow`), `elevated.ts`; `templateFixture.ts` synthetic one-station catalogs for
     `generate.test.ts`. `generatedOutputs.test.ts` checks the committed generated files are fresh
   - `lib/catalogFacts.ts` catalog to `StationFacts` (platforms go to their nearest station point; complexes
@@ -464,8 +469,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (about 58.5 KB
   today); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
-  opens or updates one PR on `chore/data-refresh` when `npm run data` changes
-  `public/data`. The workflow runs typecheck, tests, and build before pushing, but the
+  opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
+  generated interiors follow the new shapes and stations), change `public/data`. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).
 - **Station interiors are hand-authored per station.** They're merged with OSM platform
   polygons, NY Open Data entrances, and E&E elevator/escalator data. The starter

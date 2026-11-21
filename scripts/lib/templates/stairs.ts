@@ -7,7 +7,7 @@ import { centerAt, dist, onPlatform, roundUV, searchCenterline } from './context
 import type { PlatformGeom, TemplateCtx } from './context.ts'
 import { MACHINE_ENTRANCE_TYPES } from './machines.ts'
 import type { PlanEntrance } from './machines.ts'
-import { inSlab, slabCenter } from './slabs.ts'
+import { inSlab, nearestInSlab, nearestSlab, slabCenter } from './slabs.ts'
 import type { SlabPlan } from './slabs.ts'
 
 /** Plan run per meter of rise (about a 32 degree stair). */
@@ -19,7 +19,9 @@ export const LONG_RUN_M = 40
 export const STREET_STAIR_WIDTH_M = 1.5
 export const ISLAND_STAIR_WIDTH_M = 2.4
 export const SIDE_STAIR_WIDTH_M = 1.8
-const SLAB_INSET_M = 0.5
+/** The interior's default vertical exaggeration (`?interiorY=2`, src/scene/interiorLook.ts). */
+export const DRAWN_Y_SCALE = 2
+export const SLAB_INSET_M = 0.5
 const STEP_M = 2
 
 interface End {
@@ -32,17 +34,33 @@ function connector(id: string, kind: AuthoredConnector['kind'], width: number, a
   return { id, kind, width, lower: lower.end, upper: upper.end }
 }
 
-const clampTo = (lo: number, hi: number, x: number): number => Math.max(lo + SLAB_INSET_M, Math.min(hi - SLAB_INSET_M, x))
+/** A street stair's plan run is at most this, or RUN_PER_RISE x rise when that is longer. Entrances farther
+ *  than that from every slab or platform are dropped before the stairs are built (build.ts). */
+export const MAX_STREET_RUN_M = 20
+/** Two street stairs never land closer than this (center to center): one landing, one stair. */
+const LANDING_GAP_M = STREET_STAIR_WIDTH_M + 0.3
+const SEARCH_STEP_M = 0.5
 
-/** The landing on a slab: the entrance moved RUN_PER_RISE x rise toward the slab center and clamped inside; if
- *  that is under MIN_RUN_M from the entrance, the same run along u in either direction. */
-function slabLanding(slab: SlabPlan, from: FramePoint, run: number): FramePoint | null {
-  const c = slabCenter(slab)
-  const d = dist(from, c)
-  const dirs: FramePoint[] = [...(d > 1e-6 ? [[(c[0] - from[0]) / d, (c[1] - from[1]) / d] as FramePoint] : []), [1, 0], [-1, 0]]
-  for (const [du, dv] of dirs) {
-    const p: FramePoint = [clampTo(...slab.uRange, from[0] + du * run), clampTo(...slab.vRange, from[1] + dv * run)]
-    if (dist(p, from) >= MIN_RUN_M) return roundUV(p)
+export const maxStreetRun = (riseM: number): number => Math.max(MAX_STREET_RUN_M, RUN_PER_RISE * Math.abs(riseM))
+
+const unit = (from: FramePoint, to: FramePoint): FramePoint | null => {
+  const d = dist(from, to)
+  return d < 1e-6 ? null : [(to[0] - from[0]) / d, (to[1] - from[1]) / d]
+}
+
+/** The landing on a slab: along the line from the entrance toward the slab center (then toward its nearest
+ *  point, then along either way of u), the first point inside the slab at a run between RUN_PER_RISE x rise
+ *  (at least MIN_RUN_M) and the cap that is clear of the landings already taken. */
+function slabLanding(slab: SlabPlan, from: FramePoint, minRun: number, maxRun: number, free: (p: FramePoint) => boolean): FramePoint | null {
+  const dirs = [unit(from, slabCenter(slab)), unit(from, nearestInSlab(slab, from, SLAB_INSET_M)), [1, 0] as FramePoint, [-1, 0] as FramePoint]
+  for (const lo of [minRun, MIN_RUN_M]) {
+    for (const dir of dirs) {
+      if (!dir) continue
+      for (let s = lo; s <= maxRun + 1e-9; s += SEARCH_STEP_M) {
+        const p: FramePoint = [from[0] + dir[0] * s, from[1] + dir[1] * s]
+        if (inSlab(slab, p, SLAB_INSET_M) && free(p)) return roundUV(p)
+      }
+    }
   }
   return null
 }
@@ -53,38 +71,51 @@ export interface StairLevels {
   platform: Level
 }
 
-/** One stair (a ramp for a Ramp row) per entrance that is not an elevator or escalator entrance. Throws when an
- *  entrance has nowhere to land; long runs go to `log`. */
+/** The platform a street stair goes to without a mezzanine: the one nearest the entrance across the tracks. */
+export const nearerPlatform = (ctx: TemplateCtx, at: FramePoint): PlatformGeom =>
+  [...ctx.platforms].sort((a, b) => Math.abs(a.centerV - at[1]) - Math.abs(b.centerV - at[1]) || a.index - b.index)[0]!
+
+/** One stair (a ramp for a Ramp row) per entrance that is not an elevator or escalator entrance, landing on the
+ *  nearest slab (or the nearer platform) no farther than maxStreetRun, never on another stair's landing.
+ *  Entrances with nowhere to land are returned in `unplaced`; runs over LONG_RUN_M go to `log`. */
 export function streetStairs(
   ctx: TemplateCtx,
   entrances: readonly PlanEntrance[],
   slabs: readonly SlabPlan[],
   levels: StairLevels,
   log: string[],
-): AuthoredConnector[] {
-  return entrances.flatMap((e, i): AuthoredConnector[] => {
+): { connectors: AuthoredConnector[]; unplaced: PlanEntrance[] } {
+  const taken: FramePoint[] = []
+  const unplaced: PlanEntrance[] = []
+  const free = (p: FramePoint): boolean => taken.every((q) => dist(p, q) >= LANDING_GAP_M)
+  const connectors = entrances.flatMap((e): AuthoredConnector[] => {
     if (MACHINE_ENTRANCE_TYPES.has(e.row.type)) return []
     const kind = e.row.type === 'Ramp' ? 'ramp' : 'stair'
     const street: End = { end: { entrance: e.id }, y: 0 }
+    const level = levels.mezzanine ?? levels.platform
+    const minRun = Math.max(MIN_RUN_M, RUN_PER_RISE * Math.abs(level.y))
+    const maxRun = maxStreetRun(level.y)
     let landing: FramePoint | null
-    let level: Level
     if (levels.mezzanine) {
-      level = levels.mezzanine
-      const slab = slabs.find((s) => s.entrances.includes(i))
+      const slab = nearestSlab(slabs, e.at)
       if (!slab) throw new Error(`entrance ${e.id} has no slab`)
-      landing = slabLanding(slab, e.at, RUN_PER_RISE * Math.abs(level.y))
+      landing = slabLanding(slab, e.at, minRun, maxRun, free)
     } else {
-      level = levels.platform
-      const platform = [...ctx.platforms].sort((a, b) => Math.abs(a.centerV - e.at[1]) - Math.abs(b.centerV - e.at[1]))[0]!
+      const platform = nearerPlatform(ctx, e.at)
       const mid = (platform.uRange[0] + platform.uRange[1]) / 2
-      const run = RUN_PER_RISE * Math.abs(level.y)
-      landing = searchCenterline(platform, e.at[0] + Math.sign(mid - e.at[0]) * run, (p) => dist(p, e.at) >= MIN_RUN_M)
+      const ok = (p: FramePoint): boolean => dist(p, e.at) >= MIN_RUN_M && dist(p, e.at) <= maxRun && free(p)
+      landing = searchCenterline(platform, e.at[0] + Math.sign(mid - e.at[0]) * minRun, ok)
     }
-    if (!landing) throw new Error(`entrance ${e.id} (${e.row.type}): no landing at least ${MIN_RUN_M} m away on the ${level.id} level`)
+    if (!landing) {
+      unplaced.push(e)
+      return []
+    }
+    taken.push(landing)
     const run = dist(landing, e.at)
     if (run > LONG_RUN_M) log.push(`${ctx.stationId} ${e.id}: street stair runs ${run.toFixed(0)} m`)
     return [connector(`st-${e.id}`, kind, STREET_STAIR_WIDTH_M, street, { end: { level: level.id, at: landing }, y: level.y })]
   })
+  return { connectors, unplaced }
 }
 
 /** Plan ends of a slab-to-platform stair: the slab end just inside the slab edge facing the platform's middle,
@@ -110,7 +141,8 @@ function levelRun(slab: SlabPlan, platform: PlatformGeom, run: number): { slabEn
 
 /** One stair from each slab to each platform it can reach; throws when a platform is reached by none. */
 export function levelStairs(ctx: TemplateCtx, slabs: readonly SlabPlan[], mezzanine: Level, platformLevel: Level): AuthoredConnector[] {
-  const run = RUN_PER_RISE * Math.abs(platformLevel.y - mezzanine.y)
+  // Sized for the drawn rise (the renderer exaggerates y), so the stair stays under about 40 degrees as drawn.
+  const run = RUN_PER_RISE * DRAWN_Y_SCALE * Math.abs(platformLevel.y - mezzanine.y)
   const out: AuthoredConnector[] = []
   for (const platform of ctx.platforms) {
     let reached = false
