@@ -137,6 +137,10 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json` (about 57 KB gzipped; the build fails above 60 KB).
+- **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
+  opens or updates one PR on `chore/data-refresh` when `npm run data` changes
+  `public/data`. The workflow runs typecheck, tests, and build before pushing, but the
+  PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).
 - **Station interiors are hand-authored per station.** They're merged with OSM platform
   polygons, NY Open Data entrances, and E&E elevator/escalator data. The starter
   stations are Bedford Av, 1 Av, 96 St (Q), and Park Pl.

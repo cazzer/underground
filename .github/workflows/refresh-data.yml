@@ -1,0 +1,234 @@
+name: Refresh GTFS data
+
+# Regenerates public/data from the MTA static GTFS zip and opens (or updates) one PR
+# when the output changed. Needs Settings > Actions > General > "Allow GitHub Actions
+# to create and approve pull requests".
+#
+# Two jobs so the write token never sits next to npm:
+#   generate  read-only; runs npm (data, typecheck, test, build); uploads public/data
+#   publish   write token; never runs npm; commits the artifact and opens/updates the PR
+#
+# GitHub disables scheduled workflows after 60 days without repo activity; re-enable
+# in the Actions tab (or push a commit) if the daily run stops appearing.
+on:
+  schedule:
+    - cron: '17 7 * * *' # daily, 07:17 UTC (about 2-3 am New York), off the :00 rush
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Explicit bash so every run step gets -eo pipefail (a failing `npm run data | tee` fails the step).
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+env:
+  FEED_URL: https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip
+  BRANCH: chore/data-refresh
+  BOT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+jobs:
+  generate:
+    # Only on the default branch (a dispatch from another branch does nothing).
+    # The schedule event has no repository object, hence the fallback.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch || 'main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      old_version: ${{ steps.state.outputs.old_version }}
+      new_version: ${{ steps.diff.outputs.new_version }}
+      last_modified: ${{ steps.state.outputs.last_modified }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Record current feed state
+        id: state
+        run: |
+          # Values reach $GITHUB_OUTPUT, so strip everything but a safe character set.
+          old=$(node -p "require('./public/data/stations.json').feedVersion" | head -n1 | tr -cd '[:alnum:]._-')
+          # Informational only; the diff below decides whether anything changed.
+          lm=$({ curl -sIf "$FEED_URL" || true; } | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified: *//p' | head -n1 | tr -cd '[:alnum:] ,:-')
+          echo "old_version=$old" >> "$GITHUB_OUTPUT"
+          echo "last_modified=$lm" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate public/data
+        run: npm run data 2>&1 | tee "$RUNNER_TEMP/data.log"
+
+      - name: Check for changes
+        id: diff
+        run: |
+          new=$(node -p "require('./public/data/stations.json').feedVersion" | head -n1 | tr -cd '[:alnum:]._-')
+          echo "new_version=$new" >> "$GITHUB_OUTPUT"
+          changed=$({ git diff --name-only; git ls-files --others --exclude-standard; })
+          if [ -z "$changed" ]; then
+            echo "No change (feed $new)."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The refresh may only touch public/data.
+          stray=$(printf '%s\n' "$changed" | grep -v '^public/data/' || true)
+          if [ -n "$stray" ]; then
+            echo "::error::Unexpected changes outside public/data:"
+            echo "$stray"
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # A PR opened with GITHUB_TOKEN doesn't trigger the PR check workflow, so run the checks here.
+      - name: Typecheck
+        if: steps.diff.outputs.changed == 'true'
+        run: npm run typecheck
+      - name: Test
+        if: steps.diff.outputs.changed == 'true'
+        run: npm test
+      - name: Build
+        if: steps.diff.outputs.changed == 'true'
+        run: npm run build
+
+      - name: Stage artifact
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          cp -R public/data "$RUNNER_TEMP/out/data"
+          cp "$RUNNER_TEMP/data.log" "$RUNNER_TEMP/out/data.log"
+      - uses: actions/upload-artifact@v7
+        if: steps.diff.outputs.changed == 'true'
+        with:
+          name: gtfs-data
+          path: ${{ runner.temp }}/out
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: generate
+    if: needs.generate.outputs.changed == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch || 'main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # The schedule event has no repository object, so fall back to main.
+      BASE: ${{ github.event.repository.default_branch || 'main' }}
+      OLD_VERSION: ${{ needs.generate.outputs.old_version }}
+      NEW_VERSION: ${{ needs.generate.outputs.new_version }}
+      LAST_MODIFIED: ${{ needs.generate.outputs.last_modified }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the author guard walks main..branch
+      - uses: actions/download-artifact@v8
+        with:
+          name: gtfs-data
+          path: ${{ runner.temp }}/out
+
+      - name: Commit and push
+        id: push
+        run: |
+          # Any failing command aborts the step (fail closed); only greps below tolerate "no match".
+          BASE=${BASE:-main}
+          git rev-parse --verify --quiet "origin/$BASE^{commit}" > /dev/null
+
+          # Artifact allowlist: plain files only, named *.json, README.md, or LICENSE-ODbL.md.
+          art="$RUNNER_TEMP/out/data"
+          odd=$(find "$art" ! -type d ! -type f)
+          bad=$(find "$art" -type f ! -name '*.json' ! -name README.md ! -name LICENSE-ODbL.md)
+          if [ -n "$odd$bad" ]; then
+            echo "::error::Artifact has files outside the allowlist:"
+            printf '%s\n' "$odd" "$bad" | grep -v '^$'
+            exit 1
+          fi
+
+          rm -rf public/data
+          cp -R "$art" public/data
+          git config user.name 'github-actions[bot]'
+          git config user.email "$BOT_EMAIL"
+          git checkout -B "$BRANCH"
+          git add -A public/data
+
+          # Belt and braces: the artifact may only change public/data.
+          stray=$(git status --porcelain --no-renames | grep -v '^.. public/data/' || true)
+          if [ -n "$stray" ]; then
+            echo "::error::Unexpected changes outside public/data:"
+            echo "$stray"
+            exit 1
+          fi
+          if git diff --cached --quiet; then
+            echo "$BASE already has this data; nothing to publish."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Force-push guard: only overwrite the branch if the bot alone wrote it.
+          lease=''
+          rc=0
+          git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+            echo "::error::git ls-remote failed (exit $rc)"
+            exit 1
+          fi
+          if [ "$rc" -eq 0 ]; then
+            git fetch origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+            # Author and committer of every commit on the branch must be the bot.
+            log=$(git log --format='%ae%n%ce' "origin/$BASE..origin/$BRANCH")
+            others=$(printf '%s\n' "$log" | grep -vxF "$BOT_EMAIL" | grep -v '^$' || true)
+            if [ -n "$others" ]; then
+              echo "::warning::$BRANCH has commits by someone other than the bot; leaving it alone."
+              echo "pushed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if git diff --quiet "origin/$BRANCH" -- public/data; then
+              echo "$BRANCH already has this data; nothing new."
+              echo "pushed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            lease=$(git rev-parse "origin/$BRANCH")
+          else
+            echo "$BRANCH does not exist yet."
+          fi
+
+          git commit -m "chore(data): refresh GTFS data ($OLD_VERSION -> $NEW_VERSION)"
+          git push --force-with-lease="$BRANCH:$lease" origin "$BRANCH"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the PR
+        if: steps.push.outputs.pushed == 'true'
+        run: |
+          {
+            echo "Regenerated \`public/data\` from \`$FEED_URL\`."
+            echo
+            echo "- feedVersion: \`$OLD_VERSION\` -> \`$NEW_VERSION\`"
+            echo "- Last-Modified: ${LAST_MODIFIED:-unknown}"
+            echo
+            echo "Typecheck, tests, and build passed on this data before the branch was pushed."
+            echo "The PR check workflow won't run on it (a PR opened with \`GITHUB_TOKEN\` doesn't"
+            echo "trigger workflows), so there is no check status on this PR."
+            echo
+            echo "Script output (gzip sizes):"
+            echo
+            echo '````'
+            tail -c 20000 "$RUNNER_TEMP/out/data.log"
+            echo '````'
+          } > "$RUNNER_TEMP/body.md"
+
+          BASE=${BASE:-main}
+          title="Refresh GTFS data ($NEW_VERSION)"
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
+            gh pr edit "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --head "$BRANCH" --base "$BASE" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          fi
