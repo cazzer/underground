@@ -17,7 +17,7 @@ export type BandResponse = { bands: [ShapeId, ShapeBands][] } | { error: string 
 /** The worker global, typed for the two members this uses (the project's lib is DOM, not WebWorker). */
 const scope = self as unknown as {
   onmessage: ((e: MessageEvent<BandRequest>) => void) | null
-  postMessage(message: BandResponse): void
+  postMessage(message: BandResponse, transfer?: Transferable[]): void
 }
 
 scope.onmessage = (e) => {
@@ -27,7 +27,13 @@ scope.onmessage = (e) => {
       for (let i = 0; i < s.xz.length; i += 2) points.push({ x: s.xz[i]!, z: s.xz[i + 1]! })
       return { id: s.id, routeId: s.routeId, direction: s.direction, primary: s.primary, line: buildPolyline(points) }
     })
-    scope.postMessage({ bands: [...corridorBands(shapes, e.data.routes)] })
+    const bands = [...corridorBands(shapes, e.data.routes)]
+    // Moved, not copied. A zero-length array may be the shared EMPTY_PROFILE's, which must not be detached.
+    const transfer = new Set<ArrayBuffer>()
+    for (const [, b] of bands) {
+      for (const p of [b.slot, b.half]) for (const a of [p.d, p.y]) if (a.length > 0) transfer.add(a.buffer as ArrayBuffer)
+    }
+    scope.postMessage({ bands }, [...transfer])
   } catch (err) {
     scope.postMessage({ error: err instanceof Error ? err.message : String(err) })
   }

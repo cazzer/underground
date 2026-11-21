@@ -13,11 +13,12 @@ import stationsRaw from '../../public/data/stations.json?raw'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
 import type { StationDepthsFile } from '../data/stationSchema'
 import { createBandView, writeBandView } from './bandOffset'
+import { buildSegmentGrid, cellIndex, segmentDistance } from './corridorHash'
 import { createTrackPoint, trackPointInto, type DrawnTrack } from './live/trackPoint'
 import { buildNetwork, type ShapePath } from './network'
 import { bandNetwork } from './networkBands'
 import { toGround } from './projection'
-import { pointAtDistance, projectForward } from './realtime/polyline'
+import { pointAtDistance } from './realtime/polyline'
 import { TRACK_OFFSET_M } from './trackOffset'
 
 const routes = JSON.parse(routesRaw) as RoutesFile
@@ -33,7 +34,18 @@ const { shapes: bandedShapes } = bandNetwork(network)
 const colourOf = new Map(routes.routes.map((r) => [r.id, r.color]))
 const PITCH_PX = 2.5
 const HEIGHT_PX = 844
-const STEP_M = 20
+const STEP_M = 40
+const REACH_M = 12
+const COS_MAX = Math.cos((15 * Math.PI) / 180)
+
+const primaries = bandedShapes.filter((s) => s.primary)
+/** Every primary's segments, gridded once, so a sample tests only the segments near it. */
+const grid = buildSegmentGrid(
+  primaries.map((s) => s.points),
+  primaries.map(() => 0),
+  REACH_M,
+  100,
+)
 
 const camera = new PerspectiveCamera(35, 390 / HEIGHT_PX, 10, 1e7)
 camera.up.set(0, 0, -1)
@@ -55,32 +67,31 @@ interface Overlap {
  */
 function overlap(distance: number, box: { minX: number; maxX: number; minZ: number; maxZ: number }, routeIds: readonly string[] | null): Overlap {
   const inBox = (p: { x: number; z: number }) => p.x > box.minX && p.x < box.maxX && p.z > box.minZ && p.z < box.maxZ
-  const shapes = bandedShapes.filter((s) => s.primary && (!routeIds || routeIds.includes(s.routeId)))
+  const walked = (s: ShapePath) => !routeIds || routeIds.includes(s.routeId)
   const out: Overlap = { shared: 0, hidden: 0, pairs: new Map() }
-  const near = new Map(
-    shapes.map((s) => {
-      const xs = s.points.map((p) => p.x)
-      const zs = s.points.map((p) => p.z)
-      const [x0, x1, z0, z1] = [Math.min(...xs) - 12, Math.max(...xs) + 12, Math.min(...zs) - 12, Math.max(...zs) + 12]
-      return [s, (p: { x: number; z: number }) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1] as const
-    }),
-  )
-  for (const s of shapes) {
-    const others = shapes.filter((o) => colourOf.get(o.routeId) !== colourOf.get(s.routeId))
+  primaries.forEach((s, si) => {
+    if (!walked(s)) return
     for (let d = 0; d < s.length; d += STEP_M) {
       const { point, heading } = pointAtDistance(s, d)
       if (!inBox(point)) continue
+      const c = cellIndex(grid, point.x, point.z)
+      if (c < 0) continue
       const hx = Math.sin(heading)
       const hz = -Math.cos(heading)
-      const beside: [ShapePath, number][] = []
-      for (const o of others) {
-        if (!near.get(o)!(point)) continue
-        const hit = projectForward(o, point, { segment: 0, t: 0 })
-        if (hit.offsetM > 12) continue
-        if (Math.cos(pointAtDistance(o, hit.distance).heading - heading) < Math.cos((15 * Math.PI) / 180)) continue
-        beside.push([o, hit.distance])
+      // The nearest segment of each other-colour primary within reach heading the same way: [distance, along].
+      const beside = new Map<number, [number, number]>()
+      for (let j = grid.start[c]!; j < grid.start[c + 1]!; j++) {
+        const seg = grid.items[j]!
+        const o = grid.owner[seg]!
+        const other = primaries[o]!
+        if (o === si || !walked(other) || colourOf.get(other.routeId) === colourOf.get(s.routeId)) continue
+        if (grid.ux[seg]! * hx + grid.uz[seg]! * hz < COS_MAX) continue
+        const dist = segmentDistance(grid, seg, point.x, point.z)
+        if (dist > REACH_M || dist >= (beside.get(o)?.[0] ?? Infinity)) continue
+        const t = Math.min(Math.max((point.x - grid.ax[seg]!) * grid.ux[seg]! + (point.z - grid.az[seg]!) * grid.uz[seg]!, 0), grid.len[seg]!)
+        beside.set(o, [dist, grid.startD[seg]! + t])
       }
-      if (beside.length === 0) continue
+      if (beside.size === 0) continue
       out.shared += STEP_M
       camera.position.set(point.x, distance, point.z + 1e-3)
       camera.lookAt(point.x, 0, point.z)
@@ -88,16 +99,16 @@ function overlap(distance: number, box: { minX: number; maxX: number; minZ: numb
       writeBandView(view, camera.matrixWorldInverse.elements, camera.projectionMatrix.elements[5]!, HEIGHT_PX, distance, PITCH_PX, TRACK_OFFSET_M)
       const metersPerPx = (2 / (camera.projectionMatrix.elements[5]! * HEIGHT_PX)) * distance
       trackPointInto(drawn(s), d, view, a)
-      const hit = beside.find(([o, dO]) => {
-        trackPointInto(drawn(o), dO, view, b)
+      const hit = [...beside].find(([o, [, dO]]) => {
+        trackPointInto(drawn(primaries[o]!), dO, view, b)
         return Math.abs((b.x - a.x) * hz - (b.z - a.z) * hx) / metersPerPx < 1
       })
       if (!hit) continue
       out.hidden += STEP_M
-      const key = [s.routeId, hit[0].routeId].sort().join('/')
+      const key = [s.routeId, primaries[hit[0]]!.routeId].sort().join('/')
       out.pairs.set(key, (out.pairs.get(key) ?? 0) + STEP_M)
     }
-  }
+  })
   return out
 }
 

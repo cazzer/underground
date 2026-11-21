@@ -53,6 +53,9 @@ function bandsHere(network: Network, signal: AbortSignal): Promise<BandedShapes>
   })
 }
 
+/** The worker gets this long to reply (live trains wait for the bands) before the main thread takes over. */
+const WORKER_DEADLINE_MS = 8000
+
 /**
  * Resolves with the banded shapes (or, after a logged failure, the unbanded ones); rejects only when `signal`
  * aborts, which terminates the worker.
@@ -61,20 +64,31 @@ export function loadBands(network: Network, signal: AbortSignal): Promise<Banded
   if (typeof Worker === 'undefined') return bandsHere(network, signal)
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./bandWorker.ts', import.meta.url), { type: 'module' })
-    const fallBack = (why: string) => {
+    /** Stops the worker, its deadline and the abort listener: the first reply, failure, deadline or abort wins. */
+    let settled = false
+    const settle = (): boolean => {
+      if (settled) return false
+      settled = true
       worker.terminate()
+      clearTimeout(deadline)
+      signal.removeEventListener('abort', onAbort)
+      return true
+    }
+    const fallBack = (why: string) => {
+      if (!settle()) return
       console.error(`Band worker failed (${why}); finding corridors on the main thread`)
       bandsHere(network, signal).then(resolve, reject)
     }
-    signal.addEventListener('abort', () => {
-      worker.terminate()
-      reject(signal.reason)
-    })
+    const onAbort = () => {
+      if (settle()) reject(signal.reason)
+    }
+    const deadline = setTimeout(() => fallBack(`no reply in ${WORKER_DEADLINE_MS / 1000} s`), WORKER_DEADLINE_MS)
+    signal.addEventListener('abort', onAbort, { once: true })
     worker.onerror = (e) => fallBack(e.message || 'worker error')
     worker.onmessageerror = () => fallBack('unreadable reply')
     worker.onmessage = (e: MessageEvent<BandResponse>) => {
-      worker.terminate()
       if ('error' in e.data) return fallBack(e.data.error)
+      if (!settle()) return
       const bands = new Map<ShapeId, ShapeBands>(e.data.bands.map(([id, b]) => [id, { slot: profile(b.slot), half: profile(b.half) }]))
       try {
         resolve(bandShapes(network, bands))

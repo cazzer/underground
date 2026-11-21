@@ -128,7 +128,8 @@ export function orderFromVotes(votes: OrderVotes): Int32Array {
     let from = -1
     let to = -1
     for (let f = 0; f < GROUPS; f++) {
-      // Nearest places first, so of equal gains the shortest move wins and unvoted pairs keep rank order.
+      // Nearest places first, so of equal gains the shortest move wins (the pass below puts unvoted neighbours back
+      // in rank order).
       for (let step = 1; step < GROUPS; step++) {
         for (const t of [f - step, f + step]) {
           if (t < 0 || t >= GROUPS) continue

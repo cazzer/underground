@@ -102,7 +102,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
     instance is scaled to 0, so it has no marker; `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
-    `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
+    `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, `theme.train` if `routeLineMix.amount` is 1 (mono lines); stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
     `theme.trainSelectedRim` rim. Its dot is drawn on its own above every other dot; its cars get the top widen
     level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the

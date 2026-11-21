@@ -9,6 +9,7 @@ import shapesRaw from '../../public/data/shapes.json?raw'
 import stationsRaw from '../../public/data/stations.json?raw'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
 import type { StationDepthsFile } from '../data/stationSchema'
+import { buildSegmentGrid, cellIndex, segmentDistance } from './corridorHash'
 import { bandKey } from './corridors'
 import { buildNetwork, type ShapePath } from './network'
 import { bandNetwork } from './networkBands'
@@ -79,30 +80,40 @@ describe('real public/data: shared corridors', () => {
     expectBundle('F20', ['F', 'G'])
   })
 
-  /** Calls `visit(a, d, b, dB)` where primary banded shapes of different band keys run within `withinM`, heading the same way. */
+  /**
+   * Calls `visit(a, d, b, dB)`, in order of `d` along each `a`, where primary banded shapes of different band keys
+   * run within `withinM` (b's nearest segment, from a segment grid), heading within 10 degrees.
+   */
   function coRunning(stepM: number, withinM: number, visit: (a: ShapePath, d: number, b: ShapePath, dB: number) => void) {
     const shapes = bandedShapes.filter((s) => s.primary && s.bands.slot.d.length > 0)
-    const box = (s: ShapePath) => {
-      const xs = s.points.map((p) => p.x)
-      const zs = s.points.map((p) => p.z)
-      return [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)] as const
-    }
-    const boxes = new Map(shapes.map((s) => [s, box(s)]))
-    for (const a of shapes) {
-      const ba = boxes.get(a)!
-      for (const b of shapes) {
-        const bb = boxes.get(b)!
-        if (a === b || keyOf.get(b.routeId) === keyOf.get(a.routeId)) continue
-        if (ba[0] > bb[1] + withinM || bb[0] > ba[1] + withinM || ba[2] > bb[3] + withinM || bb[2] > ba[3] + withinM) continue
-        for (let d = 0; d < a.length; d += stepM) {
-          const { point, heading } = pointAtDistance(a, d)
-          const hit = projectForward(b, point, { segment: 0, t: 0 })
-          if (hit.offsetM > withinM) continue
-          if (Math.cos(pointAtDistance(b, hit.distance).heading - heading) < Math.cos((10 * Math.PI) / 180)) continue
-          visit(a, d, b, hit.distance)
+    const grid = buildSegmentGrid(
+      shapes.map((s) => s.points),
+      shapes.map(() => 0),
+      withinM,
+      100,
+    )
+    const cosMax = Math.cos((10 * Math.PI) / 180)
+    shapes.forEach((a, ai) => {
+      for (let d = 0; d < a.length; d += stepM) {
+        const { point, heading } = pointAtDistance(a, d)
+        const c = cellIndex(grid, point.x, point.z)
+        if (c < 0) continue
+        const hx = Math.sin(heading)
+        const hz = -Math.cos(heading)
+        const nearest = new Map<number, [number, number]>()
+        for (let j = grid.start[c]!; j < grid.start[c + 1]!; j++) {
+          const seg = grid.items[j]!
+          const bi = grid.owner[seg]!
+          if (bi === ai || keyOf.get(shapes[bi]!.routeId) === keyOf.get(a.routeId)) continue
+          const dist = segmentDistance(grid, seg, point.x, point.z)
+          if (dist > withinM || dist >= (nearest.get(bi)?.[0] ?? Infinity)) continue
+          const t = Math.min(Math.max((point.x - grid.ax[seg]!) * grid.ux[seg]! + (point.z - grid.az[seg]!) * grid.uz[seg]!, 0), grid.len[seg]!)
+          // The heading test is on b's nearest segment, as it was on b's heading at the nearest point.
+          nearest.set(bi, [dist, grid.ux[seg]! * hx + grid.uz[seg]! * hz >= cosMax ? grid.startD[seg]! + t : NaN])
         }
+        for (const [bi, [, dB]] of nearest) if (!Number.isNaN(dB)) visit(a, d, shapes[bi]!, dB)
       }
-    }
+    })
   }
 
   it('never puts two routes heading the same way on the same slot where they run within 6 m', () => {
@@ -124,7 +135,8 @@ describe('real public/data: shared corridors', () => {
   it('never swaps two co-running routes from one side to the other', () => {
     const swaps = new Set<string>()
     const last = new Map<string, { side: number; d: number }>()
-    coRunning(50, 8, (a, d, b, dB) => {
+    // A 100 m step: a swap back within the 1500 m window still shows.
+    coRunning(100, 8, (a, d, b, dB) => {
       const diff = profileAt(a.bands.slot, d) - profileAt(b.bands.slot, dB)
       if (Math.abs(diff) < 0.4) return
       const key = `${a.id}/${b.id}`
