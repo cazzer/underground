@@ -38,7 +38,7 @@ via `.github/workflows/deploy.yml` (Actions to Pages).
 - `public/data/`: (planned) preprocessed static JSON
 - `scripts/`: (planned) data preprocessing
 - `worker/`: (planned) Cloudflare Worker CORS proxy for MTA realtime feeds
-- `docs/research/`: research notes
+- `docs/research/`: research notes (`data-sources.md`)
 
 ## Hard rules
 - Files stay at or under 300 lines (aim for 200). Split before exceeding.
@@ -91,6 +91,16 @@ How to file:
 Reviews with nits only can be fixed in-loop without filing.
 
 ## Data
-Research is pending in `docs/research/data-sources.md` (MTA static GTFS, GTFS-realtime
-feeds, station geometry sources). Until it lands, use only `src/data/sample.ts`.
-Do not fetch real MTA data yet.
+Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
+- **The client never fetches MTA servers directly.** The MTA terms require serving
+  through a non-MTA host, even though the feeds send ACAO `*`. Realtime goes through
+  the `worker/` proxy, which returns decoded JSON with a 15 s edge cache.
+- **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
+  interpolated along shapes from TripUpdate times and scheduled segment run times.
+- **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
+  into `public/data/*.json` (about 35 KB gzipped).
+- **Station interiors are hand-authored per station.** They're merged with OSM platform
+  polygons, NY Open Data entrances, and E&E elevator/escalator data. The starter
+  stations are Bedford Av, 1 Av, 96 St (Q), and Park Pl.
+- **Attribution.** Credit MTA and show "© OpenStreetMap contributors". Include a
+  "may not be real time" notice. Don't use the MTA logo, route bullets, or the map.
