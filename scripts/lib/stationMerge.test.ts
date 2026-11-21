@@ -95,6 +95,9 @@ describe('entrance links', () => {
     })
     expect(out.entrances.find((e) => e.id === 'stair-ent')!.connectors).toEqual(['ES1', 'st-street'])
   })
+  it('reports two connectors with one id on one entrance as a duplicate id, not as two entrances', () => {
+    expect(() => build((f) => { f.authored.connectors[1] = { ...f.authored.connectors[0]! } })).toThrow(/duplicate id st-street/)
+  })
   it('rejects a connector listed by two entrances, naming it and both entrances', () => {
     const out = build()
     const entrances = new Map(out.entrances.map((e) => [e.id, { ...e, connectors: [...e.connectors] }]))
@@ -247,6 +250,13 @@ describe('elevated station (the street is the lowest level)', () => {
     const ent = out.entrances.find((e) => e.id === 'elev-ent')!
     expect(el1).toMatchObject({ kind: 'elevator', lower: { x: ent.x, z: ent.z, level: 'street' }, upper: { x: ent.x, z: ent.z, level: 'platform' } })
     expect(ent.connectors).toEqual(['EL1'])
+  })
+  it('an E&E escalator from the street sits on its entrance, the street at its lower end', () => {
+    const out = elevated()
+    const es2 = connector(out, 'ES2')
+    const ent = out.entrances.find((e) => e.id === 'esc-ent')!
+    expect(es2).toMatchObject({ kind: 'escalator', travel: 'up', lower: { x: ent.x, z: ent.z, level: 'street' }, upper: { x: ent.x, z: ent.z, level: 'house' } })
+    expect(ent.connectors).toEqual(['ES2'])
   })
   it('rejects an {entrance} upper end, which would be below its lower end', () => {
     expect(() => elevated((f) => { f.authored.connectors[1]!.upper = { entrance: 'stair-ent' } })).toThrow(/st-plat\): lower end must be below/)

@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest'
 import type { StationDepthsFile, StationInterior } from '../../src/data/stationSchema.ts'
 import { toStableJson } from './stableJson.ts'
 import { buildStationDepths, DEPTHS_OPEN_NY_NOTE } from './stationDepths.ts'
+import { GENERATED_DEPTHS_FILE, NOT_INTERIOR_FILES } from './stationIndex.ts'
 import { OPEN_NY_NOTE } from './stationMerge.ts'
 
 const interiorDir = new URL('../../public/data/stations/', import.meta.url)
-const GENERATED_DEPTHS = 'depths-generated.json'
+const GENERATED_DEPTHS = GENERATED_DEPTHS_FILE
 const all = readdirSync(interiorDir)
-  .filter((f) => f.endsWith('.json') && f !== 'index.json' && f !== GENERATED_DEPTHS)
+  .filter((f) => f.endsWith('.json') && !NOT_INTERIOR_FILES.has(f))
   .map((f) => JSON.parse(readFileSync(new URL(f, interiorDir), 'utf8')) as StationInterior)
 const interiors = all.filter((i) => !i.generated)
 const l08 = interiors.find((i) => i.stationId === 'L08')!

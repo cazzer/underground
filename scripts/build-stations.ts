@@ -1,27 +1,32 @@
 /** Builds public/data/stations/<id>.json from data/stations/<id>.authored.json plus the pinned
- *  data/stations/<id>.sources.json, public/data/stations/index.json (which stations have an interior), and public/data/station-depths.json (every platform track's ends and rail
+ *  data/stations/<id>.sources.json, and generated ones from the station catalog (data/stations/catalog/) with the
+ *  committed public/data/shapes.json and stations.json (scripts/lib/generate.ts; a hand-authored station wins),
+ *  public/data/stations/index.json (which stations have an interior), and public/data/station-depths.json (every platform track's ends and rail
  *  height) from the authored interiors; public/data/stations/depths-generated.json is the same for the generated ones. Offline: the network is only used by fetch-station-sources.ts.
  *  The only IO here; the merge is scripts/lib/stationMerge.ts. Everything is built in memory first. */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import type { StationInterior } from '../src/data/stationSchema.ts'
-import type { AuthoredStation, GeneratedStation, StationSources } from './lib/stationInputs.ts'
+import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
 import {
   checkBudget, checkFileCap, checkIndexCap, committedGzip, GENERATED_DEPTHS_GZIP_CAP_BYTES, GZIP_BUDGET_BYTES, INDEX_GZIP_CAP_BYTES,
   renderedFile,
 } from './lib/budget.ts'
+import { generateStations } from './lib/generate.ts'
+import { CATALOG_FILES, generatorCatalog, generatorLines } from './lib/generatorInputs.ts'
 import { buildStationDepths } from './lib/stationDepths.ts'
-import { buildStationIndex } from './lib/stationIndex.ts'
+import { buildStationIndex, GENERATED_DEPTHS_FILE, INDEX_FILE } from './lib/stationIndex.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
 import { markGenerated } from './lib/stationProvenance.ts'
 import { toStableJson } from './lib/stableJson.ts'
 
 const IN_DIR = new URL('../data/stations/', import.meta.url)
+const CATALOG_DIR = new URL('../data/stations/catalog/', import.meta.url)
 const OUT_DIR = new URL('../public/data/stations/', import.meta.url)
 const DATA_DIR = new URL('../public/data/', import.meta.url)
 const DEPTHS = 'station-depths.json'
-const INDEX = 'index.json'
-const GENERATED_DEPTHS = 'depths-generated.json'
+const INDEX = INDEX_FILE
+const GENERATED_DEPTHS = GENERATED_DEPTHS_FILE
 const SUFFIX = '.authored.json'
 
 function readJson<T>(url: URL): T {
@@ -52,8 +57,14 @@ function main(): void {
   if (ids.length === 0) throw new Error(`No *${SUFFIX} files in ${IN_DIR.pathname}`)
   const authoredInteriors = ids.map(buildAuthored)
 
-  // SEAM (9wc.4): the template generator fills this. A hand-authored station always wins over a generated one.
-  const generated: GeneratedStation[] = []
+  // A hand-authored station always wins over a generated one.
+  const catalog = generatorCatalog(Object.fromEntries(CATALOG_FILES.map((f) => [f, readJson(new URL(f, CATALOG_DIR))])) as Record<(typeof CATALOG_FILES)[number], unknown>)
+  const lines = generatorLines(readJson(new URL('shapes.json', DATA_DIR)), readJson(new URL('stations.json', DATA_DIR)))
+  const result = generateStations(catalog, lines)
+  for (const line of result.log) console.log(`generate: ${line}`)
+  console.log(`generate: ${result.stations.length} stations generated, ${result.skipped.length} skipped`)
+  for (const s of result.skipped) console.log(`generate: skipped ${s.stationId}: ${s.reason}`)
+  const generated = result.stations
   const authoredIds = new Set(ids)
   const skipped = generated.filter((g) => authoredIds.has(g.authored.stationId)).map((g) => g.authored.stationId)
   if (skipped.length > 0) console.log(`generated stations skipped (hand-authored wins): ${skipped.join(', ')}`)

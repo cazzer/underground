@@ -1,0 +1,123 @@
+/** Assembles one generated station from its template's levels: slices the sources, assigns tracks, plans
+ *  machines, slabs and stairs, and returns the same AuthoredStation + StationSources pair a hand-authored
+ *  station has, plus its provenance. Rows the merge can't take are dropped from the slice and named in the
+ *  notes and `log`. Pure. */
+import type { Level, LevelId } from '../../../src/data/stationSchema.ts'
+import type { DepthSource } from '../depth.ts'
+import { distanceToRing } from '../stationGeometry.ts'
+import type { OsmCatalogWay } from '../catalogTypes.ts'
+import type { AuthoredStation, GeneratedStation } from '../stationInputs.ts'
+import type { TemplateCtx } from './context.ts'
+import { MACHINE_ENTRANCE_TYPES, machineOverrides, planMachines } from './machines.ts'
+import type { PlanEntrance } from './machines.ts'
+import { mezzanineSlabs, slabOutline } from './slabs.ts'
+import { sliceSources } from './slice.ts'
+import type { GeneratorCatalog } from './slice.ts'
+import { levelStairs, streetStairs } from './stairs.ts'
+import { assignTracks } from './tracks.ts'
+import type { MapTrackLines } from './tracks.ts'
+
+export interface TemplateLevels {
+  street: Level
+  mezzanine: Level | null
+  platform: Level
+  /** Depth source of each non-street level. */
+  depths: Record<LevelId, DepthSource>
+}
+
+export interface TemplateInputs {
+  catalog: GeneratorCatalog
+  lines: MapTrackLines
+  trackWays: ReadonlyMap<string, OsmCatalogWay>
+}
+
+/** An entrance row this far from every platform is taken for a data error (R44 lists a stair 850 m away). */
+export const FAR_ENTRANCE_M = 200
+
+const pad = (n: number): string => String(n).padStart(2, '0')
+
+export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inputs: TemplateInputs, log: string[]): GeneratedStation {
+  const wayIds = ctx.platforms.flatMap((p) => p.ways.map((w) => w.id)).sort((a, b) => a - b)
+  const slice = sliceSources(inputs.catalog, ctx.row, wayIds)
+  const dropped = [...slice.dropped]
+  const kinds = new Set([levels.street, levels.mezzanine, levels.platform].flatMap((l) => (l ? [l.kind] : [])))
+
+  const all: PlanEntrance[] = []
+  for (const row of slice.sources.entrances.rows) {
+    const at = ctx.uv(row.lat, row.lon)
+    const away = Math.min(...ctx.platforms.flatMap((p) => p.ways.map((w) => distanceToRing(at, w.ring))))
+    if (away > FAR_ENTRANCE_M) dropped.push(`entrance row ${row.lat},${row.lon} (${row.type}): ${away.toFixed(0)} m from every platform`)
+    else all.push({ id: '', row, at })
+  }
+  const machines = planMachines(ctx, slice.sources.equipment.rows, all, kinds)
+  dropped.push(...machines.dropped)
+  // An elevator or escalator entrance with no machine of its kind can't be linked (checkEntranceLinks).
+  const linked = new Set(machines.plans.flatMap((p) => (p.entrance === undefined ? [] : [p.entrance])))
+  const keptIndex = new Map<number, number>()
+  const entrances: PlanEntrance[] = []
+  all.forEach((e, i) => {
+    if (MACHINE_ENTRANCE_TYPES.has(e.row.type) && !linked.has(i)) {
+      dropped.push(`entrance row ${e.row.lat},${e.row.lon} (${e.row.type}): no ${e.row.type.toLowerCase()} in the E&E rows reaches the street here`)
+      return
+    }
+    keptIndex.set(i, entrances.length)
+    entrances.push({ ...e, id: `ent-${pad(entrances.length + 1)}` })
+  })
+  const plans = machines.plans.map((p) => (p.entrance === undefined ? p : { ...p, entrance: keptIndex.get(p.entrance)! }))
+
+  const { tracks, swapped } = assignTracks(ctx, inputs.lines, inputs.trackWays)
+  const platformFor = { N: tracks.find((t) => t.stopId.endsWith('N'))!.platform, S: tracks.find((t) => t.stopId.endsWith('S'))!.platform }
+  const atEntrance = new Set(plans.filter((p) => p.entrance !== undefined && !p.kinds.includes('platform')).map((p) => p.entrance!))
+  const slabs = levels.mezzanine ? mezzanineSlabs(ctx, entrances.map((e) => e.at), atEntrance) : []
+  const equipment = machineOverrides(ctx, plans, entrances, { slabs, platformFor })
+  const connectors = [
+    ...streetStairs(ctx, entrances, slabs, levels, log),
+    ...(levels.mezzanine ? levelStairs(ctx, slabs, levels.mezzanine, levels.platform) : []),
+  ]
+
+  const platforms = ctx.platforms.flatMap((p) => {
+    // A platform split into several OSM ways keeps its tracks on the longest one, so each stop has one track.
+    const length = (ring: [number, number][]): number => Math.max(...ring.map((q) => q[0])) - Math.min(...ring.map((q) => q[0]))
+    const main = [...p.ways].sort((a, b) => length(b.ring) - length(a.ring) || a.id - b.id)[0]!
+    return p.ways.map((w) => ({
+      id: `way-${w.id}`,
+      level: levels.platform.id,
+      osmWay: w.id,
+      tracks: w === main ? tracks.filter((t) => t.platform === p).map((t) => ({ stopId: t.stopId, path: t.path })) : [],
+    }))
+  })
+  const slabName = levels.mezzanine?.name ?? 'Mezzanine'
+  for (const d of dropped) log.push(`${ctx.stationId} dropped ${d}`)
+  const notes = [
+    `Generated from the ${ctx.archetype} template (confidence ${ctx.confidence.toFixed(2)}); not hand-checked.`,
+    `Frame: u along bearing ${ctx.bearingDeg.toFixed(1)} deg (the platforms' axis) from the platforms' center, v to its right.`,
+    `Tracks: ${swapped ? 'N on the +v side' : 'N on the -v side'}, chosen by the map's direction lines.`,
+    'UNVERIFIED: slab extents, stair positions and runs, and machine positions are template guesses.',
+    ...tracks.flatMap((t) => (t.note ? [`UNVERIFIED: ${t.note}`] : [])),
+    ...dropped.map((d) => `Dropped: ${d}`),
+  ]
+  const authored: AuthoredStation = {
+    stationId: ctx.stationId,
+    name: ctx.name,
+    notes,
+    frame: { anchor: { lat: ctx.anchor.lat, lon: ctx.anchor.lon }, bearingDeg: ctx.bearingDeg },
+    fetch: { osmWays: wayIds, entrancesGtfsStopId: ctx.stationId, equipmentStationMrn: ctx.row.stationId },
+    levels: [levels.street, ...(levels.mezzanine ? [levels.mezzanine] : []), levels.platform],
+    platforms,
+    slabs: slabs.map((s, k) => ({ id: s.id, level: levels.mezzanine!.id, name: slabs.length > 1 ? `${slabName} ${k + 1}` : slabName, outline: slabOutline(s) })),
+    entrances: entrances.map((e) => ({ id: e.id, source: [e.row.lat, e.row.lon] })),
+    connectors,
+    equipment,
+    fareLines: [],
+  }
+  const sources = {
+    ...slice.sources,
+    entrances: { ...slice.sources.entrances, rows: entrances.map((e) => e.row) },
+    equipment: { ...slice.sources.equipment, rows: plans.map((p) => p.row) },
+  }
+  return {
+    authored,
+    sources,
+    meta: { archetype: ctx.archetype, confidence: Math.round(ctx.confidence * 100) / 100, levelDepths: levels.depths },
+  }
+}

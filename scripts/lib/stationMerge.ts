@@ -170,7 +170,8 @@ export function checkEntranceLinks(entrances: Map<string, Entrance>, connectors:
     e.connectors.sort()
     for (const id of e.connectors) {
       const other = owner.get(id)
-      if (other !== undefined) throw new Error(`connector ${id} is listed by two entrances, ${other} and ${e.id}`)
+      // The same entrance listing an id twice is a duplicate id, reported by the id check after this one.
+      if (other !== undefined && other !== e.id) throw new Error(`connector ${id} is listed by two entrances, ${other} and ${e.id}`)
       owner.set(id, e.id)
     }
     if (!['Stair', 'Elevator', 'Escalator', 'Ramp'].includes(e.type)) continue

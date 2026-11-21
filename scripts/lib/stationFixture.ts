@@ -77,7 +77,8 @@ export function fixture(): { authored: AuthoredStation; sources: StationSources 
 /**
  * Synthetic elevated station: the street (0) is the lowest level, a station house sits at +4 and the platform
  * at +8. Layout (meters): platform u -30..30, v -3..3; station house slab u -10..10, v 6..16. The street stair's
- * lower end is its entrance; the elevator runs street to platform from an entrance under the platform.
+ * lower end is its entrance; the elevator runs street to platform from an entrance under the platform, and the
+ * escalator street to station house from an entrance under the house (both have their entrance at the lower end).
  */
 export function elevatedFixture(): { authored: AuthoredStation; sources: StationSources } {
   const { authored: base, sources: baseSources } = fixture()
@@ -101,12 +102,13 @@ export function elevatedFixture(): { authored: AuthoredStation; sources: Station
     entrances: [
       { id: 'stair-ent', source: ll(0, 20) },
       { id: 'elev-ent', source: ll(-20, 2) },
+      { id: 'esc-ent', source: ll(5, 12) },
     ],
     connectors: [
       { id: 'st-street', kind: 'stair', width: 1.5, lower: { entrance: 'stair-ent' }, upper: { level: 'house', at: [0, 15] } },
       { id: 'st-plat', kind: 'stair', width: 2.4, lower: { level: 'house', at: [0, 7] }, upper: { level: 'platform', at: [0, 2] } },
     ],
-    equipment: [{ code: 'EL1', entrance: 'elev-ent' }],
+    equipment: [{ code: 'EL1', entrance: 'elev-ent' }, { code: 'ES2', entrance: 'esc-ent' }],
   }
   const sources: StationSources = {
     ...baseSources,
@@ -116,11 +118,15 @@ export function elevatedFixture(): { authored: AuthoredStation; sources: Station
       rows: [
         { type: 'Stair', entry: true, exit: true, lat: ll(0, 20)[0], lon: ll(0, 20)[1] },
         { type: 'Elevator', entry: true, exit: true, lat: ll(-20, 2)[0], lon: ll(-20, 2)[1] },
+        { type: 'Escalator', entry: true, exit: true, lat: ll(5, 12)[0], lon: ll(5, 12)[1] },
       ],
     },
     equipment: {
       ...baseSources.equipment,
-      rows: [{ code: 'EL1', kind: 'elevator', lat: ll(-21, 3)[0], lon: ll(-21, 3)[1], serving: 'Main St (NW corner) to platform for service in both directions' }],
+      rows: [
+        { code: 'EL1', kind: 'elevator', lat: ll(-21, 3)[0], lon: ll(-21, 3)[1], serving: 'Main St (NW corner) to platform for service in both directions' },
+        { code: 'ES2', kind: 'escalator', lat: ll(6, 13)[0], lon: ll(6, 13)[1], serving: 'Main St (SE corner) to station house mezzanine' },
+      ],
     },
   }
   return { authored, sources }
