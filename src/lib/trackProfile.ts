@@ -5,6 +5,7 @@
  */
 import type { StationId } from '../data/schema.ts'
 import type { Ground } from './projection.ts'
+import { rampBreaks, RAMP_MAX_ERROR_M } from './rampSampling.ts'
 
 /** Knots sorted by distance; between two knots y eases with smoothstep, outside them it holds the end value. */
 export interface TrackProfile {
@@ -168,16 +169,16 @@ export function resampleAt(
 }
 
 /**
- * The line with collinear vertices added at the profile's knots and every `stepM` along its ramps, so a straight
- * line drawn between vertices follows the eased profile closely. The ground path is unchanged. With an empty
- * profile it returns the same points with y = 0.
+ * The line with collinear vertices added at the profile's knots and through its ramps (`rampBreaks`), so a
+ * straight line drawn between vertices stays within `maxErrM` of the eased profile. The ground path is unchanged.
+ * With an empty profile it returns the same points with y = 0.
  */
 export function resampleForProfile(
   points: readonly Ground[],
   cumulative: readonly number[],
   p: TrackProfile,
-  stepM = 10,
+  maxErrM = RAMP_MAX_ERROR_M,
 ): ResampledLine {
-  const line = resampleAt(points, cumulative, profileBreaks(p, stepM))
+  const line = resampleAt(points, cumulative, rampBreaks(p, maxErrM))
   return { ...line, y: line.cumulative.map((d) => profileAt(p, d)) }
 }

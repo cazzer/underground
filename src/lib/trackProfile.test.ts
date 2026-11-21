@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildPolyline } from './realtime/polyline'
 import { buildTrackProfile, EMPTY_PROFILE, GRADE, profileAt, resampleForProfile, type TrackProfile } from './trackProfile'
+import { RAMP_MAX_ERROR_M } from './rampSampling'
 
 const OPTS = { grade: GRADE, yScale: 1 }
 const L = 10.2 / GRADE // 340 m
@@ -127,20 +128,15 @@ describe('resampleForProfile', () => {
     expect(r.y).toEqual([0, 0, 0, 0])
   })
 
-  it('adds collinear vertices at the knots and every step on the ramps, keeping distances', () => {
+  it('adds collinear vertices at the knots and through the ramps, keeping distances', () => {
     const p = one(2)
     const r = resampleForProfile(points, line.cumulative, p)
     const again = buildPolyline(r.points)
     expect(again.length).toBeCloseTo(line.length, 9)
     expect(r.cumulative).toEqual([...again.cumulative])
     for (const k of p.d) expect(r.cumulative.some((c) => Math.abs(c - k) < 1e-9)).toBe(true)
-    // Every vertex lies on the original path, and the ramps are sampled at least every 10 m.
-    for (let i = 1; i < r.points.length; i++) {
-      const gap = r.cumulative[i]! - r.cumulative[i - 1]!
-      const mid = (r.cumulative[i]! + r.cumulative[i - 1]!) / 2
-      const onRamp = profileAt(p, mid) !== 0 && profileAt(p, mid) !== profileAt(p, 1100)
-      if (onRamp) expect(gap).toBeLessThanOrEqual(10 + 1e-9)
-    }
+    // Far fewer vertices than a fixed 10 m step would add along the two ramps.
+    expect(r.points.length).toBeLessThan(points.length + p.d.length + 20)
     expect(r.points.every((q) => q.x === 0 || q.x === 1200 || Math.abs(q.z + 900) < 1e-9)).toBe(true)
   })
 
@@ -148,10 +144,14 @@ describe('resampleForProfile', () => {
     const p = one(2)
     const r = resampleForProfile(points, line.cumulative, p)
     r.y.forEach((y, i) => expect(y).toBe(profileAt(p, r.cumulative[i]!)))
-    // Linear between the 10 m samples stays within a few centimeters of the eased profile.
+    // The straight line between vertices stays within RAMP_MAX_ERROR_M of the eased profile everywhere.
     for (let i = 1; i < r.points.length; i++) {
-      const mid = (r.cumulative[i]! + r.cumulative[i - 1]!) / 2
-      expect(Math.abs((r.y[i]! + r.y[i - 1]!) / 2 - profileAt(p, mid))).toBeLessThan(0.05)
+      for (let k = 1; k < 16; k++) {
+        const u = k / 16
+        const d = r.cumulative[i - 1]! + (r.cumulative[i]! - r.cumulative[i - 1]!) * u
+        const drawn = r.y[i - 1]! + (r.y[i]! - r.y[i - 1]!) * u
+        expect(Math.abs(drawn - profileAt(p, d))).toBeLessThanOrEqual(RAMP_MAX_ERROR_M + 1e-9)
+      }
     }
   })
 })
