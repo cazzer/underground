@@ -61,8 +61,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
-  TEMPORARY: `?cars=a|b|c` (box, chamfered prism, flat slab; default b) until the pah.5 look round;
-  the removal list is in `src/scene/carLook.ts`
   TEMPORARY: `?orbit=a|b|c` (azimuth window ±30/45/60 degrees; default b) until pah.5 decides; the
   removal list is in `src/scene/orbitLook.ts`
 - `src/scene/`: the r3f scene
@@ -79,7 +77,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `theme.trainSelectedRim` rim. Its dot is drawn on its own above every other dot; its cars get the top widen
     level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
-    their instances, consists and per-frame writes; `carGeometry.ts` the shaded body; `carLook.ts` TEMPORARY);
+    their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body and its dimension constants);
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
