@@ -18,6 +18,8 @@ export function Scene({ network, insets }: SceneProps) {
   const primaryShapes = useMemo(() => network.shapes.filter((s) => s.primary), [network])
   return (
     <Canvas
+      // No tone mapping, so every theme token renders as the exact color it names.
+      flat
       // `far` is set by CameraRig from the fitted zoom range.
       camera={{ fov: 35, near: 10 }}
       dpr={[1, 2]}

@@ -115,6 +115,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Scene units are meters. x = east, z = south (north is up top-down), y = up.
   Convert lat/lon only through `src/lib/projection.ts`.
 - Every color, line width, and font comes from `src/theme.ts`. Never hardcode them.
+- The Canvas is `flat` (no tone mapping), so theme tokens render exactly as written.
   HUD uses Tailwind tokens (`bg-panel`, `text-ink`, ...) backed by theme CSS variables.
 - Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`).
   User rotation is disabled. Markers and dots rescale with distance
