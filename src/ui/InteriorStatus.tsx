@@ -33,7 +33,7 @@ function StatusLine({ info: { load, revealed, onRetry } }: InteriorStatusProps) 
       )
     case 'ready':
       return revealed ? (
-        <p className="whitespace-nowrap text-ink-dim">Below street · depth ×{load.model.yScale}</p>
+        <p className="whitespace-nowrap text-ink-dim">Below street{load.model.yScale === 1 ? '' : ' · not to scale'}</p>
       ) : (
         <p className="text-ink-dim">Zoom in to see the station layout</p>
       )
