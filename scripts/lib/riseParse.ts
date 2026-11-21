@@ -29,13 +29,14 @@ const METRIC = /^(\d+(?:\.\d+)?)\s*mm\s*(?:\((.*)\))?$/i
 function fraction(num: string, den: string): number | string {
   const d = Number(den)
   const f = Number(num) / d
-  if (d === 0 || f > 1) return `fraction ${num}/${den} is not a proper fraction`
+  if (d === 0 || f >= 1) return `fraction ${num}/${den} is not a proper fraction`
   return f
 }
 
 /** Inches from the INCH captures; a string is the rejection reason. */
 function inchesOf(g: (string | undefined)[]): number | string {
   const [whole, fn, fd, ln, ld] = g
+  if (whole?.includes('.') && fn !== undefined) return `decimal inches ${whole} cannot also carry a fraction`
   let inches = whole === undefined ? 0 : Number(whole)
   for (const [n, d] of [[fn, fd], [ln, ld]] as const) {
     if (n === undefined || d === undefined) continue
@@ -61,6 +62,7 @@ export function parseRise(raw: string): RiseResult {
   if (metric) {
     const m = Number(metric[1]) / 1000
     const imperial = metric[2] === undefined ? null : parseImperial(normalize(metric[2]))
+    if (imperial && !imperial.ok) return { ok: true, m, warning: `imperial twin not checked, metric used: ${imperial.reason}` }
     if (imperial?.ok && Math.abs(imperial.m - m) / m > METRIC_DISAGREE) {
       return { ok: true, m, warning: `metric ${m.toFixed(3)} m and imperial ${imperial.m.toFixed(3)} m disagree in ${JSON.stringify(s)}; metric used` }
     }

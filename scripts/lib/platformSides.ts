@@ -1,41 +1,29 @@
 /** Island or side platform, and how many tracks, from platform polygons and track centerlines.
- *  Each polygon is cut across the station axis at five places; at each cut a platform is an island when
- *  a track runs beside both long edges and a side platform when one does. The cuts vote. */
+ *  Each polygon is cut across the station axis at several places (fractions of the whole station and of
+ *  each platform); at each cut a platform is an island when a track runs beside both long edges and a side
+ *  platform when one does. The cuts vote. */
 import type { LocalPoint } from '../../src/data/stationSchema.ts'
-import { SECTION_FRACTIONS, buildSections } from './crossSection.ts'
-import type { Crossing, Section, SectionInterval, UVTrack } from './crossSection.ts'
+import { buildSections } from './crossSection.ts'
+import type { UVTrack } from './crossSection.ts'
 import { FALLBACK_CAP, geometryOnlyLayout } from './platformFallback.ts'
 import { fromUV, stationAxis, toUV } from './platformAxis.ts'
 import type { AxisFrame, UV } from './platformAxis.ts'
-import type { LayoutAnalysis, PlatformLayout } from './platformLayout.ts'
+import { capAt, deduct, newLedger } from './platformLayout.ts'
+import type { LayoutAnalysis } from './platformLayout.ts'
+import { Groups, buildLayouts, classifySection, joinSplitPlatforms } from './platformVote.ts'
+import { trackSpan } from './trackSpan.ts'
 import type { PlatformFact, TrackFact } from './stationFacts.ts'
 
 export type { LayoutAnalysis, PlatformLayout } from './platformLayout.ts'
 
 const MAX_AXIS_DEVIATION_DEG = 20
 const TRACK_NEAR_PLATFORM_M = 60
-/** A track beside an edge sits from this far inside it to this far outside it. */
-const EDGE_INSIDE_M = 1.5
-const EDGE_OUTSIDE_M = 5
-const TRACK_SPAN_MARGIN_M = 5
-const AGREE_PENALTY_BELOW = 0.8
-const AGREE_CAP_BELOW = 0.6
-const AGREE_CAP = 0.4
 const WIDTH_PRIOR_M = { island: [5, 15], side: [2.5, 8] } as const
-
-type EdgeHit = { side: -1 | 1; v: number; ref: string }
-interface SectionRec {
-  group: number
-  kind: 'island' | 'side' | 'orphan' | 'dropped'
-  v0: number
-  v1: number
-  edges: EdgeHit[]
-}
-
-const median = (xs: number[]): number => {
-  const s = [...xs].sort((a, b) => a - b)
-  return s[(s.length - 1) >> 1]!
-}
+/** How far a platform center or a track may wander in v across the cuts before the station reads as curved.
+ *  A straight station wanders by centimeters; 1 degree of skew over a 150 m platform is about 2.6 m. */
+const SPREAD_PENALTY_M = 1
+const SPREAD_CAP_M = 3
+const SPREAD_CAP = 0.5
 
 function distanceToPath(p: LocalPoint, path: LocalPoint[]): number {
   let best = Infinity
@@ -55,74 +43,18 @@ function centroid(ring: LocalPoint[]): LocalPoint {
   return [ring.reduce((s, p) => s + p[0], 0) / ring.length, ring.reduce((s, p) => s + p[1], 0) / ring.length]
 }
 
-function nearest(cs: Crossing[], v: number): Crossing | undefined {
-  return cs.reduce<Crossing | undefined>((best, c) => (best === undefined || Math.abs(c.v - v) < Math.abs(best.v - v) ? c : best), undefined)
-}
-
-/** Classifies one merged interval; a track drawn inside the polygon voids it. */
-function classify(iv: SectionInterval, crossings: Crossing[], group: number, u: number, reasons: Set<string>): SectionRec {
-  const rec = { group, v0: iv.v0, v1: iv.v1 }
-  const inside = crossings.find((c) => c.v > iv.v0 + EDGE_INSIDE_M && c.v < iv.v1 - EDGE_INSIDE_M)
-  if (inside) {
-    reasons.add(`track ${inside.ref} drawn inside a platform polygon (u ${u.toFixed(0)} m); that section is ignored for the platform`)
-    return { ...rec, kind: 'dropped', edges: [] }
-  }
-  const right = nearest(crossings.filter((c) => c.v >= iv.v1 - EDGE_INSIDE_M && c.v <= iv.v1 + EDGE_OUTSIDE_M), iv.v1)
-  const left = nearest(crossings.filter((c) => c.v >= iv.v0 - EDGE_OUTSIDE_M && c.v <= iv.v0 + EDGE_INSIDE_M), iv.v0)
-  const edges: EdgeHit[] = []
-  if (left) edges.push({ side: -1, v: left.v, ref: left.ref })
-  if (right) edges.push({ side: 1, v: right.v, ref: right.ref })
-  return { ...rec, kind: edges.length === 2 ? 'island' : edges.length === 1 ? 'side' : 'orphan', edges }
-}
-
-function mostCommon(xs: string[]): string {
-  const counts = new Map<string, number>()
-  for (const x of xs) counts.set(x, (counts.get(x) ?? 0) + 1)
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]![0]
-}
-
-class Groups {
-  private readonly parent: number[]
-  constructor(n: number) {
-    this.parent = Array.from({ length: n }, (_, i) => i)
-  }
-  find(i: number): number {
-    while (this.parent[i] !== i) i = this.parent[i] = this.parent[this.parent[i]!]!
-    return i
-  }
-  union(a: number, b: number): void {
-    this.parent[this.find(a)] = this.find(b)
-  }
-}
-
-/** Track count and positions: crossings within a margin of the platforms, median over the cuts. */
-function trackSpan(sections: Section[]): { count: number; offsets: number[] } {
-  const spans = sections
-    .filter((s) => s.intervals.length > 0)
-    .map((s) => {
-      const lo = Math.min(...s.intervals.map((i) => i.v0)) - TRACK_SPAN_MARGIN_M
-      const hi = Math.max(...s.intervals.map((i) => i.v1)) + TRACK_SPAN_MARGIN_M
-      return s.crossings.filter((c) => c.v >= lo && c.v <= hi).map((c) => c.v)
-    })
-  if (spans.length === 0) return { count: 0, offsets: [] }
-  const count = median(spans.map((s) => s.length))
-  return { count, offsets: spans.find((s) => s.length === count)! }
-}
-
 export function analyzePlatforms(platforms: PlatformFact[], tracks: TrackFact[]): LayoutAnalysis {
-  const reasons: string[] = []
-  let penalty = 0
-  let cap = 1
+  const ledger = newLedger()
   const axis = stationAxis(platforms.map((p) => p.outline))
   const bbox = platforms.flatMap((p) => p.outline.map((pt) => toUV(pt, { bearingDeg: axis.bearingDeg, origin: [0, 0] })))
   const mid = (i: 0 | 1): number => (Math.min(...bbox.map((p) => p[i])) + Math.max(...bbox.map((p) => p[i]))) / 2
   const center = fromUV([mid(0), mid(1)], { bearingDeg: axis.bearingDeg, origin: [0, 0] })
   const frame: AxisFrame = { bearingDeg: axis.bearingDeg, origin: center }
   const base = { bearingDeg: axis.bearingDeg, center }
+  const done = (r: Omit<LayoutAnalysis, 'bearingDeg' | 'center' | 'penalty' | 'cap' | 'reasons'>): LayoutAnalysis => ({ ...base, ...r, penalty: ledger.penalty, cap: ledger.cap, reasons: ledger.reasons })
 
   if (axis.deviationsDeg.some((d) => d > MAX_AXIS_DEVIATION_DEG)) {
-    penalty += 0.3
-    reasons.push(`a platform axis is more than ${MAX_AXIS_DEVIATION_DEG} degrees off the station axis (curved or crossing platforms): -0.3`)
+    deduct(ledger, 0.3, `a platform axis is more than ${MAX_AXIS_DEVIATION_DEG} degrees off the station axis (curved or crossing platforms)`)
   }
   const rings: UV[][] = platforms.map((p) => p.outline.map((pt) => toUV(pt, frame)))
   const ways = platforms.map((p) => p.osmWay)
@@ -130,78 +62,38 @@ export function analyzePlatforms(platforms: PlatformFact[], tracks: TrackFact[])
   const tracksNear = platforms.some((p) => tracks.some((t) => distanceToPath(centroid(p.outline), t.path) <= TRACK_NEAR_PLATFORM_M))
   if (!tracksNear) {
     const f = geometryOnlyLayout(rings, ways)
-    reasons.push(`no track within ${TRACK_NEAR_PLATFORM_M} m of any platform: ${f.reason}`)
-    return { ...base, platformType: f.platformType, trackCount: f.trackCount, trackOffsetsV: f.trackOffsetsV, layouts: f.layouts, penalty, cap: Math.min(cap, FALLBACK_CAP), reasons, geometryOnly: true }
+    ledger.reasons.push(`no track within ${TRACK_NEAR_PLATFORM_M} m of any platform: ${f.reason}`)
+    ledger.cap = Math.min(ledger.cap, FALLBACK_CAP)
+    return done({ platformType: f.platformType, trackCount: f.trackCount, trackOffsetsV: f.trackOffsetsV, layouts: f.layouts, geometryOnly: true })
   }
 
   const uvTracks: UVTrack[] = tracks.map((t) => ({ ref: t.ref, pts: t.path.map((pt) => toUV(pt, frame)) }))
-  const sections = buildSections(rings, uvTracks, SECTION_FRACTIONS)
+  const sections = buildSections(rings, uvTracks)
   const groups = new Groups(platforms.length)
+  joinSplitPlatforms(rings, groups)
   for (const s of sections) for (const iv of s.intervals) for (const p of iv.platforms) groups.union(p, iv.platforms[0]!)
 
-  const noted = new Set<string>()
-  const recs = sections.flatMap((s) => s.intervals.map((iv) => classify(iv, s.crossings, groups.find(iv.platforms[0]!), s.u, noted)))
-  reasons.push(...noted)
-  if (sections.some((s) => s.gapWithoutTrack)) {
-    penalty += 0.2
-    reasons.push('two platform polygons at least 4 m apart with no track between them: -0.2')
-  }
+  const notes = new Set<string>()
+  const recs = sections.flatMap((s) => s.intervals.map((iv) => classifySection(iv, s.crossings, groups.find(iv.platforms[0]!), s.u, notes)))
+  ledger.reasons.push(...notes)
+  if (sections.some((s) => s.gapWithoutTrack)) deduct(ledger, 0.2, 'two platform polygons at least 4 m apart with no track between them')
 
-  const layouts: PlatformLayout[] = []
-  for (const g of new Set(platforms.map((_, i) => groups.find(i)))) {
-    const members = platforms.map((_, i) => i).filter((i) => groups.find(i) === g)
-    const wayList = members.map((i) => ways[i]!).sort((a, b) => a - b)
-    const mine = recs.filter((r) => r.group === g)
-    const valid = mine.filter((r) => r.kind === 'island' || r.kind === 'side')
-    if (valid.length === 0) {
-      if (mine.some((r) => r.kind === 'orphan')) {
-        penalty += 0.3
-        reasons.push(`platform ${wayList.join('+')} has no track beside either edge (orphan): -0.3`)
-      } else reasons.push(`platform ${wayList.join('+')} is not used: ${mine.length === 0 ? 'no cross-section reaches it' : 'its sections were dropped'}`)
-      continue
-    }
-    const islands = valid.filter((r) => r.kind === 'island').length
-    const kind = islands > valid.length - islands ? 'island' : 'side'
-    const agreement = Math.max(islands, valid.length - islands) / (valid.length + mine.filter((r) => r.kind === 'orphan').length)
-    if (agreement < AGREE_PENALTY_BELOW) {
-      penalty += 0.2
-      reasons.push(`platform ${wayList.join('+')}: only ${(agreement * 100).toFixed(0)}% of cross-sections agree on ${kind}: -0.2`)
-    }
-    if (agreement < AGREE_CAP_BELOW) {
-      cap = Math.min(cap, AGREE_CAP)
-      reasons.push(`platform ${wayList.join('+')}: cross-sections disagree; confidence capped at ${AGREE_CAP}`)
-    }
-    const agreeing = valid.filter((r) => r.kind === kind)
-    const edges = ([-1, 1] as const).flatMap((side) => {
-      const hits = agreeing.flatMap((r) => r.edges.filter((e) => e.side === side))
-      return hits.length === 0 ? [] : [{ side, offsetV: median(hits.map((h) => h.v)), trackRef: mostCommon(hits.map((h) => h.ref)) }]
-    })
-    const us = members.flatMap((i) => rings[i]!.map((p) => p[0]))
-    layouts.push({
-      osmWays: wayList,
-      kind,
-      centerV: median(agreeing.map((r) => (r.v0 + r.v1) / 2)),
-      widthM: median(agreeing.map((r) => r.v1 - r.v0)),
-      uRange: [Math.min(...us), Math.max(...us)],
-      edges,
-    })
-  }
+  const { layouts, spreadM: centerSpread } = buildLayouts(ways, rings, recs, groups, ledger)
+  const span = trackSpan(sections)
+  const spread = Math.max(centerSpread, span.spreadM)
+  if (spread > SPREAD_PENALTY_M) deduct(ledger, 0.2, `platform centers or tracks wander ${spread.toFixed(1)} m across the station (curved or skewed)`)
+  if (spread > SPREAD_CAP_M) capAt(ledger, SPREAD_CAP, `platforms are curved (${spread.toFixed(1)} m of wander)`)
 
-  const { count, offsets } = trackSpan(sections)
-  const meanV = offsets.length === 0 ? 0 : offsets.reduce((s, v) => s + v, 0) / offsets.length
+  const meanV = span.offsets.length === 0 ? 0 : span.offsets.reduce((s, v) => s + v, 0) / span.offsets.length
   for (const l of layouts) {
     const [lo, hi] = WIDTH_PRIOR_M[l.kind]
-    if (l.widthM < lo || l.widthM > hi) {
-      penalty += 0.1
-      reasons.push(`platform ${l.osmWays.join('+')} is ${l.widthM.toFixed(1)} m wide, outside the usual ${lo}-${hi} m for a ${l.kind} platform: -0.1`)
-    }
+    if (l.widthM < lo || l.widthM > hi) deduct(ledger, 0.1, `platform ${l.osmWays.join('+')} is ${l.widthM.toFixed(1)} m wide, outside the usual ${lo}-${hi} m for a ${l.kind} platform`)
     const edge = l.edges[0]
-    if (l.kind === 'side' && edge && offsets.length > 0 && Math.abs(l.centerV - meanV) > 1 && edge.side === (l.centerV < meanV ? -1 : 1)) {
-      penalty += 0.3
-      reasons.push(`side platform ${l.osmWays.join('+')} has its track on the side away from the other tracks: -0.3`)
+    if (l.kind === 'side' && edge && span.offsets.length > 0 && Math.abs(l.centerV - meanV) > 1 && edge.side === (l.centerV < meanV ? -1 : 1)) {
+      deduct(ledger, 0.3, `side platform ${l.osmWays.join('+')} has its track on the side away from the other tracks`)
     }
   }
   const kinds = new Set(layouts.map((l) => l.kind))
   const platformType = kinds.size === 0 ? null : kinds.size === 2 ? 'mixed' : [...kinds][0]!
-  return { ...base, platformType, trackCount: count, trackOffsetsV: [...offsets].sort((a, b) => a - b), layouts, penalty, cap, reasons, geometryOnly: false }
+  return done({ platformType, trackCount: span.count, trackOffsetsV: span.offsets, layouts, geometryOnly: false })
 }

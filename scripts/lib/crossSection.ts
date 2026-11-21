@@ -92,12 +92,22 @@ export function mergeIntervals(raw: SectionInterval[], crossings: Crossing[]): {
   return { intervals: out, gapWithoutTrack }
 }
 
-export function buildSections(rings: UV[][], tracks: UVTrack[], fractions: number[] = SECTION_FRACTIONS): Section[] {
-  const us = rings.flatMap((r) => r.map((p) => p[0]))
-  const uMin = Math.min(...us)
-  const uMax = Math.max(...us)
-  return fractions.map((f) => {
-    const u = uMin + f * (uMax - uMin)
+const MIN_CUT_SPACING_M = 0.5
+
+/** Cut positions: fractions of the union u-extent and, so a short or staggered platform is sampled
+ *  too, of each platform's own u-range. Cuts closer than half a meter are one cut. */
+export function cutPositions(rings: UV[][], fractions: number[], perPlatform: boolean): number[] {
+  const rangeOf = (rs: UV[][]): [number, number] => {
+    const us = rs.flatMap((r) => r.map((p) => p[0]))
+    return [Math.min(...us), Math.max(...us)]
+  }
+  const ranges = [rangeOf(rings), ...(perPlatform ? rings.map((r) => rangeOf([r])) : [])]
+  const us = ranges.flatMap(([lo, hi]) => fractions.map((f) => lo + f * (hi - lo))).sort((a, b) => a - b)
+  return us.filter((u, i) => i === 0 || u - us[i - 1]! >= MIN_CUT_SPACING_M)
+}
+
+export function buildSections(rings: UV[][], tracks: UVTrack[], fractions: number[] = SECTION_FRACTIONS, perPlatform = true): Section[] {
+  return cutPositions(rings, fractions, perPlatform).map((u) => {
     const crossings = trackCrossings(tracks, u)
     const raw = rings.flatMap((ring, i) => polygonIntervals(ring, u).map(([v0, v1]): SectionInterval => ({ v0, v1, platforms: [i] })))
     const { intervals, gapWithoutTrack } = mergeIntervals(raw, crossings)

@@ -27,3 +27,19 @@ export interface LayoutAnalysis {
   /** No track was near any platform; the layout came from polygons alone. */
   geometryOnly: boolean
 }
+
+/** Running score for one analysis: every deduction and cap says why. */
+export interface Ledger {
+  penalty: number
+  cap: number
+  reasons: string[]
+}
+export const newLedger = (): Ledger => ({ penalty: 0, cap: 1, reasons: [] })
+export function deduct(l: Ledger, amount: number, why: string): void {
+  l.penalty += amount
+  l.reasons.push(`${why}: -${amount}`)
+}
+export function capAt(l: Ledger, cap: number, why: string): void {
+  l.cap = Math.min(l.cap, cap)
+  l.reasons.push(`${why}; confidence capped at ${cap}`)
+}

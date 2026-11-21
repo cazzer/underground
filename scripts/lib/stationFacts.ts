@@ -1,5 +1,6 @@
 /** Everything the archetype classifier knows about one station, already in station-local meters
  *  (x east, z south, from any origin). Types only; the catalog adapter that fills them is a later step. */
+import type { LatLon } from '../../src/lib/projection.ts'
 import type { LocalPoint } from '../../src/data/stationSchema.ts'
 
 export type Structure = 'subway' | 'elevated' | 'viaduct' | 'open-cut' | 'at-grade' | 'embankment'
@@ -13,6 +14,8 @@ export interface PlatformFact {
 }
 
 export interface TrackFact {
+  /** The OSM way id or LRS id of the line, as in the source. Assigning GTFS child stop ids (L08N, L08S) to
+   *  tracks by direction is the template step's job (9wc.4), not the classifier's. */
   ref: string
   source: 'osm' | 'lrs'
   path: LocalPoint[]
@@ -36,6 +39,9 @@ export interface EntranceFact {
 export interface StationFacts {
   stationId: string
   name: string
+  /** The lat/lon that every LocalPoint below is measured from (x east, z south), so a template can fill
+   *  AuthoredStation.frame.anchor. */
+  origin: LatLon
   structure: Structure
   /** A station complex (several stations sharing platforms or levels); never classified. */
   complex: boolean

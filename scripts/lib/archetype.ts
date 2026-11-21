@@ -8,7 +8,10 @@ import { toUV } from './platformAxis.ts'
 import { analyzePlatforms } from './platformSides.ts'
 import type { LayoutAnalysis, PlatformLayout } from './platformSides.ts'
 import type { StationFacts } from './stationFacts.ts'
+import { geometryProblems } from './stationFactsCheck.ts'
 import type { LocalPoint } from '../../src/data/stationSchema.ts'
+import { toLatLon } from '../../src/lib/projection.ts'
+import type { LatLon } from '../../src/lib/projection.ts'
 
 export type { PlatformLayout } from './platformSides.ts'
 
@@ -19,7 +22,7 @@ export type Archetype =
   | 'cut-cover-mezzanine'
   | 'underground-express'
   | 'deep'
-  | 'open-cut'
+  | 'open-air'
   | 'unknown'
 
 export interface ArchetypeParams {
@@ -28,6 +31,10 @@ export interface ArchetypeParams {
   /** [0, 180), same convention as AuthoredStation.frame.bearingDeg. */
   bearingDeg: number
   center: LocalPoint
+  /** The lat/lon that `center` and every local point is measured from (StationFacts.origin). */
+  origin: LatLon
+  /** `center` as lat/lon: the anchor for AuthoredStation.frame. */
+  anchor: LatLon
   /** Track positions, v to the right of the bearing, from `center`. */
   trackOffsetsV: number[]
   platforms: PlatformLayout[]
@@ -60,6 +67,8 @@ function entranceSides(f: StationFacts, a: LayoutAnalysis): (-1 | 1)[] {
 
 export function classifyStation(f: StationFacts): ArchetypeResult {
   if (f.platforms.length === 0) return unknown(0, ['no platform polygons'])
+  const problems = geometryProblems(f)
+  if (problems.length > 0) return unknown(0, problems.map((p) => `bad geometry: ${p}`))
   if (f.complex) return unknown(0.2, ['station complex: platforms and levels are shared with other stations'])
 
   const tagged = f.platforms.map((p) => ({ tag: p.levelTag, level: parseOsmLevel(p.levelTag) }))
@@ -96,6 +105,8 @@ export function classifyStation(f: StationFacts): ArchetypeResult {
     trackCount: analysis.trackCount,
     bearingDeg: analysis.bearingDeg,
     center: analysis.center,
+    origin: f.origin,
+    anchor: toLatLon({ x: analysis.center[0], z: analysis.center[1] }, f.origin),
     trackOffsetsV: analysis.trackOffsetsV,
     platforms: analysis.layouts,
     hasMezzanine: mezz.value,
@@ -115,7 +126,7 @@ export function classifyStation(f: StationFacts): ArchetypeResult {
     if (tracks === 3) return result('elevated-3-track', `${f.structure} with 3 tracks`)
     return result('unknown', `${f.structure} with ${tracks} tracks has no template`, 0.3)
   }
-  if (f.structure !== 'subway') return result('open-cut', `${f.structure} station, open to the sky`)
+  if (f.structure !== 'subway') return result('open-air', `${f.structure} station: no roof or mezzanine to model, open-air archetype`)
 
   if (depths.platform.y <= DEEP_PLATFORM_Y && depths.platform.source !== 'structure-default') {
     if (depths.platform.source === 'osm-level') deduct(DEEP_OSM_ONLY_PENALTY, 'depth rests on the OSM level tag alone')

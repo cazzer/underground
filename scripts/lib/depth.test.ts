@@ -106,7 +106,17 @@ describe('stationDepths', () => {
     const d = stationDepths({ ...base, equipment: [eq('EL1', 'street to mezzanine', "30'"), eq('EL2', 'street to platform', "32'")] })
     expect(d.platform.y).toBeCloseTo(-32 * 0.3048, 3)
     expect(d.mezzanine).toEqual({ y: d.platform.y / 2, source: 'structure-default' })
-    expect(d.reasons.join('\n')).toMatch(/not 2.5 m nearer/)
+    expect(d.reasons.join('\n')).toMatch(/not 2.5 m from both the street and the platform/)
+  })
+
+  it('keeps the mezzanine off the street level too (OSM level -1 with a mezzanine, elevated level 1)', () => {
+    const sub = stationDepths({ ...base, platformLevel: -1 })
+    expect(sub.platform.y).toBe(-4.5)
+    expect(sub.mezzanine).toEqual({ y: -2.25, source: 'structure-default' })
+    expect(sub.reasons.join('\n')).toMatch(/not 2.5 m from both the street/)
+    const el = stationDepths({ ...base, structure: 'elevated', platformLevel: 1 })
+    expect(el.platform.y).toBe(4.5)
+    expect(el.mezzanine).toEqual({ y: 2.25, source: 'structure-default' })
   })
 
   it('has no mezzanine when the station has none', () => {

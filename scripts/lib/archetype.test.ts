@@ -21,13 +21,13 @@ interface Row {
 const rows: Row[] = [
   { name: 'Bedford Av (L), island, mezzanine from E&E', facts: fx.bedfordAv(), archetype: 'cut-cover-mezzanine', platformType: 'island', tracks: 2, reason: /mezzanine: EL358 serving text/ },
   { name: '1 Av (L), side platforms', facts: fx.firstAvL(), archetype: 'cut-cover-mezzanine', platformType: 'side', tracks: 2, reason: /mezzanine: EL1 serving text/ },
-  { name: '79 St (1), shallow side platforms, 4 tracks', facts: fx.seventyNinthSt1(), archetype: 'shallow-per-direction', platformType: 'side', tracks: 4, reason: /no mezzanine: OSM level -1/ },
+  { name: '79 St (1), shallow side platforms, 4 tracks', facts: fx.seventyNinthSt1(), archetype: 'shallow-per-direction', platformType: 'side', tracks: 4, reason: /no mezzanine, inferred from OSM level -1/ },
   { name: '96 St (1/2/3), two islands', facts: fx.ninetySixthSt123(), archetype: 'underground-express', platformType: 'island', tracks: 4, reason: /4 tracks with two island platforms/ },
   { name: 'Livonia Av, elevated 2 tracks', facts: fx.livoniaAv(), archetype: 'elevated-2-track', platformType: 'island', tracks: 2, reason: /elevated with 2 tracks/ },
   { name: '40 St-Lowery St, 3 tracks, two sides', facts: fx.fortiethStLowery(), archetype: 'elevated-3-track', platformType: 'side', tracks: 3, reason: /elevated with 3 tracks/ },
   { name: '61 St-Woodside, 3 tracks, island and side', facts: fx.sixtyFirstStWoodside(), archetype: 'elevated-3-track', platformType: 'mixed', tracks: 3, reason: /elevated with 3 tracks/ },
   { name: '191 St, deep from an E&E rise', facts: fx.oneNinetyFirstSt(), archetype: 'deep', platformType: 'island', tracks: 2, reason: /below the street \(ee-rise\)/ },
-  { name: 'Avenue H, open cut, side platforms, 4 tracks', facts: fx.avenueH(), archetype: 'open-cut', platformType: 'side', tracks: 4, reason: /no mezzanine: the open-cut station is open to the street/ },
+  { name: 'Avenue H, open cut, side platforms, 4 tracks', facts: fx.avenueH(), archetype: 'open-air', platformType: 'side', tracks: 4, reason: /open-air archetype/ },
 ]
 
 describe('classifyStation on a station of each archetype', () => {
@@ -96,7 +96,7 @@ describe('edge cases', () => {
   })
 
   it('falls back to two parallel polygons as side platforms', () => {
-    const f = fx.buildStation('X4', 'subway', 40, [[-12, -7], [7, 12]], [], { levelTags: ['-1'] })
+    const f = fx.buildStation('X4', 'subway', 40, [[-12, -8], [8, 12]], [], { levelTags: ['-1'] })
     expect(classifyStation(f).params?.platformType).toBe('side')
   })
 
@@ -189,7 +189,7 @@ describe('edge cases', () => {
     const r = classifyStation(f)
     expect(reasonsOf(r)).toMatch(/below the street: -0.3/)
     expect(reasonsOf(r)).toMatch(/no entrances: -0.2/)
-    expect(r.confidence).toBeCloseTo(0.5, 5)
+    expect(r.confidence).toBeCloseTo(0.4, 5) // -0.3 level, -0.2 entrances, -0.1 for a mezzanine inferred from level -1 alone
   })
 
   it('flags a side platform whose only track is on the side away from the other tracks', () => {

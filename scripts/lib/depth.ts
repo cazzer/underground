@@ -27,7 +27,7 @@ export interface DepthInput {
 const LEVEL_M = 4.5
 const MIN_RISE_M = 1
 const MAX_RISE_M = 60
-const MIN_MEZZANINE_SEPARATION_M = 2.5
+const MIN_SEPARATION_M = 2.5
 
 /** "-2" is -2. Lists ("-1;-2"), blanks and words ("B") are null: the tag does not name one level. */
 export function parseOsmLevel(tag: string | null): number | null {
@@ -64,7 +64,7 @@ function collectRises(equipment: EquipmentFact[], reasons: string[]): Rises {
       const s = parseServing(e.serving)
       pair = [s.from, s.to].sort().join('+')
     } catch (err) {
-      reasons.push(`${e.code}: ignored for depth: ${(err as Error).message}`)
+      reasons.push(`${e.code}: ignored for depth: ${err instanceof Error ? err.message : String(err)}`)
       continue
     }
     if (e.rise === null) continue
@@ -137,9 +137,14 @@ export function stationDepths(i: DepthInput, deepList: DeepStation[] = DEEP_STAT
   }
   if (!i.hasMezzanine) mezzanine = null
 
-  if (mezzanine && Math.abs(mezzanine.y) > Math.abs(platform.y) - MIN_MEZZANINE_SEPARATION_M) {
-    reasons.push(`mezzanine ${mezzanine.y} m is not ${MIN_MEZZANINE_SEPARATION_M} m nearer the street than the platform ${platform.y} m; set to half the platform depth`)
-    mezzanine = { y: platform.y / 2, source: 'structure-default' }
+  if (mezzanine && sign !== 0) {
+    // Depth below (or height above) the street, so both ends compare the same way.
+    const away = mezzanine.y * sign
+    const platformAway = platform.y * sign
+    if (away < MIN_SEPARATION_M || away > platformAway - MIN_SEPARATION_M) {
+      reasons.push(`mezzanine ${mezzanine.y} m is not ${MIN_SEPARATION_M} m from both the street and the platform ${platform.y} m; set to half the platform depth`)
+      mezzanine = { y: platform.y / 2, source: 'structure-default' }
+    }
   }
   return { platform, mezzanine, reasons }
 }

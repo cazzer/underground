@@ -22,7 +22,7 @@ const GOOD: [string, number][] = [
   ["4362mm (14' 3-3/4in)", 4.362],
   ["28 ' 9 3/16in", 8.7678],
 ]
-const BAD = ['14.8', '100', "40'39' 11 1/2in", "56' - 21.4in", '10in - 2 3/8in', '', "10' 3 5/4in", "10' 1/0in"]
+const BAD = ['14.8', '100', "40'39' 11 1/2in", "56' - 21.4in", '10in - 2 3/8in', '', "10' 3 5/4in", "10' 1/0in", "10' 4/4in", "10' 3.5 1/2in"]
 
 describe('parseRise', () => {
   it.each(GOOD)('%s', (input, meters) => {
@@ -41,6 +41,12 @@ describe('parseRise', () => {
     const r = parseRise("20000 mm (77' 1 15/16in)")
     expect(r).toMatchObject({ ok: true, m: 20 })
     expect(r.ok && r.warning).toMatch(/disagree/)
+  })
+
+  it('warns, and still returns the metric value, when the parenthesized imperial twin does not parse', () => {
+    const r = parseRise('7000 mm (about 23 feet)')
+    expect(r).toMatchObject({ ok: true, m: 7 })
+    expect(r.ok && r.warning).toMatch(/imperial twin not checked/)
   })
 
   it('has no warning when metric and imperial agree', () => {

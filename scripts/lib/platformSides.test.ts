@@ -110,4 +110,21 @@ describe('analyzePlatforms', () => {
     expect(a.cap).toBe(0.5)
     expect(a.layouts[0]!.edges.every((e) => e.trackRef === 'estimated')).toBe(true)
   })
+
+  it('keeps one edge for a side platform whose sections put the track on different edges, and says so', () => {
+    const f = buildStation('I', 'subway', 55, [[-3, 3]], [-4.7, 4.7])
+    clipTrack(f, 0, 0, 0.5) // left track: first half only
+    clipTrack(f, 1, 0.5, 1) // right track: second half only
+    const a = run(f)
+    expect(a.layouts[0]!.kind).toBe('side')
+    expect(a.layouts[0]!.edges).toHaveLength(1)
+    expect(a.layouts[0]!.edges[0]!.side).toBe(1)
+    expect(a.reasons.join('\n')).toMatch(/put its one track on different edges; kept the right one: -0.2/)
+  })
+
+  it('does not read two wide polygons without tracks as side platforms', () => {
+    const a = run(buildStation('J', 'subway', 55, [[-12, -7], [7, 12]], []))
+    expect(a.platformType).toBeNull()
+    expect(a.reasons.join('\n')).toMatch(/neither an island .* nor two narrow side platforms/)
+  })
 })
