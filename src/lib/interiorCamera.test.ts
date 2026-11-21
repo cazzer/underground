@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { PerspectiveCamera, Vector3 } from 'three'
 import { frameInterior, interiorFreeRect, type InteriorFrameInput } from './interiorCamera'
 import { ENTER_RADIUS, EXIT_DISTANCE } from './focusMachine'
 import { interiorOpacity } from './interiorReveal'
@@ -25,24 +26,26 @@ describe('interiorFreeRect', () => {
 })
 
 const center = { x: 1000, z: 2000 }
+const north = { towardCamera: 0, azimuth: 0 }
 const mpp = (d: number, height: number) => (2 * d * Math.tan((35 * Math.PI) / 360)) / height
 
 describe('frameInterior', () => {
   const cases: [string, InteriorFrameInput][] = [
     [
       'desktop 1440x900, panel on the right',
-      { center, viewport, fovDeg: 35, free: interiorFreeRect(viewport, insets, { left: 1136, top: 628, right: 1424, bottom: 884 }) },
+      { center, ...north, viewport, fovDeg: 35, free: interiorFreeRect(viewport, insets, { left: 1136, top: 628, right: 1424, bottom: 884 }) },
     ],
     [
       'phone 390x844, panel stacked above the footer',
       {
         center,
+        ...north,
         viewport: { width: 390, height: 844 },
         fovDeg: 35,
         free: interiorFreeRect({ width: 390, height: 844 }, { top: 80, bottom: 70 }, { left: 16, top: 470, right: 374, bottom: 770 }),
       },
     ],
-    ['a tiny free rect', { center, viewport, fovDeg: 35, free: { left: 0, top: 70, right: 40, bottom: 90 } }],
+    ['a tiny free rect', { center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 70, right: 40, bottom: 90 } }],
   ]
 
   it.each(cases)('%s: stays at full reveal and keeps the station focused', (_, input) => {
@@ -56,17 +59,49 @@ describe('frameInterior', () => {
 
   it('keeps the center when the free rect is the whole viewport', () => {
     const free = { left: 0, top: 0, right: 1440, bottom: 900 }
-    expect(frameInterior({ center, viewport, free, fovDeg: 35 })).toEqual({ distance: 180, target: center })
+    expect(frameInterior({ center, ...north, viewport, free, fovDeg: 35 })).toEqual({ distance: 180, target: center })
   })
 
   it('shifts the target east when the free rect is left of center, so the interior moves left', () => {
-    const { target } = frameInterior({ center, viewport, fovDeg: 35, free: { left: 0, top: 0, right: 1120, bottom: 900 } })
+    const { target } = frameInterior({ center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 0, right: 1120, bottom: 900 } })
     expect(target.x).toBeCloseTo(1000 + 160 * mpp(180, 900))
     expect(target.z).toBe(2000)
   })
 
   it('shifts the target north when the free band is below center, like frameBounds', () => {
-    const { target } = frameInterior({ center, viewport, fovDeg: 35, free: { left: 0, top: 100, right: 1440, bottom: 900 } })
+    const { target } = frameInterior({ center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 100, right: 1440, bottom: 900 } })
     expect(target.z).toBeCloseTo(2000 - (50 * mpp(180, 900)) / Math.cos(ISO_POLAR))
+  })
+})
+
+describe('frameInterior at any azimuth', () => {
+  const free = interiorFreeRect(viewport, insets, { left: 1136, top: 628, right: 1424, bottom: 884 })
+  const midDepth = 8
+  const towardCamera = midDepth * Math.tan(ISO_POLAR)
+
+  /** Screen px of the mid-depth interior center for a real camera placed by the framing result. */
+  function project(deg: number) {
+    const azimuth = (deg * Math.PI) / 180
+    const { distance, target } = frameInterior({ center, towardCamera, azimuth, viewport, free, fovDeg: 35 })
+    const cam = new PerspectiveCamera(35, viewport.width / viewport.height, 1, 5000)
+    const t = new Vector3(target.x, 0, target.z)
+    cam.position.copy(t).add(new Vector3().setFromSphericalCoords(distance, ISO_POLAR, azimuth))
+    cam.lookAt(t)
+    cam.updateMatrixWorld()
+    const p = new Vector3(center.x, -midDepth, center.z).project(cam)
+    return { x: ((p.x + 1) / 2) * viewport.width, y: ((1 - p.y) / 2) * viewport.height }
+  }
+
+  it('lands the center near the free rect center (the shift is sized at target depth, so perspective leaves ~8%)', () => {
+    const p = project(0)
+    expect(Math.abs(p.x - (free.left + free.right) / 2)).toBeLessThan(15)
+    expect(Math.abs(p.y - (free.top + free.bottom) / 2)).toBeLessThan(15)
+  })
+
+  it.each([-60, 45])('azimuth %i deg: projects to the same screen point as north-up', (deg) => {
+    const rotated = project(deg)
+    const flat = project(0)
+    expect(rotated.x).toBeCloseTo(flat.x, 3)
+    expect(rotated.y).toBeCloseTo(flat.y, 3)
   })
 })

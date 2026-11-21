@@ -25,22 +25,24 @@ export function interiorBounds(interior: StationInterior): LocalBounds {
   return b
 }
 
+export interface FocusAnchor {
+  /** Ground point under the interior's plan center (no depth shift). */
+  center: Ground
+  /** Meters the camera target must sit toward the camera so the mid-depth center is mid-screen. */
+  towardCamera: number
+}
+
 /**
- * Ground point to aim the camera at so the interior's plan center at mid-depth sits mid-screen.
- * Viewed at polar angle θ from the south, a point h meters down lines up with the ground point
- * h·tanθ south (+z) of it, so the target moves south by the scaled mid-depth times `tanPolar`.
+ * Where to aim the camera so the interior's plan center at mid-depth sits mid-screen. Viewed at
+ * polar angle θ, a point h meters down lines up with the ground point h·tanθ toward the camera, so
+ * the target moves that far along the view azimuth (south at north-up); the caller rotates it.
  */
-export function interiorFocusTarget(
-  origin: Ground,
-  interior: StationInterior,
-  yScale: number,
-  tanPolar: number,
-): Ground {
+export function interiorFocusAnchor(origin: Ground, interior: StationInterior, yScale: number, tanPolar: number): FocusAnchor {
   const b = interiorBounds(interior)
   const minY = Math.min(...interior.levels.map((l) => l.y))
   return {
-    x: origin.x + (b.minX + b.maxX) / 2,
-    z: origin.z + (b.minZ + b.maxZ) / 2 + ((-minY * yScale) / 2) * tanPolar,
+    center: { x: origin.x + (b.minX + b.maxX) / 2, z: origin.z + (b.minZ + b.maxZ) / 2 },
+    towardCamera: ((-minY * yScale) / 2) * tanPolar,
   }
 }
 

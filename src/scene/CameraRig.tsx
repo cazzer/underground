@@ -11,6 +11,7 @@ import { frameInterior, interiorFreeRect, type ScreenRect } from '../lib/interio
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
 import type { InteriorModel } from './interiorModel'
+import { useStationOrbit } from './useStationOrbit'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
@@ -36,10 +37,17 @@ interface Flight extends Destination {
   e0: number
 }
 
-/** Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal. */
-function interiorFlight(model: InteriorModel, viewport: Viewport, insets: Insets, panel: ScreenRect | null, fovDeg: number): Destination {
+/** Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal, from the current azimuth. */
+function interiorFlight(
+  model: InteriorModel,
+  viewport: Viewport,
+  insets: Insets,
+  panel: ScreenRect | null,
+  fovDeg: number,
+  azimuth: number,
+): Destination {
   const free = interiorFreeRect(viewport, insets, panel)
-  const { distance, target } = frameInterior({ center: model.focusCenter, viewport, free, fovDeg })
+  const { distance, target } = frameInterior({ ...model.focusAnchor, azimuth, viewport, free, fovDeg })
   return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance }
 }
 
@@ -104,7 +112,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     if (!c) throw new Error('Fly request before the map controls mounted')
     const dest =
       l.interior?.stationId === station.id
-        ? interiorFlight(l.interior, l.size, l.insets, l.panel, camera.fov)
+        ? interiorFlight(l.interior, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
         : { stationId: station.id, target: new Vector3(station.pos.x, 0, station.pos.z), distance: FOCUS_DISTANCE }
     const fromDistance = camera.position.distanceTo(c.target)
     flight.current = {
@@ -124,7 +132,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     const f = flight.current
     const c = controls.current
     if (interior && c && f?.stationId === interior.stationId) {
-      const dest = interiorFlight(interior, size, insets, panel, camera.fov)
+      const dest = interiorFlight(interior, size, insets, panel, camera.fov, c.getAzimuthalAngle())
       f.from.copy(c.target)
       f.fromDistance = camera.position.distanceTo(c.target)
       f.e0 = flightProgress(f.elapsed, f.duration)
@@ -132,6 +140,10 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       f.distance = dest.distance
     }
   }, [interior, panel, size, insets, camera])
+
+  const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
+  const busy = useCallback(() => flight.current !== null || hold.current !== null, [])
+  useStationOrbit({ controls, camera, focusPos, busy })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((_, delta) => {
@@ -197,7 +209,6 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     <MapControls
       ref={controls}
       makeDefault
-      enableRotate={false}
       enableDamping
       zoomToCursor
       minDistance={MIN_DISTANCE}

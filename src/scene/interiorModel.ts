@@ -1,6 +1,6 @@
 import { Color } from 'three'
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
-import { interiorBounds, interiorFocusTarget, levelLabels, paddedHull, type LevelLabel } from '../lib/interiorFraming'
+import { interiorBounds, interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { buildInteriorBuffers, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
 import { toGround, type Ground } from '../lib/projection'
 import { mixHex } from '../lib/routeColor'
@@ -16,8 +16,8 @@ export interface InteriorModel {
   strong: Buffers
   fine: Buffers
   labels: LevelLabel[]
-  /** Ground target that puts the plan center at mid-depth mid-screen, seen isometrically. */
-  focusCenter: Ground
+  /** Plan center and the toward-camera shift that puts it at mid-depth mid-screen, seen isometrically. */
+  focusAnchor: FocusAnchor
   /** Look B's cutaway outline (group-local), or null. */
   hull: LocalPoint[] | null
   yScale: number
@@ -96,7 +96,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     strong,
     fine: hull ? withCutLine(fine, hull, colorOf('fare', 0)) : fine,
     labels: levelLabels(interior, yScale),
-    focusCenter: interiorFocusTarget(origin, interior, yScale, Math.tan(ISO_POLAR)),
+    focusAnchor: interiorFocusAnchor(origin, interior, yScale, Math.tan(ISO_POLAR)),
     hull,
     yScale,
   }
