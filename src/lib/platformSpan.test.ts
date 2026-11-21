@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
-import type { StationDepthsFile, StationInterior } from '../data/stationSchema'
+import { decodeStationDepths } from '../data/depthsCodec'
+import type { PackedDepthsFile, StationInterior } from '../data/stationSchema'
 import { buildNetwork } from './network'
 import {
   MASK_INSET_M,
@@ -77,22 +78,27 @@ describe('Bedford Av (L08) platform spans, committed data', () => {
   const stationsFile = readJson('../../public/data/stations.json') as StationsFile
   const routesFile = readJson('../../public/data/routes.json') as RoutesFile
   const shapesFile = readJson('../../public/data/shapes.json') as ShapesFile
-  const depths = readJson('../../public/data/station-depths.json') as StationDepthsFile
+  const packed = readJson('../../public/data/station-depths.json') as PackedDepthsFile
   const l08 = readJson('../../public/data/stations/L08.json') as StationInterior
-  const network = buildNetwork(stationsFile, routesFile, shapesFile, TRACK_OFFSET_M, depths, 2)
+  const network = buildNetwork(stationsFile, routesFile, shapesFile, TRACK_OFFSET_M, packed, 2)
   const spans = network.platformSpans.get('L08')!
-  const anchor = toGround(l08.anchor)
-  const depth = depths.stations.find((s) => s.stationId === 'L08')!
+  const lines = shapesFile.shapes.map((s) => ({ id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(trackLine(s, TRACK_OFFSET_M)) }))
+  // The decoded track (ends on the drawn line) gives the spans; the authored one is what they must stay near.
+  const depth = decodeStationDepths(packed, stationsFile.stations, lines).depths.stations.find((s) => s.stationId === 'L08')!
+  const anchor = toGround(depth.anchor)
+  const authoredAnchor = toGround(l08.anchor)
 
   it('gives every L shape riding Bedford Av a span, and only those', () => {
     expect(spans.size).toBeGreaterThan(0)
     for (const id of spans.keys()) expect(network.shapes.find((s) => s.id === id)!.routeId, id).toBe('L')
-    expect([...network.platformSpans.keys()]).toEqual(['L08'])
+    expect(network.platformSpans.has('L08')).toBe(true)
   })
 
   it.each(['N', 'S'] as const)('puts the L..%s trains on their own track at its rail depth, within the platform extent', (dir) => {
     const track = depth.tracks.find((t) => t.stopId === `L08${dir}`)!
     const [a, b] = track.ends.map(([x, z]) => ({ x: anchor.x + x, z: anchor.z + z }))
+    const path = l08.platforms.flatMap((p) => p.tracks).find((t) => t.stopId === `L08${dir}`)!.path
+    const [ta, tb] = [path[0]!, path.at(-1)!].map(([x, z]) => ({ x: authoredAnchor.x + x, z: authoredAnchor.z + z }))
     const trackLength = Math.hypot(b!.x - a!.x, b!.z - a!.z)
     const riders = network.shapes.filter((s) => spans.has(s.id))
     expect(riders.filter((s) => s.direction === dir).length).toBeGreaterThan(0)
@@ -110,8 +116,9 @@ describe('Bedford Av (L08) platform spans, committed data', () => {
         expect(trainSpanWeight(d, span)).toBe(1)
         // Within the platform: the shape's point there is within a few meters of the authored track.
         const p = pointAtDistance(line, d).point
-        const u = Math.min(Math.max(((p.x - a!.x) * (b!.x - a!.x) + (p.z - a!.z) * (b!.z - a!.z)) / trackLength ** 2, 0), 1)
-        const q = { x: a!.x + (b!.x - a!.x) * u, z: a!.z + (b!.z - a!.z) * u }
+        const len2 = (tb!.x - ta!.x) ** 2 + (tb!.z - ta!.z) ** 2
+        const u = Math.min(Math.max(((p.x - ta!.x) * (tb!.x - ta!.x) + (p.z - ta!.z) * (tb!.z - ta!.z)) / len2, 0), 1)
+        const q = { x: ta!.x + (tb!.x - ta!.x) * u, z: ta!.z + (tb!.z - ta!.z) * u }
         expect(Math.hypot(p.x - q.x, p.z - q.z), `${shape.id} at ${t}`).toBeLessThan(3)
       }
     }

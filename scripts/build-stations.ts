@@ -1,21 +1,21 @@
 /** Builds public/data/stations/<id>.json from data/stations/<id>.authored.json plus the pinned
  *  data/stations/<id>.sources.json, and generated ones from the station catalog (data/stations/catalog/) with the
  *  committed public/data/shapes.json and stations.json (scripts/lib/generate.ts; a hand-authored station wins),
- *  public/data/stations/index.json (which stations have an interior), and public/data/station-depths.json (every platform track's ends and rail
- *  height) from the authored interiors; public/data/stations/depths-generated.json is the same for the generated ones. Offline: the network is only used by fetch-station-sources.ts.
+ *  public/data/stations/index.json (which stations have an interior), and public/data/station-depths.json (every interior's
+ *  platform tracks, packed: scripts/lib/depthsPack.ts). Offline: the network is only used by fetch-station-sources.ts.
  *  The only IO here; the merge is scripts/lib/stationMerge.ts. Everything is built in memory first. */
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
+import type { ShapesFile, StationsFile } from '../src/data/schema.ts'
 import type { StationInterior } from '../src/data/stationSchema.ts'
+import { TRACK_OFFSET_M } from '../src/lib/trackOffset.ts'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
-import {
-  checkBudget, checkFileCap, checkIndexCap, committedGzip, GENERATED_DEPTHS_GZIP_CAP_BYTES, GZIP_BUDGET_BYTES, INDEX_GZIP_CAP_BYTES,
-  renderedFile,
-} from './lib/budget.ts'
+import { checkBudget, checkIndexCap, committedGzip, GZIP_BUDGET_BYTES, INDEX_GZIP_CAP_BYTES, renderedFile } from './lib/budget.ts'
+import { drawnLines, packStationDepths, renderPackedDepths } from './lib/depthsPack.ts'
 import { generateStations } from './lib/generate.ts'
 import { CATALOG_FILES, generatorCatalog, generatorLines } from './lib/generatorInputs.ts'
 import { buildStationDepths } from './lib/stationDepths.ts'
-import { buildStationIndex, GENERATED_DEPTHS_FILE, INDEX_FILE, NOT_INTERIOR_FILES } from './lib/stationIndex.ts'
+import { buildStationIndex, INDEX_FILE, NOT_INTERIOR_FILES } from './lib/stationIndex.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
 import { markGenerated } from './lib/stationProvenance.ts'
 import { toStableJson } from './lib/stableJson.ts'
@@ -26,7 +26,6 @@ const OUT_DIR = new URL('../public/data/stations/', import.meta.url)
 const DATA_DIR = new URL('../public/data/', import.meta.url)
 const DEPTHS = 'station-depths.json'
 const INDEX = INDEX_FILE
-const GENERATED_DEPTHS = GENERATED_DEPTHS_FILE
 const SUFFIX = '.authored.json'
 
 function readJson<T>(url: URL): T {
@@ -59,7 +58,9 @@ function main(): void {
 
   // A hand-authored station always wins over a generated one.
   const catalog = generatorCatalog(Object.fromEntries(CATALOG_FILES.map((f) => [f, readJson(new URL(f, CATALOG_DIR))])) as Record<(typeof CATALOG_FILES)[number], unknown>)
-  const lines = generatorLines(readJson(new URL('shapes.json', DATA_DIR)), readJson(new URL('stations.json', DATA_DIR)))
+  const shapesFile = readJson<ShapesFile>(new URL('shapes.json', DATA_DIR))
+  const stationsFile = readJson<StationsFile>(new URL('stations.json', DATA_DIR))
+  const lines = generatorLines(shapesFile, stationsFile)
   const result = generateStations(catalog, lines)
   for (const line of result.log) console.log(`generate: ${line}`)
   console.log(`generate: ${result.stations.length} stations generated, ${result.skipped.length} skipped`)
@@ -73,11 +74,15 @@ function main(): void {
     .map((g) => markGenerated(buildStationInterior(g.authored, g.sources), g.meta))
   const interiors = [...authoredInteriors, ...generatedInteriors]
 
-  // Authored depths load up front; generated ones go to their own file (always written, an empty-but-valid
-  // file when nothing is generated), fetched only under the TEMPORARY ?generated=1.
-  const depths = renderedFile(DEPTHS, toStableJson(buildStationDepths(authoredInteriors), 2))
-  const generatedDepths = renderedFile(GENERATED_DEPTHS, toStableJson(buildStationDepths(generatedInteriors), 2))
-  checkFileCap(generatedDepths, GENERATED_DEPTHS_GZIP_CAP_BYTES)
+  // Every interior's depths load up front, packed against the stations and drawn lines the client builds.
+  const packed = packStationDepths(buildStationDepths(interiors), stationsFile.stations, drawnLines(shapesFile.shapes, TRACK_OFFSET_M))
+  // The client never warns about these (they are packed as no track); this is where they show.
+  if (packed.notRidden.length > 0) {
+    console.warn(`WARNING: station-depths: no drawn line rides ${packed.notRidden.length} interior track(s); the map keeps them at street level: ${packed.notRidden.join(', ')}`)
+  }
+  for (const { stopId, errorM } of packed.inexact) console.warn(`WARNING: station-depths: ${stopId} packs ${errorM.toFixed(1)} m off its runs`)
+  console.log(`station-depths: ${packed.file.station.length} stations, ${packed.split.length} track(s) packed on their own: ${packed.split.join(', ')}`)
+  const depths = renderedFile(DEPTHS, renderPackedDepths(packed.file))
   // index.json is fetched right after startup (not render-blocking, no waiting for a first focus), so it
   // isn't in this budget; it has its own cap instead.
   const index = renderedFile(INDEX, toStableJson(buildStationIndex(interiors), 2))
@@ -106,10 +111,6 @@ function main(): void {
   }
   writeFileSync(new URL(INDEX, OUT_DIR), index.text)
   console.log(`stations/${INDEX}: ${index.raw} bytes (${index.gzip} gzipped, cap ${INDEX_GZIP_CAP_BYTES})`)
-  writeFileSync(new URL(GENERATED_DEPTHS, OUT_DIR), generatedDepths.text)
-  console.log(
-    `stations/${GENERATED_DEPTHS}: ${generatedDepths.raw} bytes (${generatedDepths.gzip} gzipped, cap ${GENERATED_DEPTHS_GZIP_CAP_BYTES})`,
-  )
   writeFileSync(new URL(DEPTHS, DATA_DIR), depths.text)
   console.log(`${DEPTHS}: ${depths.raw} bytes (${depths.gzip} gzipped)`)
   console.log(`public/data total gzip: ${total} B (budget ${GZIP_BUDGET_BYTES} B)`)

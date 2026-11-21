@@ -9,9 +9,6 @@ import { gzipSync } from 'node:zlib'
 export const GZIP_BUDGET_BYTES = 60_000
 /** stations/index.json loads after startup (not render-blocking), so it has its own cap outside the budget above. */
 export const INDEX_GZIP_CAP_BYTES = 8_000
-/** stations/depths-generated.json (generated stations' track depths) loads only under the TEMPORARY `?generated=1`
- *  for now, so it is outside the budget above, with its own cap. */
-export const GENERATED_DEPTHS_GZIP_CAP_BYTES = 32_000
 
 export interface RenderedFile {
   name: string

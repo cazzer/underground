@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { decodeShapePoints, deltaEncode } from '../data/codec'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
-import type { StationDepthsFile } from '../data/stationSchema'
+import type { PackedDepthsFile } from '../data/stationSchema'
 import { NO_BANDS } from './corridors'
 import { buildNetwork, pointAlong, stationAccess, type ShapePath } from './network'
 import { toGround } from './projection'
 import { EMPTY_PROFILE, profileAt } from './trackProfile'
 
 const FV = 'v1'
-const NO_DEPTHS: StationDepthsFile = { license: 'ODbL-1.0', attribution: [], stations: [] }
+const NO_DEPTHS: PackedDepthsFile = { license: 'ODbL-1.0', attribution: [], format: 2, station: [], y: [], a: [], h: [], da: [], dh: [], tracks: {} }
 
 function stationsFile(): StationsFile {
   return {
@@ -136,14 +136,35 @@ describe('buildNetwork track profile', () => {
   const len = Math.hypot(b!.x - a!.x, b!.z - a!.z)
   const [ux, uz] = [(b!.x - a!.x) / len, (b!.z - a!.z) / len]
   const t = (g.x - a!.x) * ux + (g.z - a!.z) * uz
-  const end = (s: number): [number, number] => [a!.x + ux * (t + s) - g.x, a!.z + uz * (t + s) - g.z]
-  const station = (stationId: string, railY: number, from: number, to: number, stops = [stationId + 'N']) => ({
-    stationId,
-    anchor,
-    tracks: stops.map((stopId) => ({ stopId, railY, ends: [end(from), end(to)] as [[number, number], [number, number]] })),
-  })
-  const build = (...stations: ReturnType<typeof station>[]) =>
-    buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, { ...NO_DEPTHS, stations }, 2)
+  /** A packed station whose listed stops each get an override: the run's centre (meters from the station point) and half-length. */
+  interface Packed {
+    stationId: string
+    railY: number
+    from: number
+    to: number
+    stops: string[]
+  }
+  const station = (stationId: string, railY: number, from: number, to: number, stops = [stationId + 'N']): Packed => ({ stationId, railY, from, to, stops })
+  const build = (...packed: Packed[]) => {
+    const all = stationsFile().stations
+    const depths: PackedDepthsFile = { ...NO_DEPTHS, station: [], y: [], a: [], h: [], da: [], dh: [], tracks: {} }
+    let prev = 0
+    for (const p of packed) {
+      const st = all.find((s) => s.id === p.stationId)!
+      const index = all.indexOf(st)
+      depths.station.push(depths.station.length === 0 ? index : index - prev)
+      prev = index
+      for (const col of [depths.y, depths.a, depths.h, depths.da, depths.dh]) col.push(0)
+      const pos = toGround(st)
+      const mid = (p.from + p.to) / 2
+      for (const stopId of st.stops) {
+        depths.tracks[stopId] = p.stops.includes(stopId)
+          ? [p.railY * 10, a!.x + ux * (t + mid) - pos.x, a!.z + uz * (t + mid) - pos.z, (p.to - p.from) / 2]
+          : null
+      }
+    }
+    return buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, depths, 2)
+  }
 
   it('descends a shape to a station depth it rides, scaled by yScale, and warns about a track nobody rides', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -151,7 +172,7 @@ describe('buildNetwork track profile', () => {
     const shape = net.shapes[0]!
     expect(net.stationTrackY).toEqual(new Map([['101', -20.4]]))
     expect(warn).toHaveBeenCalledTimes(1)
-    expect(warn.mock.calls[0]![0]).toMatch(/101S/)
+    expect(warn.mock.calls[0]![1]).toEqual(["101S"])
     warn.mockRestore()
     expect(profileAt(shape.profile, t)).toBeCloseTo(-20.4, 9)
     expect(shape.y[0]).toBe(0)

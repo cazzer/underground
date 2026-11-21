@@ -1,6 +1,7 @@
 /** public/data → render model: projected stations, routes, and shape paths. Pure. */
 import type { AdaStatus, Borough, Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
-import type { StationDepthsFile } from '../data/stationSchema'
+import { decodeStationDepths } from '../data/depthsCodec'
+import type { PackedDepthsFile } from '../data/stationSchema'
 import { NO_BANDS, type CorridorShape, type ShapeBands } from './corridors'
 import { boundsCenter } from './framing'
 import { vertexBandInputs } from './lineBuffers'
@@ -145,14 +146,15 @@ export function drawnPath(
  * `trackOffsetM` moves every shape that far right of its own travel direction (see trackLine.ts). Each shape
  * that stops at a station in `depths` descends to that station's rails (y scaled by `yScale`, the interior's
  * vertical exaggeration); the rest stay at 0. Shapes come without bands: networkBands.ts adds them later, off
- * the first paint. Warns about authored tracks no shape rides.
+ * the first paint. `depths` is decoded against these stations and drawn lines (depthsCodec.ts). Warns, in one
+ * line, about packed tracks no shape rides.
  */
 export function buildNetwork(
   stationsFile: StationsFile,
   routesFile: RoutesFile,
   shapesFile: ShapesFile,
   trackOffsetM: number,
-  depths: StationDepthsFile,
+  depths: PackedDepthsFile,
   yScale: number,
 ): Network {
   const { feedVersion } = stationsFile
@@ -181,8 +183,12 @@ export function buildNetwork(
     if (points.length < 2) throw new Error(`Shape ${s.id} has ${points.length} point(s); needs at least 2`)
     return { id: s.id, routeId: s.routeId, direction: s.direction, primary: s.primary, line: buildPolyline(points) }
   })
-  const { runs, unmatched } = profileRuns(depths, stations, lines)
-  for (const stopId of unmatched) console.warn(`Track depth: no shape rides the ${stopId} platform track; it stays at street level`)
+  const decoded = decodeStationDepths(depths, stationsFile.stations, lines)
+  const { runs, unmatched } = profileRuns(decoded.depths, stations, lines)
+  // The build packs only tracks a shape rides and prints the rest (npm run data:stations), so this stays quiet
+  // unless the files are out of step; then it is one line, not one per track.
+  const offLine = [...decoded.missed, ...unmatched]
+  if (offLine.length > 0) console.warn(`Track depth: no shape rides ${offLine.length} platform track(s); they stay at street level:`, offLine)
 
   const profiles = new Map<ShapeId, TrackProfile>()
   const stationTrackY = new Map<StationId, number>()
