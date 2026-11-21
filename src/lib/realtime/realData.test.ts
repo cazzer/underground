@@ -7,7 +7,7 @@ import l08Raw from '../../../public/data/stations/L08.json?raw'
 import stationsRaw from '../../../public/data/stations.json?raw'
 import tripIndexRaw from '../../../public/data/trip-index.json?raw'
 import type { RoutesFile, ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
-import type { StationDepthsFile, StationInterior } from '../../data/stationSchema'
+import type { PackedDepthsFile, StationInterior } from '../../data/stationSchema'
 import { createSlotTable, reconcileSlots } from '../live/slots'
 import { buildNetwork } from '../network'
 import { toGround } from '../projection'
@@ -165,7 +165,7 @@ describe('Bedford Av (L08): a stopped L train sits on its platform track', () =>
 })
 
 describe('real public/data: trains ride the drawn profile', () => {
-  const network = buildNetwork(stations, JSON.parse(routesRaw) as RoutesFile, shapes, TRACK_OFFSET_M, JSON.parse(depthsRaw) as StationDepthsFile, 2)
+  const network = buildNetwork(stations, JSON.parse(routesRaw) as RoutesFile, shapes, TRACK_OFFSET_M, JSON.parse(depthsRaw) as PackedDepthsFile, 2)
   const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, network.shapeById)
 
   it('uses the same resampled line, distances and profile as the map for every pattern', () => {

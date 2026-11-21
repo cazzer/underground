@@ -1,33 +1,15 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import type { StationDepthsFile, StationInterior } from '../../src/data/stationSchema.ts'
-import { toStableJson } from './stableJson.ts'
+import type { StationInterior } from '../../src/data/stationSchema.ts'
 import { buildStationDepths, DEPTHS_OPEN_NY_NOTE } from './stationDepths.ts'
-import { GENERATED_DEPTHS_FILE, NOT_INTERIOR_FILES } from './stationIndex.ts'
 import { OPEN_NY_NOTE } from './stationMerge.ts'
 
-const interiorDir = new URL('../../public/data/stations/', import.meta.url)
-const GENERATED_DEPTHS = GENERATED_DEPTHS_FILE
-const all = readdirSync(interiorDir)
-  .filter((f) => f.endsWith('.json') && !NOT_INTERIOR_FILES.has(f))
-  .map((f) => JSON.parse(readFileSync(new URL(f, interiorDir), 'utf8')) as StationInterior)
-const interiors = all.filter((i) => !i.generated)
-const l08 = interiors.find((i) => i.stationId === 'L08')!
-const committed = readFileSync(new URL('../../public/data/station-depths.json', import.meta.url), 'utf8')
-const committedGenerated = readFileSync(new URL(GENERATED_DEPTHS, interiorDir), 'utf8')
+// The committed station-depths.json is the packed form; depthsPack.test.ts checks it against every interior.
+const l08 = JSON.parse(readFileSync(new URL('../../public/data/stations/L08.json', import.meta.url), 'utf8')) as StationInterior
 
 describe('buildStationDepths', () => {
-  it('matches the committed station-depths.json, from the authored interiors only (rerun npm run data:stations if not)', () => {
-    expect(interiors.length).toBeGreaterThan(0)
-    expect(toStableJson(buildStationDepths(interiors), 2)).toBe(committed)
-  })
-
-  it('matches the committed stations/depths-generated.json, from the generated interiors only (empty but valid when none)', () => {
-    expect(toStableJson(buildStationDepths(all.filter((i) => i.generated)), 2)).toBe(committedGenerated)
-  })
-
   it('puts the L08 rails 1.1 m below the platform (-9.1 m) and keeps the track ends', () => {
-    const out = JSON.parse(committed) as StationDepthsFile
+    const out = buildStationDepths([l08])
     expect(out.license).toBe('ODbL-1.0')
     expect(out.attribution[0]).toBe('© OpenStreetMap contributors')
     const [station] = out.stations

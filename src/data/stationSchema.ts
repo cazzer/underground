@@ -138,9 +138,46 @@ export interface StationIndex {
   stations: Record<StationId, StationIndexEntry>
 }
 
+/** One platform track's own values (an override in `PackedDepthsFile.tracks`): rail y in decimeters, centre x and z in
+ *  whole meters east and south of the station's stations.json point, and half-length in whole meters. */
+export type PackedTrack = [y: number, x: number, z: number, h: number]
+
 /**
- * public/data/station-depths.json, written by scripts/build-stations.ts from the same interiors: each platform
- * track's ends and rail height, so the map's tracks can descend to meet the interior. ODbL like the interiors.
+ * public/data/station-depths.json, written by scripts/build-stations.ts from every interior (authored and generated):
+ * per station the rail height and where its platform tracks run along the drawn track lines, so the map's tracks can
+ * descend to meet the interior. Columnar to fit the startup budget; src/data/depthsCodec.ts decodes it to a
+ * `StationDepthsFile` against the same build's stations.json and drawn lines. ODbL like the interiors.
+ *
+ * Column values (whole meters unless noted) are measured along the drawn line of the stop's direction nearest the
+ * station's stations.json point P, from P's projection d onto it: the N track runs d + a ± h, the S track d - a + da ±
+ * (h + dh). So da and dh are 0 when the S track mirrors the N one, the common case.
+ */
+export interface PackedDepthsFile {
+  license: 'ODbL-1.0'
+  /** Union of the interiors' credits, OSM first. */
+  attribution: string[]
+  format: 2
+  /** stations.json's feedVersion when packed: the indexes below only mean anything against that build. */
+  feedVersion: string
+  /** One entry per station, in stations.json order: its index there, minus the previous entry's (the first is its index). */
+  station: number[]
+  /** Columns parallel to `station`. Rail y, decimeters relative to the street (negative below). */
+  y: number[]
+  /** N track centre along its line from d. */
+  a: number[]
+  /** N track half-length. */
+  h: number[]
+  /** S track: centre is d - a + da along its line, half-length h + dh. */
+  da: number[]
+  dh: number[]
+  /** A child stop the columns don't reproduce: its own values (centre-based), or null when it has no track. */
+  tracks: Record<StopId, PackedTrack | null>
+}
+
+/**
+ * The per-track station depths the track profile is anchored to (trackAnchors.ts `profileRuns`): each platform
+ * track's ends and rail height. Decoded from public/data/station-depths.json (`PackedDepthsFile`); the build also
+ * makes it directly from the interiors (scripts/lib/stationDepths.ts) before packing.
  */
 export interface StationDepthsFile {
   license: 'ODbL-1.0'
@@ -157,8 +194,8 @@ export interface StationDepth {
 }
 export interface TrackDepth {
   stopId: StopId
-  /** Real rail height, meters relative to the street (platform level y - RAIL_DROP_M), rounded to 0.01. */
+  /** Real rail height, meters relative to the street (platform level y - RAIL_DROP_M), rounded to 0.01 (0.1 decoded). */
   railY: number
-  /** First and last point of the interior's track path, station-local meters. */
+  /** First and last point of the interior's track path, station-local meters (decoded: on the nearest drawn track line). */
   ends: [LocalPoint, LocalPoint]
 }
