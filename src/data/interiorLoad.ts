@@ -27,6 +27,8 @@ export type IndexLoad =
  * loading, so a good load doesn't pop) is marked by that interior and draws neither; one with no interior (not in
  * the index, or the index failed) or a failed load keeps them as the fallback. While the index is still loading
  * nothing is known, so the marker stays hidden rather than flashing for a station that turns out to have one.
+ * Retry on a failed load goes back to loading, so the marker blinks off until the retry settles (and on again if it
+ * fails again); that is fine.
  */
 export function focusedMarkerShown(stationId: string | null, index: IndexLoad, load: InteriorLoad): boolean {
   if (!stationId || index.status === 'loading') return false

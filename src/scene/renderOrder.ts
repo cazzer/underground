@@ -39,4 +39,6 @@ export const RENDER_ORDER = {
   spanCarRim: 9.4,
   spanCarHalo: 9.45,
   spanCars: 9.5,
+  // The focus ring of a focused station with no interior, redrawn over the trains.
+  focusRing: 10,
 } as const

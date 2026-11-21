@@ -6,6 +6,7 @@ import { writeMarkerMatrices } from '../lib/markerMatrices'
 import type { Station } from '../lib/network'
 import { theme } from '../theme'
 import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
+import { FocusRing } from './FocusRing'
 import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
@@ -18,7 +19,7 @@ interface StationsProps {
 /**
  * All station markers as two instanced meshes (fill, then ring). The focused station's marker is hidden
  * (its panel and interior mark it); it stays pickable, since ScenePicker picks in screen space. A station with no
- * interior (`focusedMarker`) keeps its marker, drawn like any other: the theme has no focused-disk look.
+ * interior (`focusedMarker`) keeps its marker, plus a `theme.stationFocus` FocusRing above the trains.
  */
 export function Stations({ stations, focusedMarker }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
@@ -97,6 +98,7 @@ export function Stations({ stations, focusedMarker }: StationsProps) {
         {/* Default white material: the per-instance colors are the ring colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
+      {focusedMarker && focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} />}
     </>
   )
 }
