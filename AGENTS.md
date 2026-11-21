@@ -37,7 +37,8 @@ so dev and preview serve under that path.
   committed `public/data/shapes.json` and `stations.json` (a hand-authored station wins; it prints each skipped
   candidate with its reason and each dropped source row), and pack `public/data/station-depths.json` (every interior's
   platform tracks and rail heights; it counts toward the shared 60 KB budget). It prints a `WARNING:` line listing
-  interior tracks no drawn line rides (packed as no track, so the client stays quiet about them). Offline.
+  interior tracks no drawn line rides (packed as no track, so the client stays quiet about them), and fails if any
+  track packs more than 2 m off its runs. Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
   pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
@@ -490,7 +491,9 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   `tracks` overrides a stop the columns don't reproduce with its own `[y, x, z, h]` (centre in meters from the station
   point, decoded onto the nearest line of its direction within 15 m), or `null` for no track. The encoder decodes every
   choice and checks the runs `profileRuns` finds against the full per-track ends (`PACK_TOL_M`, 2 m; the committed file
-  is checked to 3 m by `depthsPack.test.ts`). Since ends land on a drawn line, a sibling shape that just missed the 6 m
+  is checked to 3 m by `depthsPack.test.ts`). `feedVersion` is stations.json's at packing time: on a mismatch (a stale or
+  mixed deploy) the decoder logs one error and returns no depths, so tracks stay flat and the map still loads; a
+  malformed file (bad index or delta, non-number value, override not four numbers) throws. Since ends land on a drawn line, a sibling shape that just missed the 6 m
   match may ride too. ODbL, with the union of the interiors' credits minus the OPEN-NY note, plus its own line
   ("Some railY values come from E&E rises and are MTA data under the OPEN-NY Terms of Use") only when a platform
   level's `depthSource` is `ee-rise`. It depends on stations.json and shapes.json, so rerun `data:stations` after `data`.
@@ -543,13 +546,13 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
-  about 200 B of headroom; the depths file is about 1.5 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
+  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), change `public/data`. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).
-- **Station interiors are hand-authored per station.** They're merged with OSM platform
-  polygons, NY Open Data entrances, and E&E elevator/escalator data. The starter
-  stations are Bedford Av, 1 Av, 96 St (Q), and Park Pl.
+- **Station interiors are hand-authored or generated.** Bedford Av (L08) is hand-authored and wins over a generated
+  one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".
+  Both are merged with OSM platform polygons, NY Open Data entrances, and E&E elevator/escalator data.
 - **Attribution.** Credit MTA and show "© OpenStreetMap contributors". Include a
   "may not be real time" notice. Don't use the MTA logo, route bullets, or the map.
