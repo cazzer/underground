@@ -1,0 +1,37 @@
+{
+  "stationId": "106",
+  "name": "Marble Hill-225 St",
+  "anchor": {
+    "lat": 40.87460800193168,
+    "lon": -73.90979892959213
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 0.7
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-326119859","level":"platform","outline":[[-60.51,49.82],[-63.58,46.97],[-46.33,31.33],[-21.8,9.08],[-11.42,1.7],[32.72,-40.53],[50.7,-59.24],[52.33,-57.83],[21.64,-26.23],[-2.14,-3.79],[-36.86,27.3],[-54.11,43.62]],"tracks":[{"stopId":"106S","path":[[-58.72,50.67],[-42.68,35.24],[-15.24,9.99],[10.96,-13.73],[53.08,-56.46]]}],"osmRef":"way/326119859","sources":["generated","osm"]},
+    {"id":"way-326119860","level":"platform","outline":[[-52.87,57.2],[-50.08,59.81],[-23.16,34.8],[-10.1,22.66],[-2.6,13.52],[1.91,8.96],[15.38,-3.05],[40.47,-27.91],[61.5,-49.17],[59.67,-50.54],[28.03,-18.28],[4.47,3.94],[-28.48,34.09],[-45.82,50.09]],"tracks":[{"stopId":"106N","path":[[-53.36,55.75],[-34.29,37.18],[-11.03,16.25],[17.89,-9.96],[31.11,-22.92],[43.96,-36.25],[58.39,-50.87],[59.08,-51.58]]}],"osmRef":"way/326119860","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-55.24,25.33],[-29.57,1.07],[-2.74,29.46],[-28.41,53.72]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-0.36,"z":31.99,"level":"street"},"upper":{"x":-7.47,"z":30.85,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-64.24,"z":15.81,"level":"street"},"upper":{"x":-49.32,"z":20.72,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-20.7,"z":11.92,"level":"station-house"},"upper":{"x":-10.23,"z":2.03,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":-12.17,"z":20.95,"level":"station-house"},"upper":{"x":-1.7,"z":11.06,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-0.36,"z":31.99,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-64.24,"z":15.81,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

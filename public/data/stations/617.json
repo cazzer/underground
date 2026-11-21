@@ -1,0 +1,34 @@
+{
+  "stationId": "617",
+  "name": "Cypress Av",
+  "anchor": {
+    "lat": 40.80548878612982,
+    "lon": -73.91431003409191
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.7
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-905261616","level":"platform","outline":[[-70.86,-33.78],[65.85,42.6],[64.53,45.01],[-71.83,-32.13]],"tracks":[{"stopId":"617N","path":[[-70.18,-34.92],[65.67,41]]}],"osmRef":"way/905261616","sources":["generated","osm"]},
+    {"id":"way-905261617","level":"platform","outline":[[70.93,33.7],[-65.42,-42.5],[-64.27,-44.46],[72.16,31.54]],"tracks":[{"stopId":"617S","path":[[-65.24,-40.88],[70.28,34.85]]}],"osmRef":"way/905261617","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":63.72,"z":42.98,"level":"platform"},"upper":{"x":68.56,"z":49.08,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":26.38,"z":21.98,"level":"platform"},"upper":{"x":28.99,"z":32.06,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":69.04,"z":31.23,"level":"platform"},"upper":{"x":79.44,"z":27.4,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":68.56,"z":49.08,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":28.99,"z":32.06,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":79.44,"z":27.4,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

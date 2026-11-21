@@ -1,0 +1,30 @@
+{
+  "stationId": "245",
+  "name": "Beverly Rd",
+  "anchor": {
+    "lat": 40.6450939035995,
+    "lon": -73.94896413869364
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907189057","level":"platform","outline":[[-9.64,-78.4],[-12.91,-78.14],[0.05,79.03],[3.31,78.8]],"tracks":[{"stopId":"245S","path":[[-8.25,-77.51],[4.54,77.72]]}],"osmRef":"way/907189057","sources":["generated","osm"]},
+    {"id":"way-907189058","level":"platform","outline":[[-3.32,-78.94],[9.64,78.37],[12.9,78.15],[-0.05,-79.2]],"tracks":[{"stopId":"245N","path":[[-4.55,-77.84],[8.33,78.46]]}],"osmRef":"way/907189058","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-4.51,"z":3.89,"level":"platform"},"upper":{"x":-24.24,"z":6.73,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-24.24,"z":6.73,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

@@ -9,6 +9,9 @@ import { gzipSync } from 'node:zlib'
 export const GZIP_BUDGET_BYTES = 60_000
 /** stations/index.json loads after startup (not render-blocking), so it has its own cap outside the budget above. */
 export const INDEX_GZIP_CAP_BYTES = 8_000
+/** stations/depths-generated.json (generated stations' track depths) loads only under the TEMPORARY `?generated=1`
+ *  for now, so it is outside the budget above, with its own cap. */
+export const GENERATED_DEPTHS_GZIP_CAP_BYTES = 32_000
 
 export interface RenderedFile {
   name: string
@@ -48,10 +51,15 @@ export function checkBudget(files: readonly RenderedFile[], others: Readonly<Rec
   return total
 }
 
+/** A file outside the budget must fit its own cap; returns its gzip size. */
+export function checkFileCap(file: RenderedFile, capBytes: number): number {
+  if (file.gzip > capBytes) {
+    throw new Error(`${file.name} is ${file.gzip} B gzipped, over its ${capBytes} B cap. Nothing written.`)
+  }
+  return file.gzip
+}
+
 /** The station index must fit its own cap; returns its gzip size. */
 export function checkIndexCap(index: RenderedFile): number {
-  if (index.gzip > INDEX_GZIP_CAP_BYTES) {
-    throw new Error(`${index.name} is ${index.gzip} B gzipped, over its ${INDEX_GZIP_CAP_BYTES} B cap. Nothing written.`)
-  }
-  return index.gzip
+  return checkFileCap(index, INDEX_GZIP_CAP_BYTES)
 }

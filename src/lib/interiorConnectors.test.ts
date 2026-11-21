@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Connector } from '../data/stationSchema'
 import { stationAxis } from './interiorAxis'
-import { doorSide } from './interiorConnectors'
+import { doorSide, inclineEnds } from './interiorConnectors'
 import { buildInteriorBuffers, type Buffers, type InteriorRole, type MachineStyle } from './interiorGeometry'
 import { count, ELEVATOR, fixture, opts, ROLES, seg } from './interiorFixture'
 
@@ -189,6 +189,35 @@ describe('escalators', () => {
     const [lower, upper] = ends(listedBy([zeroRunAt(9)], ['ES1']))
     expect(upper).toBeCloseTo(9)
     expect(lower).toBeCloseTo(9 - 4 * Math.sqrt(3))
+  })
+
+  it('pins the street end at the entrance: the upper end below ground, the lower end at an elevated station', () => {
+    const c = zeroRunAt(9)
+    const anchor = { point: [9, 10] as [number, number], atEntrance: true, lateral: 0 }
+    const run = 4 * Math.sqrt(3)
+    const below = inclineEnds(c, 4, [1, 0], [0, 0], anchor)
+    expect(below.upper).toEqual([9, 10])
+    expect(below.lower[0]).toBeCloseTo(9 - run)
+    const elevated = inclineEnds(c, 4, [1, 0], [0, 0], anchor, 'lower')
+    expect(elevated.lower).toEqual([9, 10])
+    expect(elevated.upper[0]).toBeCloseTo(9 - run)
+    // Centered runs ignore which end is the street.
+    expect(inclineEnds(c, 4, [1, 0], [0, 0], { ...anchor, atEntrance: false }, 'lower')).toEqual(inclineEnds(c, 4, [1, 0], [0, 0], { ...anchor, atEntrance: false }))
+  })
+
+  it('draws an elevated station\'s street escalator up from its entrance toward the center', () => {
+    const base = listedBy([{ ...zeroRunAt(9), lower: { x: 9, z: 10, level: 'street' }, upper: { x: 9, z: 10, level: 'mezz' } }], ['ES1'])
+    const elevated = {
+      ...base,
+      levels: [
+        { id: 'plat', name: 'Platform', kind: 'platform' as const, y: 8 },
+        { id: 'mezz', name: 'Station house', kind: 'mezzanine' as const, y: 4 },
+        { id: 'street', name: 'Street', kind: 'street' as const, y: 0 },
+      ],
+    }
+    const [lower, upper] = ends(elevated)
+    expect(lower).toBeCloseTo(9)
+    expect(upper).toBeCloseTo(9 - 4 * Math.sqrt(3))
   })
 
   it('keeps an authored `at` off the entrance: the run is centered on its own point', () => {

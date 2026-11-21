@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { toStableJson } from './stableJson.ts'
-import { fixture, ll } from './stationFixture.ts'
+import { elevatedFixture, fixture, ll } from './stationFixture.ts'
 import { ELEVATOR_WIDTH_M, ESCALATOR_WIDTH_M } from './stationEquipment.ts'
-import { buildStationInterior, OPEN_NY_NOTE } from './stationMerge.ts'
+import { buildStationInterior, checkEntranceLinks, OPEN_NY_NOTE } from './stationMerge.ts'
 
 const build = (mutate: (f: ReturnType<typeof fixture>) => void = () => {}) => {
   const f = fixture()
@@ -69,8 +69,9 @@ describe('authored connectors', () => {
     expect(st.sources).toEqual(['authored', 'nyopendata'])
     expect(ent.connectors).toEqual(['st-street'])
   })
-  it('rejects {entrance} as the lower end', () => {
-    expect(() => build((f) => { f.authored.connectors[0]!.lower = { entrance: 'stair-ent' } })).toThrow(/only be the upper end/)
+  it('rejects an {entrance} lower end below ground, where the street is the top level', () => {
+    expect(() => build((f) => { f.authored.connectors[0]!.lower = { entrance: 'stair-ent' } })).toThrow(/st-street\): lower end must be below/)
+    expect(() => build((f) => { f.authored.connectors[1]!.lower = { entrance: 'stair-ent' } })).toThrow(/st-plat\): lower end must be below/)
   })
   it('rejects a lower end that is not below the upper end, and a non-positive width', () => {
     expect(() => build((f) => { f.authored.connectors[1]!.lower = { level: 'mezz', at: [-12, 0] } })).toThrow(/lower end must be below/)
@@ -93,6 +94,15 @@ describe('entrance links', () => {
       f.authored.equipment = [{ code: 'EL1', entrance: 'elev-ent' }, { code: 'EL2', at: [-26, 0] }, { code: 'ES1', entrance: 'stair-ent', at: [-15, 1] }]
     })
     expect(out.entrances.find((e) => e.id === 'stair-ent')!.connectors).toEqual(['ES1', 'st-street'])
+  })
+  it('reports two connectors with one id on one entrance as a duplicate id, not as two entrances', () => {
+    expect(() => build((f) => { f.authored.connectors[1] = { ...f.authored.connectors[0]! } })).toThrow(/duplicate id st-street/)
+  })
+  it('rejects a connector listed by two entrances, naming it and both entrances', () => {
+    const out = build()
+    const entrances = new Map(out.entrances.map((e) => [e.id, { ...e, connectors: [...e.connectors] }]))
+    entrances.get('stair-ent')!.connectors.push('EL1')
+    expect(() => checkEntranceLinks(entrances, out.connectors)).toThrow('connector EL1 is listed by two entrances, elev-ent and stair-ent')
   })
   it('rejects an entrance override on a machine that does not reach the street', () => {
     expect(() => build((f) => { f.authored.equipment.push({ code: 'ES1', entrance: 'stair-ent', at: [-15, 1] }) })).toThrow(/ES1 does not reach the street/)
@@ -126,6 +136,15 @@ describe('equipment', () => {
     const down = serve('mezzanine to platform for Main St exit')
     expect(connector(down, 'ES1')).toMatchObject({ travel: 'down', lower: { level: 'platform' }, upper: { level: 'mezz' } })
     expect(connector(serve('platform to mezzanine for service in both directions'), 'ES1')).not.toHaveProperty('travel')
+  })
+  it('gives an escalator its own run from an `ends` override, by elevation, adding authored', () => {
+    const es1 = connector(build((f) => { f.authored.equipment.push({ code: 'ES1', ends: { lower: [-15, 0], upper: [-20, 0] } }) }), 'ES1')
+    expect(es1).toMatchObject({ lower: { x: -15, z: 0, level: 'platform' }, upper: { x: -20, z: 0, level: 'mezz' } })
+    expect(es1.sources).toEqual(['authored', 'nyopendata'])
+  })
+  it('rejects `ends` on an elevator or together with `at`', () => {
+    expect(() => build((f) => { f.authored.equipment[1] = { code: 'EL2', ends: { lower: [-24, 0], upper: [-26, 0] } } })).toThrow(/only an escalator has a run/)
+    expect(() => build((f) => { f.authored.equipment.push({ code: 'ES1', at: [-15, 0], ends: { lower: [-15, 0], upper: [-20, 0] } }) })).toThrow(/either "at" or "ends"/)
   })
   it('applies default widths and honors an override', () => {
     const out = build((f) => { f.authored.equipment[1]!.width = 1.8 })
@@ -213,5 +232,47 @@ describe('output', () => {
     const nums: number[] = []
     JSON.stringify(build(), (_k, v: unknown) => { if (typeof v === 'number') nums.push(v); return v })
     expect(nums.filter((n) => decimals(n) > 2 && !Object.values(build().anchor).includes(n))).toEqual([])
+  })
+})
+
+describe('elevated station (the street is the lowest level)', () => {
+  const elevated = (mutate: (f: ReturnType<typeof elevatedFixture>) => void = () => {}) => {
+    const f = elevatedFixture()
+    mutate(f)
+    return buildStationInterior(f.authored, f.sources)
+  }
+  it('sorts the levels above the street, highest first', () => {
+    expect(elevated().levels.map((l) => [l.id, l.y])).toEqual([['platform', 8], ['house', 4], ['street', 0]])
+  })
+  it('an {entrance} lower end takes the entrance point at the street level and links back', () => {
+    const out = elevated()
+    const st = connector(out, 'st-street')
+    const ent = out.entrances.find((e) => e.id === 'stair-ent')!
+    expect(st.lower).toEqual({ x: ent.x, z: ent.z, level: 'street' })
+    expect(st.upper.level).toBe('house')
+    expect(st.sources).toEqual(['authored', 'nyopendata'])
+    expect(ent.connectors).toEqual(['st-street'])
+  })
+  it('an E&E elevator from the street takes its entrance override on the lower end', () => {
+    const out = elevated()
+    const el1 = connector(out, 'EL1')
+    const ent = out.entrances.find((e) => e.id === 'elev-ent')!
+    expect(el1).toMatchObject({ kind: 'elevator', lower: { x: ent.x, z: ent.z, level: 'street' }, upper: { x: ent.x, z: ent.z, level: 'platform' } })
+    expect(ent.connectors).toEqual(['EL1'])
+  })
+  it('an E&E escalator from the street sits on its entrance, the street at its lower end', () => {
+    const out = elevated()
+    const es2 = connector(out, 'ES2')
+    const ent = out.entrances.find((e) => e.id === 'esc-ent')!
+    expect(es2).toMatchObject({ kind: 'escalator', travel: 'up', lower: { x: ent.x, z: ent.z, level: 'street' }, upper: { x: ent.x, z: ent.z, level: 'house' } })
+    expect(ent.connectors).toEqual(['ES2'])
+  })
+  it('rejects an {entrance} upper end, which would be below its lower end', () => {
+    expect(() => elevated((f) => { f.authored.connectors[1]!.upper = { entrance: 'stair-ent' } })).toThrow(/st-plat\): lower end must be below/)
+  })
+  it('rejects an entrance override on a machine with no street end', () => {
+    expect(() => elevated((f) => { f.sources.equipment.rows[0]!.serving = 'mezzanine to platform for service in both directions' })).toThrow(
+      /EL1 does not reach the street \(it joins house and platform\)/,
+    )
   })
 })

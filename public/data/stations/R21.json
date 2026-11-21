@@ -1,0 +1,44 @@
+{
+  "stationId": "R21",
+  "name": "8 St-NYU",
+  "anchor": {
+    "lat": 40.730339580924095,
+    "lon": -73.99263043102934
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907579944","level":"platform","outline":[[56.14,-74.05],[58.76,-72.46],[-41.24,83.25],[-43.83,81.63]],"tracks":[{"stopId":"R21N","path":[[-44.6,79.98],[-8.56,23.79],[54.83,-74.84]]}],"osmRef":"way/907579944","sources":["generated","osm"]},
+    {"id":"way-907579945","level":"platform","outline":[[43.61,-81.54],[40.99,-83.1],[-58.64,72.53],[-56.05,74.11]],"tracks":[{"stopId":"R21S","path":[[-54.72,74.91],[1.74,-13.39],[44.39,-79.92]]}],"osmRef":"way/907579945","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-31.53,"z":65.3,"level":"platform"},"upper":{"x":-34.42,"z":72.01,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-47.33,"z":57.67,"level":"platform"},"upper":{"x":-53.22,"z":62.45,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":19.51,"z":-14.18,"level":"platform"},"upper":{"x":25.84,"z":-18.68,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":2.4,"z":-20,"level":"platform"},"upper":{"x":2.74,"z":-28.33,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-05","kind":"stair","lower":{"x":27.03,"z":-25.89,"level":"platform"},"upper":{"x":35.38,"z":-29.09,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-06","kind":"stair","lower":{"x":4.04,"z":-22.56,"level":"platform"},"upper":{"x":-9.81,"z":-35.24,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-07","kind":"stair","lower":{"x":11.15,"z":-33.68,"level":"platform"},"upper":{"x":10.14,"z":-42.88,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-08","kind":"stair","lower":{"x":12.64,"z":-36,"level":"platform"},"upper":{"x":-1.62,"z":-48.94,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-34.42,"z":72.01,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-53.22,"z":62.45,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":25.84,"z":-18.68,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":2.74,"z":-28.33,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]},
+    {"id":"ent-05","x":35.38,"z":-29.09,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]},
+    {"id":"ent-06","x":-9.81,"z":-35.24,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-06"],"sources":["nyopendata"]},
+    {"id":"ent-07","x":10.14,"z":-42.88,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-07"],"sources":["nyopendata"]},
+    {"id":"ent-08","x":-1.62,"z":-48.94,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-08"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

@@ -4,12 +4,11 @@ import { describe, expect, it } from 'vitest'
 import type { StationIndex, StationInterior } from '../../src/data/stationSchema.ts'
 import { buildInteriorBuffers, RAIL_DROP_M } from '../../src/lib/interiorGeometry.ts'
 import { toStableJson } from './stableJson.ts'
-import { buildStationIndex } from './stationIndex.ts'
+import { buildStationIndex, INDEX_FILE, NOT_INTERIOR_FILES } from './stationIndex.ts'
 
 const dir = new URL('../../public/data/stations/', import.meta.url)
-const INDEX_FILE = 'index.json'
 const ids = readdirSync(dir)
-  .filter((f) => f.endsWith('.json') && f !== INDEX_FILE)
+  .filter((f) => f.endsWith('.json') && !NOT_INTERIOR_FILES.has(f))
   .map((f) => f.replace(/\.json$/, ''))
   .sort()
 const read = (id: string) => JSON.parse(readFileSync(new URL(`${id}.json`, dir), 'utf8')) as StationInterior

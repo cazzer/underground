@@ -1,0 +1,35 @@
+{
+  "stationId": "101",
+  "name": "Van Cortlandt Park-242 St",
+  "anchor": {
+    "lat": 40.88921070798873,
+    "lon": -73.8986146818555
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-242351162","level":"platform","outline":[[26.8,-77.21],[-30.97,75.64],[-26.77,77.11],[30.96,-75.58]],"tracks":[{"stopId":"101N","path":[[-25.04,76.85],[-24.34,75.01],[7.06,-8.18]]},{"stopId":"101S","path":[[-31.7,74.39],[-31.01,72.56],[0.73,-11.4]]}],"osmRef":"way/242351162","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[15.25,-63.68],[26.47,-93.37],[38.16,-88.95],[26.93,-59.26]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":15.36,"z":-63.64,"level":"street"},"upper":{"x":20.16,"z":-69,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":30.07,"z":-102.89,"level":"street"},"upper":{"x":28.66,"z":-91.77,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":23.32,"z":-61.7,"level":"station-house"},"upper":{"x":18.23,"z":-48.23,"level":"platform"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":15.36,"z":-63.64,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":30.07,"z":-102.89,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

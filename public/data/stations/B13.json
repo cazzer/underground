@@ -1,0 +1,44 @@
+{
+  "stationId": "B13",
+  "name": "Fort Hamilton Pkwy",
+  "anchor": {
+    "lat": 40.64092347152936,
+    "lon": -73.99430742790486
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-427044491","level":"platform","outline":[[-6.6,82.38],[-4,-105.3],[-7.3,-105.24],[-10.15,82.23]],"tracks":[{"stopId":"B13S","path":[[-4.94,82.38],[-2.04,-105.03]]}],"osmRef":"way/427044491","sources":["generated","osm"]},
+    {"id":"way-427044492","level":"platform","outline":[[7.06,-79.92],[3.87,105.3],[7.13,105.35],[10.2,-79.76]],"tracks":[{"stopId":"B13N","path":[[2.18,104.67],[2.77,82.92],[5.4,-79.42]]}],"osmRef":"way/427044492","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house 1","outline":[[-12.4,92.22],[-12.09,72.22],[9.81,72.56],[9.5,92.56]],"sources":["generated"]},
+    {"id":"slab-2","level":"station-house","name":"Station house 2","outline":[[-10.34,-38.97],[-10.02,-58.96],[11.87,-58.62],[11.56,-38.62]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":7.38,"z":82.67,"level":"street"},"upper":{"x":0.18,"z":82.44,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-9.75,"z":82.11,"level":"street"},"upper":{"x":-2.55,"z":82.35,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":-8.74,"z":-48.54,"level":"street"},"upper":{"x":-1.54,"z":-48.73,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":9.4,"z":-49.06,"level":"street"},"upper":{"x":2.21,"z":-48.84,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-8.26,"z":73.28,"level":"station-house"},"upper":{"x":-8.04,"z":58.88,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":6.06,"z":73.5,"level":"station-house"},"upper":{"x":6.28,"z":59.11,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p1","kind":"stair","lower":{"x":-6.58,"z":-39.91,"level":"station-house"},"upper":{"x":-6.81,"z":-25.51,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-2-p2","kind":"stair","lower":{"x":7.93,"z":-39.68,"level":"station-house"},"upper":{"x":7.71,"z":-25.28,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":7.38,"z":82.67,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-9.75,"z":82.11,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":-8.74,"z":-48.54,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":9.4,"z":-49.06,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

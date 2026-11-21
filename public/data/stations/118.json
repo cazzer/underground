@@ -1,0 +1,34 @@
+{
+  "stationId": "118",
+  "name": "Cathedral Pkwy (110 St)",
+  "anchor": {
+    "lat": 40.804233562325315,
+    "lon": -73.9666650734266
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-449067973","level":"platform","outline":[[-27.88,77.95],[-34.64,74.6],[45.26,-68.88],[51.64,-65.45]],"tracks":[{"stopId":"118N","path":[[-36.57,73.26],[42.27,-68.49],[42.76,-69.36]]}],"osmRef":"way/449067973","sources":["generated","osm"]},
+    {"id":"way-449067974","level":"platform","outline":[[-51.85,65.33],[-45.18,68.9],[34.66,-74.49],[28.03,-78.1]],"tracks":[{"stopId":"118S","path":[[-43.09,69.73],[35.88,-72.98]]}],"osmRef":"way/449067974","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-0.08,"z":20.17,"level":"platform"},"upper":{"x":2.62,"z":29.91,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":11.8,"z":-1.21,"level":"platform"},"upper":{"x":21.22,"z":-4.21,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":-6.08,"z":-9.08,"level":"platform"},"upper":{"x":-9.42,"z":-19.19,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":2.62,"z":29.91,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":21.22,"z":-4.21,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":-9.42,"z":-19.19,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

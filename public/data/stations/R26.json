@@ -1,0 +1,44 @@
+{
+  "stationId": "R26",
+  "name": "Rector St",
+  "anchor": {
+    "lat": 40.707394077913996,
+    "lon": -74.01324592754345
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.8
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907576666","level":"platform","outline":[[-40.63,82.37],[-37.58,84.39],[-23.42,61.92],[-13.87,45],[-4.61,26.83],[11.94,-6.18],[49.05,-78.42],[45.76,-80.01],[8.65,-7.79],[-7.94,25.31],[-17.13,43.3],[-26.57,60.09]],"tracks":[{"stopId":"R26N","path":[[-41.91,81.52],[-27.9,59.31],[-18.49,42.59],[-10.54,27.04],[-9.34,24.67],[7.23,-8.39],[44.39,-80.68]]}],"osmRef":"way/907576666","sources":["generated","osm"]},
+    {"id":"way-907576667","level":"platform","outline":[[-17.35,20.58],[-26.48,38.42],[-35.75,54.95],[-49.48,76.54],[-46.37,78.57],[-32.56,56.71],[-23.23,40.08],[-14.07,22.19],[2.51,-10.86],[39.64,-83.11],[36.39,-84.77],[-0.79,-12.5]],"tracks":[{"stopId":"R26S","path":[[-28.4,52.45],[-21.84,40.78],[-12.68,22.87],[3.88,-10.18],[40.55,-81.53]]}],"osmRef":"way/907576667","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-6.67,"z":3.34,"level":"platform"},"upper":{"x":-4.91,"z":-3.87,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":0.15,"z":-10.25,"level":"platform"},"upper":{"x":2.19,"z":-17.3,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":16.38,"z":-18.84,"level":"platform"},"upper":{"x":22.26,"z":-23.9,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":6.9,"z":-23.42,"level":"platform"},"upper":{"x":8.61,"z":-30.65,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-05","kind":"stair","lower":{"x":29.18,"z":-43.74,"level":"platform"},"upper":{"x":34.97,"z":-48.85,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-06","kind":"stair","lower":{"x":19.85,"z":-48.6,"level":"platform"},"upper":{"x":21.48,"z":-55.87,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-07","kind":"stair","lower":{"x":41.07,"z":-66.87,"level":"platform"},"upper":{"x":46.96,"z":-71.91,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-08","kind":"stair","lower":{"x":31.4,"z":-71.07,"level":"platform"},"upper":{"x":32.77,"z":-78.47,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-4.91,"z":-3.87,"type":"Stair","entry":false,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":2.19,"z":-17.3,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":22.26,"z":-23.9,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":8.61,"z":-30.65,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]},
+    {"id":"ent-05","x":34.97,"z":-48.85,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]},
+    {"id":"ent-06","x":21.48,"z":-55.87,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-06"],"sources":["nyopendata"]},
+    {"id":"ent-07","x":46.96,"z":-71.91,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-07"],"sources":["nyopendata"]},
+    {"id":"ent-08","x":32.77,"z":-78.47,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-08"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

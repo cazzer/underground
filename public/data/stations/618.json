@@ -1,0 +1,36 @@
+{
+  "stationId": "618",
+  "name": "Brook Av",
+  "anchor": {
+    "lat": 40.80757730290464,
+    "lon": -73.91925982563284
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.8
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-905263368","level":"platform","outline":[[-77.66,-37.02],[59.21,38.95],[58.06,41.29],[-78.75,-35.08]],"tracks":[{"stopId":"618N","path":[[-77,-38.17],[59.79,37.77]]}],"osmRef":"way/905263368","sources":["generated","osm"]},
+    {"id":"way-905263369","level":"platform","outline":[[-59.52,-38.7],[77.45,37.36],[78.83,34.94],[-58.04,-41.28]],"tracks":[{"stopId":"618S","path":[[-59.33,-37.08],[76.79,38.5]]}],"osmRef":"way/905263369","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":0.75,"z":7.9,"level":"platform"},"upper":{"x":2.05,"z":20.39,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-3.77,"z":5.38,"level":"platform"},"upper":{"x":-15.84,"z":12.27,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":17.67,"z":2.53,"level":"platform"},"upper":{"x":28.16,"z":-1.52,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":-4.51,"z":-9.81,"level":"platform"},"upper":{"x":-6.7,"z":-20.69,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":2.05,"z":20.39,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-15.84,"z":12.27,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":28.16,"z":-1.52,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":-6.7,"z":-20.69,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

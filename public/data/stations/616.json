@@ -1,0 +1,36 @@
+{
+  "stationId": "616",
+  "name": "E 143 St-St Mary's St",
+  "anchor": {
+    "lat": 40.80875501136317,
+    "lon": -73.90764815855319
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-905260133","level":"platform","outline":[[-15.28,76.35],[24.26,-74.08],[28.59,-72.96],[-11.45,77.29]],"tracks":[{"stopId":"616N","path":[[-16.3,75.07],[22.97,-74.38]]}],"osmRef":"way/905260133","sources":["generated","osm"]},
+    {"id":"way-905260134","level":"platform","outline":[[-25.2,73.86],[14.28,-76.43],[11,-77.22],[-28.33,72.73]],"tracks":[{"stopId":"616S","path":[[-23.93,74.16],[15.32,-75.18]]}],"osmRef":"way/905260134","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-12.42,"z":73.27,"level":"platform"},"upper":{"x":-7.99,"z":81.89,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-26.52,"z":72.37,"level":"platform"},"upper":{"x":-36.02,"z":77.32,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":-18.87,"z":43.24,"level":"platform"},"upper":{"x":-30.08,"z":47.73,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":-2.09,"z":34.22,"level":"platform"},"upper":{"x":2.35,"z":42.83,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-7.99,"z":81.89,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-36.02,"z":77.32,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":-30.08,"z":47.73,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":2.35,"z":42.83,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

@@ -1,0 +1,33 @@
+{
+  "stationId": "M01",
+  "name": "Middle Village-Metropolitan Av",
+  "anchor": {
+    "lat": 40.71141484858553,
+    "lon": -73.88958559944987
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.8
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":8,"depthSource":"structure-default"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4,"depthSource":"structure-default"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-297680843","level":"platform","outline":[[23.35,-74.54],[25.53,-73.87],[28.14,-72.99],[25.08,-64.35],[12.5,-29.98],[6.73,-12.76],[0.27,4.78],[-5.99,22.97],[-11.66,39.91],[-16.76,57.29],[-21.39,74.75],[-23.13,74.57],[-25.8,73.79],[-27.29,73.17],[-22.25,55.83],[-16.94,38.25],[-11.4,21.24],[-5.02,3.02],[13.35,-48.9],[19.62,-65.99],[22.02,-73.01],[22.68,-72.78]],"tracks":[{"stopId":"M01N","path":[[-28.67,72.37],[-25.23,58.02],[-19.74,39.87],[-13.68,22.19],[-7.51,4.28],[-4.36,-4.71]]},{"stopId":"M01S","path":[[-20.37,74.91],[-15.98,59.74],[-10.98,41.72],[-5.09,24.02],[1.12,6.37],[4.7,-2.68]]}],"osmRef":"way/297680843","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[16.43,-66.42],[24.51,-90.08],[35.72,-86.26],[27.64,-62.6]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":30.07,"z":-88.83,"level":"street"},"upper":{"x":28.12,"z":-82.73,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":22.18,"z":-65.52,"level":"station-house"},"upper":{"x":18.04,"z":-53.41,"level":"platform"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":30.07,"z":-88.83,"type":"Station House","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

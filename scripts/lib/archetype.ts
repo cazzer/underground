@@ -1,6 +1,7 @@
 /** Station archetype from facts: which hand-built template (if any) a station can be generated from.
  *  Pure. Every confidence deduction pushes a reason; an archetype below INTERIOR_MIN_CONFIDENCE is
  *  informative only and must not be turned into an interior. */
+import { DEEP_REASON, DEEP_RISE_M, PINNED_DEEP, tallestRise } from './deepArchetype.ts'
 import { parseOsmLevel, stationDepths } from './depth.ts'
 import type { DepthResult } from './depth.ts'
 import { mezzanineEvidence } from './mezzanineEvidence.ts'
@@ -113,6 +114,11 @@ export function classifyStation(input: StationFacts): ArchetypeResult {
     reasons.push(why)
     return { archetype, params: archetype === 'unknown' ? null : params, confidence: clamp01(Math.min(cap, 1 - penalty)), reasons }
   }
+
+  // Pinned or measured deep stations get no template (deepArchetype.ts).
+  if (PINNED_DEEP.some((d) => d.stationId === f.stationId)) return result('deep', DEEP_REASON)
+  const tallest = tallestRise(f.equipment)
+  if (tallest && tallest.m > DEEP_RISE_M) return result('deep', `${tallest.code} rises ${tallest.m.toFixed(1)} m, over ${DEEP_RISE_M} m (60 ft): deep station`)
 
   const tracks = analysis.trackCount
   if (f.structure === 'elevated' || f.structure === 'viaduct') {

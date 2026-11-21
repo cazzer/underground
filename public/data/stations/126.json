@@ -1,0 +1,32 @@
+{
+  "stationId": "126",
+  "name": "50 St",
+  "anchor": {
+    "lat": 40.761878639995466,
+    "lon": -73.98377121554459
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-525428788","level":"platform","outline":[[45.89,-64.8],[40.43,-67.39],[9.91,-2.14],[-3.97,26.2],[-27.26,73.78],[-21.26,76.46],[1.56,29.57],[15.94,0]],"tracks":[{"stopId":"126N","path":[[-28.1,72.57],[38.96,-67.33]]}],"osmRef":"way/525428788","sources":["generated","osm"]},
+    {"id":"way-525428789","level":"platform","outline":[[21.96,-74.41],[27.41,-71.92],[-2.43,-8.11],[-15.89,19.36],[-38.96,66.47],[-46.2,62.76],[-22.29,16.84],[-9.63,-10.23]],"tracks":[{"stopId":"126S","path":[[-37.51,66.5],[-15.34,21.91],[-1.26,-7.54],[28.43,-71.01]]}],"osmRef":"way/525428789","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-14.07,"z":54.23,"level":"platform"},"upper":{"x":-4.24,"z":66.96,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-9.23,"z":44.35,"level":"platform"},"upper":{"x":0.9,"z":57.23,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-4.24,"z":66.96,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":0.9,"z":57.23,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

@@ -1,0 +1,37 @@
+{
+  "stationId": "612",
+  "name": "Whitlock Av",
+  "anchor": {
+    "lat": 40.82639365548557,
+    "lon": -73.88630521011002
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-426103268","level":"platform","outline":[[-17.42,79.84],[-15.2,79.82],[4.17,-81.6],[0.22,-82.06],[-17.95,71.42]],"tracks":[{"stopId":"612S","path":[[-13.37,79.76],[5.72,-81.24]]}],"osmRef":"way/426103268","sources":["generated","osm"]},
+    {"id":"way-426103269","level":"platform","outline":[[-4.16,81.6],[-2.94,81.73],[-2.27,75.59],[-0.21,75.73],[2.16,62.3],[4.02,45.15],[19.14,-79.77],[15.42,-80.22]],"tracks":[{"stopId":"612N","path":[[-6.06,81.08],[13.7,-80.15]]}],"osmRef":"way/426103269","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-2.97,-72.37],[0.03,-97.21],[23.08,-94.43],[20.09,-69.59]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":18.78,"z":-100.23,"level":"street"},"upper":{"x":15.47,"z":-93.83,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":4.14,"z":-100.56,"level":"street"},"upper":{"x":6.49,"z":-93.75,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":1.14,"z":-72.88,"level":"station-house"},"upper":{"x":-0.58,"z":-58.58,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":16.2,"z":-71.06,"level":"station-house"},"upper":{"x":14.47,"z":-56.77,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":18.78,"z":-100.23,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":4.14,"z":-100.56,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

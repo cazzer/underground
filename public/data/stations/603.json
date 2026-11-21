@@ -1,0 +1,37 @@
+{
+  "stationId": "603",
+  "name": "Middletown Rd",
+  "anchor": {
+    "lat": 40.84390085718817,
+    "lon": -73.83627478051112
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-426103245","level":"platform","outline":[[-56.71,66.09],[-55.04,67.5],[-54.03,67.39],[-46.44,61.1],[-37.73,51.66],[57.29,-46.55],[54.5,-49.14]],"tracks":[{"stopId":"603N","path":[[-57.25,64.64],[-55.81,63.27],[-45.03,51.77],[-25.85,31.76],[52.86,-49.4],[53.56,-50.1]]}],"osmRef":"way/426103245","sources":["generated","osm"]},
+    {"id":"way-426103246","level":"platform","outline":[[56.27,-66.27],[55.12,-67.62],[47.62,-61.86],[-54.85,43.62],[-53.12,45.11],[-55.75,47.79],[-54.73,48.8]],"tracks":[{"stopId":"603S","path":[[-53.23,49.72],[-50.65,47.14],[56.9,-64.57]]}],"osmRef":"way/426103246","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-32.46,17.59],[-10.61,-5],[5.35,10.43],[-16.5,33.02]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-17.09,"z":32.45,"level":"street"},"upper":{"x":-15.73,"z":25.38,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-9.36,"z":-3.8,"level":"street"},"upper":{"x":-11.01,"z":3.21,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-8.51,"z":-1.58,"level":"station-house"},"upper":{"x":1.5,"z":-11.93,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":1.66,"z":8.26,"level":"station-house"},"upper":{"x":11.68,"z":-2.09,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-17.09,"z":32.45,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-9.36,"z":-3.8,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

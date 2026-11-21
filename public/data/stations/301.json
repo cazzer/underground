@@ -1,0 +1,29 @@
+{
+  "stationId": "301",
+  "name": "Harlem-148 St",
+  "anchor": {
+    "lat": 40.82366742050776,
+    "lon": -73.93602275747573
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-426140000","level":"platform","outline":[[-69.94,-35.17],[66.6,41.44],[69.98,35.24],[-66.56,-41.51]],"tracks":[{"stopId":"301N","path":[[-41.24,-28.78],[70.63,34.09]]},{"stopId":"301S","path":[[-45.86,-20.14],[65.93,42.57]]}],"osmRef":"way/426140000","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-66.56,"z":-41.51,"level":"platform"},"upper":{"x":-81.05,"z":-46.35,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-81.05,"z":-46.35,"type":"Station House","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

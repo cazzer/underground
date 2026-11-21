@@ -1,0 +1,32 @@
+{
+  "stationId": "L19",
+  "name": "Halsey St",
+  "anchor": {
+    "lat": 40.695710974823875,
+    "lon": -73.90426782676279
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-906960253","level":"platform","outline":[[57.41,47.91],[55.12,50.79],[-64.46,-39.04],[-62.06,-41.82]],"tracks":[{"stopId":"L19S","path":[[-61.07,-42.98],[57.57,46.1]]}],"osmRef":"way/906960253","sources":["generated","osm"]},
+    {"id":"way-906960254","level":"platform","outline":[[-54.72,-50.5],[-57.16,-47.69],[62.15,41.97],[64.43,39.08]],"tracks":[{"stopId":"L19N","path":[[-57.33,-45.89],[61.17,43.14]]}],"osmRef":"way/906960254","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":48.36,"z":43.41,"level":"platform"},"upper":{"x":48.38,"z":55.37,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-30.84,"z":-30.22,"level":"platform"},"upper":{"x":-33.2,"z":-39.08,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":48.38,"z":55.37,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-33.2,"z":-39.08,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

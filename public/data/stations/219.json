@@ -1,0 +1,43 @@
+{
+  "stationId": "219",
+  "name": "Prospect Av",
+  "anchor": {
+    "lat": 40.819601805692045,
+    "lon": -73.90175345172274
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 0.7
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":4.5,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":2.25,"depthSource":"structure-default"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-326138067","level":"platform","outline":[[-75.36,45.15],[-76.53,43.6],[-26.85,9.63],[-17.47,0.47],[-7.46,-6.36],[20.39,-25.35],[27.38,-29.04],[37.82,-34.58],[52.17,-44.33],[53.4,-42.55]],"tracks":[{"stopId":"219S","path":[[-74.09,46.24],[53.88,-40.85]]}],"osmRef":"way/326138067","sources":["generated","osm"]},
+    {"id":"way-326138068","level":"platform","outline":[[-54.62,43.6],[75.28,-45.02],[76.7,-43.35],[45.29,-22.22],[36.61,-13.59],[-2.22,12.88],[-12.03,17.28],[-53.22,45.71]],"tracks":[{"stopId":"219N","path":[[-54.95,42.09],[-5.12,7.91],[37.17,-21.24],[74.37,-46.04]]}],"osmRef":"way/326138068","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[-35.46,0.67],[12.75,-32.39],[31.26,-5.39],[-16.95,27.66]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-18.9,"z":24.81,"level":"street"},"upper":{"x":-17.01,"z":21.75,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":21.25,"z":1.47,"level":"street"},"upper":{"x":17.7,"z":0.88,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":-20.32,"z":-1.34,"level":"street"},"upper":{"x":-16.72,"z":-1.54,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-04","kind":"stair","lower":{"x":29.15,"z":-8.47,"level":"street"},"upper":{"x":25.61,"z":-7.77,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-05","kind":"stair","lower":{"x":7.36,"z":-31.71,"level":"street"},"upper":{"x":5.8,"z":-26.86,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":19.01,"z":-21.49,"level":"station-house"},"upper":{"x":24.95,"z":-25.56,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":27.14,"z":-9.63,"level":"station-house"},"upper":{"x":33.08,"z":-13.71,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-18.9,"z":24.81,"type":"Stair","entry":false,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":21.25,"z":1.47,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":-20.32,"z":-1.34,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]},
+    {"id":"ent-04","x":29.15,"z":-8.47,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-04"],"sources":["nyopendata"]},
+    {"id":"ent-05","x":7.36,"z":-31.71,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-05"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

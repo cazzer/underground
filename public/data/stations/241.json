@@ -1,0 +1,38 @@
+{
+  "stationId": "241",
+  "name": "President St-Medgar Evers College",
+  "anchor": {
+    "lat": 40.66812041463747,
+    "lon": -73.95067361060013
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-4.5,"depthSource":"osm-level"},
+    {"id":"platform","name":"Platform","kind":"platform","y":-9,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907190597","level":"platform","outline":[[8.76,-77.91],[12.01,-77.72],[1,78.56],[-2.29,78.35]],"tracks":[{"stopId":"241N","path":[[-3.54,77.28],[7.44,-77.99]]}],"osmRef":"way/907190597","sources":["generated","osm"]},
+    {"id":"way-907190598","level":"platform","outline":[[2.22,-78.31],[-1.08,-78.52],[-11.9,77.73],[-8.63,77.96]],"tracks":[{"stopId":"241S","path":[[-7.32,78.05],[3.47,-77.23]]}],"osmRef":"way/907190598","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine","outline":[[-16.83,3.23],[-15.43,-16.72],[17.61,-14.41],[16.21,5.55]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"ES304","kind":"escalator","lower":{"x":4.17,"z":10.31,"level":"platform"},"upper":{"x":5.26,"z":-5.25,"level":"mezzanine"},"width":1.2,"travel":"up","sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":11.23,"z":-5,"level":"mezzanine"},"upper":{"x":18.41,"z":-4.6,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-9.04,"z":-6.1,"level":"mezzanine"},"upper":{"x":-16.23,"z":-6.48,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":-6.07,"z":17.42,"level":"platform"},"upper":{"x":-5.07,"z":3.05,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":3.62,"z":18.1,"level":"platform"},"upper":{"x":4.62,"z":3.73,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":18.41,"z":-4.6,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-16.23,"z":-6.48,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

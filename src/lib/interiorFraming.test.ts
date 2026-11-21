@@ -68,6 +68,12 @@ describe('interiorFocusAnchor', () => {
     // A corner and the entrance tie at (±25, 11.5) from the center: past the 25 m half of the longer side.
     expect(a.reach).toBeCloseTo(Math.hypot(25, 11.5))
   })
+  it('aims at mid-height between the lowest and highest level, away from the camera above the street', () => {
+    const elevated = { ...interior, levels: [{ id: 'plat', name: 'Platform', kind: 'platform', y: 8 }, { id: 'street', name: 'Street', kind: 'street', y: 0 }] } satisfies StationInterior
+    expect(interiorFocusAnchor({ x: 0, z: 0 }, elevated, 2, Math.SQRT2).towardCamera).toBeCloseTo(-8 * Math.SQRT2)
+    const both = { ...interior, levels: [{ id: 'plat', name: 'Platform', kind: 'platform', y: 6 }, { id: 'street', name: 'Street', kind: 'street', y: 0 }, { id: 'mezz', name: 'Mezzanine', kind: 'mezzanine', y: -2 }] } satisfies StationInterior
+    expect(interiorFocusAnchor({ x: 0, z: 0 }, both, 1, 1).towardCamera).toBeCloseTo(-2)
+  })
 })
 
 describe('formatDepth', () => {

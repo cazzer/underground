@@ -3,6 +3,11 @@
 Inputs to `npm run data:stations`, which writes `public/data/stations/<id>.json`. Nothing here
 is shipped to the site.
 
+An authored `{ "entrance": ... }` connector end, and an E&E machine's `entrance` override, go on whichever
+end is at the street: the upper end below ground, the lower end at an elevated station (where the street,
+y 0, is the lowest level). An escalator override may give `ends` (`{ "lower": [u, v], "upper": [u, v] }`, by elevation) instead of `at`
+for a run of its own; with an `entrance`, its street end sits on the entrance point.
+
 This project is not endorsed by the MTA. Data may not be real time and is not guaranteed to
 be accurate.
 
@@ -20,8 +25,9 @@ be accurate.
   by `npm run data:catalog:fetch`. Station, entrance and equipment rows share the keys `gtfsStopId`,
   `stationId` (the E&E station MRN without leading zeros) and `complexId`; envelopes and OSM ways
   carry no station key. `catalog/stations.json` is also read by `npm run data` (borough and ADA status
-  for `public/data/stations.json`) together with `stations/access-exceptions.json`; after a catalog refresh, run `npm run data:access` (offline). Nothing here is read by
-  `npm run data:stations`; the rest is input for the planned station generator. The DOS Track LRS is not pinned (see `../docs/research/data-sources.md` §5.1).
+  for `public/data/stations.json`) together with `stations/access-exceptions.json`; after a catalog refresh, run `npm run data:access` (offline). `npm run data:stations` reads
+  `stations.json`, `entrances.json`, `equipment.json`, `osm-platforms.json` and `osm-tracks.json` (with the
+  committed `public/data/shapes.json` and `stations.json`) to generate interiors; `envelopes.json` is not used. The DOS Track LRS is not pinned (see `../docs/research/data-sources.md` §5.1).
   **E&E coordinates are unreliable:** the dataset's own overview says they are the station center
   when a machine's exact location is not known, and some are plainly wrong (25 machines are over 500 m
   from their station; EL100 is at Jay St, 15 km from 149 St-Hostos). Place machines from their `serving` text, not from `lat`/`lon`.
@@ -50,6 +56,23 @@ be accurate.
 4. Commit the sources, the authored file, and `public/data/stations/` together. A test fails if the
    committed output is stale.
 
+## Generated stations
+
+`npm run data:stations` also generates an interior for every station the archetype classifier puts in a template
+archetype (elevated 2 or 3 tracks, cut-and-cover under a mezzanine, shallow side platforms) at confidence 0.7 or
+more, unless `stations/<id>.authored.json` exists (hand-authored wins). The generator builds the same inputs an
+authored station has, in memory: an `AuthoredStation` (levels from the classifier's depths, platforms from the OSM
+ways, N/S tracks matched to the map's direction lines, one mezzanine slab per cluster of entrances, stairs, and an
+`at` for every elevator and escalator) and a `StationSources` slice of the catalog. Nothing of it is written to
+`data/`. Source rows the merge can't take are left out of the slice and printed: E&E serving texts with more than
+one " to ", machines joining two levels of one kind (mezzanine to mezzanine), elevator or escalator entrances with
+no machine of their kind, duplicate entrance points, entrance rows over 200 m from every platform, and entrances
+whose street stair would run more than 20 m (or finds no free landing within it). Stations listed in
+`scripts/lib/deepArchetype.ts`, or with an E&E rise over 60 ft, are deep and get no generated interior; so do
+multi-level stations (E&E rows naming an upper, lower or intermediate mezzanine, a concourse or balcony, or joining
+two mezzanines), which need hand authoring. Every position the template places is a guess (the output carries
+`generated` and per-level `depthSource`).
+
 ## Refreshing the catalog
 
 1. `npm run data:catalog:fetch` (needs network; Overpass is often busy, and the script retries
@@ -64,7 +87,9 @@ be accurate.
    borough and ADA changes (`stationAccess.test.ts` fails while it is stale). If it names a GTFS
    station with no catalog row, or a catalog row with no GTFS station, edit
    `stations/access-exceptions.json` (below).
-5. Commit. `catalogData.test.ts` checks the files against each other.
+5. Run `npm run data:stations` to regenerate the generated interiors (`generatedOutputs.test.ts` fails while they
+   are stale) and review what it prints as skipped or dropped.
+6. Commit. `catalogData.test.ts` checks the files against each other.
 
 ## Access exceptions
 

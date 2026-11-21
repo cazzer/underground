@@ -1,0 +1,35 @@
+{
+  "stationId": "L21",
+  "name": "Bushwick Av-Aberdeen St",
+  "anchor": {
+    "lat": 40.682754694169496,
+    "lon": -73.90520787241087
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "cut-cover-mezzanine",
+    "confidence": 0.8
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-4.5,"depthSource":"osm-level"},
+    {"id":"platform","name":"Platform","kind":"platform","y":-9,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-906958417","level":"platform","outline":[[-16.16,-44.21],[-27.14,-75.36],[-23.57,-76.49],[-12.72,-45.42],[-0.35,-15.17],[25.46,39.89],[41.45,69.42],[38.2,71.15],[22.11,41.39],[-3.74,-13.79]],"tracks":[{"stopId":"L21N","path":[[-20.85,-52.87],[-17.61,-43.69],[-5.15,-13.21],[20.7,42.01],[36.35,71]]}],"osmRef":"way/906958417","sources":["generated","osm"]},
+    {"id":"way-906958418","level":"platform","outline":[[-27.3,-39.89],[-38.24,-71.13],[-34.73,-72.21],[-23.74,-41.01],[-11.54,-11.12],[14.55,44.64],[30.57,74.37],[27.23,75.93],[11.24,46.26],[-15.07,-9.89]],"tracks":[{"stopId":"L21S","path":[[-33.25,-72.67],[-22.28,-41.46],[-10.1,-11.63],[15.93,43.98],[31.96,73.73]]}],"osmRef":"way/906958418","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"mezzanine","name":"Mezzanine","outline":[[25.24,27.71],[33.4,45.97],[8.55,57.09],[0.38,38.83]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":11.04,"z":45.02,"level":"mezzanine"},"upper":{"x":4.47,"z":47.96,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":13.35,"z":18.35,"level":"platform"},"upper":{"x":19.23,"z":31.49,"level":"mezzanine"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":2.48,"z":23.21,"level":"platform"},"upper":{"x":8.36,"z":36.35,"level":"mezzanine"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":4.47,"z":47.96,"type":"Station House","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

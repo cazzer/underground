@@ -1,0 +1,37 @@
+{
+  "stationId": "201",
+  "name": "Wakefield-241 St",
+  "anchor": {
+    "lat": 40.90300998207996,
+    "lon": -73.85072564260682
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-2-track",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-425601284","level":"platform","outline":[[42.87,-69.24],[46.3,-67.04],[-42.79,69.34],[-46.4,66.97]],"tracks":[{"stopId":"201N","path":[[-41.43,70.05],[-40.37,68.36],[14.89,-16.18]]},{"stopId":"201S","path":[[-47.64,65.7],[-46.59,64.07],[-35.68,47.06],[8.76,-20.43]]}],"osmRef":"way/425601284","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[9.95,-34.13],[36.29,-74.39],[53.6,-63.07],[27.26,-22.81]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":27.26,"z":-22.81,"level":"street"},"upper":{"x":28.5,"z":-29.9,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":53.47,"z":-63.15,"level":"street"},"upper":{"x":47.49,"z":-59.14,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-03","kind":"stair","lower":{"x":34.11,"z":-71.04,"level":"street"},"upper":{"x":33.36,"z":-63.88,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":19.17,"z":-29.3,"level":"station-house"},"upper":{"x":11.28,"z":-17.25,"level":"platform"},"width":2.4,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":27.26,"z":-22.81,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":53.47,"z":-63.15,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]},
+    {"id":"ent-03","x":34.11,"z":-71.04,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-03"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

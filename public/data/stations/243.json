@@ -1,0 +1,32 @@
+{
+  "stationId": "243",
+  "name": "Winthrop St",
+  "anchor": {
+    "lat": 40.65669863334729,
+    "lon": -73.95020752187105
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907189909","level":"platform","outline":[[-3.14,-78.53],[0.11,-78.8],[12.76,77.8],[9.51,78.03]],"tracks":[{"stopId":"243N","path":[[-4.46,-78.42],[8.2,78.13]]}],"osmRef":"way/907189909","sources":["generated","osm"]},
+    {"id":"way-907189910","level":"platform","outline":[[3.18,78.46],[-0.13,78.65],[-12.72,-77.8],[-9.47,-78.04]],"tracks":[{"stopId":"243S","path":[[-8.16,-78.15],[4.41,77.4]]}],"osmRef":"way/907189910","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":-0.73,"z":50.56,"level":"platform"},"upper":{"x":-11.68,"z":58.67,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":0.89,"z":-48.86,"level":"platform"},"upper":{"x":19.13,"z":-55.55,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":-11.68,"z":58.67,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":19.13,"z":-55.55,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

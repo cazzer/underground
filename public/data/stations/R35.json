@@ -1,0 +1,32 @@
+{
+  "stationId": "R35",
+  "name": "25 St",
+  "anchor": {
+    "lat": 40.660356665738554,
+    "lon": -73.99814102628763
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-907181919","level":"platform","outline":[[-62.72,67.78],[-65.62,65.56],[48.13,-78.59],[51.03,-76.37]],"tracks":[{"stopId":"R35S","path":[[-61.52,68.71],[7.03,-18.09],[51.65,-74.67]]}],"osmRef":"way/907181919","sources":["generated","osm"]},
+    {"id":"way-907181920","level":"platform","outline":[[-51.24,76.63],[-48.36,78.83],[65.63,-65.55],[62.69,-67.75]],"tracks":[{"stopId":"R35N","path":[[-51.85,74.9],[-0.65,10.06],[61.47,-68.68]]}],"osmRef":"way/907181920","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":6.96,"z":5.82,"level":"platform"},"upper":{"x":15.94,"z":3.74,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-6.48,"z":-6.44,"level":"platform"},"upper":{"x":-7,"z":-16.02,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":15.94,"z":3.74,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-7,"z":-16.02,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

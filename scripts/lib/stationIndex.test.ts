@@ -38,7 +38,8 @@ describe('buildStationIndex', () => {
     expect(() => buildStationIndex([interior('L08'), interior('L08', true)])).toThrow(/Duplicate interior for station L08/)
   })
 
-  it('throws on the id "index", which would collide with index.json', () => {
+  it('throws on the ids "index" and "depths-generated", which would collide with the non-interior files', () => {
     expect(() => buildStationIndex([interior('index')])).toThrow(/"index"/)
+    expect(() => buildStationIndex([interior('depths-generated')])).toThrow(/"depths-generated"/)
   })
 })

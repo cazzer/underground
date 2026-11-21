@@ -16,6 +16,11 @@ export function expectStationIndex(raw: unknown, url: string): StationIndex {
   return raw as StationIndex
 }
 
+/** TEMPORARY (generatedLook.ts): the index without its generated entries, so those stations show no interior. */
+export function withoutGenerated(index: StationIndex): StationIndex {
+  return { stations: Object.fromEntries(Object.entries(index.stations).filter(([, e]) => e.provenance !== 'generated')) }
+}
+
 /** Fetches `<baseUrl>data/stations/index.json`: the ids that have an interior file. */
 export async function loadStationIndex(baseUrl: string): Promise<StationIndex> {
   const url = `${baseUrl}data/stations/index.json`

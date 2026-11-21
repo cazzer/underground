@@ -1,0 +1,38 @@
+{
+  "stationId": "604",
+  "name": "Westchester Sq-E Tremont Av",
+  "anchor": {
+    "lat": 40.83987165655377,
+    "lon": -73.84297726226227
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "elevated-3-track",
+    "confidence": 1
+  },
+  "levels": [
+    {"id":"platform","name":"Platform","kind":"platform","y":9,"depthSource":"osm-level"},
+    {"id":"station-house","name":"Station house","kind":"mezzanine","y":4.5,"depthSource":"osm-level"},
+    {"id":"street","name":"Street","kind":"street","y":0}
+  ],
+  "platforms": [
+    {"id":"way-426103266","level":"platform","outline":[[-54.78,68.06],[-53.25,69.33],[-42.03,59.76],[53.75,-45.86],[51,-48.14]],"tracks":[{"stopId":"604N","path":[[-55.49,66.75],[49.43,-48.65]]}],"osmRef":"way/426103266","sources":["generated","osm"]},
+    {"id":"way-426103267","level":"platform","outline":[[54.61,-68.06],[-52.82,50.14],[-55.52,47.75],[5.74,-19.63],[17.16,-32.04],[43.78,-61.68],[53.3,-69.41]],"tracks":[{"stopId":"604S","path":[[-51.68,50.81],[55.11,-66.72]]}],"osmRef":"way/426103267","sources":["generated","osm"]}
+  ],
+  "slabs": [
+    {"id":"slab-1","level":"station-house","name":"Station house","outline":[[1.87,-21.11],[15.34,-35.89],[33.1,-19.71],[19.63,-4.92]],"sources":["generated"]}
+  ],
+  "connectors": [
+    {"id":"EL512","kind":"elevator","lower":{"x":3.28,"z":-21.18,"level":"street"},"upper":{"x":3.28,"z":-21.18,"level":"station-house"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL513","kind":"elevator","lower":{"x":23.36,"z":-15.06,"level":"station-house"},"upper":{"x":23.36,"z":-15.06,"level":"platform"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"EL514","kind":"elevator","lower":{"x":12.79,"z":-24.68,"level":"station-house"},"upper":{"x":12.79,"z":-24.68,"level":"platform"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":8.6,"z":-28.5,"level":"street"},"upper":{"x":13.92,"z":-23.65,"level":"station-house"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-slab-1-p1","kind":"stair","lower":{"x":6.74,"z":-18.02,"level":"station-house"},"upper":{"x":-2.96,"z":-7.38,"level":"platform"},"width":1.8,"sources":["generated"]},
+    {"id":"st-slab-1-p2","kind":"stair","lower":{"x":17.31,"z":-8.38,"level":"station-house"},"upper":{"x":7.62,"z":2.26,"level":"platform"},"width":1.8,"sources":["generated"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":8.6,"z":-28.5,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

@@ -1,0 +1,32 @@
+{
+  "stationId": "113",
+  "name": "157 St",
+  "anchor": {
+    "lat": 40.83405230973397,
+    "lon": -73.94492818286672
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-4.5,"depthSource":"osm-level"}
+  ],
+  "platforms": [
+    {"id":"way-448963636","level":"platform","outline":[[-30.82,76.71],[-36.69,73.76],[43.38,-70.02],[48.81,-67.26]],"tracks":[{"stopId":"113N","path":[[-38.44,72.79],[41.31,-71.41]]}],"osmRef":"way/448963636","sources":["generated","osm"]},
+    {"id":"way-448963637","level":"platform","outline":[[-48.02,67.7],[-43.55,70.03],[36.28,-73.57],[30.64,-76.39]],"tracks":[{"stopId":"113S","path":[[-41.59,70.76],[37.86,-72.67]]}],"osmRef":"way/448963637","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"st-ent-01","kind":"stair","lower":{"x":3.65,"z":7.85,"level":"platform"},"upper":{"x":14.54,"z":22.11,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":-3.55,"z":-7.79,"level":"platform"},"upper":{"x":-12.15,"z":-20.78,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":14.54,"z":22.11,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-12.15,"z":-20.78,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

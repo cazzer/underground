@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expectStationIndex } from './loadStationIndex'
+import { expectStationIndex, withoutGenerated } from './loadStationIndex'
 
 const URL = 'x/index.json'
 
@@ -22,5 +22,12 @@ describe('expectStationIndex', () => {
     ['a non-object entry', { stations: { L08: 'authored' } }],
   ])('rejects %s', (_name, raw) => {
     expect(() => expectStationIndex(raw, URL)).toThrow(URL)
+  })
+})
+
+describe('withoutGenerated', () => {
+  it('drops generated entries and keeps authored ones', () => {
+    const index = { stations: { L08: { provenance: 'authored' }, A01: { provenance: 'generated' } } } as const
+    expect(withoutGenerated(index)).toEqual({ stations: { L08: { provenance: 'authored' } } })
   })
 })

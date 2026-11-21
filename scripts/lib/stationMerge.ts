@@ -132,9 +132,10 @@ function buildStairs(authored: AuthoredStation, ctx: Ctx, entrances: Map<string,
     const id = text(r.id, `${at}.id`)
     const end = (role: 'lower' | 'upper'): { end: Endpoint; viaEntrance: Entrance | undefined } => {
       const e = record(r[role], `${at}.${role}`)
+      // Either end may be an entrance: it sits on the street, which is the lowest level at an elevated station.
+      // The lower-below-upper check then rejects an entrance end on the wrong side of the other end.
       if ('entrance' in e) {
-        if (role !== 'upper') throw new Error(`${at}.lower: an entrance can only be the upper end`)
-        const entrance = entranceOf(entrances, e.entrance, `${at}.upper.entrance`)
+        const entrance = entranceOf(entrances, e.entrance, `${at}.${role}.entrance`)
         return { end: { x: entrance.x, z: entrance.z, level: ctx.street.id }, viaEntrance: entrance }
       }
       const [x, z] = ctx.frame.fromUV(pair(e.at, `${at}.${role}.at`))
@@ -142,7 +143,9 @@ function buildStairs(authored: AuthoredStation, ctx: Ctx, entrances: Map<string,
     }
     const lower = end('lower')
     const upper = end('upper')
-    upper.viaEntrance?.connectors.push(id)
+    // Both ends on entrances would be two street ends; the elevation check below rejects that.
+    const viaEntrance = lower.viaEntrance ?? upper.viaEntrance
+    viaEntrance?.connectors.push(id)
     const width = finite(r.width, `${at}.width`)
     if (width <= 0) throw new Error(`${at}.width: must be > 0, got ${width}`)
     if (ctx.levels.get(lower.end.level)!.y >= ctx.levels.get(upper.end.level)!.y) {
@@ -154,15 +157,23 @@ function buildStairs(authored: AuthoredStation, ctx: Ctx, entrances: Map<string,
       lower: lower.end,
       upper: upper.end,
       width,
-      sources: srcs('authored', ...(upper.viaEntrance ? (['nyopendata'] as const) : [])),
+      sources: srcs('authored', ...(viaEntrance ? (['nyopendata'] as const) : [])),
     }
   })
 }
 
-function checkEntranceLinks(entrances: Map<string, Entrance>, connectors: Connector[]): void {
+/** Every entrance has a connector of a matching kind, and no connector is listed by two entrances. Sorts each list. */
+export function checkEntranceLinks(entrances: Map<string, Entrance>, connectors: Connector[]): void {
+  const owner = new Map<string, string>()
   for (const e of entrances.values()) {
     if (e.connectors.length === 0) throw new Error(`entrance ${e.id}: no connector reaches it`)
     e.connectors.sort()
+    for (const id of e.connectors) {
+      const other = owner.get(id)
+      // The same entrance listing an id twice is a duplicate id, reported by the id check after this one.
+      if (other !== undefined && other !== e.id) throw new Error(`connector ${id} is listed by two entrances, ${other} and ${e.id}`)
+      owner.set(id, e.id)
+    }
     if (!['Stair', 'Elevator', 'Escalator', 'Ramp'].includes(e.type)) continue
     for (const id of e.connectors) {
       const kind = connectors.find((c) => c.id === id)!.kind

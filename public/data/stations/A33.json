@@ -1,0 +1,33 @@
+{
+  "stationId": "A33",
+  "name": "Spring St",
+  "anchor": {
+    "lat": 40.725539888817735,
+    "lon": -74.00401370140052
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "generated": {
+    "archetype": "shallow-per-direction",
+    "confidence": 0.9
+  },
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"platform","name":"Platform","kind":"platform","y":-6.27,"depthSource":"ee-rise"}
+  ],
+  "platforms": [
+    {"id":"way-767428212","level":"platform","outline":[[17.13,-95.21],[21.28,-93.92],[-35.87,89.37],[-40.02,88.08]],"tracks":[{"stopId":"A33S","path":[[-34.3,89.85],[22.56,-92.48]]}],"osmRef":"way/767428212","sources":["generated","osm"]},
+    {"id":"way-767428213","level":"platform","outline":[[35.86,-89.37],[-21.28,93.91],[-17.13,95.22],[40.02,-88.08]],"tracks":[{"stopId":"A33N","path":[[-22.85,93.42],[34.3,-89.85]]}],"osmRef":"way/767428213","sources":["generated","osm"]}
+  ],
+  "slabs": [],
+  "connectors": [
+    {"id":"EL1106","kind":"elevator","lower":{"x":-8.17,"z":-1.15,"level":"platform"},"upper":{"x":-8.17,"z":-1.15,"level":"street"},"width":2,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-01","kind":"stair","lower":{"x":8.44,"z":5.89,"level":"platform"},"upper":{"x":22.2,"z":-0.32,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]},
+    {"id":"st-ent-02","kind":"stair","lower":{"x":8.62,"z":-60.59,"level":"platform"},"upper":{"x":-1.63,"z":-74.29,"level":"street"},"width":1.5,"sources":["generated","nyopendata"]}
+  ],
+  "entrances": [
+    {"id":"ent-01","x":22.2,"z":-0.32,"type":"Easement - Street","entry":true,"exit":true,"connectors":["st-ent-01"],"sources":["nyopendata"]},
+    {"id":"ent-02","x":-1.63,"z":-74.29,"type":"Stair","entry":true,"exit":true,"connectors":["st-ent-02"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

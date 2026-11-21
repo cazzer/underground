@@ -25,7 +25,8 @@ export interface AuthoredStation {
   equipment: EquipmentOverride[]
   fareLines: { id: string; level: LevelId; path: FramePoint[] }[]
 }
-/** `entrance` is allowed only as the upper end; it resolves to the entrance point at the street level. */
+/** `entrance` resolves to the entrance point at the street level: the upper end below ground, the lower end
+ *  at an elevated station (the lower end must still be below the upper end). */
 export type AuthoredEnd = { level: LevelId; at: FramePoint } | { entrance: string }
 export interface AuthoredConnector {
   id: string
@@ -38,7 +39,11 @@ export interface EquipmentOverride {
   code: string
   /** Replaces the E&E position (adds 'authored' to sources). */
   at?: FramePoint
-  /** Street entrance this machine serves. Without `at`, the machine sits at the entrance point. */
+  /** Escalators only, instead of `at`: the lower and upper plan ends (by elevation), giving it a run of its own
+   *  (adds 'authored'). A street end with an `entrance` sits on the entrance point whatever is given for it. */
+  ends?: { lower: FramePoint; upper: FramePoint }
+  /** Street entrance this machine serves (one of its two levels must be the street). Without `at`, the
+   *  machine sits at the entrance point. */
   entrance?: string
   /** Required when the station has two levels of the same kind (e.g. Hudson Yards). */
   levels?: { lower: LevelId; upper: LevelId }
@@ -75,8 +80,9 @@ export interface StationSources {
 }
 export interface OsmWay {
   id: number
-  version: number
-  timestamp: string
+  /** Present in per-station fetches (`out geom meta`); the catalog was fetched without meta. The merge never reads them. */
+  version?: number
+  timestamp?: string
   tags: Record<string, string>
   ring: [lat: number, lon: number][]
 }
