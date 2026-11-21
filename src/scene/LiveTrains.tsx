@@ -23,7 +23,7 @@ const DOT_MIN_METERS = 2.5
 const HALO_RATIO = 1.5
 const DOT_Y = 0.5
 const SEGMENTS = 16
-/** Cars are laid out only for trains within this many camera distances (plus a train length) of the view center. */
+/** Cars are laid out only for trains within this many camera distances (plus 300 m slack) of the view center. */
 const CARS_WITHIN = { distances: 3, plusM: 300 }
 
 interface LiveTrainsProps extends LiveLayer {

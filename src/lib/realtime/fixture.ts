@@ -119,4 +119,4 @@ export const index: TripIndexFile = {
 export const segments: Record<string, number> = { '101N>102N': 100, '102N>103N': 100 }
 
 export const lookup = buildTripLookup(index, shapes)
-export const geometries = buildShapeGeometries(shapes, index, stations)
+export const geometries = buildShapeGeometries(shapes, index, stations, 0)

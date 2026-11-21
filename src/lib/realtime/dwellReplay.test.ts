@@ -15,12 +15,16 @@ import { createSlotTable, reconcileSlots, stepSlot } from '../live/slots'
 import { DWELL_MAX_SHARE, dwellFor, hopDistance, planHop } from './position'
 import type { LiveTrip } from './prepareTrips'
 import { buildShapeGeometries } from './shapeGeometry'
+import { TRACK_OFFSETS } from '../trackOffset'
 
 const shapes = JSON.parse(shapesRaw) as ShapesFile
 const stations = JSON.parse(stationsRaw) as StationsFile
 const index = JSON.parse(tripIndexRaw) as TripIndexFile
 const segments = (JSON.parse(segmentsRaw) as SegmentsFile).segments
-const geometries = [...buildShapeGeometries(shapes, index, stations).values()]
+// Every ?tracks= offset: each changes hop lengths on curves, so each must keep the speed and replay checks.
+const OFFSETS = Object.entries(TRACK_OFFSETS).map(
+  ([name, offsetM]) => [name, offsetM, [...buildShapeGeometries(shapes, index, stations, offsetM).values()]] as const,
+)
 
 const BASE = 1_795_228_554
 const POLL_S = 20
@@ -38,7 +42,7 @@ const runOf = (stops: readonly string[], k: number): number => {
   return runS
 }
 
-describe('dwell on every real pattern hop', () => {
+describe.each(OFFSETS)('dwell on every real pattern hop at ?tracks=%s (%s m)', (_name, _offsetM, geometries) => {
   it('needs at most 25 m/s to cover each hop in its run time minus the dwell', () => {
     let hops = 0
     for (const g of geometries) {
@@ -53,7 +57,7 @@ describe('dwell on every real pattern hop', () => {
   })
 })
 
-describe('replaying a scheduled train on every real pattern', () => {
+describe.each(OFFSETS)('replaying a scheduled train on every real pattern at ?tracks=%s (%s m)', (_name, _offsetM, geometries) => {
   it('holds at each stop, never jumps or cross-fades, and arrives by schedule end + 20 s', () => {
     let stopsChecked = 0
     for (const g of geometries) {

@@ -124,7 +124,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then the route's pattern
     that calls at the train's stop and covers most of its predicted stops (ties go to the primary)
   - `polyline.ts` cumulative length, point/heading at distance, forward-only projection
-  - `shapeGeometry.ts` stop distances along each shape, computed at load
+  - `shapeGeometry.ts` each pattern's track line (`trackLine`, the map's offset line) and its stop distances, computed at load
   - `position.ts` `planHop` (once per poll: hop, run time, arrival) and `hopDistance` (per frame, no
     allocation); `positionAlongShape` is their composition. A trip with no VehiclePosition doesn't advance
     to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
@@ -204,8 +204,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   route_sort_order. Don't add per-route `<Line>`s.
 - Each shape draws `trackOffsetM` to the right of its own travel direction (`trackLine` in
   `buildNetwork`), so the two directions are parallel tracks; zoomed out the pair reads as one line.
-  Code that needs the offset reads `network.trackOffsetM`. Live dots stay on the centerline until
-  pah.3 moves them onto their track (through `trackLine`, so dots and lines agree).
+  Code that needs the offset reads `network.trackOffsetM`. Live trains ride the same `trackLine`
+  (passed through `useLive` to `buildShapeGeometries`), so dots and cars sit on their direction's track.
   TEMPORARY: `?tracks=a|b|off` (4.7 m, measured at Bedford Av; 3 m; off = one line; default a); the
   removal list is in `src/data/trackLook.ts`
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.

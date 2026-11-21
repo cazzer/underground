@@ -6,11 +6,12 @@ import type { SegmentsFile, TripIndexFile } from './schema'
 
 /**
  * Fetches trip-index and segments (only needed for live trains) and builds what `prepareTrips`
- * joins against. Throws when they come from a different build than the stations already loaded.
+ * joins against, with trip lines `trackOffsetM` right of travel like the map's (`network.trackOffsetM`). Throws when they come from a different build than the stations already loaded.
  */
 export async function loadRealtimeStatic(
   baseUrl: string,
   files: NetworkFiles,
+  trackOffsetM: number,
   signal: AbortSignal,
 ): Promise<StaticRealtimeData> {
   const [index, segments] = await Promise.all([
@@ -26,7 +27,7 @@ export async function loadRealtimeStatic(
   }
   return {
     lookup: buildTripLookup(index, files.shapes),
-    geometries: buildShapeGeometries(files.shapes, index, files.stations),
+    geometries: buildShapeGeometries(files.shapes, index, files.stations, trackOffsetM),
     segments: segments.segments,
   }
 }

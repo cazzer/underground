@@ -1,6 +1,6 @@
-import { decodeShapePoints } from '../../data/codec'
 import type { ShapeId, ShapesFile, StationsFile, StopId, TripIndexFile } from '../../data/schema'
 import { toGround, type Ground } from '../projection'
+import { trackLine } from '../trackLine'
 import { buildPolyline, projectForward, type Polyline } from './polyline'
 
 export interface ShapeGeometry {
@@ -9,18 +9,21 @@ export interface ShapeGeometry {
   stops: readonly StopId[]
   /** Distance along `line` of each stop; same length as `stops`, non-decreasing. */
   stopDistances: readonly number[]
-  /** Largest distance from a stop to the shape; a sanity bound, not used in positioning. */
+  /** Largest distance from a stop to the track line; a sanity bound, not used in positioning. */
   maxStopOffsetM: number
 }
 
 /**
- * Projects every pattern's stops onto its shape, forward-only so distances never decrease
- * (even on hairpins). Throws if a pattern stop has no station or a pattern has no shape.
+ * Builds each pattern's line with `trackLine(shape, trackOffsetM)`, the same line the map draws, so
+ * dots ride their direction's track (at offset 0 it is still spur-dropped, not the raw shape). Then
+ * projects the stops onto it, forward-only so distances never decrease (even on hairpins). Throws if
+ * a pattern stop has no station or a pattern has no shape.
  */
 export function buildShapeGeometries(
   shapes: ShapesFile,
   index: TripIndexFile,
   stations: StationsFile,
+  trackOffsetM: number,
 ): Map<ShapeId, ShapeGeometry> {
   const stopGround = new Map<StopId, Ground>()
   for (const st of stations.stations) {
@@ -33,7 +36,7 @@ export function buildShapeGeometries(
   for (const [shapeId, pattern] of Object.entries(index.patterns)) {
     const shape = shapeById.get(shapeId)
     if (!shape) throw new Error(`pattern ${shapeId} has no shape`)
-    const line = buildPolyline(decodeShapePoints(shape).map((p) => toGround(p)))
+    const line = buildPolyline(trackLine(shape, trackOffsetM))
     let cursor = { segment: 0, t: 0 }
     let maxStopOffsetM = 0
     const stopDistances = pattern.stops.map((stop) => {
