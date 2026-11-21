@@ -10,8 +10,6 @@ export const RENDER_ORDER = {
   // From a station marker down to its sunken platform tracks, under the marker disc.
   stationTie: 1.5,
   lineFocus: 2,
-  // Along a revealed station's platforms the map track gives way to the interior's: over the lines, under the markers.
-  platformTrackMask: 2.5,
   stationFill: 3,
   stationRing: 4,
   trainHalo: 5,

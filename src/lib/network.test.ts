@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { decodeShapePoints, deltaEncode } from '../data/codec'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
 import type { StationDepthsFile } from '../data/stationSchema'
+import { NO_BANDS } from './corridors'
 import { buildNetwork, pointAlong, stationAccess, type ShapePath } from './network'
 import { toGround } from './projection'
 import { EMPTY_PROFILE, profileAt } from './trackProfile'
@@ -179,7 +180,7 @@ function path(points: { x: number; z: number }[]): ShapePath {
     const b = points[i]!
     cumulative.push(cumulative[i - 1]! + Math.hypot(b.x - a.x, b.z - a.z))
   }
-  return { id: 's', routeId: 'r', direction: 'N', primary: true, points, cumulative, length: cumulative.at(-1) ?? 0, y: points.map(() => 0), profile: EMPTY_PROFILE }
+  return { id: 's', routeId: 'r', direction: 'N', primary: true, points, cumulative, length: cumulative.at(-1) ?? 0, y: points.map(() => 0), profile: EMPTY_PROFILE, bandInputs: new Float32Array(points.length * 4), bands: NO_BANDS }
 }
 
 describe('stationAccess', () => {

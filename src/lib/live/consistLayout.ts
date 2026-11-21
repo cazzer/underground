@@ -1,8 +1,7 @@
+import type { BandView } from '../bandOffset'
 import { writeChordMatrix } from '../markerMatrices'
-import type { Ground } from '../projection'
-import { pointAtDistanceInto, type Polyline } from '../realtime/polyline'
-import { profileAt, type TrackProfile } from '../trackProfile'
 import { consistCenter, MAX_CARS, type Consist } from './consist'
+import { createTrackPoint, trackPointInto, type DrawnTrack, type TrackPoint } from './trackPoint'
 
 /** Per-frame sizes shared by every train. */
 export interface CarFrame {
@@ -41,26 +40,22 @@ export function consistSpanInto(out: ConsistSpan, lineLength: number, shown: num
   return out
 }
 
-/** The track's height at `distance`, clamped to the line like pointAtDistanceInto, so a car end's y matches its ground point. */
-export function trackY(line: Polyline, profile: TrackProfile, distance: number): number {
-  return profileAt(profile, Math.min(Math.max(distance, 0), line.length))
-}
-
 /** Reused per-frame state: the chord ends of the car being written, and the train's span. */
 export interface ConsistScratch {
-  a: Ground
-  b: Ground
+  a: TrackPoint
+  b: TrackPoint
   span: ConsistSpan
 }
 
 export function createConsistScratch(): ConsistScratch {
-  return { a: { x: 0, z: 0 }, b: { x: 0, z: 0 }, span: { cars: 0, pitch: 0, step: 0, rear: 0 } }
+  return { a: createTrackPoint(), b: createTrackPoint(), span: { cars: 0, pitch: 0, step: 0, rear: 0 } }
 }
 
 /**
  * Writes one train's car bodies and halos at instances `slot * MAX_CARS + c`. The cars are laid end to end
- * along `line` around the consist center, each at its chord's midpoint facing along the chord, so a curve
- * bends the train and no car leaves the line. Chord ends sit at the track's height (`profile`), so on a ramp
+ * along the track around the consist center, each at its chord's midpoint facing along the chord, so a curve
+ * bends the train and no car leaves the line. Chord ends are track points (trackPointInto in `view`: on the
+ * route's band, at the track's height), so on a ramp
  * each car (and its halo) pitches with the track. `mix * k` (each 0..1) scales spacing and car length around the
  * center, so at mix = 0 the train collapses to the dot's point; `k` (the slot's fade) also scales the body
  * section, so a fading train shrinks to nothing while the handoff keeps it legible. Car geometry is unit
@@ -72,8 +67,8 @@ export function writeConsist(
   bodies: Float32Array,
   halos: Float32Array,
   slot: number,
-  line: Polyline,
-  profile: TrackProfile,
+  track: DrawnTrack,
+  view: BandView,
   shown: number,
   consist: Consist,
   mix: number,
@@ -83,6 +78,7 @@ export function writeConsist(
   scratch: ConsistScratch,
 ): void {
   const base = slot * MAX_CARS
+  const line = track.line
   const n = line.points.length === 0 ? 0 : Math.min(consist.cars, MAX_CARS)
   if (n > 0) {
     const u = mix * k
@@ -97,24 +93,20 @@ export function writeConsist(
     const haloLength = step + 2 * u * frame.rimM
     let a = scratch.a
     let b = scratch.b
-    pointAtDistanceInto(line, rear, a)
-    let ya = trackY(line, profile, rear)
+    trackPointInto(track, rear, view, a)
     for (let c = 0; c < n; c++) {
-      const d = rear + (c + 1) * step
-      pointAtDistanceInto(line, d, b)
-      const yb = trackY(line, profile, d)
+      trackPointInto(track, rear + (c + 1) * step, view, b)
       const ux = b.x - a.x
-      const uy = yb - ya
+      const uy = b.y - a.y
       const uz = b.z - a.z
       const mx = (a.x + b.x) / 2
-      const my = (ya + yb) / 2 + frame.y
+      const my = (a.y + b.y) / 2 + frame.y
       const mz = (a.z + b.z) / 2
       writeChordMatrix(bodies, base + c, mx, my, mz, ux, uy, uz, cross, height, bodyLength)
       writeChordMatrix(halos, base + c, mx, my, mz, ux, uy, uz, haloWidth, 1, haloLength)
       const t = a
       a = b
       b = t
-      ya = yb
     }
   }
   clearCars(bodies, halos, slot, n)

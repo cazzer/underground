@@ -1,13 +1,16 @@
 /** public/data → render model: projected stations, routes, and shape paths. Pure. */
 import type { AdaStatus, Borough, Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
 import type { StationDepthsFile } from '../data/stationSchema'
+import { NO_BANDS, type CorridorShape, type ShapeBands } from './corridors'
 import { boundsCenter } from './framing'
+import { vertexBandInputs } from './lineBuffers'
 import { toGround, type Ground } from './projection'
 import { platformSpans, type PlatformSpan } from './platformSpan'
-import { buildPolyline } from './realtime/polyline'
+import { buildPolyline, type Polyline } from './realtime/polyline'
 import { profileRuns } from './trackAnchors'
 import { trackLine } from './trackLine'
-import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleForProfile, type ProfileRun, type TrackProfile } from './trackProfile'
+import { lineBreaks } from './trackBreaks'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, profileAt, resampleAt, type ProfileRun, type TrackProfile } from './trackProfile'
 
 export interface Station {
   id: StationId
@@ -50,7 +53,7 @@ export interface ShapePath {
   primary: boolean
   /**
    * `trackLine`: spurs dropped, `trackOffsetM` right of travel, so the directions are parallel tracks; then
-   * resampled along the profile's ramps (collinear points, the ground path is unchanged).
+   * resampled along the profile's ramps and the band's tapers (collinear points, the ground path is unchanged).
    */
   points: Ground[]
   /** Cumulative distance (meters) at each point; last entry is the total length. */
@@ -60,6 +63,10 @@ export interface ShapePath {
   y: number[]
   /** Shared with the realtime geometry, so trains ride the drawn track up and down. */
   profile: TrackProfile
+  /** The band offset's inputs at each point (lineBuffers.ts vertexBandInputs): miter, slot and half-width there. */
+  bandInputs: Float32Array
+  /** The shape's bands along its distance (corridors.ts); NO_BANDS when it shares no corridor or before bandShapes. */
+  bands: ShapeBands
 }
 
 export interface Bounds {
@@ -77,7 +84,11 @@ export interface Network {
   /** In route_sort_order. */
   routes: readonly Route[]
   routeById: ReadonlyMap<RouteId, Route>
+  /** Without bands (NO_BANDS): the first paint draws these while networkBands.ts finds the corridors. */
   shapes: readonly ShapePath[]
+  shapeById: ReadonlyMap<ShapeId, ShapePath>
+  /** Each shape's track line before resampling, in `shapes` order: the corridor search's input. */
+  trackLines: readonly CorridorShape[]
   /** Covers every station and every shape point. */
   bounds: Bounds
   center: Ground
@@ -99,9 +110,42 @@ function extend(b: Bounds, p: Ground): void {
 }
 
 /**
+ * A shape's drawn path: `line` resampled along its profile's ramps, its platform spans' fade and its bands'
+ * tapers (trackBreaks.ts), with each point's height and band inputs.
+ */
+export function drawnPath(
+  meta: Pick<ShapePath, 'id' | 'routeId' | 'direction' | 'primary'>,
+  line: Polyline,
+  profile: TrackProfile,
+  bands: ShapeBands,
+  spans: ReadonlyMap<StationId, ReadonlyMap<ShapeId, PlatformSpan>>,
+): ShapePath {
+  const { points, cumulative } = resampleAt(line.points, line.cumulative, lineBreaks(profile, bands, spans, meta.id))
+  const bandInputs = vertexBandInputs(
+    points,
+    cumulative.map((d) => profileAt(bands.slot, d)),
+    cumulative.map((d) => profileAt(bands.half, d)),
+  )
+  return {
+    id: meta.id,
+    routeId: meta.routeId,
+    direction: meta.direction,
+    primary: meta.primary,
+    points,
+    cumulative,
+    length: cumulative.at(-1)!,
+    y: cumulative.map((d) => profileAt(profile, d)),
+    profile,
+    bandInputs,
+    bands,
+  }
+}
+
+/**
  * `trackOffsetM` moves every shape that far right of its own travel direction (see trackLine.ts). Each shape
  * that stops at a station in `depths` descends to that station's rails (y scaled by `yScale`, the interior's
- * vertical exaggeration); the rest stay at 0. Warns about authored tracks no shape rides.
+ * vertical exaggeration); the rest stay at 0. Shapes come without bands: networkBands.ts adds them later, off
+ * the first paint. Warns about authored tracks no shape rides.
  */
 export function buildNetwork(
   stationsFile: StationsFile,
@@ -135,7 +179,7 @@ export function buildNetwork(
     if (!routeById.has(s.routeId)) throw new Error(`Shape ${s.id} references unknown route "${s.routeId}"`)
     const points = trackLine(s, trackOffsetM)
     if (points.length < 2) throw new Error(`Shape ${s.id} has ${points.length} point(s); needs at least 2`)
-    return { id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(points) }
+    return { id: s.id, routeId: s.routeId, direction: s.direction, primary: s.primary, line: buildPolyline(points) }
   })
   const { runs, unmatched } = profileRuns(depths, stations, lines)
   for (const stopId of unmatched) console.warn(`Track depth: no shape rides the ${stopId} platform track; it stays at street level`)
@@ -160,19 +204,10 @@ export function buildNetwork(
       stationTrackY.set(run.stationId, deepest === undefined ? y : Math.min(deepest, y))
     }
     if (profile !== EMPTY_PROFILE) profiles.set(s.id, profile)
-    const { points, cumulative, y } = resampleForProfile(line.points, line.cumulative, profile)
-    for (const p of points) extend(bounds, p)
-    return {
-      id: s.id,
-      routeId: s.routeId,
-      direction: s.direction,
-      primary: s.primary,
-      points,
-      cumulative,
-      length: cumulative.at(-1)!,
-      y,
-      profile,
-    }
+    const path = drawnPath(s, line, profile, NO_BANDS, platformSpans([[s.id, built.kept]]))
+    // Resampled points are collinear, so bands (which only resample) never move the bounds.
+    for (const p of path.points) extend(bounds, p)
+    return path
   })
 
   return {
@@ -182,6 +217,8 @@ export function buildNetwork(
     routes,
     routeById,
     shapes,
+    shapeById: new Map(shapes.map((s) => [s.id, s])),
+    trackLines: lines,
     bounds,
     center: boundsCenter(bounds),
     trackOffsetM,

@@ -4,6 +4,7 @@ import { geometries } from '../realtime/fixture'
 import { pointAtDistance } from '../realtime/polyline'
 import type { LiveTrip } from '../realtime/prepareTrips'
 import type { ShapeGeometry } from '../realtime/shapeGeometry'
+import { createBandView } from '../bandOffset'
 import { buildTrackProfile, GRADE } from '../trackProfile'
 import { consistFor } from './consist'
 import { createSlotTable, type SlotTable } from './slots'
@@ -55,7 +56,7 @@ function place(t: SlotTable, i: number, key: string, geometry: ShapeGeometry, sh
 }
 
 function input(t: SlotTable, mix: number): TrainPickInput {
-  return { table: t, consistOf: () => consistFor('1'), y: 0.5, carHeightM: () => 4, mix, localS: LOCAL_S }
+  return { table: t, consistOf: () => consistFor('1'), y: 0.5, carHeightM: () => 4, view: createBandView(), mix, localS: LOCAL_S }
 }
 
 /** The ground point `along` meters past the dot at 1000 m on the northbound shape, shifted `east` meters. */

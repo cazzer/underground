@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Network } from '../lib/network'
+import type { BandedShapes } from '../lib/networkBands'
+import { loadBands } from './loadBands'
 import { showGenerated } from './generatedLook'
 import { loadNetwork, type NetworkFiles } from './loadNetwork'
 import { TRACK_OFFSET_M } from '../lib/trackOffset'
@@ -8,7 +10,8 @@ import { interiorLook } from '../scene/interiorLook'
 export type NetworkLoad =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; network: Network; files: NetworkFiles }
+  /** `bands` resolves after the first paint (loadBands.ts); it rejects only on unmount or retry. */
+  | { status: 'ready'; network: Network; files: NetworkFiles; bands: Promise<BandedShapes> }
 
 /** Loads public/data once per mount (and again on `retry`). */
 export function useNetwork(): { load: NetworkLoad; retry: () => void } {
@@ -20,7 +23,13 @@ export function useNetwork(): { load: NetworkLoad; retry: () => void } {
     // The interior's vertical scale, so the tracks descend to the rails the interior draws.
     loadNetwork(import.meta.env.BASE_URL, TRACK_OFFSET_M, interiorLook.yScale, controller.signal, { generatedDepths: showGenerated }).then(
       ({ network, files }) => {
-        if (!controller.signal.aborted) setLoad({ status: 'ready', network, files })
+        if (controller.signal.aborted) return
+        const bands = loadBands(network, controller.signal)
+        // It rejects only on the abort below (nothing waits on that); anything else is a bug worth seeing.
+        bands.catch((err: unknown) => {
+          if (!controller.signal.aborted) console.error('Shared corridors: unexpected failure', err)
+        })
+        setLoad({ status: 'ready', network, files, bands })
       },
       (err: unknown) => {
         if (controller.signal.aborted) return

@@ -10,28 +10,34 @@
  */
 import { useFrame } from '@react-three/fiber'
 import { useMemo } from 'react'
+import type { StationId } from '../data/schema'
 import { useFocus } from '../lib/focus'
-import type { Network } from '../lib/network'
+import type { Network, ShapePath } from '../lib/network'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
 import { routeLineBuffers, useLineLayer } from './useLineLayer'
+import { usePlatformFade } from './usePlatformFade'
 
 interface LayerProps {
   network: Network
+  /** The shapes SubwayLines draws (banded once the bands arrive). */
+  paths: readonly ShapePath[]
+  /** Its platform tracks fade out with the interior, as SubwayLines' do. */
+  interiorStationId: StationId | null
 }
 
 /** Option A: the focused station's routes, redrawn in route colors over the mono network. */
-export function LineHighlight({ network }: LayerProps) {
+export function LineHighlight({ network, paths, interiorStationId }: LayerProps) {
   const { focusedId } = useFocus()
   const buffers = useMemo(() => {
     const station = focusedId ? network.stationById.get(focusedId) : undefined
     if (!station) return null
     const routes = new Set(station.routeIds)
-    const paths = network.shapes.filter((s) => routes.has(s.routeId))
-    return routeLineBuffers(network, paths, theme.routeLineMix)
-  }, [network, focusedId])
+    return routeLineBuffers(network, paths.filter((s) => routes.has(s.routeId)), theme.routeLineMix)
+  }, [network, paths, focusedId])
   const lines = useLineLayer(buffers, RENDER_ORDER.lineFocus)
+  usePlatformFade(lines, buffers, paths, network, interiorStationId)
   return lines && <primitive object={lines} />
 }
 
@@ -39,9 +45,10 @@ export function LineHighlight({ network }: LayerProps) {
 const FADE_FAR = 8_000
 const FADE_NEAR = 3_000
 
-export function LineFade({ network }: LayerProps) {
-  const buffers = useMemo(() => routeLineBuffers(network, network.shapes, theme.routeLineMix), [network])
+export function LineFade({ network, paths, interiorStationId }: LayerProps) {
+  const buffers = useMemo(() => routeLineBuffers(network, paths, theme.routeLineMix), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lineFocus)
+  usePlatformFade(lines, buffers, paths, network, interiorStationId)
   useFrame((state) => {
     if (!lines) return
     const d = cameraDistance(state)

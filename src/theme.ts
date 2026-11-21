@@ -14,6 +14,8 @@ export interface Theme {
   lineMono: string
   /** Line width in screen pixels. */
   lineWidth: number
+  /** Center-to-center gap, CSS px, between routes drawn side by side in a shared corridor (bandOffset.ts). */
+  bandPitchPx: number
   stationFill: string
   stationStroke: string
   stationFocus: string
@@ -92,6 +94,7 @@ export const THEMES = {
     routeLineMix: { toward: '#ffffff', amount: 0.3 },
     lineMono: '#5ce1ff',
     lineWidth: 1.5,
+    bandPitchPx: 2.5,
     stationFill: '#0b2147',
     stationStroke: '#ffffff',
     stationFocus: '#ffd166',

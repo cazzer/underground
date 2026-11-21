@@ -1,10 +1,12 @@
 import { Canvas } from '@react-three/fiber'
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import type { LiveLayer } from '../data/useLive'
+import { createBandView } from '../lib/bandOffset'
 import type { Insets } from '../lib/framing'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
+import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
@@ -12,7 +14,6 @@ import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
-import { PlatformTrackMask } from './PlatformTrackMask'
 import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
 import { StationTies } from './StationTies'
@@ -22,6 +23,8 @@ import { YouAreHere } from './YouAreHere'
 
 interface SceneProps {
   network: Network
+  /** The banded shapes, once found after the first paint (null draws network.shapes, without bands). */
+  banded: BandedShapes | null
   insets: Insets
   /** Placed trips to draw; null draws none. */
   live: LiveLayer | null
@@ -35,8 +38,11 @@ interface SceneProps {
   here: { ground: Ground; accuracyM: number } | null
 }
 
-export function Scene({ network, insets, live, onLiveError, interior, panel, here }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, panel, here }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
+  /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
+  const bandView = useMemo(createBandView, [])
+  const interiorStationId = interior?.stationId ?? null
   return (
     <Canvas
       // No tone mapping, so every theme token renders as the exact color it names.
@@ -49,14 +55,13 @@ export function Scene({ network, insets, live, onLiveError, interior, panel, her
     >
       <color attach="background" args={[theme.background]} />
       <MapGrid />
-      <SubwayLines network={network} />
+      <SubwayLines network={network} paths={banded?.shapes ?? network.shapes} interiorStationId={interiorStationId} view={bandView} />
       <StationTies network={network} />
-      {interior && <PlatformTrackMask network={network} stationId={interior.stationId} />}
       <Stations stations={network.stations} />
       <ScenePicker stations={network.stations} trainPick={trainPick} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
-          <LiveTrains {...live} network={network} trainPick={trainPick} interiorStationId={interior?.stationId ?? null} />
+          <LiveTrains {...live} network={network} trainPick={trainPick} interiorStationId={interiorStationId} view={bandView} />
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}

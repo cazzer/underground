@@ -120,7 +120,7 @@ export interface ResampledLine {
 }
 
 /** Every knot, plus a point every `stepM` inside each knot span that changes height, in increasing order. */
-function breakDistances(p: TrackProfile, stepM: number): number[] {
+export function profileBreaks(p: TrackProfile, stepM: number): number[] {
   const out: number[] = []
   for (let k = 0; k < p.d.length; k++) {
     const d0 = p.d[k]!
@@ -133,17 +133,14 @@ function breakDistances(p: TrackProfile, stepM: number): number[] {
 }
 
 /**
- * The line with collinear vertices added at the profile's knots and every `stepM` along its ramps, so a straight
- * line drawn between vertices follows the eased profile closely. The ground path is unchanged. With an empty
- * profile it returns the same points with y = 0.
+ * The line with collinear vertices added at each of `breaks` (increasing distances; ones on or outside an existing
+ * vertex add nothing), and its cumulative distances re-summed. The ground path is unchanged.
  */
-export function resampleForProfile(
+export function resampleAt(
   points: readonly Ground[],
   cumulative: readonly number[],
-  p: TrackProfile,
-  stepM = 10,
-): ResampledLine {
-  const breaks = breakDistances(p, stepM)
+  breaks: readonly number[],
+): { points: Ground[]; cumulative: number[] } {
   const out: Ground[] = []
   let b = 0
   for (let i = 0; i < points.length; i++) {
@@ -167,5 +164,20 @@ export function resampleForProfile(
     if (i > 0) sum += Math.hypot(q.x - out[i - 1]!.x, q.z - out[i - 1]!.z)
     cum.push(sum)
   })
-  return { points: out, cumulative: cum, y: cum.map((d) => profileAt(p, d)) }
+  return { points: out, cumulative: cum }
+}
+
+/**
+ * The line with collinear vertices added at the profile's knots and every `stepM` along its ramps, so a straight
+ * line drawn between vertices follows the eased profile closely. The ground path is unchanged. With an empty
+ * profile it returns the same points with y = 0.
+ */
+export function resampleForProfile(
+  points: readonly Ground[],
+  cumulative: readonly number[],
+  p: TrackProfile,
+  stepM = 10,
+): ResampledLine {
+  const line = resampleAt(points, cumulative, profileBreaks(p, stepM))
+  return { ...line, y: line.cumulative.map((d) => profileAt(p, d)) }
 }
