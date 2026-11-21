@@ -17,6 +17,24 @@ type PointRequest = Extract<FlyRequest, { kind: 'point' }>
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
+const keepTarget = new Vector3()
+const keepPosition = new Vector3()
+/**
+ * Drops the controls' leftover damped motion (pan offset, rotation and zoom deltas) without moving
+ * the camera. Otherwise momentum from a pan or wheel just before a fly-to resumes when the flight
+ * lands and slides the view off the station (underground-3s3). Allocation-free; safe per frame.
+ */
+function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void {
+  keepTarget.copy(c.target)
+  keepPosition.copy(camera.position)
+  const damping = c.enableDamping
+  c.enableDamping = false
+  c.update() // without damping, update() applies and zeroes the pending deltas
+  c.enableDamping = damping
+  c.target.copy(keepTarget)
+  camera.position.copy(keepPosition)
+}
+
 const MIN_DISTANCE = 40
 /** How far past the fitted city overview the user may zoom out. */
 const MAX_ZOOM_OUT = 1.3
@@ -117,6 +135,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       const c = controls.current
       if (!c) throw new Error('Fly request before the map controls mounted')
       hold.current = null
+      flushMotion(c, camera)
       const l = latest.current
       const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
       const fromDistance = camera.position.distanceTo(c.target)
@@ -137,6 +156,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     const l = latest.current
     const c = controls.current
     if (!c) throw new Error('Fly request before the map controls mounted')
+    flushMotion(c, camera)
     const dest =
       l.interior?.stationId === station.id
         ? interiorFlight(l.interior, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
@@ -201,7 +221,10 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       camera.position.add(step)
       const offset = scratch.current.copy(camera.position).sub(c.target).setLength(distance)
       camera.position.copy(c.target).add(offset)
-      if (e >= 1) flight.current = null
+      if (e >= 1) {
+        flight.current = null
+        flushMotion(c, camera)
+      }
     } else if (hold.current && focusedId !== hold.current.stationId) {
       hold.current = null
     } else if (hold.current && !shouldReleaseHold(hold.current, distance, c.target)) {
