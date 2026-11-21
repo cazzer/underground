@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import type { FocusState } from './focusMachine'
+import { nextFocus, type FocusState } from './focusMachine'
+import type { Station } from './network'
+import type { Ground } from './projection'
 
 export interface FlyRequest {
   stationId: string
@@ -16,8 +18,11 @@ interface FocusValue {
   select: (stationId: string) => void
   /** User closed the panel: unfocus and remember the station so the camera doesn't refocus it. */
   dismiss: () => void
-  /** Focus state changed because the camera got near/far; no fly. */
-  setFromCamera: (next: FocusState) => void
+  /**
+   * Re-evaluate focus for the camera's position; no fly. Applied against the latest state, so
+   * it can't overwrite a select or dismiss that landed in between.
+   */
+  updateFromCamera: (distance: number, target: Ground, stations: readonly Station[]) => void
 }
 
 interface FocusProviderProps {
@@ -38,18 +43,21 @@ export function FocusProvider({ children }: FocusProviderProps) {
     () => setState((s) => (s.focusedId === null ? s : { focusedId: null, dismissedId: s.focusedId })),
     [],
   )
-  const setFromCamera = useCallback(
-    (next: FocusState) =>
-      setState((prev) =>
-        prev.focusedId === next.focusedId && prev.dismissedId === next.dismissedId ? prev : next,
-      ),
+  const updateFromCamera = useCallback(
+    (distance: number, target: Ground, stations: readonly Station[]) =>
+      setState((prev) => {
+        const next = nextFocus({ ...prev, distance, target, stations })
+        return next.focusedId === prev.focusedId && next.dismissedId === prev.dismissedId
+          ? prev
+          : { focusedId: next.focusedId, dismissedId: next.dismissedId }
+      }),
     [],
   )
 
   const { focusedId, dismissedId } = state
   const value = useMemo<FocusValue>(
-    () => ({ focusedId, dismissedId, flyRequest, select, dismiss, setFromCamera }),
-    [focusedId, dismissedId, flyRequest, select, dismiss, setFromCamera],
+    () => ({ focusedId, dismissedId, flyRequest, select, dismiss, updateFromCamera }),
+    [focusedId, dismissedId, flyRequest, select, dismiss, updateFromCamera],
   )
   return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>
 }

@@ -30,7 +30,7 @@ export function CameraRig({ center }: CameraRigProps) {
   const flight = useRef<Flight | null>(null)
   const scratch = useRef(new Vector3())
   const camera = useThree((s) => s.camera)
-  const { focusedId, dismissedId, flyRequest, setFromCamera } = useFocus()
+  const { focusedId, dismissedId, flyRequest, updateFromCamera } = useFocus()
   // Reused every frame so the per-frame focus check doesn't allocate.
   const input = useRef<FocusInput>({
     focusedId,
@@ -75,8 +75,11 @@ export function CameraRig({ center }: CameraRigProps) {
       cur.dismissedId = dismissedId
       cur.distance = distance
       cur.target = c.target
-      const next = nextFocus(cur)
-      if (next !== cur) setFromCamera(next)
+      // Cheap pre-check on the reused input; only a real change pays for a copied target and
+      // a functional update, which re-runs the rules against the latest state.
+      if (nextFocus(cur) !== cur) {
+        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations)
+      }
     }
 
     const polar = tiltForDistance(distance)
