@@ -1,0 +1,42 @@
+# Data sources
+
+Each file group below comes from one source. Files marked "planned" are not in
+this directory yet.
+
+This project is not endorsed by the MTA. Data may not be real time and is not
+guaranteed to be accurate.
+
+## MTA GTFS
+
+Static GTFS schedule data, https://www.mta.info/developers.
+
+- `stations.json` (planned)
+- `routes.json` (planned)
+- `shapes.json` (planned)
+- `segments.json` (planned)
+- `transfers.json` (planned)
+- `trip-index.json` (planned)
+
+## OpenStreetMap (ODbL 1.0)
+
+© OpenStreetMap contributors, available under the ODbL 1.0. See
+`LICENSE-ODbL.md`.
+
+- Station platform geometry (planned)
+
+Per-station interior files (`stations/<id>.json`, planned) merge hand-authored
+interiors with OSM platform polygons. Treat them as OSM-derived and ODbL.
+
+## NY Open Data / MTA Elevator and Escalator feeds
+
+Attribution: Metropolitan Transportation Authority, https://www.mta.info/open-data.
+License terms are not yet verified.
+
+- Subway entrances and exits (planned)
+- Elevator and escalator equipment (planned)
+
+## Hand-authored
+
+Station interior layouts (levels, mezzanines, stairs) written for this project.
+
+- `stations/<id>.json` (planned; see the OSM note above)
