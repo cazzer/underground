@@ -13,11 +13,14 @@ import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
 import { LiveStatus } from './LiveStatus'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
+import { LinkNotice } from './LinkNotice'
 import { LocateButton } from './LocateButton'
 import { LocateStatus } from './LocateStatus'
 import { OrbitHint } from './OrbitHint'
 import { RouteChip } from './RouteChip'
 import { TrainGonePanel, TrainPanel } from './TrainPanel'
+import { SearchButton } from './SearchButton'
+import { StationSearch, type StationSearchHandle } from './StationSearch'
 
 interface ArrivalsPanelProps {
   network: Network
@@ -27,7 +30,7 @@ interface ArrivalsPanelProps {
   onClose: () => void
   interior: InteriorStatusInfo
   ref: Ref<HTMLElement>
-  /** Takes focus when a panel that covered this one closes. */
+  /** Takes focus when a panel that covered this one closes, or after the visitor picks this station from search. */
   headingRef: Ref<HTMLHeadingElement>
 }
 
@@ -41,7 +44,7 @@ function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, 
       className="pointer-events-auto max-h-full min-h-0 w-72 max-w-full overflow-auto border border-edge bg-panel p-4 text-ink backdrop-blur-sm sm:shrink-0"
     >
       <div className="flex items-start justify-between gap-3">
-        <h2 ref={headingRef} tabIndex={-1} className="text-lg leading-tight outline-none">
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
           {station.name}
         </h2>
         <button
@@ -87,10 +90,12 @@ interface HudProps {
   onPanel: (rect: ScreenRect | null) => void
   /** The location button's state and actions. */
   locate: LocateControls
+  /** Shown under the location message when a `#station=` link named no station. */
+  linkNotice: { show: boolean; onDismiss: () => void }
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, onPanel, locate }: HudProps) {
-  const { focusedId, dismiss } = useFocus()
+export function Hud({ network, live, arrivals, onInsets, interior, onPanel, locate, linkNotice }: HudProps) {
+  const { focusedId, dismiss, select } = useFocus()
   const { selectedSummary, selections, notice, dismissNotice, clearTrain } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
   const trainOpen = selectedSummary !== null
@@ -115,6 +120,29 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
     dismissNotice()
     setFocusReturns((n) => n + 1)
   }, [dismissNotice])
+  const searchButton = useRef<HTMLButtonElement>(null)
+  const search = useRef<StationSearchHandle>(null)
+  // Mirrors the dialog's native open state (set on open and on its close event); the Esc guard reads it.
+  const [searchOpen, setSearchOpen] = useState(false)
+  // Cancel and Esc leave focus to the dialog, which hands it back to the button that was focused when it
+  // opened. A choice instead moves it to the new station's panel, once the dialog has closed.
+  const focusPanelOnClose = useRef(false)
+  const openSearch = () => {
+    // A tap doesn't focus a button on iOS; the dialog restores focus to whatever had it when it opened.
+    searchButton.current?.focus()
+    search.current?.open()
+    setSearchOpen(true)
+  }
+  const onSearchClosed = () => {
+    setSearchOpen(false)
+    if (!focusPanelOnClose.current) return
+    focusPanelOnClose.current = false
+    stationHeading.current?.focus()
+  }
+  const onSearchChoose = (stationId: string) => {
+    focusPanelOnClose.current = true
+    select(stationId)
+  }
   // Clearing removes the × the user just pressed; focus goes back to the button that started it.
   const { clear } = locate
   const onClearLocation = useCallback(() => {
@@ -160,7 +188,8 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
 
   // Esc closes what covers the station panel first (the train panel, then the notice), then the station's.
   useEffect(() => {
-    if (!focusedId && !trainOpen && !noticeOpen) return
+    // While search is open, Esc belongs to it: one press must not also dismiss a panel.
+    if ((!focusedId && !trainOpen && !noticeOpen) || searchOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (trainOpen) closeTrain()
@@ -169,26 +198,37 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedId, trainOpen, noticeOpen, dismiss, closeTrain, closeNotice])
+  }, [focusedId, trainOpen, noticeOpen, searchOpen, dismiss, closeTrain, closeNotice])
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
       <header ref={header} className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
+          <h1 className="text-xl tracking-[0.2em] uppercase sm:tracking-[0.3em]">underground</h1>
           <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)}</p>
           <LiveStatus status={live} />
           <LocateStatus state={locate.state} onClear={onClearLocation} />
           <p role="status" aria-live="polite" className="sr-only">
             {notice ?? ''}
           </p>
+          <LinkNotice
+            show={linkNotice.show}
+            onDismiss={linkNotice.onDismiss}
+            onSearch={() => {
+              linkNotice.onDismiss()
+              openSearch()
+            }}
+          />
         </div>
-        <LocateButton
-          ref={locateButton}
-          onLocate={locate.locate}
-          locating={locate.state.status === 'locating'}
-          located={markedPlacement(locate.state) !== null}
-        />
+        <div className="flex shrink-0 gap-2">
+          <SearchButton ref={searchButton} onOpen={openSearch} />
+          <LocateButton
+            ref={locateButton}
+            onLocate={locate.locate}
+            locating={locate.state.status === 'locating'}
+            located={markedPlacement(locate.state) !== null}
+          />
+        </div>
       </header>
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
       <div ref={bottom} className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
@@ -210,6 +250,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
           />
         ) : null}
       </div>
+      <StationSearch ref={search} network={network} onChoose={onSearchChoose} onClose={onSearchClosed} />
     </div>
   )
 }
