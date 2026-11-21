@@ -11,6 +11,13 @@ export const FALLBACK_SPEED_MPS = 8
 export const MIN_RUN_S = 30
 /** INCOMING_AT means "about to arrive": never show it less than this far along the hop. */
 export const INCOMING_MIN_FRACTION = 0.75
+/** Nominal station dwell (s). NYCT segment run times are arrival-to-arrival, so they include it. */
+export const DWELL_S = 30
+/** A short hop never spends more than this share of its run time dwelling. */
+export const DWELL_MAX_SHARE = 0.35
+
+/** Seconds of a `runS` hop spent held at the origin stop before the train moves. */
+export const dwellFor = (runS: number): number => Math.min(DWELL_S, DWELL_MAX_SHARE * runS)
 
 export interface PositionInput {
   geometry: ShapeGeometry
@@ -59,8 +66,10 @@ export interface HopPlan {
   to: number
   /** Predicted arrival at `to`; null when the fraction is fixed. */
   arriveAt: number | null
-  /** Scheduled seconds for the hop. */
+  /** Scheduled seconds for the hop, arrival to arrival. */
   runS: number
+  /** Seconds held at `from` before running; part of `runS`. */
+  dwellS: number
   /** Progress along the hop when it doesn't depend on time (dwelling, overdue at the next stop); else null. */
   fixedFraction: number | null
   /** Floor on the progress (INCOMING_AT trains are never shown early in the hop). */
@@ -140,6 +149,7 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
     to: hop.to,
     arriveAt: hop.arriveAt,
     runS,
+    dwellS: dwellFor(runS),
     fixedFraction: hop.fraction ?? null,
     minFraction: hop.fraction === undefined && status === 'INCOMING_AT' ? INCOMING_MIN_FRACTION : 0,
     departsInS: hop.departsInS,
@@ -149,7 +159,8 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
 /** Progress along the planned hop at `now`, 0..1. Pure arithmetic: runs per frame. */
 export function hopFraction(plan: HopPlan, now: number): number {
   if (plan.fixedFraction !== null) return plan.fixedFraction
-  return Math.max(plan.minFraction, clamp01(1 - (plan.arriveAt! - now) / plan.runS))
+  // The train holds at `from` until `runS - dwellS` before arriving, then runs for the rest of the hop.
+  return Math.max(plan.minFraction, clamp01(1 - (plan.arriveAt! - now) / (plan.runS - plan.dwellS)))
 }
 
 /** Meters along the shape at `now`. No allocation: runs per frame. */
@@ -160,8 +171,12 @@ export function hopDistance(plan: HopPlan, geometry: ShapeGeometry, now: number)
 
 /**
  * Where a train is along its shape: interpolated from the hop's scheduled run time and the
- * predicted arrival at its next stop. Overdue trains wait at the next platform, delayed or
- * dwelling ones hold at the previous stop. STOPPED_AT still interpolates toward the next stop,
+ * predicted arrival at its next stop. The first `dwellFor(runS)` seconds of the hop are a dwell
+ * at the origin stop (segment times include it), so the train holds there, then runs and still
+ * arrives on the predicted time; the same rule for every status, so a status flip never moves
+ * the target. The shorter run means a mid-hop revision of the predicted arrival moves the target up
+ * to 1/0.65 (about 1.54x) as far as before; the correction layer absorbs it. Overdue trains wait at
+ * the next platform, delayed or dwelling ones hold at the previous stop. STOPPED_AT still interpolates toward the next stop,
  * because B-division feeds leave STOPPED_AT set after the train departs.
  */
 export function positionAlongShape(input: PositionInput): PositionResult {

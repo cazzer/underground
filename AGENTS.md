@@ -116,7 +116,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `shapeGeometry.ts` stop distances along each shape, computed at load
   - `position.ts` `planHop` (once per poll: hop, run time, arrival) and `hopDistance` (per frame, no
     allocation); `positionAlongShape` is their composition. A trip with no VehiclePosition doesn't advance
-    to its next hop until the next poll
+    to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
+    first `dwellFor(runS)` (30 s, at most 35% of the hop) of every hop is held at its origin stop: the train
+    leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status
   - `smoothing.ts` smoothDistance: per-frame ease that never goes backward
   - `filters.ts` ghostReason: unassigned, stale vehicle, no future arrival
   - `prepareTrips.ts` per poll: filter, join, plan; returns live trips (each with its `HopPlan`) and
