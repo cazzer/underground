@@ -32,7 +32,7 @@ const row = (id: string, over: Partial<CatalogStation> = {}): CatalogStation => 
 
 const noExceptions: AccessExceptions = { missing: {}, orphans: {} }
 const exceptions = (over: Partial<AccessExceptions>): AccessExceptions => ({ ...noExceptions, ...over })
-const add = (stations: GtfsStation[], rows: CatalogStation[], e: AccessExceptions = noExceptions) => addAccess(stations, rows, e)
+const add = (stations: GtfsStation[], rows: CatalogStation[], e: AccessExceptions = noExceptions) => addAccess(stations, rows, e).stations
 
 const none = { ada: 0, adaNorth: false, adaSouth: false }
 const partial = { ada: 2, adaNorth: false, adaSouth: true, adaNotes: 'Downtown only' }
@@ -128,8 +128,10 @@ describe('addAccess exceptions', () => {
     expect(() => add([gtfs('B')], [row('B')], missingB())).toThrow(/"missing" B: the catalog has a row now, remove it/)
   })
 
-  it('throws when a missing entry is not a GTFS station', () => {
-    expect(() => add([gtfs('A')], [row('A')], missingB())).toThrow(/"missing" B: not a GTFS station, remove it/)
+  it('warns, without throwing, when a missing entry is not a GTFS station (a GTFS change)', () => {
+    const r = addAccess([gtfs('A')], [row('A')], missingB())
+    expect(r.stations.map((s) => s.id)).toEqual(['A'])
+    expect(r.warnings).toEqual([expect.stringMatching(/"missing" B: not a GTFS station, remove it/)])
   })
 
   it('ignores a listed orphan catalog row', () => {
@@ -137,9 +139,18 @@ describe('addAccess exceptions', () => {
     expect(out.map((s) => s.id)).toEqual(['A'])
   })
 
-  it('throws when a listed orphan is a GTFS station now or has no catalog row', () => {
-    const e = exceptions({ orphans: { A: 'was closed' } })
-    expect(() => add([gtfs('A')], [row('A')], e)).toThrow(/"orphans" A: it is a GTFS station now, remove it/)
+  it('warns, without throwing, when a listed orphan is a GTFS station now', () => {
+    const r = addAccess([gtfs('A')], [row('A')], exceptions({ orphans: { A: 'was closed' } }))
+    expect(r.stations.map((s) => s.id)).toEqual(['A'])
+    expect(r.warnings).toEqual([expect.stringMatching(/"orphans" A: it is a GTFS station now, remove it/)])
+  })
+
+  it('has no warnings when every exception is still needed', () => {
+    const r = addAccess([gtfs('A'), gtfs('B')], [row('A'), row('X')], exceptions({ ...missingB(), orphans: { X: 'closed' } }))
+    expect(r.warnings).toEqual([])
+  })
+
+  it('throws when a listed orphan has no catalog row (a catalog change)', () => {
     expect(() => add([gtfs('B')], [row('B')], exceptions({ orphans: { X: 'gone' } }))).toThrow(/"orphans" X: the catalog has no such row, remove it/)
   })
 
@@ -160,6 +171,15 @@ describe('parseAccessExceptions', () => {
     expect(() => parseAccessExceptions({ missing: { B: { borough: 'M', ada: 'none', reason: ' ' } }, orphans: {} })).toThrow(/"missing" B/)
     expect(() => parseAccessExceptions({ missing: {}, orphans: { X: 3 } })).toThrow(/"orphans" X/)
   })
+
+  it('checks adaPartial when present', () => {
+    const entry = (adaPartial: unknown) => ({ missing: { B: { borough: 'M', ada: 'partial', reason: 'new', adaPartial } }, orphans: {} })
+    expect(parseAccessExceptions(entry({ north: true, south: false, note: 'Uptown only' }))).toBeTruthy()
+    expect(() => parseAccessExceptions(entry('x'))).toThrow(/"missing" B: adaPartial needs boolean north and south/)
+    expect(() => parseAccessExceptions(entry({ north: 1, south: false, note: 'n' }))).toThrow(/adaPartial/)
+    expect(() => parseAccessExceptions(entry({ north: true, south: false }))).toThrow(/adaPartial/)
+    expect(() => parseAccessExceptions(entry({ north: true, south: false, note: ' ' }))).toThrow(/non-empty note/)
+  })
 })
 
 describe('the committed stations.json', () => {
@@ -178,7 +198,8 @@ describe('the committed stations.json', () => {
 
   it('is what addAccess makes from the catalog (run npm run data:access if this fails)', () => {
     const bare = file.stations.map(({ borough: _b, ada: _a, adaPartial: _p, ...rest }) => rest)
-    const rebuilt = { ...file, stations: addAccess(bare, catalog.rows, exceptions) }
-    expect(toStableJson(rebuilt, 2)).toBe(stationsText)
+    const access = addAccess(bare, catalog.rows, exceptions)
+    expect(access.warnings).toEqual([])
+    expect(toStableJson({ ...file, stations: access.stations }, 2)).toBe(stationsText)
   })
 })

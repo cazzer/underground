@@ -33,6 +33,10 @@ export function parseAccessExceptions(value: unknown): AccessExceptions {
     if (!isRecord(e) || typeof e.borough !== 'string' || typeof e.ada !== 'string' || typeof e.reason !== 'string' || e.reason.trim() === '') {
       throw new Error(`access-exceptions.json "missing" ${id}: needs string borough and ada, and a non-empty reason`)
     }
+    const p = e.adaPartial
+    if (p !== undefined && (!isRecord(p) || typeof p.north !== 'boolean' || typeof p.south !== 'boolean' || typeof p.note !== 'string' || p.note.trim() === '')) {
+      throw new Error(`access-exceptions.json "missing" ${id}: adaPartial needs boolean north and south and a non-empty note`)
+    }
   }
   for (const [id, reason] of Object.entries(value.orphans)) {
     if (typeof reason !== 'string' || reason.trim() === '') throw new Error(`access-exceptions.json "orphans" ${id}: the reason must be a non-empty string`)

@@ -16,7 +16,9 @@ const STATIONS = 'stations.json'
 function main(): void {
   const file = JSON.parse(readFileSync(new URL(STATIONS, DATA_DIR), 'utf8')) as StationsFile
   const bare = file.stations.map(({ borough: _b, ada: _a, adaPartial: _p, ...rest }) => rest)
-  const rebuilt = renderedFile(STATIONS, toStableJson({ ...file, stations: addAccess(bare, readCatalogStations(), readAccessExceptions()) }, 2))
+  const access = addAccess(bare, readCatalogStations(), readAccessExceptions())
+  if (access.warnings.length > 0) throw new Error(`Stale access exceptions (nothing written):\n  ${access.warnings.join('\n  ')}`)
+  const rebuilt = renderedFile(STATIONS, toStableJson({ ...file, stations: access.stations }, 2))
 
   const others: Record<string, number> = {}
   for (const name of readdirSync(DATA_DIR)) {

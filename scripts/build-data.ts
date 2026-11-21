@@ -61,8 +61,10 @@ async function main(): Promise<void> {
 
   const { segments, skipped: skippedSegments } = buildSegments(feed.stopTimes)
   const { file: tripIndex, skippedNoShape } = buildTripIndex(feed)
+  const access = addAccess(buildStations(feed), readCatalogStations(), readAccessExceptions())
+  for (const warning of access.warnings) console.warn(`WARNING: ${warning}`)
   const outputs: [string, unknown, number][] = [
-    ['stations.json', { feedVersion, stations: addAccess(buildStations(feed), readCatalogStations(), readAccessExceptions()) }, 2],
+    ['stations.json', { feedVersion, stations: access.stations }, 2],
     ['routes.json', { feedVersion, routes: buildRoutes(feed) }, 2],
     ['shapes.json', { feedVersion, shapes: buildShapes(feed, SIMPLIFY_TOLERANCE_M) }, 2],
     ['segments.json', { feedVersion, segments }, 2],

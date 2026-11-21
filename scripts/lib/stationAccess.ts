@@ -52,46 +52,58 @@ function duplicates(ids: readonly string[]): string[] {
   return [...dupes]
 }
 
+export interface AccessResult {
+  stations: Station[]
+  /** Stale exceptions caused by a GTFS change (an orphan that is a station now, a missing entry for
+   *  a station the feed dropped). The unattended `npm run data` prints these; `npm run data:access`
+   *  and the staleness test fail on them. */
+  warnings: string[]
+}
+
 /** Adds `borough`, `ada` and (partial only) `adaPartial` after `routes`, keeping the input order.
  *  A GTFS station with no catalog row takes its authored `exceptions.missing` entry; a catalog row
  *  with no GTFS station is ignored when listed in `exceptions.orphans`. An exception that is no
- *  longer needed throws, so it gets removed. Throws once, listing every problem. */
-export function addAccess(stations: GtfsStation[], rows: readonly CatalogStation[], exceptions: AccessExceptions): Station[] {
+ *  longer needed is removed by hand: one made stale by the catalog throws, one made stale by a GTFS
+ *  change is a warning. Throws once, listing every problem. */
+export function addAccess(stations: GtfsStation[], rows: readonly CatalogStation[], exceptions: AccessExceptions): AccessResult {
   const problems: string[] = []
+  const warnings: string[] = []
+  const hasMissing = (id: string): boolean => Object.hasOwn(exceptions.missing, id)
+  const hasOrphan = (id: string): boolean => Object.hasOwn(exceptions.orphans, id)
   const dupes = duplicates(rows.map((r) => r.gtfsStopId))
   if (dupes.length > 0) problems.push(`catalog has more than one row for: ${dupes.join(', ')}`)
   const byId = new Map(rows.map((r) => [r.gtfsStopId, r]))
   const known = new Set(stations.map((s) => s.id))
 
-  const missing = stations.filter((s) => !byId.has(s.id) && !(s.id in exceptions.missing)).map((s) => s.id)
+  const missing = stations.filter((s) => !byId.has(s.id) && !hasMissing(s.id)).map((s) => s.id)
   if (missing.length > 0) {
     problems.push(
       `GTFS stations with no catalog row: ${missing.join(', ')} (run npm run data:catalog:fetch; ` +
         `if 39hk-dx4f doesn't list it yet, add it to data/stations/access-exceptions.json)`,
     )
   }
-  const orphans = rows.filter((r) => !known.has(r.gtfsStopId) && !(r.gtfsStopId in exceptions.orphans)).map((r) => r.gtfsStopId)
+  const orphans = rows.filter((r) => !known.has(r.gtfsStopId) && !hasOrphan(r.gtfsStopId)).map((r) => r.gtfsStopId)
   if (orphans.length > 0) {
     problems.push(`catalog rows with no GTFS station: ${orphans.join(', ')} (if they are expected, list them under "orphans" in data/stations/access-exceptions.json)`)
   }
   for (const id of Object.keys(exceptions.missing)) {
-    if (!known.has(id)) problems.push(`access-exceptions.json "missing" ${id}: not a GTFS station, remove it`)
+    if (!known.has(id)) warnings.push(`access-exceptions.json "missing" ${id}: not a GTFS station, remove it`)
     else if (byId.has(id)) problems.push(`access-exceptions.json "missing" ${id}: the catalog has a row now, remove it`)
   }
   for (const id of Object.keys(exceptions.orphans)) {
-    if (known.has(id)) problems.push(`access-exceptions.json "orphans" ${id}: it is a GTFS station now, remove it`)
+    if (known.has(id)) warnings.push(`access-exceptions.json "orphans" ${id}: it is a GTFS station now, remove it`)
     else if (!byId.has(id)) problems.push(`access-exceptions.json "orphans" ${id}: the catalog has no such row, remove it`)
   }
 
   const out: Station[] = []
   for (const station of stations) {
     const row = byId.get(station.id)
-    const exception = exceptions.missing[station.id]
+    const exception = hasMissing(station.id) ? exceptions.missing[station.id] : undefined
     const access = row !== undefined ? encodeRow(row) : exception !== undefined ? encodeException(station.id, exception) : null
     if (access === null) continue
     if (Array.isArray(access)) problems.push(...access)
     else out.push({ ...station, ...access })
   }
   if (problems.length > 0) throw new Error(`Station access data does not match the feed:\n  ${problems.join('\n  ')}`)
-  return out
+  return { stations: out, warnings }
 }

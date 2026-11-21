@@ -59,8 +59,12 @@ be accurate.
 `missing` gives the borough and ADA status of a GTFS station that 39hk-dx4f doesn't list yet (for
 example a new station); `orphans` lets the join ignore a catalog row whose station the GTFS feed
 doesn't have. Without an entry the join fails, so the daily data refresh stops instead of shipping
-a station with no access fields. An entry that is no longer needed (the catalog now has the row, or
-the orphan now exists in GTFS) also fails, so remove it when that happens.
+a station with no access fields. An entry that is no longer needed is to be removed, and how loudly
+depends on the cause. If the catalog made it stale (it now has the `missing` row, or the orphan
+row is gone), every command fails. If a GTFS change did (an `orphans` entry that is a GTFS station
+now, a `missing` entry for a station the feed dropped), `npm run data` only prints a warning, so
+the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `npm run data:access` and
+`stationAccess.test.ts` still fail until the entry is removed.
 
 ## Licenses
 
