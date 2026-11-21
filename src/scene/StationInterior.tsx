@@ -25,8 +25,9 @@ interface StationInteriorProps {
 }
 
 /**
- * The focused station's interior as two merged line layers (fine, then strong) in a group at
- * its anchor, plus the street veil and DOM level labels. Everything fades in with the tilt.
+ * The focused station's interior as merged line layers in a group at its anchor: fine, then strong, for the platform
+ * the lifted trains ride and below, and the same pair for the levels above, drawn after those trains. Plus the street
+ * veil and DOM level labels. Everything fades in with the tilt.
  */
 export function StationInterior({ model, network }: StationInteriorProps) {
   const station = network.stationById.get(model.stationId)
@@ -49,6 +50,9 @@ export function StationInterior({ model, network }: StationInteriorProps) {
     theme.interiorFineWidth,
     dash,
   )
+  // Levels above the lifted platform trains (SpanCars), drawn after them; look C leaves these empty.
+  const overStrong = useLineLayer(model.overStrong, RENDER_ORDER.interiorOver, theme.interiorLineWidth, dash)
+  const overFine = useLineLayer(model.overFine, RENDER_ORDER.interiorOverFine, theme.interiorFineWidth, dash)
 
   useFrame((state) => {
     const g = group.current
@@ -59,6 +63,8 @@ export function StationInterior({ model, network }: StationInteriorProps) {
     g.visible = o > 0
     if (strong) strong.material.opacity = o
     if (fine) fine.material.opacity = o
+    if (overStrong) overStrong.material.opacity = o
+    if (overFine) overFine.material.opacity = o
     if (veil.current) (veil.current.material as MeshBasicMaterial).opacity = interiorLook.veilOpacity * o
     for (const el of labels.current) if (el) showLabel(el, o)
   })
@@ -69,6 +75,8 @@ export function StationInterior({ model, network }: StationInteriorProps) {
       {interiorLook.veil !== 'none' && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
       {strong && <primitive object={strong} />}
+      {overFine && <primitive object={overFine} />}
+      {overStrong && <primitive object={overStrong} />}
       {model.labels.map((label, i) => (
         // zIndexRange [0, 0]: drei's default z-index would paint labels over the HUD panel.
         <Html key={label.levelId} position={label.position} zIndexRange={[0, 0]}>

@@ -108,7 +108,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
     veil blends, so a copy at weight 0 renders exactly like its veiled street car. Along those platforms the map
     track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
-  - `StationInterior.tsx` the focused station's interior (two line layers; for a generated interior both materials are dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, drei Html
+  - `StationInterior.tsx` the focused station's interior (two line layers on each side of the lifted-train split; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
@@ -378,7 +378,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies).
+  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies),
+  interior levels above the lifted trains 9.6 (fine) and 9.7 (strong).
   The focused station (picked or auto-focused by zoom) draws no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
@@ -429,14 +430,18 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   instance `slot * MAX_CARS + c`). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
 - The station interior is a group at `toGround(anchor)` with depths drawn ×2 (x/z true; labels give
-  real depths). Two merged `LineSegments2` (fine, then strong strokes) are built from the deepest
+  real depths). Merged `LineSegments2` (fine, then strong strokes, a pair on each side of the split below) are built from the deepest
   level up, so upper levels paint over lower ones; levels farther from the street (in level count; deeper, or
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
   in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
   layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
-  are redrawn above the veil and strokes (`SpanCars.tsx`, 9.4 to 9.5; not in look C): every car within
+  are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.4 to 9.5; not in look C),
+  and the levels above it draw over those trains at 9.6 (fine) and 9.7 (strong): `buildInteriorBuffers` splits at
+  `splitLevel` (`trainLevelIndex`, the deepest level with a platform track). That level and below stay at 8/9; a
+  level above it, and a stair, escalator or elevator shaft whose upper end is above it, go over (an elevator's
+  stop stays with its level). At most four interior line layers; look C doesn't split. Every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
   toward the background after shading by `veilTint` (veil opacity × reveal × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal

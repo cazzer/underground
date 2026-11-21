@@ -30,13 +30,18 @@ export const RENDER_ORDER = {
   // Station interior. Look C (?interior=c, temporary) draws it under the street layers.
   interiorUnderFine: -0.6,
   interiorUnder: -0.3,
-  // The veil dims everything above (live trains included), then fine and strong interior strokes.
+  // The veil dims everything above (live trains included), then fine and strong interior strokes of the platform level
+  // the lifted trains ride and the levels below it.
   interiorVeil: 7,
   interiorFine: 8,
   interior: 9,
-  // Trains on a revealed station's platforms, redrawn above the veil and the interior strokes: rim, footprints,
-  // bodies (depth-tested against the street cars they copy). Keep 10 and up free for anything that must top them.
+  // Trains on a revealed station's platforms, redrawn above the veil and those strokes: rim, footprints, bodies
+  // (depth-tested against the street cars they copy).
   spanCarRim: 9.4,
   spanCarHalo: 9.45,
   spanCars: 9.5,
+  // The interior's levels above that platform (mezzanines, their stairs, escalators and shafts, the street), fine
+  // then strong, over the lifted trains: they stand in front of them. Keep 10 and up free for anything that must top them.
+  interiorOverFine: 9.6,
+  interiorOver: 9.7,
 } as const

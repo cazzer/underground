@@ -20,9 +20,9 @@ export interface Buffers {
   /** Six floats per segment, matching `positions`. */
   colors: Float32Array
   /**
-   * TEMPORARY (approxLook.ts, look B). Two floats per segment: the dash distance at its start and end, meters. A
-   * dashed segment runs 0 to its length, so every edge starts on a dash and none falls wholly into a gap; a solid
-   * one is 0, 0, so a dashed material never cuts it. Read only when the layer's material is dashed.
+   * Two floats per segment: the dash distance at its start and end, meters. A dashed segment runs 0 to its length,
+   * so every edge starts on a dash and none falls wholly into a gap; a solid one is 0, 0, so a dashed material never
+   * cuts it. Read only when the layer's material is dashed.
    */
   distances: Float32Array
 }
