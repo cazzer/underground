@@ -52,9 +52,9 @@ describe('buildShapeGeometries', () => {
     const st: StationsFile = {
       feedVersion: 'x',
       stations: [
-        { id: 'A', name: 'A', lat: 40.7, lon: -74.0, stops: ['AN'], routes: [] },
-        { id: 'B', name: 'B', lat: 40.72, lon: -74.0, stops: ['BN'], routes: [] },
-        { id: 'C', name: 'C', lat: 40.7001, lon: -74.0, stops: ['CN'], routes: [] },
+        { id: 'A', name: 'A', lat: 40.7, lon: -74.0, stops: ['AN'], routes: [], borough: 'M', ada: 'none' },
+        { id: 'B', name: 'B', lat: 40.72, lon: -74.0, stops: ['BN'], routes: [], borough: 'M', ada: 'none' },
+        { id: 'C', name: 'C', lat: 40.7001, lon: -74.0, stops: ['CN'], routes: [], borough: 'M', ada: 'none' },
       ],
     }
     const idx: TripIndexFile = {

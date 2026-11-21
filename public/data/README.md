@@ -17,7 +17,7 @@ delta-encoded.
 
 Route colors come from `routes.txt`. MTA's IP status for those colors is UNVERIFIED.
 
-- `stations.json`
+- `stations.json` (also see the NY Open Data section: its `borough`, `ada` and `adaPartial` fields)
 - `routes.json`
 - `shapes.json`
 - `segments.json`
@@ -40,6 +40,9 @@ where it came from.
 Attribution: Metropolitan Transportation Authority, https://www.mta.info/open-data.
 License terms are not yet verified.
 
+- MTA Subway Stations (dataset 39hk-dx4f, pinned in `data/stations/catalog/stations.json`) gives
+  `borough`, `ada` and `adaPartial` in `stations.json`. MTA data under the OPEN-NY Terms of Use
+  (2013-03-08), attributed to the Metropolitan Transportation Authority.
 - Subway entrances and exits (dataset i9wp-a4ja) and the elevator and escalator asset inventory
   (94fv-bak7) feed entrance and elevator positions in `stations/*.json`.
 

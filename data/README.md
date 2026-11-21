@@ -19,8 +19,9 @@ be accurate.
   envelopes, and OSM platform and subway-track ways within 250 to 300 m of a station), written only
   by `npm run data:catalog:fetch`. Station, entrance and equipment rows share the keys `gtfsStopId`,
   `stationId` (the E&E station MRN without leading zeros) and `complexId`; envelopes and OSM ways
-  carry no station key. Nothing here is read by `npm run data:stations`; it is input for the planned
-  station generator. The DOS Track LRS is not pinned (see `../docs/research/data-sources.md` §5.1).
+  carry no station key. `catalog/stations.json` is also read by `npm run data` (borough and ADA status
+  for `public/data/stations.json`); after a catalog refresh, rerun `npm run data`. Nothing here is read by
+  `npm run data:stations`; the rest is input for the planned station generator. The DOS Track LRS is not pinned (see `../docs/research/data-sources.md` §5.1).
   **E&E coordinates are unreliable:** the dataset's own overview says they are the station center
   when a machine's exact location is not known, and some are plainly wrong (25 machines are over 500 m
   from their station; EL100 is at Jay St, 15 km from 149 St-Hostos). Place machines from their `serving` text, not from `lat`/`lon`.
@@ -45,7 +46,9 @@ be accurate.
 2. Re-check the OPEN-NY Terms of Use and the datasets' overview PDFs for changes (links and quotes
    in `../docs/research/data-sources.md` §5.1).
 3. Review the diff of `stations/catalog/`. The E&E file changes most often (new machines).
-4. Commit. `catalogData.test.ts` checks the files against each other.
+4. Rerun `npm run data` so `public/data/stations.json` picks up borough and ADA changes
+   (`stationAccess.test.ts` fails while it is stale).
+5. Commit. `catalogData.test.ts` checks the files against each other.
 
 ## Licenses
 

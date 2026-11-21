@@ -17,7 +17,26 @@ export interface DataFile {
   feedVersion: string
 }
 
-export interface Station {
+/** Borough codes as 39hk-dx4f writes them. */
+export type Borough = 'Bx' | 'M' | 'Bk' | 'Q' | 'SI'
+export type AdaStatus = 'none' | 'full' | 'partial'
+export interface PartialAccess {
+  /** Accessible toward the north-labelled direction (the N stop). */
+  north: boolean
+  /** Accessible toward the south-labelled direction (the S stop). */
+  south: boolean
+  /** MTA text, e.g. "Downtown only". */
+  note: string
+}
+/** Borough and accessibility from the MTA Subway Stations dataset (39hk-dx4f). */
+export interface StationAccess {
+  borough: Borough
+  ada: AdaStatus
+  /** Present iff ada === 'partial'. */
+  adaPartial?: PartialAccess
+}
+
+export interface Station extends StationAccess {
   id: StationId
   name: string
   /** WGS84 degrees, rounded to 5 dp. */

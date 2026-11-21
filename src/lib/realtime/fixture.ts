@@ -42,6 +42,8 @@ const station = (s: Spot): Station => ({
   lon: s.lon,
   stops: [`${s.id}N`, `${s.id}S`],
   routes: [],
+  borough: 'M',
+  ada: 'none',
 })
 
 const spotOf = new Map([...MAIN, ...SI].map((s) => [s.id, s]))
