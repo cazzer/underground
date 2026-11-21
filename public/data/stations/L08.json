@@ -1,0 +1,49 @@
+{
+  "stationId": "L08",
+  "name": "Bedford Av",
+  "anchor": {
+    "lat": 40.717398,
+    "lon": -73.95701
+  },
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov"],
+  "levels": [
+    {"id":"street","name":"Street","kind":"street","y":0},
+    {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-4.3},
+    {"id":"platform","name":"Platform","kind":"platform","y":-9.1}
+  ],
+  "platforms": [
+    {"id":"island","level":"platform","outline":[[-54.75,-49.26],[-58.52,-44.4],[54.69,49.32],[58.58,44.42]],"tracks":[{"stopId":"L08N","path":[[-62.5,-57.8],[68.49,50.56]]},{"stopId":"L08S","path":[[-68.49,-50.56],[62.5,57.8]]}],"osmRef":"way/906963980","sources":["authored","osm"]}
+  ],
+  "slabs": [
+    {"id":"mezz-bedford","level":"mezzanine","name":"Bedford Av mezzanine","outline":[[-49.16,-69.22],[-38.37,-60.3],[-46.02,-51.05],[-33.69,-40.85],[-46.44,-25.44],[-58.77,-35.64],[-66.42,-26.39],[-77.21,-35.32]],"sources":["authored"]},
+    {"id":"mezz-driggs","level":"mezzanine","name":"Driggs Av mezzanine","outline":[[50.8,26.45],[69.29,41.75],[53.99,60.24],[35.5,44.94]],"sources":["authored"]}
+  ],
+  "connectors": [
+    {"id":"EL358","kind":"elevator","lower":{"x":-55.09,"z":-45.58,"level":"platform"},"upper":{"x":-55.09,"z":-45.58,"level":"mezzanine"},"width":2,"sources":["authored","nyopendata"]},
+    {"id":"EL359","kind":"elevator","lower":{"x":-49.63,"z":-56.48,"level":"mezzanine"},"upper":{"x":-49.63,"z":-56.48,"level":"street"},"width":2,"sources":["nyopendata"]},
+    {"id":"st-bedford-ne-1","kind":"stair","lower":{"x":-44.12,"z":-46.75,"level":"mezzanine"},"upper":{"x":-38.7,"z":-42.25,"level":"street"},"width":1.5,"sources":["authored","nyopendata"]},
+    {"id":"st-bedford-ne-2","kind":"stair","lower":{"x":-44.93,"z":-61.31,"level":"mezzanine"},"upper":{"x":-40.49,"z":-66.68,"level":"street"},"width":1.5,"sources":["authored","nyopendata"]},
+    {"id":"st-bedford-se-1","kind":"stair","lower":{"x":-68.54,"z":-31.52,"level":"mezzanine"},"upper":{"x":-72.94,"z":-26.12,"level":"street"},"width":1.5,"sources":["authored","nyopendata"]},
+    {"id":"st-bedford-se-2","kind":"stair","lower":{"x":-54.05,"z":-34.59,"level":"mezzanine"},"upper":{"x":-48.71,"z":-30.13,"level":"street"},"width":1.5,"sources":["authored","nyopendata"]},
+    {"id":"st-driggs-ne-1","kind":"stair","lower":{"x":57.6,"z":36.75,"level":"mezzanine"},"upper":{"x":62.99,"z":41.16,"level":"street"},"width":1.5,"sources":["authored","nyopendata"]},
+    {"id":"st-driggs-ne-2","kind":"stair","lower":{"x":57.61,"z":34.68,"level":"mezzanine"},"upper":{"x":62.08,"z":29.26,"level":"street"},"width":1.5,"sources":["authored","nyopendata"]},
+    {"id":"st-driggs-se-1","kind":"stair","lower":{"x":43.97,"z":50.39,"level":"mezzanine"},"upper":{"x":39.49,"z":55.83,"level":"street"},"width":1.5,"sources":["authored","nyopendata"]},
+    {"id":"st-driggs-se-2","kind":"stair","lower":{"x":48.01,"z":49.58,"level":"mezzanine"},"upper":{"x":53.41,"z":53.99,"level":"street"},"width":1.5,"sources":["authored","nyopendata"]},
+    {"id":"st-platform-east","kind":"stair","lower":{"x":38.53,"z":31.87,"level":"platform"},"upper":{"x":45.46,"z":37.61,"level":"mezzanine"},"width":2.4,"sources":["authored"]},
+    {"id":"st-platform-west-1","kind":"stair","lower":{"x":-35.44,"z":-29.32,"level":"platform"},"upper":{"x":-42.38,"z":-35.06,"level":"mezzanine"},"width":2.4,"sources":["authored"]},
+    {"id":"st-platform-west-2","kind":"stair","lower":{"x":-45.46,"z":-37.61,"level":"platform"},"upper":{"x":-52.39,"z":-43.34,"level":"mezzanine"},"width":2.4,"sources":["authored"]}
+  ],
+  "entrances": [
+    {"id":"bedford-ne-1","x":-38.7,"z":-42.25,"type":"Stair","entry":true,"exit":true,"connectors":["st-bedford-ne-1"],"sources":["nyopendata"]},
+    {"id":"bedford-ne-2","x":-40.49,"z":-66.68,"type":"Stair","entry":true,"exit":true,"connectors":["st-bedford-ne-2"],"sources":["nyopendata"]},
+    {"id":"bedford-ne-elevator","x":-49.63,"z":-56.48,"type":"Elevator","entry":true,"exit":true,"connectors":["EL359"],"sources":["nyopendata"]},
+    {"id":"bedford-se-1","x":-72.94,"z":-26.12,"type":"Stair","entry":true,"exit":true,"connectors":["st-bedford-se-1"],"sources":["nyopendata"]},
+    {"id":"bedford-se-2","x":-48.71,"z":-30.13,"type":"Stair","entry":true,"exit":true,"connectors":["st-bedford-se-2"],"sources":["nyopendata"]},
+    {"id":"driggs-ne-1","x":62.99,"z":41.16,"type":"Stair","entry":true,"exit":true,"connectors":["st-driggs-ne-1"],"sources":["nyopendata"]},
+    {"id":"driggs-ne-2","x":62.08,"z":29.26,"type":"Stair","entry":true,"exit":true,"connectors":["st-driggs-ne-2"],"sources":["nyopendata"]},
+    {"id":"driggs-se-1","x":39.49,"z":55.83,"type":"Stair","entry":true,"exit":true,"connectors":["st-driggs-se-1"],"sources":["nyopendata"]},
+    {"id":"driggs-se-2","x":53.41,"z":53.99,"type":"Stair","entry":true,"exit":true,"connectors":["st-driggs-se-2"],"sources":["nyopendata"]}
+  ],
+  "fareLines": []
+}

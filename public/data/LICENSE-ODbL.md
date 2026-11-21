@@ -1,7 +1,7 @@
 # OpenStreetMap data (ODbL)
 
-Files in this directory derived from OpenStreetMap, such as station platform
-geometry (planned), are © OpenStreetMap contributors. They are made available
+Files in this directory derived from OpenStreetMap, such as the station interiors
+in `stations/`, are © OpenStreetMap contributors. They are made available
 under the Open Database License (ODbL) 1.0:
 https://opendatacommons.org/licenses/odbl/1-0/
 

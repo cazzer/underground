@@ -1,0 +1,64 @@
+{
+  "stationId": "L08",
+  "name": "Bedford Av",
+  "notes": [
+    "Frame: u = meters along bearing 129.6 deg (the OSM platform's long axis, Bedford Av toward Driggs Av) from the anchor (OSM platform centroid); v = meters to the right (SW).",
+    "One island platform and two mezzanines (Bedford Av west, Driggs Av east): Wikipedia 'Bedford Avenue station', facts only.",
+    "UNVERIFIED: elevations. Mezzanine -4.3 m and platform -9.1 m are typical cut-and-cover figures; the E&E inventory has no rise for EL358/EL359.",
+    "UNVERIFIED: track sides assume right-hand running: 8 Av-bound L08N on the NE side (v < 0), Canarsie-bound L08S on the SW side; centerlines 4.7 m off the axis.",
+    "UNVERIFIED: mezzanine outlines are drawn to contain every stair landing; real extents unknown.",
+    "UNVERIFIED: platform stairs. Wikipedia: two stairs plus the elevator at the west end, one stair at the east end. Positions, 9 m runs and 2.4 m widths are guesses.",
+    "UNVERIFIED: street stairs. Tops are the Open Data points; bottoms assume 7 m runs toward N 7 St; widths 1.5 m.",
+    "UNVERIFIED: corner names in entrance ids come from the frame (v < 0 = north side of N 7 St).",
+    "EL358: E&E position is 6 m past the platform's SW edge, over the track; moved onto the platform axis at the west end.",
+    "EL359: E&E position is in the N 7 St roadway, 9.6 m from the Open Data elevator entrance (NE corner, matching the ENE text); placed at the entrance.",
+    "No fare control lines: positions unknown."
+  ],
+  "frame": { "anchor": { "lat": 40.717398, "lon": -73.95701 }, "bearingDeg": 129.6 },
+  "fetch": { "osmWays": [906963980], "entrancesGtfsStopId": "L08", "equipmentStationMrn": "120" },
+  "levels": [
+    { "id": "street", "name": "Street", "kind": "street", "y": 0 },
+    { "id": "mezzanine", "name": "Mezzanine", "kind": "mezzanine", "y": -4.3 },
+    { "id": "platform", "name": "Platform", "kind": "platform", "y": -9.1 }
+  ],
+  "platforms": [
+    { "id": "island", "level": "platform", "osmWay": 906963980, "tracks": [
+      { "stopId": "L08N", "path": [[-85, -4.7], [85, -4.7]] },
+      { "stopId": "L08S", "path": [[-85, 4.7], [85, 4.7]] } ] }
+  ],
+  "slabs": [
+    { "id": "mezz-bedford", "level": "mezzanine", "name": "Bedford Av mezzanine",
+      "outline": [[-82, -22], [-68, -22], [-68, -10], [-52, -10], [-52, 10], [-68, 10], [-68, 22], [-82, 22]] },
+    { "id": "mezz-driggs", "level": "mezzanine", "name": "Driggs Av mezzanine",
+      "outline": [[56, -12], [80, -12], [80, 12], [56, 12]] }
+  ],
+  "entrances": [
+    { "id": "bedford-ne-1", "source": [40.717778, -73.9574692] },
+    { "id": "bedford-ne-2", "source": [40.7179977, -73.9574904] },
+    { "id": "bedford-ne-elevator", "source": [40.7179059, -73.9575989] },
+    { "id": "bedford-se-1", "source": [40.7176329, -73.9578755] },
+    { "id": "bedford-se-2", "source": [40.717669, -73.957588] },
+    { "id": "driggs-ne-1", "source": [40.7170278, -73.9562626] },
+    { "id": "driggs-ne-2", "source": [40.7171349, -73.9562734] },
+    { "id": "driggs-se-1", "source": [40.7168959, -73.9565414] },
+    { "id": "driggs-se-2", "source": [40.7169125, -73.9563763] }
+  ],
+  "connectors": [
+    { "id": "st-bedford-ne-1", "kind": "stair", "width": 1.5, "lower": { "level": "mezzanine", "at": [-63.8, -7.9] }, "upper": { "entrance": "bedford-ne-1" } },
+    { "id": "st-bedford-ne-2", "kind": "stair", "width": 1.5, "lower": { "level": "mezzanine", "at": [-73.7, -18.6] }, "upper": { "entrance": "bedford-ne-2" } },
+    { "id": "st-bedford-se-1", "kind": "stair", "width": 1.5, "lower": { "level": "mezzanine", "at": [-72.9, 19.4] }, "upper": { "entrance": "bedford-se-1" } },
+    { "id": "st-bedford-se-2", "kind": "stair", "width": 1.5, "lower": { "level": "mezzanine", "at": [-63.7, 7.8] }, "upper": { "entrance": "bedford-se-2" } },
+    { "id": "st-driggs-ne-1", "kind": "stair", "width": 1.5, "lower": { "level": "mezzanine", "at": [67.8, -8.4] }, "upper": { "entrance": "driggs-ne-1" } },
+    { "id": "st-driggs-ne-2", "kind": "stair", "width": 1.5, "lower": { "level": "mezzanine", "at": [66.5, -10] }, "upper": { "entrance": "driggs-ne-2" } },
+    { "id": "st-driggs-se-1", "kind": "stair", "width": 1.5, "lower": { "level": "mezzanine", "at": [66, 10.8] }, "upper": { "entrance": "driggs-se-1" } },
+    { "id": "st-driggs-se-2", "kind": "stair", "width": 1.5, "lower": { "level": "mezzanine", "at": [68.6, 7.6] }, "upper": { "entrance": "driggs-se-2" } },
+    { "id": "st-platform-west-1", "kind": "stair", "width": 2.4, "lower": { "level": "platform", "at": [-46, 0] }, "upper": { "level": "mezzanine", "at": [-55, 0] } },
+    { "id": "st-platform-west-2", "kind": "stair", "width": 2.4, "lower": { "level": "platform", "at": [-59, 0] }, "upper": { "level": "mezzanine", "at": [-68, 0] } },
+    { "id": "st-platform-east", "kind": "stair", "width": 2.4, "lower": { "level": "platform", "at": [50, 0] }, "upper": { "level": "mezzanine", "at": [59, 0] } }
+  ],
+  "equipment": [
+    { "code": "EL358", "at": [-71.5, 0] },
+    { "code": "EL359", "entrance": "bedford-ne-elevator" }
+  ],
+  "fareLines": []
+}
