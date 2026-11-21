@@ -6,7 +6,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import type { StationInterior } from '../src/data/stationSchema.ts'
 import type { AuthoredStation, GeneratedStation, StationSources } from './lib/stationInputs.ts'
-import { checkBudget, committedGzip, GZIP_BUDGET_BYTES, renderedFile } from './lib/budget.ts'
+import { checkBudget, checkIndexCap, committedGzip, GZIP_BUDGET_BYTES, INDEX_GZIP_CAP_BYTES, renderedFile } from './lib/budget.ts'
 import { buildStationDepths } from './lib/stationDepths.ts'
 import { buildStationIndex } from './lib/stationIndex.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
@@ -59,8 +59,10 @@ function main(): void {
   const interiors = [...authoredInteriors, ...generatedInteriors]
 
   const depths = renderedFile(DEPTHS, toStableJson(buildStationDepths(interiors), 2))
-  // index.json is fetched lazily on the first station focus, not at startup, so it is outside this budget.
+  // index.json is fetched right after startup (not render-blocking, no waiting for a first focus), so it
+  // isn't in this budget; it has its own cap instead.
   const index = renderedFile(INDEX, toStableJson(buildStationIndex(interiors), 2))
+  checkIndexCap(index)
   // The client loads station-depths.json up front, so it shares the 60 KB budget with the GTFS files (the one limit).
   const total = checkBudget([depths], committedGzip(DATA_DIR, new Set([DEPTHS])))
   const files = interiors.map((interior) => ({ id: interior.stationId, json: toStableJson(interior, 2) }))
@@ -70,7 +72,7 @@ function main(): void {
     console.log(`stations/${id}.json: ${Buffer.byteLength(json)} bytes (${gzipSync(json).length} gzipped)`)
   }
   writeFileSync(new URL(INDEX, OUT_DIR), index.text)
-  console.log(`stations/${INDEX}: ${index.raw} bytes (${index.gzip} gzipped)`)
+  console.log(`stations/${INDEX}: ${index.raw} bytes (${index.gzip} gzipped, cap ${INDEX_GZIP_CAP_BYTES})`)
   writeFileSync(new URL(DEPTHS, DATA_DIR), depths.text)
   console.log(`${DEPTHS}: ${depths.raw} bytes (${depths.gzip} gzipped)`)
   console.log(`public/data total gzip: ${total} B (budget ${GZIP_BUDGET_BYTES} B)`)

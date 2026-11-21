@@ -17,11 +17,11 @@ function withDepthSources(interior: StationInterior, depths: GeneratedMeta['leve
   return interior.levels.map((l) => {
     if (l.kind === 'street') {
       if (Object.hasOwn(depths, l.id)) throw new Error(`${id}: levelDepths must not name the street level "${l.id}"`)
-      return { id: l.id, name: l.name, kind: l.kind, y: l.y }
+      return { ...l }
     }
     const depthSource = Object.hasOwn(depths, l.id) ? depths[l.id] : undefined
     if (!depthSource) throw new Error(`${id}: levelDepths is missing level "${l.id}"`)
-    return { id: l.id, name: l.name, kind: l.kind, y: l.y, depthSource }
+    return { ...l, depthSource }
   })
 }
 

@@ -19,7 +19,7 @@ const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
 }
 
 /** Appended after the MTA credit: the nyopendata elements are not ODbL (user's licensing decision, card 9wc.1.1 option A). */
-export const OPEN_NY_NOTE = 'Elements with source nyopendata are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
+export const OPEN_NY_NOTE = 'Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
 
 const byId = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 

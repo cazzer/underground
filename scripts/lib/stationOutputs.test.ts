@@ -28,7 +28,8 @@ const OPTIONS = {
 
 describe('station index', () => {
   it('lists exactly the stations with a public/data/stations file', () => {
-    expect(Object.keys(index.stations)).toEqual(ids)
+    // Compared sorted: JS puts integer-like keys first when it writes the object.
+    expect(Object.keys(index.stations).sort()).toEqual(ids)
   })
 
   it.each(ids)('%s: the entry matches the interior file', (id) => {

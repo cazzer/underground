@@ -29,10 +29,11 @@ export function interiorIdOf(stationId: string | null, index: IndexLoad): string
 }
 
 /**
- * What to show for station `stationId` (null: no station focused). Until the index is ready there is
- * nothing to say about the station; a station the index doesn't list has no interior. Then a cached
- * model wins, so a revisit is ready on its first render, and a settled attempt for another station
- * means this one is loading.
+ * What to show for station `stationId` (null: no station focused). Until the index is ready, or if it
+ * failed, there is nothing to say about the station (almost no station has an interior, so a panel
+ * would be wrong for nearly all of them); a station the index doesn't list has none either. Then a
+ * cached model wins, so a revisit is ready on its first render, and a settled attempt for another
+ * station means this one is loading.
  */
 export function deriveInteriorLoad(
   stationId: string | null,
@@ -41,8 +42,6 @@ export function deriveInteriorLoad(
   settled: SettledLoad | null,
 ): InteriorLoad {
   if (!stationId) return NONE
-  if (index.status === 'loading') return LOADING
-  if (index.status === 'error') return { status: 'error', message: index.message }
   const id = interiorIdOf(stationId, index)
   if (!id) return NONE
   const model = peek(id)

@@ -365,11 +365,14 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   generated interiors use `generated` in place of `authored` in `sources`. Their non-street levels carry
   `depthSource`: only `ee-rise` is measured, the rest are estimates (label "≈"). Nothing generated ships yet.
 - `public/data/stations/index.json` (`StationIndex`) maps each station id with an interior file to its
-  `provenance` (`authored` or `generated`). The client fetches it lazily, so it is outside the 60 KB startup
-  budget; a station not listed never fetches an interior. `index` is not a valid station id.
+  `provenance` (`authored` or `generated`). The client fetches it on mount, after the startup files and not
+  render-blocking, so it is outside the 60 KB startup budget and has its own cap (the build fails above 8 KB
+  gzipped); a station not listed never fetches an interior, and until it loads (or if it fails, retried on the next
+  focus change) no station shows an interior panel. The object's key order lists integer-like ids first; don't rely on it. `index` is not a valid station id.
 - `public/data/station-depths.json` (`StationDepthsFile`) is extracted from these files by the same build: per
   station its anchor and, per track, `stopId`, real `railY` and the path's two ends. ODbL, with the union of the
-  interiors' credits.
+  interiors' credits minus the OPEN-NY note, plus its own line ("railY values from E&E rises are MTA data under
+  the OPEN-NY Terms of Use") only when a platform level's `depthSource` is `ee-rise`.
 - Authoring uses a `[u, v]` frame aligned to the platform; the merge converts it. Guesses are marked
   `UNVERIFIED:` in the authored file's `notes`; they are not copied to the output.
 

@@ -1,8 +1,11 @@
 /** Built station interiors to public/data/station-depths.json: each platform track's ends and rail height. Pure. */
 import type { StationDepth, StationDepthsFile, StationInterior, TrackDepth } from '../../src/data/stationSchema.ts'
 import { RAIL_DROP_M } from '../../src/lib/interiorGeometry.ts'
+import { OPEN_NY_NOTE } from './stationMerge.ts'
 
 const OSM_CREDIT = '© OpenStreetMap contributors'
+/** Only when a rail height comes from an E&E rise (an MTA/OPEN-NY value); the interiors' own OPEN-NY note is about their elements. */
+export const DEPTHS_OPEN_NY_NOTE = 'railY values from E&E rises are MTA data under the OPEN-NY Terms of Use'
 const round2 = (v: number): number => Math.round(v * 100) / 100
 
 function stationDepth(interior: StationInterior): StationDepth {
@@ -24,10 +27,17 @@ function stationDepth(interior: StationInterior): StationDepth {
   return { stationId: interior.stationId, anchor: interior.anchor, tracks }
 }
 
+/** True when a platform that contributes a rail height sits on a level whose depth is a measured E&E rise. */
+function usesEeRise(interior: StationInterior): boolean {
+  const onRise = new Set(interior.levels.filter((l) => l.depthSource === 'ee-rise').map((l) => l.id))
+  return interior.platforms.some((p) => p.tracks.length > 0 && onRise.has(p.level))
+}
+
 /** One entry per interior (sorted by station id). The file inherits the interiors' ODbL license and credits. */
 export function buildStationDepths(interiors: readonly StationInterior[]): StationDepthsFile {
   const sorted = [...interiors].sort((a, b) => (a.stationId < b.stationId ? -1 : a.stationId > b.stationId ? 1 : 0))
-  const credits = [...new Set(sorted.flatMap((i) => i.attribution))]
+  const credits = [...new Set(sorted.flatMap((i) => i.attribution))].filter((c) => c !== OPEN_NY_NOTE)
+  if (sorted.some(usesEeRise)) credits.push(DEPTHS_OPEN_NY_NOTE)
   credits.sort((a, b) => Number(b === OSM_CREDIT) - Number(a === OSM_CREDIT))
   for (const i of sorted) {
     if (i.license !== 'ODbL-1.0') throw new Error(`${i.stationId}: unexpected license ${JSON.stringify(i.license)}`)

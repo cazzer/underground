@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { StationDepthsFile, StationInterior } from '../../src/data/stationSchema.ts'
 import { toStableJson } from './stableJson.ts'
-import { buildStationDepths } from './stationDepths.ts'
+import { buildStationDepths, DEPTHS_OPEN_NY_NOTE } from './stationDepths.ts'
 import { OPEN_NY_NOTE } from './stationMerge.ts'
 
 const interiorDir = new URL('../../public/data/stations/', import.meta.url)
@@ -36,7 +36,22 @@ describe('buildStationDepths', () => {
     const other: StationInterior = { ...l08, stationId: 'A01', attribution: ['Someone else', '© OpenStreetMap contributors'] }
     const out = buildStationDepths([l08, other])
     expect(out.stations.map((s) => s.stationId)).toEqual(['A01', 'L08'])
-    expect(out.attribution).toEqual(['© OpenStreetMap contributors', 'Someone else', 'Metropolitan Transportation Authority, data.ny.gov', OPEN_NY_NOTE])
+    expect(out.attribution).toEqual(['© OpenStreetMap contributors', 'Someone else', 'Metropolitan Transportation Authority, data.ny.gov'])
+  })
+
+  it("drops the interiors' OPEN-NY note and adds its own only when a platform level's depth is an E&E rise", () => {
+    expect(l08.attribution).toContain(OPEN_NY_NOTE)
+    expect(buildStationDepths([l08]).attribution).not.toContain(OPEN_NY_NOTE)
+    expect(buildStationDepths([l08]).attribution).not.toContain(DEPTHS_OPEN_NY_NOTE)
+    const withSource = (depthSource: 'ee-rise' | 'osm-level'): StationInterior => ({
+      ...l08,
+      levels: l08.levels.map((l) => (l.kind === 'platform' ? { ...l, depthSource } : l)),
+    })
+    expect(buildStationDepths([withSource('ee-rise')]).attribution).toEqual([...buildStationDepths([l08]).attribution, DEPTHS_OPEN_NY_NOTE])
+    expect(buildStationDepths([withSource('osm-level')]).attribution).not.toContain(DEPTHS_OPEN_NY_NOTE)
+    // an ee-rise on a level no platform stands on contributes no rail height
+    const mezzOnly: StationInterior = { ...l08, levels: l08.levels.map((l) => (l.kind === 'mezzanine' ? { ...l, depthSource: 'ee-rise' as const } : l)) }
+    expect(buildStationDepths([mezzOnly]).attribution).not.toContain(DEPTHS_OPEN_NY_NOTE)
   })
 
   it('throws on a platform on an unknown level or a duplicated stop', () => {

@@ -32,11 +32,16 @@ function initialIndexLoad(): IndexLoad {
   return index ? { status: 'ready', index } : INDEX_LOADING
 }
 
-/** Interior for the focused station; stations the index doesn't list never fetch. */
+/**
+ * Interior for the focused station; stations the index doesn't list never fetch. The index is fetched on
+ * mount (no waiting for a first focus); while it loads or after it fails, no station shows an interior panel.
+ * `retry` retries a failed interior.
+ */
 export function useStationInterior(stationId: string | null): { load: InteriorLoad; retry: () => void } {
   const [indexLoad, setIndexLoad] = useState<IndexLoad>(initialIndexLoad)
   const [settled, setSettled] = useState<SettledLoad | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [indexAttempt, setIndexAttempt] = useState(0)
   const id = interiorIdOf(stationId, indexLoad)
 
   useEffect(() => {
@@ -54,7 +59,15 @@ export function useStationInterior(stationId: string | null): { load: InteriorLo
     return () => {
       cancelled = true
     }
-  }, [attempt])
+  }, [indexAttempt])
+
+  // A failed index is requested again on the next focus change (the cache already evicted the failure).
+  useEffect(() => {
+    if (indexLoad.status !== 'error') return
+    setIndexLoad(INDEX_LOADING)
+    setIndexAttempt((n) => n + 1)
+    // Only a focus change retries; `indexLoad` is read, not a trigger.
+  }, [stationId])
 
   useEffect(() => {
     if (!id || cache.peek(id)) return
@@ -78,7 +91,6 @@ export function useStationInterior(stationId: string | null): { load: InteriorLo
 
   const retry = useCallback(() => {
     setSettled(null)
-    setIndexLoad((prev) => (prev.status === 'error' ? INDEX_LOADING : prev))
     setAttempt((n) => n + 1)
   }, [])
 

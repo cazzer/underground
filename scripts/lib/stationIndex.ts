@@ -1,6 +1,8 @@
 /** public/data/stations/index.json: which stations have an interior, and whether it is authored or generated. Pure. */
 import type { StationIndex, StationInterior } from '../../src/data/stationSchema.ts'
 
+/** Entries are inserted in id order, but a JS object lists integer-like keys ("101") first, numerically,
+ *  so the written key order is not plain string order. Readers must not rely on it. */
 export function buildStationIndex(interiors: readonly StationInterior[]): StationIndex {
   const sorted = [...interiors].sort((a, b) => (a.stationId < b.stationId ? -1 : a.stationId > b.stationId ? 1 : 0))
   const stations: StationIndex['stations'] = {}

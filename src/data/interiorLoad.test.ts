@@ -28,9 +28,12 @@ describe('deriveInteriorLoad', () => {
     expect(deriveInteriorLoad(null, { status: 'loading' }, cached, null)).toEqual({ status: 'none' })
   })
 
-  it('is loading while the index loads, and an error when the index failed', () => {
-    expect(deriveInteriorLoad('L08', { status: 'loading' }, cached, null)).toEqual({ status: 'loading' })
-    expect(deriveInteriorLoad('L08', { status: 'error', message: 'HTTP 404' }, cached, null)).toEqual({ status: 'error', message: 'HTTP 404' })
+  it('is none while the index loads or after it failed, so no station gets a false panel', () => {
+    expect(deriveInteriorLoad('L08', { status: 'loading' }, cached, null)).toEqual({ status: 'none' })
+    expect(deriveInteriorLoad('L08', { status: 'loading' }, empty, null)).toEqual({ status: 'none' })
+    expect(deriveInteriorLoad('L10', { status: 'error', message: 'HTTP 404' }, empty, null)).toEqual({ status: 'none' })
+    const error = { id: 'L08', load: { status: 'error' as const, message: 'HTTP 500' } }
+    expect(deriveInteriorLoad('L08', { status: 'error', message: 'HTTP 404' }, empty, error)).toEqual({ status: 'none' })
   })
 
   it('is none for a station the index does not list', () => {

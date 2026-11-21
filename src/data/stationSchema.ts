@@ -126,12 +126,12 @@ export interface FareLine {
   sources: InteriorSource[]
 }
 
-/** public/data/stations/index.json: every station that has an interior file. Lazily fetched, not part of the startup budget. */
+/** public/data/stations/index.json: every station that has an interior file. Fetched after the startup files (not render-blocking), so it has its own size cap rather than the startup budget. */
 export interface StationIndexEntry {
   provenance: InteriorProvenance
 }
 export interface StationIndex {
-  /** Sorted by id. */
+  /** Written in id order, except that JS lists integer-like ids first; don't rely on key order. */
   stations: Record<StationId, StationIndexEntry>
 }
 
