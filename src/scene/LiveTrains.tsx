@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { CircleGeometry, Color, DynamicDrawUsage, type InstancedMesh, type Mesh } from 'three'
+import { CircleGeometry, Color, DynamicDrawUsage, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial } from 'three'
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix } from '../lib/live/consist'
@@ -46,12 +46,18 @@ interface LiveTrainsProps extends LiveLayer {
 export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: LiveTrainsProps) {
   const dots = useRef<InstancedMesh>(null)
   const halo = useRef<InstancedMesh>(null)
+  // The selected train's dot is drawn on its own, above every other dot: rim, background gap, then the dot.
+  const selected = useRef<Group>(null)
   const rim = useRef<Mesh>(null)
+  const selectedHalo = useRef<Mesh>(null)
+  const selectedDot = useRef<Mesh<CircleGeometry, MeshBasicMaterial>>(null)
   const cars = useTrainCars()
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
   const { selectedKey } = useTrainSelection()
   /** The slot drawn as selected, -1 for none. Read once per frame. */
   const selectedSlot = useRef(-1)
+  /** Each slot's dot color (shared Color objects), so the selected dot can take it without allocating. */
+  const slotColors = useMemo(() => new Array<Color | null>(TRAIN_CAPACITY).fill(null), [])
   const point = useMemo(() => ({ x: 0, z: 0 }), [])
   const range = useMemo(() => ({ start: 0, count: 0 }), [])
   const geometry = useMemo(
@@ -90,9 +96,10 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
       const routeId = trip ? trainRouteId(trip, network.routeById, patterns) : null
       const color = (routeId !== null && colors.byRoute.get(routeId)) || colors.fallback
       d.setColorAt(i, color)
+      slotColors[i] = color
       cars.setSlot(i, routeId, color)
     },
-    [table, network, patterns, colors, cars],
+    [table, network, patterns, colors, cars, slotColors],
   )
 
   // Instance colors must exist before the first frame, or the shader compiles without them.
@@ -142,7 +149,10 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
     const d = dots.current
     const h = halo.current
     const r = rim.current
-    if (!d || !h || !r) return
+    const g = selected.current
+    const sh = selectedHalo.current
+    const sd = selectedDot.current
+    if (!d || !h || !r || !g || !sh || !sd) return
     const perfMs = performance.now()
     const now = clockNow(offsetS, perfMs)
     const localS = perfMs / 1000
@@ -154,7 +164,8 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
     const center = getControls(state)?.target
     const reach = camera * CARS_WITHIN.distances + CARS_WITHIN.plusM
     const out = d.instanceMatrix.array as Float32Array
-    const selected = selectedSlot.current
+    const sel = selectedSlot.current
+    let dotScale = 0
     let rimRadius = 0
 
     for (let i = 0; i < table.high; i++) {
@@ -168,11 +179,15 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
         cars.clear(i)
         freeSlot(table, i)
       } else {
-        if (i === selected) {
-          writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k * SELECTED_GROWTH)
+        if (i === sel) {
+          // Its instance is hidden; the selected meshes draw it above the rest.
+          writeInstanceMatrix(out, i, 0, 0, 0, 0)
+          dotScale = scale * k * SELECTED_GROWTH
           // Fades out with the dot as the cars (which carry their own rim) unfold.
-          rimRadius = scale * k * SELECTED_GROWTH * HALO_RATIO + screenScale(camera, RIM_PX, 0) * k * (1 - mix)
-          r.position.set(point.x, DOT_Y, point.z)
+          rimRadius = dotScale * HALO_RATIO + screenScale(camera, RIM_PX, 0) * k * (1 - mix)
+          g.position.set(point.x, DOT_Y, point.z)
+          const color = slotColors[i]
+          if (color) sd.material.color.copy(color)
         } else writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k)
         if (!carsOn) continue
         const dx = center ? point.x - center.x : 0
@@ -183,8 +198,12 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
       }
     }
     h.instanceMatrix.array.set(out)
-    r.visible = rimRadius > 0
-    if (rimRadius > 0) r.scale.setScalar(rimRadius)
+    g.visible = rimRadius > 0
+    if (rimRadius > 0) {
+      r.scale.setScalar(rimRadius)
+      sh.scale.setScalar(Math.max(dotScale, 1e-6))
+      sd.scale.setScalar(Math.max(dotScale, 1e-6))
+    }
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
@@ -197,9 +216,6 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
 
   return (
     <>
-      <mesh ref={rim} geometry={geometry.rim} visible={false} frustumCulled={false} renderOrder={RENDER_ORDER.trainRim}>
-        <meshBasicMaterial color={theme.trainSelectedRim} transparent depthTest={false} depthWrite={false} />
-      </mesh>
       <instancedMesh
         ref={halo}
         args={[geometry.halo, undefined, TRAIN_CAPACITY]}
@@ -217,6 +233,17 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
         {/* Default white material: the per-instance colors are the dot colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
+      <group ref={selected} visible={false}>
+        <mesh ref={rim} geometry={geometry.rim} frustumCulled={false} renderOrder={RENDER_ORDER.selectedTrainRim}>
+          <meshBasicMaterial color={theme.trainSelectedRim} transparent depthTest={false} depthWrite={false} />
+        </mesh>
+        <mesh ref={selectedHalo} geometry={geometry.halo} frustumCulled={false} renderOrder={RENDER_ORDER.selectedTrainHalo}>
+          <meshBasicMaterial color={theme.background} transparent depthTest={false} depthWrite={false} />
+        </mesh>
+        <mesh ref={selectedDot} geometry={geometry.dot} frustumCulled={false} renderOrder={RENDER_ORDER.selectedTrain}>
+          <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
+        </mesh>
+      </group>
       <TrainCars layer={cars} />
     </>
   )

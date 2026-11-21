@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RealtimeTrip } from '../../data/realtime'
 import { lookup } from '../realtime/fixture'
-import { goneNotice, selectedAnnouncement, trainSummary } from './trainSummary'
+import { goneNotice, trainSummary } from './trainSummary'
 
 const ROUTES = new Map([
   ['1', { shortName: '1' }],
@@ -48,12 +48,5 @@ describe('goneNotice', () => {
     expect(goneNotice({ routeId: 'L', routeName: 'L', headsign: null })).toBe('The L train is no longer tracked.')
     expect(goneNotice(null)).toBe("Lost this train's live position.")
     expect(goneNotice({ routeId: null, routeName: null, headsign: 'X' })).toBe("Lost this train's live position.")
-  })
-})
-
-describe('selectedAnnouncement', () => {
-  it('names the picked train', () => {
-    expect(selectedAnnouncement({ routeId: 'FX', routeName: 'F express', headsign: 'Jamaica-179 St' })).toBe('Selected F express train to Jamaica-179 St.')
-    expect(selectedAnnouncement(null)).toBe('Selected train.')
   })
 })

@@ -26,6 +26,12 @@ const MIN_WIDTH_PX = 5
  */
 const WIDEN_STEP = 0.005
 const widenFor = (slot: number): number => 1 + (Math.imul(slot, 0x9e3779b1) >>> 28) * WIDEN_STEP
+/**
+ * The selected train sits above every level and a little higher, so where another train shares or parallels
+ * its corridor the selected roof wins the depth test.
+ */
+const SELECTED_WIDEN = 1 + 16 * WIDEN_STEP
+const SELECTED_LIFT_M = 0.2
 const STRIDE = MAX_CARS * 16
 /** Clean slots an upload range may span between dirty ones: fewer bufferSubData calls for a few KB more. */
 const BRIDGE_SLOTS = 16
@@ -82,7 +88,7 @@ export function useTrainCars(): TrainCarsLayer {
   const layer = useMemo((): Omit<TrainCarsLayer, 'bodies' | 'halos' | 'rims' | 'geometry'> => {
     const consists = new Array<Consist>(TRAIN_CAPACITY).fill(DEFAULT_CONSIST)
     const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: carLook.widthM, crossScale: 1, y: CAR_Y }
-    const gapFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM }
+    const gapFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM, y: CAR_Y + SELECTED_LIFT_M }
     const rimFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM + SELECTED_RIM.minM }
     /** writeConsist writes bodies with the footprints; the rim's bodies land here and are never drawn. */
     const rimBodies = new Float32Array(MAX_CARS * 16)
@@ -153,7 +159,7 @@ export function useTrainCars(): TrainCarsLayer {
         if (!b || !h) return
         const out = b.instanceMatrix.array as Float32Array
         const consist = consists[i]!
-        const widen = widenFor(i)
+        const widen = i === selected ? SELECTED_WIDEN : widenFor(i)
         writeConsist(out, h.instanceMatrix.array as Float32Array, i, line, shown, consist, mix, k, widen, i === selected ? gapFrame : frame, scratch)
         const r = rims.current
         if (i === selected && r) {

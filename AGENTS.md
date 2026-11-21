@@ -76,7 +76,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
-    `theme.trainSelectedRim` rim, a disc under its halo and footprints under its car halos; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
+    `theme.trainSelectedRim` rim. Its dot is drawn on its own above every other dot; its cars get the top widen
+    level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
     their instances, consists and per-frame writes; `carGeometry.ts` the shaded body; `carLook.ts` TEMPORARY);
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
@@ -85,9 +86,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
-- `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer, arrivals panel;
-  `TrainPanel.tsx` holds the selected-train panel, which covers the station panel, and the "no longer
-  tracked" panel shown for 10 s; Esc closes the train first, then the notice, then the station); `LoadStatus.tsx` loading/error panel
+- `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
+  panel; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
+  each pick, and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
+  notice, then the station, and closing either of the first two returns focus to the station heading or else
+  the location button); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
@@ -237,9 +240,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   positive `useFrame` priority (it takes over rendering).
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
-  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, selected-train rim 4.75,
-  train halo 5, car rim 5.25, car halo 5.5, trains 6, you-are-here halo 6.4, cars 6.5, you-are-here
-  reticle 6.55, focused ring 10
+  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
+  car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
+  you-are-here reticle 6.55, focused ring 10
   (whenever a station is focused, so a train never covers it).
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth

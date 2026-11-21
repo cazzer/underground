@@ -23,7 +23,7 @@ export interface PickHit {
   distancePx: number
 }
 
-export type Pick = { kind: 'station'; index: number } | { kind: 'train'; index: number }
+export type ScenePick = { kind: 'station'; index: number } | { kind: 'train'; index: number }
 
 /** Distance from `p` to the segment a-b, in pixels. A zero-length segment is its point. */
 export function segmentDistancePx(p: ScreenPoint, a: ScreenPoint, b: ScreenPoint): number {
@@ -75,7 +75,7 @@ export function trainHitPx(touch: boolean, station: PickHit | null): number {
  * through. When the station is the one already open (`focusedIndex`), any train in reach wins instead: the
  * station's panel is up, so a second click there means the train waiting at it.
  */
-export function choosePick(station: PickHit | null, train: PickHit | null, focusedIndex = -1): Pick | null {
+export function choosePick(station: PickHit | null, train: PickHit | null, focusedIndex = -1): ScenePick | null {
   if (train && (!station || station.index === focusedIndex || train.distancePx <= station.distancePx - STATION_PRIORITY_PX)) {
     return { kind: 'train', index: train.index }
   }

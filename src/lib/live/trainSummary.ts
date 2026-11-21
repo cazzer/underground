@@ -42,8 +42,3 @@ export function goneNotice(summary: TrainSummary | null): string {
   const name = trainName(summary)
   return name ? `The ${name} is no longer tracked.` : "Lost this train's live position."
 }
-
-/** What a screen reader hears when a train is picked. */
-export function selectedAnnouncement(summary: TrainSummary | null): string {
-  return `Selected ${trainName(summary) ?? 'train'}.`
-}

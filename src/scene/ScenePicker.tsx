@@ -5,7 +5,7 @@ import { useFocus } from '../lib/focus'
 import { carMix } from '../lib/live/consist'
 import { nearestTrain, trainScreenPoints, type TrainPickInput, type TrainPickSource } from '../lib/live/trainPick'
 import type { Station } from '../lib/network'
-import { choosePick, nearestStation, trainHitPx, type Pick, type ScreenPoint, type ToScreen } from '../lib/pick'
+import { choosePick, nearestStation, trainHitPx, type ScenePick, type ScreenPoint, type ToScreen } from '../lib/pick'
 import { useTrainSelection } from '../lib/trainSelection'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
 import { MARKER_MIN_METERS } from './markerShape'
@@ -81,7 +81,7 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
       input.localS = performance.now() / 1000
       return input
     }
-    const pickAt = (clientX: number, clientY: number, touch: boolean): Pick | null => {
+    const pickAt = (clientX: number, clientY: number, touch: boolean): ScenePick | null => {
       const trains = begin()
       click.x = clientX - view.left
       click.y = clientY - view.top
@@ -123,7 +123,8 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
       presses.delete(e.pointerId)
       const wasGesture = gesture
       if (presses.size === 0) gesture = false
-      // Released off the canvas (over the HUD): not a click on the map.
+      // A mouse released over the HUD is not a click on the map. Touch is captured to the canvas, so this only
+      // matters for a mouse: MapControls listens on the document and never captures the pointer.
       if (!press || wasGesture || e.button > 0 || e.target !== el) return
       if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > CLICK_SLOP_PX[press.touch ? 'touch' : 'mouse']) return
       const pick = picker.pickAt(e.clientX, e.clientY, press.touch)

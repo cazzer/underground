@@ -36,8 +36,17 @@ interface TrainPanelProps {
 /** The selected train: its route and where it is headed. Sits where the station panel does, over it. */
 export function TrainPanel({ network, summary, focusKey, onClose, ref }: TrainPanelProps) {
   const heading = useRef<HTMLHeadingElement>(null)
+  // Two frames late: after a touch tap the browser's compatibility mouse events land on the canvas and would
+  // blur a heading focused at once.
   useEffect(() => {
-    heading.current?.focus({ preventScroll: true })
+    let second = 0
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => heading.current?.focus({ preventScroll: true }))
+    })
+    return () => {
+      cancelAnimationFrame(first)
+      cancelAnimationFrame(second)
+    }
   }, [focusKey])
 
   const route = summary.routeId === null ? undefined : network.routeById.get(summary.routeId)

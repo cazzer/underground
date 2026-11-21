@@ -10,10 +10,12 @@ export const RENDER_ORDER = {
   lineFocus: 2,
   stationFill: 3,
   stationRing: 4,
-  // The selected train's rim, under its background halo so a gap separates it from the dot (or cars).
-  trainRim: 4.75,
   trainHalo: 5,
   trains: 6,
+  // The selected train's dot, drawn on its own above the other dots: its rim, a background gap, the dot.
+  selectedTrainRim: 6.1,
+  selectedTrainHalo: 6.15,
+  selectedTrain: 6.2,
   // Zoomed in, each train is a consist of cars: background-colored footprints, then the bodies.
   carRim: 5.25,
   carHalo: 5.5,
