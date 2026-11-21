@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { Ground } from '../projection'
 import { buildPolyline, pointAtDistance, type Polyline } from '../realtime/polyline'
 import { MAX_CARS, type Consist } from './consist'
-import { consistSpanInto, createConsistScratch, writeConsist, type CarFrame } from './consistLayout'
+import { consistSpanInto, createConsistScratch, trackY, writeConsist, type CarFrame } from './consistLayout'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, type TrackProfile } from '../trackProfile'
 
 const FRAME: CarFrame = { gapM: 1.2, rimM: 0.5, widthM: 3, crossScale: 1, y: 0.5 }
 const TEN: Consist = { cars: 10, pitchM: 15.5 }
@@ -17,11 +18,11 @@ interface Car {
   height: number
 }
 
-function layout(line: Polyline, shown: number, consist = TEN, mix = 1, slot = 0, k = 1) {
+function layout(line: Polyline, shown: number, consist = TEN, mix = 1, slot = 0, k = 1, profile: TrackProfile = EMPTY_PROFILE) {
   const size = (slot + 1) * MAX_CARS * 16
   const bodies = new Float32Array(size).fill(7)
   const halos = new Float32Array(size).fill(7)
-  writeConsist(bodies, halos, slot, line, shown, consist, mix, k, 1, FRAME, createConsistScratch())
+  writeConsist(bodies, halos, slot, line, profile, shown, consist, mix, k, 1, FRAME, createConsistScratch())
   const cars: Car[] = []
   for (let c = 0; c < consist.cars; c++) {
     const o = (slot * MAX_CARS + c) * 16
@@ -124,7 +125,7 @@ describe('writeConsist', () => {
   it('widens the section by crossScale without changing the spacing', () => {
     const bodies = new Float32Array(MAX_CARS * 16)
     const halos = new Float32Array(MAX_CARS * 16)
-    writeConsist(bodies, halos, 0, straight(1000), 500, TEN, 1, 1, 1, { ...FRAME, crossScale: 2 }, createConsistScratch())
+    writeConsist(bodies, halos, 0, straight(1000), EMPTY_PROFILE, 500, TEN, 1, 1, 1, { ...FRAME, crossScale: 2 }, createConsistScratch())
     expect(bodies[5]).toBe(2)
     expect(bodies[16 + 12]! - bodies[12]!).toBeCloseTo(15.5, 3)
   })
@@ -160,10 +161,33 @@ describe('writeConsist', () => {
     const bodies = new Float32Array(MAX_CARS * 16)
     const halos = new Float32Array(MAX_CARS * 16)
     const b60: Consist = { cars: 8, pitchM: 18.3 }
-    writeConsist(bodies, halos, 0, straight(1000), 500, b60, 1, 1, 1.075, FRAME, createConsistScratch())
+    writeConsist(bodies, halos, 0, straight(1000), EMPTY_PROFILE, 500, b60, 1, 1, 1.075, FRAME, createConsistScratch())
     const length = Math.hypot(bodies[8]!, bodies[10]!)
     expect(length).toBeGreaterThan(18.3 - 1.2)
     expect(length).toBeLessThanOrEqual(18.3 - 0.6 + 1e-4)
+  })
+
+  it('rides the profile: chord ends at track height, each car pitched down a ramp and level at the platform', () => {
+    const line = straight(1000)
+    const profile = buildTrackProfile([{ d0: 700, d1: 900, yReal: -10.2 }], { grade: GRADE, yScale: 2 }).profile
+    const len = (o: number, b: Float32Array) => Math.hypot(b[o + 8]!, b[o + 9]!, b[o + 10]!)
+    const onRamp = layout(line, 530, TEN, 1, 0, 1, profile)
+    const s = consistSpanInto({ cars: 0, pitch: 0, step: 0, rear: 0 }, 1000, 530, TEN, 1)
+    for (let c = 0; c < TEN.cars; c++) {
+      const o = c * 16
+      const [ya, yb] = [trackY(line, profile, s.rear + c * s.step), trackY(line, profile, s.rear + (c + 1) * s.step)]
+      expect(onRamp.bodies[o + 13]).toBeCloseTo((ya + yb) / 2 + FRAME.y, 4)
+      expect(onRamp.halos[o + 13]).toBeCloseTo((ya + yb) / 2 + FRAME.y, 4)
+      // Forward points down the ramp along the chord; up tilts back so it stays perpendicular.
+      expect(onRamp.bodies[o + 9]! / len(o, onRamp.bodies)).toBeCloseTo((yb - ya) / Math.hypot(s.step, yb - ya), 4)
+      expect(onRamp.bodies[o + 9]!).toBeLessThan(0)
+      expect(onRamp.bodies[o + 5]!).toBeGreaterThan(0)
+    }
+    const atPlatform = layout(line, 800, TEN, 1, 0, 1, profile)
+    for (let c = 0; c < TEN.cars; c++) {
+      expect(atPlatform.bodies[c * 16 + 13]).toBeCloseTo(-20.4 + FRAME.y, 4)
+      expect(atPlatform.bodies[c * 16 + 9]).toBeCloseTo(0, 6)
+    }
   })
 
   it('zeroes the instances past the consist and leaves other slots alone', () => {

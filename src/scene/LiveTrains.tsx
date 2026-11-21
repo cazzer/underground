@@ -4,6 +4,7 @@ import { CircleGeometry, Color, DynamicDrawUsage, type Group, type InstancedMesh
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix } from '../lib/live/consist'
+import { trackY } from '../lib/live/consistLayout'
 import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import { trainRouteId } from '../lib/live/trainRoute'
@@ -172,7 +173,10 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
       const trip = table.trips[i]
       if (!trip) continue
       const shown = stepSlot(table, i, hopDistance(trip.plan, trip.geometry, now), now, localS, dt)
-      pointAtDistanceInto(table.drawGeometry[i]!.line, shown, point)
+      const drawn = table.drawGeometry[i]!
+      pointAtDistanceInto(drawn.line, shown, point)
+      // The track's height here: below the street where the line descends to a station.
+      const y = DOT_Y + trackY(drawn.line, drawn.profile, shown)
       const k = slotScale(table, i, localS, FADE_S)
       if (k === 0 && isLeaving(table, i)) {
         writeInstanceMatrix(out, i, 0, 0, 0, 0)
@@ -185,15 +189,15 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: Liv
           dotScale = scale * k * SELECTED_GROWTH
           // Fades out with the dot as the cars (which carry their own rim) unfold.
           rimRadius = dotScale * HALO_RATIO + screenScale(camera, RIM_PX, 0) * k * (1 - mix)
-          g.position.set(point.x, DOT_Y, point.z)
+          g.position.set(point.x, y, point.z)
           const color = slotColors[i]
           if (color) sd.material.color.copy(color)
-        } else writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k)
+        } else writeInstanceMatrix(out, i, point.x, y, point.z, scale * k)
         if (!carsOn) continue
         const dx = center ? point.x - center.x : 0
         const dz = center ? point.z - center.z : 0
         if (dx * dx + dz * dz < reach * reach) {
-          cars.writeTrain(i, table.drawGeometry[i]!.line, shown, mix, k)
+          cars.writeTrain(i, drawn.line, drawn.profile, shown, mix, k)
         } else cars.hide(i)
       }
     }
