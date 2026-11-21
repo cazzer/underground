@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ArrivalsSource } from '../lib/live/arrivals'
 import { clockNow } from '../lib/live/clock'
 import { deriveLiveStatus, type LiveStatus } from '../lib/live/liveStatus'
 import type { JoinStage } from '../lib/realtime/joinTrip'
@@ -35,6 +36,8 @@ export interface Live {
   status: LiveStatus
   layer: LiveLayer | null
   debug: LiveDebugInfo | null
+  /** For the station panel's arrivals; null until there is a snapshot and the join data. */
+  arrivals: ArrivalsSource | null
   /** The technical cause behind a failed or fatal state, for `?debug` (it is already in the console). */
   technical: string | null
   /** For the error boundary around the live layer: a render crash shows in the HUD instead of blanking the map. */
@@ -86,6 +89,11 @@ export function useLive(files: NetworkFiles | null): Live {
     [data, placed, offsetS, layerError],
   )
 
+  const arrivals = useMemo<ArrivalsSource | null>(
+    () => (data && snapshot && offsetS !== null ? { snapshot, offsetS, lookup: data.lookup, failures: feed.failures } : null),
+    [data, snapshot, offsetS, feed.failures],
+  )
+
   const debug = useMemo<LiveDebugInfo | null>(() => {
     if (!placed || !snapshot || offsetS === null) return null
     const stages: Record<JoinStage, number> = { path: 0, tripKey: 0, primary: 0 }
@@ -120,5 +128,5 @@ export function useLive(files: NetworkFiles | null): Live {
     nowS: offsetS === null ? 0 : clockNow(offsetS, performance.now()),
   })
 
-  return { status, layer, debug, technical: fatalError ?? feed.lastError, onLayerError }
+  return { status, layer, debug, arrivals, technical: fatalError ?? feed.lastError, onLayerError }
 }

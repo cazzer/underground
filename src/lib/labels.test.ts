@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { routeChipLabel, scheduleLabel } from './labels'
+import { routeChipLabel, routeSpokenName, scheduleLabel } from './labels'
 
 describe('routeChipLabel', () => {
   it('writes express variants as the base route plus a diamond', () => {
@@ -12,6 +12,17 @@ describe('routeChipLabel', () => {
     expect(routeChipLabel('A')).toBe('A')
     expect(routeChipLabel('S')).toBe('S')
     expect(routeChipLabel('SIR')).toBe('SIR')
+  })
+})
+
+describe('routeSpokenName', () => {
+  it('says express variants as the base route plus "express"', () => {
+    expect(routeSpokenName('FX')).toBe('F express')
+    expect(routeSpokenName('6X')).toBe('6 express')
+  })
+  it('leaves other names alone', () => {
+    expect(routeSpokenName('A')).toBe('A')
+    expect(routeSpokenName('SIR')).toBe('SIR')
   })
 })
 
