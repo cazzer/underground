@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PerspectiveCamera, Vector3 } from 'three'
 import { freeCenterShift, interiorFreeRect } from './interiorCamera'
-import { focusPoint, pivotShift, rotateScreenOffset } from './orbitLimits'
+import { focusPoint, pivotShift, rotateArmed, ROTATE_ARM_TILT, rotateScreenOffset, screenOffsetTo } from './orbitLimits'
 import { ISO_POLAR } from './tilt'
 
 describe('rotateScreenOffset', () => {
@@ -66,5 +66,39 @@ describe('pivotShift', () => {
   it('is zero when the angle held, and the focus point is the target with no offset', () => {
     expect(pivotShift(12, 30, 0.4, 0.4, { x: 1, z: 1 })).toEqual({ x: 0, z: 0 })
     expect(focusPoint({ x: 3, z: 4 }, 0, 0, 0.9, { x: 0, z: 0 })).toEqual({ x: 3, z: 4 })
+  })
+})
+
+describe('screenOffsetTo', () => {
+  it('is the offset whose focus point is the given point, at any azimuth', () => {
+    const target = { x: 40, z: -12 }
+    const station = { x: 10, z: 25 }
+    for (const theta of [0, 0.7, -2.4, Math.PI]) {
+      const o = { right: 0, toward: 0 }
+      screenOffsetTo(target, station, theta, o)
+      const p = focusPoint(target, o.right, o.toward, theta, { x: 0, z: 0 })
+      expect(p.x).toBeCloseTo(station.x, 9)
+      expect(p.z).toBeCloseTo(station.z, 9)
+    }
+  })
+
+  it('pivoting on it keeps the station put through a turn', () => {
+    const target = { x: 40, z: -12 }
+    const station = { x: 10, z: 25 }
+    const o = { right: 0, toward: 0 }
+    screenOffsetTo(target, station, 0.3, o)
+    const m = pivotShift(o.right, o.toward, 0.3, 1.1, { x: 0, z: 0 })
+    const p = focusPoint({ x: target.x + m.x, z: target.z + m.z }, o.right, o.toward, 1.1, { x: 0, z: 0 })
+    expect(p.x).toBeCloseTo(station.x, 9)
+    expect(p.z).toBeCloseTo(station.z, 9)
+  })
+})
+
+describe('rotateArmed', () => {
+  it('arms only a gesture that starts focused with the view tipped', () => {
+    expect(rotateArmed(true, 1)).toBe(true)
+    expect(rotateArmed(true, ROTATE_ARM_TILT)).toBe(true)
+    expect(rotateArmed(true, ROTATE_ARM_TILT - 1e-6)).toBe(false)
+    expect(rotateArmed(false, 1)).toBe(false)
   })
 })

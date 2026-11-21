@@ -18,6 +18,30 @@ export const PAN_RADIUS_MAX = 180
 export const PAN_CLAMP_TILT = 0.5
 /** Tilt progress (tiltT) from which a focused view may spin a full turn. */
 export const FULL_SPIN_TILT = 0.67
+/** Tilt progress (tiltT) a gesture must start at to turn the view (rotateArmed). */
+export const ROTATE_ARM_TILT = 0.5
+
+/**
+ * Whether a gesture may turn the view, decided once when it starts: only one begun on a focused station
+ * with the view already tipped (ROTATE_ARM_TILT). A pinch that starts out unfocused or nearly top-down
+ * never turns, even after focus engages part-way through it and its fingers drift sideways.
+ */
+export function rotateArmed(focused: boolean, tilt: number): boolean {
+  return focused && tilt >= ROTATE_ARM_TILT
+}
+
+/**
+ * The screen-frame offset (`right`, `toward`, written into `out`) of the view center from `point` at azimuth
+ * `theta`: the inverse of rotateScreenOffset, so focusPoint(target, right, toward, theta) is `point` again.
+ */
+export function screenOffsetTo(target: Ground, point: Ground, theta: number, out: { right: number; toward: number }): void {
+  const x = target.x - point.x
+  const z = target.z - point.z
+  const s = Math.sin(theta)
+  const c = Math.cos(theta)
+  out.right = x * c - z * s
+  out.toward = x * s + z * c
+}
 /** How far past the radius a drag may stretch before a hard stop. */
 export const PAN_GIVE = 30
 /** Exponential rate (per second) at which a stretch past the radius eases back. */

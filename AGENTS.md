@@ -133,7 +133,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
   location message
   `OrbitHint.tsx` the header's muted turn hint under the status lines (right- or Shift-drag; two fingers on a
-  coarse pointer), shown while a station is focused until the first turn of the session (`src/lib/orbitTurned.ts`)
+  coarse pointer), shown while a station is focused until the session's first user turn (about 17° of an armed gesture on one focused station; flights, springs and the cap don't count; `src/lib/orbitTurned.ts`)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths without bands, bounds,
@@ -191,8 +191,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `interiorReveal.ts` distance to interior opacity. These have `.ts` imports
     because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always `LANDING_DISTANCE`, the tilt's
     near distance) in the screen area the header, footer and station panel leave free, at the current azimuth, or
-    on a portrait free area (`landingAzimuth`, ground height ≥ 1.5× width: phones) turned at most 90° so the
-    platforms (`stationAxis`, `InteriorModel.axis`) run up the screen;
+    on a portrait free area (`landingAzimuth`, ground height ≥ 1.5× width: phones) turned just enough that the
+    platforms (`stationAxis`, `InteriorModel.axis`) run within 30° of screen-vertical, decided once per flight;
     `orbitLimits.ts` azimuth cap by tilt, short-way spring to north-up, soft pan radius, focus-point pivot;
     `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`)
   - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
@@ -386,10 +386,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   close the panel) springs the view back to north-up the short way round (an exponential ease capped at
   180°/s; under prefers-reduced-motion it snaps to north-up at once), so the city and top-down views
   are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it
-  mid-gesture applies a stale rotate start), and `rotateSpeed` is 0 while unfocused so drift can't replay
-  when the bounds open. Markers and dots rescale with distance
+  mid-gesture applies a stale rotate start). A gesture turns the view only if it was armed at its start
+  (`rotateArmed`: focused and tiltT ≥ 0.5, set by `onStart`, cleared by `onEnd`); otherwise `rotateSpeed` is 0
+  for all of it, so a pinch that starts unfocused or nearly top-down never turns, whatever its fingers do.
+  A bare station pivots on its own point. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
-- Every `on*` handler passed to `MapControls` (today `onStart`) stays referentially
+- Every `on*` handler passed to `MapControls` (today `onStart` and `onEnd`) stays referentially
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
   which can lock them mid-drag. Set control limits imperatively in `useFrame` (priority -2, before
   drei's `update()` at -1; the pivot and pan clamp at -0.5; the band view at -0.25), not as changing props. Never use a
@@ -468,9 +470,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (the route lines' alpha times 1 − weight × reveal in the band line shader, the weight easing back to 0 over the
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
-  beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run up
-  the screen); a bare station lands at the same distance with its point in the free area above the panel. Both
-  retarget mid-flight when the interior or the panel's final size arrives.
+  beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
+  up the screen); a bare station lands at the same distance with its point in the free area above the panel. Both
+  retarget mid-flight when the interior or the panel's final size arrives (an interior arriving after 90% of
+  the flight adds no turn). Under prefers-reduced-motion station and point flights snap, with no turn. The
+  location button frames its fix at ENTER_DISTANCE × 1.1 (about 1210 m) or farther.
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.
 
 ## Station interior format

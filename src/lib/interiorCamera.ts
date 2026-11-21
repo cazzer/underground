@@ -76,11 +76,17 @@ export function freeCenterShift(
 export const PORTRAIT_GROUND_RATIO = 1.5
 
 /**
+ * How far off screen-vertical a portrait landing leaves the platform axis, radians (30°): most of the fit
+ * gain of a straight-up axis, while the levels still read apart in the isometric view.
+ */
+export const LANDING_AXIS_OFF_VERTICAL = (30 * Math.PI) / 180
+
+/**
  * Camera azimuth for landing on an interior whose platforms run along `axis` (unit plan vector, x east,
  * z south). When the free area is portrait in ground terms (PORTRAIT_GROUND_RATIO; screen-vertical ground
- * spans 1 / cos(ISO_POLAR) times the pixels a horizontal one does), the view turns so the axis runs up
- * the screen, whichever of its two directions is the shorter turn from `current`: a long station then
- * fits along the free area's long side. Otherwise the view keeps `current`.
+ * spans 1 / cos(ISO_POLAR) times the pixels a horizontal one does), the view turns just far enough that the
+ * axis runs within LANDING_AXIS_OFF_VERTICAL of screen-vertical, so a long station fits along the free
+ * area's long side; already within it, or on a landscape free area, the view keeps `current`.
  */
 export function landingAzimuth(axis: readonly [number, number], current: number, free: ScreenRect): number {
   const across = free.right - free.left
@@ -88,9 +94,12 @@ export function landingAzimuth(axis: readonly [number, number], current: number,
   if (upDown < across * PORTRAIT_GROUND_RATIO) return current
   // At azimuth θ the camera sits along (sin θ, cos θ) from the target, which is screen-vertical on the ground.
   const along = Math.atan2(axis[0], axis[1])
-  const turn = wrapAngle(along - current)
-  const shorter = Math.abs(turn) > Math.PI / 2 ? turn - Math.sign(turn) * Math.PI : turn
-  return wrapAngle(current + shorter)
+  // The axis's angle off vertical at `current`, folded into (-90°, 90°]: the axis has no head or tail.
+  let off = wrapAngle(current - along)
+  if (off > Math.PI / 2) off -= Math.PI
+  else if (off <= -Math.PI / 2) off += Math.PI
+  if (Math.abs(off) <= LANDING_AXIS_OFF_VERTICAL) return current
+  return wrapAngle(current - off + Math.sign(off) * LANDING_AXIS_OFF_VERTICAL)
 }
 
 /**

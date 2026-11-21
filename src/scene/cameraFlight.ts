@@ -3,7 +3,7 @@ import type { MapControls } from '@react-three/drei'
 import type { ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import type { FlyRequest } from '../lib/focus'
-import { EXIT_DISTANCE } from '../lib/focusMachine'
+import { ENTER_DISTANCE } from '../lib/focusMachine'
 import { framePoint, type Insets, type Viewport } from '../lib/framing'
 import { frameInterior, interiorFreeRect, LANDING_DISTANCE, landingAzimuth, type ScreenRect } from '../lib/interiorCamera'
 import { wrapAngle } from '../lib/orbitLimits'
@@ -28,6 +28,11 @@ export interface Flight extends Destination {
   fromDistance: number
   /** Camera azimuth when `from` was last set; the turn to `azimuth` runs from it with the rebased progress. */
   fromAzimuth: number
+  /**
+   * Whether the landing turn has been decided (once per flight, when the interior is first known, or never
+   * for a point or a bare station). Retargets keep the decided `azimuth`, so a turn can't stop halfway or whip.
+   */
+  turnDecided: boolean
   elapsed: number
   duration: number
   /** Eased progress when `from` was last rebased (a mid-flight retarget); 0 at the start. */
@@ -56,9 +61,15 @@ export function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void
   c.enableDamping = damping
 }
 
+/** prefers-reduced-motion: flights snap to their destination, with no landing turn. */
+export function prefersReducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
 /**
- * Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal. A portrait free
- * area turns the view so the platforms run up the screen (landingAzimuth); otherwise it keeps `azimuth`.
+ * Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal, framed for
+ * `azimuth`. With `turn`, a portrait free area first picks a landing azimuth that runs the platforms
+ * nearly up the screen (landingAzimuth); the result's `azimuth` is that turn, or null for none.
  */
 export function interiorFlight(
   model: InteriorModel,
@@ -67,11 +78,12 @@ export function interiorFlight(
   panel: ScreenRect | null,
   fovDeg: number,
   azimuth: number,
+  turn: boolean,
 ): Destination {
   const free = interiorFreeRect(viewport, insets, panel)
-  const land = landingAzimuth(model.axis, azimuth, free)
+  const land = turn ? landingAzimuth(model.axis, azimuth, free) : azimuth
   const { distance, target } = frameInterior({ ...model.focusAnchor, azimuth: land, viewport, free, fovDeg })
-  return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance, azimuth: land }
+  return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance, azimuth: land === azimuth ? null : land }
 }
 
 /** Fly-to for a station with no interior: its point in the middle of the free area (above a stacked panel), at the landing distance. */
@@ -89,9 +101,9 @@ export function stationFlight(
   return { stationId, target: new Vector3(target.x, 0, target.z), distance: LANDING_DISTANCE, azimuth: null }
 }
 
-/** Fly-to for a ground point (a location fix): `radiusM` in view, never closer than the focus range. */
+/** Fly-to for a ground point (a location fix): `radiusM` in view, landing a little outside the focus range. */
 export function pointFlight(req: PointRequest, viewport: Viewport, insets: Insets, fovDeg: number, maxDistance: number): Destination {
-  const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, EXIT_DISTANCE * 1.2, maxDistance)
+  const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, ENTER_DISTANCE * 1.1, maxDistance)
   return { stationId: null, target: new Vector3(target.x, 0, target.z), distance, azimuth: null }
 }
 

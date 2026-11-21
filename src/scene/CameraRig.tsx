@@ -10,11 +10,22 @@ import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
-import { flushMotion, interiorFlight, pointFlight, stationFlight, turnOffset, type Flight, type MapControlsImpl } from './cameraFlight'
+import {
+  flushMotion,
+  interiorFlight,
+  pointFlight,
+  prefersReducedMotion,
+  stationFlight,
+  turnOffset,
+  type Flight,
+  type MapControlsImpl,
+} from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
 import { useStationOrbit } from './useStationOrbit'
 
 const MIN_DISTANCE = 40
+/** An interior arriving after this much of the flight (eased progress) lands without a turn. */
+const LATE_TURN_PROGRESS = 0.9
 /** How far past the fitted city overview the user may zoom out. */
 const MAX_ZOOM_OUT = 1.3
 
@@ -62,10 +73,11 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   }, [camera, maxDistance])
 
   // Read by the fly effect through a ref: depending on these would re-fire a stale fly request.
-  const latest = useRef({ interior, panel, size, insets, maxDistance })
+  // onStart reads `network` here too, so it stays referentially stable (underground-by0).
+  const latest = useRef({ interior, panel, size, insets, maxDistance, network })
   useLayoutEffect(() => {
-    latest.current = { interior, panel, size, insets, maxDistance }
-  }, [interior, panel, size, insets, maxDistance])
+    latest.current = { interior, panel, size, insets, maxDistance, network }
+  }, [interior, panel, size, insets, maxDistance, network])
 
   // Layout effect, not a passive one: a frame between the select and a passive effect would see
   // the new focus with no flight and drop it again (the camera is still far out).
@@ -79,12 +91,13 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       const l = latest.current
       const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
       const fromDistance = camera.position.distanceTo(c.target)
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const reduced = prefersReducedMotion()
       flight.current = {
         ...dest,
         from: c.target.clone(),
         fromDistance,
         fromAzimuth: c.getAzimuthalAngle(),
+        turnDecided: true,
         elapsed: 0,
         duration: reduced ? 0 : flightDuration(fromDistance, dest.distance),
         e0: 0,
@@ -98,18 +111,20 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     const c = controls.current
     if (!c) throw new Error('Fly request before the map controls mounted')
     flushMotion(c, camera)
-    const dest =
-      l.interior?.stationId === station.id
-        ? interiorFlight(l.interior, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
-        : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
+    const reduced = prefersReducedMotion()
+    const known = l.interior?.stationId === station.id ? l.interior : null
+    const dest = known
+      ? interiorFlight(known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
+      : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
     const fromDistance = camera.position.distanceTo(c.target)
     flight.current = {
       ...dest,
       from: c.target.clone(),
       fromDistance,
       fromAzimuth: c.getAzimuthalAngle(),
+      turnDecided: known !== null || reduced,
       elapsed: 0,
-      duration: flightDuration(fromDistance, dest.distance),
+      duration: reduced ? 0 : flightDuration(fromDistance, dest.distance),
       e0: 0,
     }
   }, [flyRequest, network, camera])
@@ -125,14 +140,23 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     const station = network.stationById.get(f.stationId)
     if (!station) return
     const az = c.getAzimuthalAngle()
-    const dest =
-      interior?.stationId === f.stationId
-        ? interiorFlight(interior, size, insets, panel, camera.fov, az)
-        : stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
+    const e0 = flightProgress(f.elapsed, f.duration)
+    let dest
+    if (interior?.stationId !== f.stationId) {
+      dest = stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
+    } else if (f.turnDecided) {
+      // Frame for the azimuth already chosen (the landing turn, or the current one when there is none).
+      dest = interiorFlight(interior, size, insets, panel, camera.fov, f.azimuth ?? az, false)
+      dest.azimuth = f.azimuth
+    } else {
+      // The interior arrived mid-flight: decide the turn now, unless the flight is nearly down.
+      dest = interiorFlight(interior, size, insets, panel, camera.fov, az, e0 <= LATE_TURN_PROGRESS)
+      f.turnDecided = true
+    }
     f.from.copy(c.target)
     f.fromDistance = camera.position.distanceTo(c.target)
     f.fromAzimuth = az
-    f.e0 = flightProgress(f.elapsed, f.duration)
+    f.e0 = e0
     f.target = dest.target
     f.distance = dest.distance
     f.azimuth = dest.azimuth
@@ -142,7 +166,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   const flying = useCallback(() => flight.current !== null, [])
   const busy = useCallback(() => flight.current !== null || hold.current !== null, [])
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
-  useStationOrbit({
+  const { onGestureStart, onGestureEnd } = useStationOrbit({
     controls,
     camera,
     focusPos,
@@ -207,15 +231,18 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   const onStart = useCallback(() => {
     const f = flight.current
     const c = controls.current
-    if (f && c && f.stationId !== null) {
+    const station = f?.stationId != null ? latest.current.network.stationById.get(f.stationId) : undefined
+    if (f && c && station) {
       hold.current = {
-        stationId: f.stationId,
+        stationId: station.id,
+        station: station.pos,
         distance: camera.position.distanceTo(c.target),
         target: { x: c.target.x, z: c.target.z },
       }
     }
     flight.current = null
-  }, [camera])
+    onGestureStart()
+  }, [camera, onGestureStart])
 
   return (
     <MapControls
@@ -226,6 +253,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       minDistance={MIN_DISTANCE}
       maxDistance={maxDistance}
       onStart={onStart}
+      onEnd={onGestureEnd}
     />
   )
 }
