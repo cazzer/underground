@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Connector, Entrance } from '../data/stationSchema'
-import { BANK_GAP_M, BANK_RADIUS_M, spreadBanks } from './escalatorBanks'
+import { BANK_GAP_M, spreadBanks } from './escalatorBanks'
 
 /** An inventory-style escalator: both ends at (x, z). */
 const esc = (id: string, x: number, z: number, width = 1.2): Connector => ({
@@ -59,12 +59,32 @@ describe('spreadBanks', () => {
     expect(anchors.get('ES2')).toEqual({ point: [4, 5], atEntrance: true, lateral: expect.closeTo(pitch / 2) })
   })
 
-  it(`banks escalators within ${BANK_RADIUS_M} m of each other on the first one's point; farther ones stay apart`, () => {
-    const anchors = spreadBanks([esc('ES1', 4, 5), esc('ES2', 4.3, 5.2), esc('ES3', 4.6, 5)], [])
-    expect(anchors.get('ES1')).toMatchObject({ point: [4, 5], atEntrance: false })
-    expect(anchors.get('ES2')).toMatchObject({ point: [4, 5], atEntrance: false })
-    expect(anchors.get('ES1')!.lateral).toBeLessThan(0)
-    expect(anchors.get('ES3')).toEqual({ point: [4.6, 5], atEntrance: false, lateral: 0 })
+  it("banks a chain transitively, whatever the input order, on the first member's point", () => {
+    // ES3 is 0.6 m from ES1 and 0.36 m from ES2, which is 0.36 m from ES1.
+    const anchors = spreadBanks([esc('ES3', 4.6, 5), esc('ES2', 4.3, 5.2), esc('ES1', 4, 5)], [])
+    for (const id of ['ES1', 'ES2', 'ES3']) expect(anchors.get(id)).toMatchObject({ point: [4, 5], atEntrance: false })
+    const pitch = 1.2 + BANK_GAP_M
+    expect(['ES1', 'ES2', 'ES3'].map((id) => anchors.get(id)!.lateral)).toEqual([-pitch, 0, pitch].map((v) => expect.closeTo(v)))
+  })
+
+  it('banks escalators whose bands would touch (1 m apart), not ones 3 m apart', () => {
+    const near = spreadBanks([esc('ES1', 0, 0), esc('ES2', 1, 0)], [])
+    expect(near.get('ES2')).toMatchObject({ point: [0, 0], lateral: expect.closeTo((1.2 + BANK_GAP_M) / 2) })
+    const far = spreadBanks([esc('ES1', 0, 0), esc('ES2', 3, 0)], [])
+    expect(far.get('ES1')).toEqual({ point: [0, 0], atEntrance: false, lateral: 0 })
+    expect(far.get('ES2')).toEqual({ point: [3, 0], atEntrance: false, lateral: 0 })
+  })
+
+  it('never banks an authored escalator centered on its own point; one authored on its entrance still banks', () => {
+    const authored = (c: Connector): Connector => ({ ...c, sources: ['nyopendata', 'authored'] })
+    const anchors = spreadBanks(
+      [authored(esc('ES1', 4, 8)), esc('ES2', 4, 8), authored(esc('ES3', 0, 0)), esc('ES4', 0, 0)],
+      [entrance('E1', 0, 0, ['ES3'])],
+    )
+    expect(anchors.get('ES1')).toEqual({ point: [4, 8], atEntrance: false, lateral: 0 })
+    expect(anchors.get('ES2')).toEqual({ point: [4, 8], atEntrance: false, lateral: 0 })
+    expect(anchors.get('ES3')).toEqual({ point: [0, 0], atEntrance: true, lateral: expect.closeTo(-(1.2 + BANK_GAP_M) / 2) })
+    expect(anchors.get('ES4')).toEqual({ point: [0, 0], atEntrance: true, lateral: expect.closeTo((1.2 + BANK_GAP_M) / 2) })
   })
 
   it('skips escalators with a run of their own and every other kind', () => {
