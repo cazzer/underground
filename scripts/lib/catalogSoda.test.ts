@@ -29,6 +29,10 @@ describe('trimCatalogStations', () => {
       },
     ])
   })
+  it('trims the routes and throws on a blank list', () => {
+    expect(trimCatalogStations([stationRow({ daytime_routes: ' N W ' })])[0]!.routes).toEqual(['N', 'W'])
+    expect(() => trimCatalogStations([stationRow({ daytime_routes: '   ' })])).toThrow(/daytime_routes/)
+  })
   it('sorts by gtfsStopId and keeps real ADA notes', () => {
     const rows = trimCatalogStations([stationRow({ gtfs_stop_id: 'R01' }), stationRow({ gtfs_stop_id: 'A02', ada_notes: 'Uptown only' })])
     expect(rows.map((r) => r.gtfsStopId)).toEqual(['A02', 'R01'])

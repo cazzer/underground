@@ -1,4 +1,4 @@
-/** Pins citywide station data into data/stations/catalog/ (stations, entrances, equipment, envelopes, osm).
+/** Pins citywide station data into data/stations/catalog/ (stations, entrances, equipment, envelopes, osm-platforms, osm-tracks).
  *
  *  npm run data:catalog:fetch
  *
@@ -10,7 +10,7 @@
  *  Never add the 2021 draft NYCT GTFS-Pathways feed to this catalog: the MTA says not to use it in
  *  public-facing applications (docs/research/station-modeling.md). The DOS Track LRS (dyuj-5if7) is a
  *  file geodatabase only, so OSM railway=subway ways are the track source. */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { assertRowCount, parseCount, parseViewMeta, trimCatalogEntrances, trimCatalogEquipment, trimCatalogStations } from './lib/catalogSoda.ts'
 import { trimEnvelopes } from './lib/catalogEnvelopes.ts'
 import { catalogBbox, trimOverpassCatalog } from './lib/catalogOsm.ts'
@@ -27,17 +27,39 @@ const OVERPASS_TIMEOUT_MS = 240_000
 const ROW_LIMIT = 5000
 const RETRY_STATUSES = [429, 502, 503, 504]
 const RETRY_DELAYS_S = [30, 60, 120]
+const RADII = { platformRadiusM: 250, trackRadiusM: 300 }
 const MAX_FILE_BYTES = 2_000_000
 const MAX_TOTAL_BYTES = 5_000_000
 
+/** Seconds from a Retry-After header, as a number of seconds; an HTTP date or junk is ignored. */
+function retryAfterS(res: Response): number | undefined {
+  const n = Number(res.headers.get('Retry-After'))
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 300) : undefined
+}
+
+const sleep = (s: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, s * 1000))
+
+/** GET or POST returning JSON. Retries 429/502/503/504 and thrown network errors (reset, timeout) after
+ *  30, 60 and 120 s, or the Retry-After the server sent. */
 async function getJson(url: string, init: RequestInit = {}, timeoutMs = TIMEOUT_MS): Promise<unknown> {
+  const what = `${init.method ?? 'GET'} ${url}`
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, { ...init, headers: { ...HEADERS, ...init.headers }, signal: AbortSignal.timeout(timeoutMs) })
-    if (res.ok) return res.json()
     const delay = RETRY_DELAYS_S[attempt]
-    if (!RETRY_STATUSES.includes(res.status) || delay === undefined) throw new Error(`${init.method ?? 'GET'} ${url}: HTTP ${res.status} ${res.statusText}`)
-    console.log(`${url}: HTTP ${res.status}; retry ${attempt + 1} of ${RETRY_DELAYS_S.length} in ${delay} s`)
-    await new Promise((resolve) => setTimeout(resolve, delay * 1000))
+    let wait: number | undefined
+    let why: string
+    try {
+      const res = await fetch(url, { ...init, headers: { ...HEADERS, ...init.headers }, signal: AbortSignal.timeout(timeoutMs) })
+      if (res.ok) return await res.json()
+      await res.body?.cancel()
+      if (!RETRY_STATUSES.includes(res.status) || delay === undefined) throw new Error(`${what}: HTTP ${res.status} ${res.statusText}`)
+      why = `HTTP ${res.status}`
+      wait = retryAfterS(res)
+    } catch (err) {
+      if (delay === undefined || !(err instanceof TypeError || (err instanceof DOMException && ['TimeoutError', 'AbortError'].includes(err.name)))) throw err
+      why = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    }
+    console.log(`${what}: ${why}; retry ${attempt + 1} of ${RETRY_DELAYS_S.length} in ${wait ?? delay} s`)
+    await sleep(wait ?? delay!)
   }
 }
 
@@ -64,30 +86,30 @@ async function main(): Promise<void> {
   const bbox = catalogBbox(stations)
   const query =
     `[out:json][timeout:180][bbox:${bbox.south},${bbox.west},${bbox.north},${bbox.east}];` +
-    '(way["railway"="platform"];way["railway"="subway"];);out meta geom;relation["railway"="platform"];out ids;'
+    '(way["railway"="platform"];way["railway"="subway"];);out geom;relation["railway"="platform"];out ids;'
   const overpass = await getJson(
     OVERPASS_URL,
     { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ data: query }) },
     OVERPASS_TIMEOUT_MS,
   )
-  const osm = trimOverpassCatalog(overpass, stations, { platformRadiusM: 250, trackRadiusM: 300 })
+  const osm = trimOverpassCatalog(overpass, stations, RADII)
 
+  const osmHeader = {
+    license: 'ODbL-1.0',
+    attribution: '© OpenStreetMap contributors',
+    fetchedAt: new Date().toISOString(),
+    baseTimestamp: osm.baseTimestamp,
+    query,
+    platformRadiusM: RADII.platformRadiusM,
+    trackRadiusM: RADII.trackRadiusM,
+  }
   const files: Record<string, unknown> = {
     'stations.json': { ...stationData.header, rows: stations },
     'entrances.json': { ...entranceData.header, rows: trimCatalogEntrances(entranceData.rows) },
     'equipment.json': { ...equipmentData.header, rows: trimCatalogEquipment(equipmentData.rows) },
     'envelopes.json': { ...envelopeData.header, kept: envelopes.length, rows: envelopes },
-    'osm.json': {
-      license: 'ODbL-1.0',
-      attribution: '© OpenStreetMap contributors',
-      fetchedAt: new Date().toISOString(),
-      baseTimestamp: osm.baseTimestamp,
-      query,
-      platformRadiusM: 250,
-      trackRadiusM: 300,
-      skippedRelations: osm.skippedRelations,
-      ways: osm.ways,
-    },
+    'osm-platforms.json': { ...osmHeader, skippedRelations: osm.skippedRelations, ways: osm.platforms },
+    'osm-tracks.json': { ...osmHeader, ways: osm.tracks },
   }
   const rendered = Object.entries(files).map(([name, value]) => ({ name, text: toStableJson(value, 2) }))
   let total = 0
@@ -100,8 +122,9 @@ async function main(): Promise<void> {
   console.log(`total: ${(total / 1000).toFixed(0)} KB`)
   if (total > MAX_TOTAL_BYTES) throw new Error(`catalog is ${total} bytes, over the ${MAX_TOTAL_BYTES} byte budget; nothing written`)
   mkdirSync(DIR, { recursive: true })
-  for (const { name, text } of rendered) writeFileSync(new URL(name, DIR), text)
-  console.log(`${stations.length} stations, ${osm.ways.length} OSM ways, ${osm.skippedRelations.length} platform relations skipped, ${envelopes.length} NYCT envelopes`)
+  for (const { name, text } of rendered) writeFileSync(new URL(`${name}.tmp`, DIR), text)
+  for (const { name } of rendered) renameSync(new URL(`${name}.tmp`, DIR), new URL(name, DIR))
+  console.log(`${stations.length} stations, ${osm.platforms.length} OSM platform and ${osm.tracks.length} track ways, ${osm.skippedRelations.length} platform relations skipped, ${envelopes.length} NYCT envelopes`)
   console.log('Review the diff of data/stations/catalog/')
 }
 

@@ -156,8 +156,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
-  - `data/stations/catalog/`: citywide pinned extracts (stations, entrances, equipment, envelopes, osm),
-    keyed by `gtfsStopId`/`stationId`/`complexId`; written only by `scripts/fetch-station-catalog.ts`
+  - `data/stations/catalog/`: citywide pinned extracts (stations, entrances, equipment, envelopes,
+    osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
+    `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
+    downstream), and OSM ways have none either (join by distance)
 - `scripts/`: `build-data.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge; `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)

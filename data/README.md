@@ -14,13 +14,16 @@ be accurate.
 - `stations/<id>.sources.json`: pinned extracts of the public sources, written only by
   `npm run data:stations:fetch -- --station <id>`. Each section records its query or URL, when it
   was fetched, and the source's own update time or version. The build never touches the network.
-- `stations/catalog/{stations,entrances,equipment,envelopes,osm}.json`: citywide pinned extracts
-  (all 496 stations, 2,120 entrance rows, 759 E&E machines, 475 NYCT station envelopes, and 5,029
-  OSM platform and subway-track ways within 250 to 300 m of a station), written only by
-  `npm run data:catalog:fetch`. Rows share the keys `gtfsStopId`, `stationId` (the E&E station MRN
-  without leading zeros) and `complexId`. Nothing here is read by `npm run data:stations`; it is
-  input for the planned station generator. The DOS Track LRS is not pinned (see
-  `../docs/research/data-sources.md` §5.1).
+- `stations/catalog/{stations,entrances,equipment,envelopes,osm-platforms,osm-tracks}.json`: citywide
+  pinned extracts (all 496 stations, 2,120 entrance rows, 759 E&E machines, 475 NYCT station
+  envelopes, and OSM platform and subway-track ways within 250 to 300 m of a station), written only
+  by `npm run data:catalog:fetch`. Station, entrance and equipment rows share the keys `gtfsStopId`,
+  `stationId` (the E&E station MRN without leading zeros) and `complexId`; envelopes and OSM ways
+  carry no station key. Nothing here is read by `npm run data:stations`; it is input for the planned
+  station generator. The DOS Track LRS is not pinned (see `../docs/research/data-sources.md` §5.1).
+  **E&E coordinates are unreliable:** the dataset's own overview says they are the station center
+  when a machine's exact location is not known, and some are plainly wrong (25 machines are over 500 m
+  from their station; EL100 is at Jay St, 15 km from 149 St-Hostos). Place machines from their `serving` text, not from `lat`/`lon`.
 
 ## Refreshing
 
@@ -34,9 +37,9 @@ be accurate.
 
 ## Refreshing the catalog
 
-1. `npm run data:catalog:fetch` (needs network; Overpass is often busy, and the script retries 502s
-   and 429s after 30, 60 and 120 s). It writes nothing unless every request succeeds, each row count
-   matches `count(*)`, no file is over 2 MB and the total is under 5 MB.
+1. `npm run data:catalog:fetch` (needs network; Overpass is often busy, and the script retries
+   429, 502, 503, 504 and network errors after 30, 60 and 120 s, or the Retry-After). It writes nothing unless every request succeeds, each row count
+   matches `count(*)`, no file is over 2 MB (`osm-platforms.json` and `osm-tracks.json` are separate for headroom) and the total is under 5 MB.
 2. Review the diff of `stations/catalog/`. The E&E file changes most often (new machines).
 3. Commit. `catalogData.test.ts` checks the files against each other.
 
@@ -48,7 +51,7 @@ be accurate.
   94fv-bak7), as are `catalog/stations.json`, `catalog/entrances.json`, `catalog/equipment.json` and
   `catalog/envelopes.json` (39hk-dx4f, i9wp-a4ja, 94fv-bak7, vkng-7ivg). Attribution: Metropolitan
   Transportation Authority. No license is set on the datasets, so the OPEN-NY Terms of Use apply;
-  see `../docs/research/data-sources.md` §5.1 (open questions included).
-- `catalog/osm.json` is © OpenStreetMap contributors, available under the ODbL 1.0.
+  see `../docs/research/data-sources.md` §5.1 (licensing decisions included).
+- `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors, available under the ODbL 1.0.
 - The `*.authored.json` files are offered under the ODbL 1.0, because their frame is registered to
   OpenStreetMap geometry.

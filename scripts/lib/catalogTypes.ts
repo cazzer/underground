@@ -85,7 +85,6 @@ export interface CatalogEnvelope {
 
 export interface OsmCatalogWay {
   id: number
-  version: number
   tags: Record<string, string>
   closed: boolean
   points: [lat: number, lon: number][]

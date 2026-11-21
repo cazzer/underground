@@ -6,12 +6,24 @@ import { toGround } from '../../src/lib/projection.ts'
 import { finite, list, record, text } from './check.ts'
 import type { OsmCatalogWay } from './catalogTypes.ts'
 
-export const PLATFORM_TAGS = ['railway', 'public_transport', 'subway', 'train', 'level', 'layer', 'name', 'ref', 'local_ref', 'area', 'tunnel', 'indoor']
+/** operator and network stay on platforms, raw, so PATH and other non-NYCT platforms can be told apart. */
+export const PLATFORM_TAGS = ['railway', 'public_transport', 'subway', 'train', 'level', 'layer', 'name', 'ref', 'local_ref', 'area', 'tunnel', 'indoor', 'operator', 'network']
 export const TRACK_TAGS = ['railway', 'level', 'layer', 'tunnel', 'bridge', 'service', 'usage', 'name', 'ref', 'railway:track_ref', 'network', 'operator']
+
+/** Track operator and network values that nearly every track carries; dropped so the file keeps only
+ *  the tags that tell a track apart (a missing operator means NYCT, a missing network means NYC Subway). */
+const TRACK_DEFAULTS: Record<string, string> = { operator: 'New York City Transit Authority', network: 'NYC Subway' }
 
 export interface CatalogRadii {
   platformRadiusM: number
   trackRadiusM: number
+  /** GTFS stop ids allowed to have no platform way within platformRadiusM (name them in a comment). */
+  platformExceptions?: readonly string[]
+}
+
+export interface CatalogStationPoint extends LatLon {
+  gtfsStopId: string
+  name: string
 }
 
 export interface Bbox {
@@ -61,18 +73,35 @@ function nearFinder(points: readonly LatLon[], cellM: number): (p: LatLon, radiu
 
 export interface OverpassCatalog {
   baseTimestamp: string
-  ways: OsmCatalogWay[]
+  platforms: OsmCatalogWay[]
+  tracks: OsmCatalogWay[]
   /** Platform relations (multipolygons) the catalog does not model; listed so they can be picked up later. */
   skippedRelations: number[]
 }
 
-/** Overpass `out meta geom` JSON to the ways near a station, sorted by id. Ways tagged railway=platform
- *  use the platform radius and tag list, railway=subway the track ones; any other way throws. */
-export function trimOverpassCatalog(json: unknown, stations: readonly LatLon[], radii: CatalogRadii): OverpassCatalog {
+/** The stations with no platform vertex within `radiusM`: a response cut short by a timeout, or an area
+ *  OSM does not map. Used on the fetch and on the committed file. */
+export function stationsWithoutPlatform(stations: readonly CatalogStationPoint[], platforms: readonly OsmCatalogWay[], radiusM: number): CatalogStationPoint[] {
+  const vertices = platforms.flatMap((w) => w.points.map(([lat, lon]) => toGround({ lat, lon })))
+  return stations.filter((s) => {
+    const g = toGround(s)
+    return !vertices.some((v) => Math.hypot(v.x - g.x, v.z - g.z) <= radiusM)
+  })
+}
+
+const byId = (a: OsmCatalogWay, b: OsmCatalogWay): number => a.id - b.id
+
+/** Overpass `out geom` JSON to the platform and track ways near a station, each sorted by id. Ways tagged
+ *  railway=platform use the platform radius and tag list, railway=subway the track ones; any other way
+ *  throws. Throws on a `remark` (Overpass answers HTTP 200 with a runtime error and partial elements) and
+ *  when a station has no platform within the radius, unless it is in `platformExceptions`. */
+export function trimOverpassCatalog(json: unknown, stations: readonly CatalogStationPoint[], radii: CatalogRadii): OverpassCatalog {
   const root = record(json, 'overpass')
+  if (typeof root.remark === 'string') throw new Error(`overpass remark (the answer may be partial): ${root.remark}`)
   const baseTimestamp = text(record(root.osm3s, 'overpass.osm3s').timestamp_osm_base, 'overpass.osm3s.timestamp_osm_base')
   const near = nearFinder(stations, Math.max(radii.platformRadiusM, radii.trackRadiusM))
-  const ways: OsmCatalogWay[] = []
+  const platforms: OsmCatalogWay[] = []
+  const tracks: OsmCatalogWay[] = []
   const skippedRelations: number[] = []
   list(root.elements, 'overpass.elements').forEach((raw, i) => {
     const el = record(raw, `overpass.elements[${i}]`)
@@ -91,19 +120,25 @@ export function trimOverpassCatalog(json: unknown, stations: readonly LatLon[], 
       return [finite(pt.lat, `${at}.geometry[${j}].lat`), finite(pt.lon, `${at}.geometry[${j}].lon`)]
     })
     if (points.length < 2) throw new Error(`${at}.geometry: expected at least 2 points, got ${points.length}`)
-    const radius = platform ? radii.platformRadiusM : radii.trackRadiusM
-    if (!points.some(([lat, lon]) => near({ lat, lon }, radius))) return
-    const first = points[0]
-    const last = points[points.length - 1]
-    const closed = points.length >= 4 && first![0] === last![0] && first![1] === last![1]
-    const kept = platform ? PLATFORM_TAGS : TRACK_TAGS
-    ways.push({
+    if (!points.some(([lat, lon]) => near({ lat, lon }, platform ? radii.platformRadiusM : radii.trackRadiusM))) return
+    const first = points[0]!
+    const last = points[points.length - 1]!
+    const kept = (platform ? PLATFORM_TAGS : TRACK_TAGS).filter((k) => typeof tags[k] === 'string' && (platform || tags[k] !== TRACK_DEFAULTS[k]))
+    const way: OsmCatalogWay = {
       id,
-      version: finite(el.version, `${at}.version`),
-      tags: Object.fromEntries(kept.filter((k) => typeof tags[k] === 'string').map((k) => [k, tags[k] as string])),
-      closed,
+      tags: Object.fromEntries(kept.map((k) => [k, tags[k] as string])),
+      closed: points.length >= 4 && first[0] === last[0] && first[1] === last[1],
       points,
-    })
+    }
+    ;(platform ? platforms : tracks).push(way)
   })
-  return { baseTimestamp, ways: ways.sort((a, b) => a.id - b.id), skippedRelations: skippedRelations.sort((a, b) => a - b) }
+  platforms.sort(byId)
+  tracks.sort(byId)
+  const exceptions = new Set(radii.platformExceptions ?? [])
+  const bare = stationsWithoutPlatform(stations, platforms, radii.platformRadiusM).filter((s) => !exceptions.has(s.gtfsStopId))
+  if (bare.length > 0) {
+    const names = bare.slice(0, 10).map((s) => `${s.gtfsStopId} ${s.name}`).join(', ')
+    throw new Error(`overpass: ${bare.length} of ${stations.length} stations have no platform way within ${radii.platformRadiusM} m (${names}); the response may be incomplete`)
+  }
+  return { baseTimestamp, platforms, tracks, skippedRelations: skippedRelations.sort((a, b) => a - b) }
 }

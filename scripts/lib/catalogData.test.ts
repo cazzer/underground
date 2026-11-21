@@ -1,6 +1,8 @@
 /** Reads the committed data/stations/catalog/ files: they must agree with themselves and with each other. */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { MIN_ENVELOPES } from './catalogEnvelopes.ts'
+import { stationsWithoutPlatform } from './catalogOsm.ts'
 import type { CatalogEntrance, CatalogEnvelope, CatalogEquipment, CatalogStation, OsmCatalogWay, SodaHeader } from './catalogTypes.ts'
 
 function load<T extends object>(name: string): T {
@@ -11,7 +13,13 @@ const stations = load<SodaHeader & { rows: CatalogStation[] }>('stations')
 const entrances = load<SodaHeader & { rows: CatalogEntrance[] }>('entrances')
 const equipment = load<SodaHeader & { rows: CatalogEquipment[] }>('equipment')
 const envelopes = load<SodaHeader & { kept: number; rows: CatalogEnvelope[] }>('envelopes')
-const osm = load<{ baseTimestamp: string; ways: OsmCatalogWay[]; skippedRelations: number[] }>('osm')
+interface OsmFile {
+  baseTimestamp: string
+  platformRadiusM: number
+  ways: OsmCatalogWay[]
+}
+const platforms = load<OsmFile & { skippedRelations: number[] }>('osm-platforms')
+const tracks = load<OsmFile>('osm-tracks')
 
 describe('the pinned catalog', () => {
   it('holds exactly the rows its headers counted', () => {
@@ -20,6 +28,7 @@ describe('the pinned catalog', () => {
     expect(equipment.rows).toHaveLength(equipment.count)
     expect(envelopes.rows).toHaveLength(envelopes.kept)
     expect(envelopes.kept).toBeLessThanOrEqual(envelopes.count)
+    expect(envelopes.kept).toBeGreaterThanOrEqual(MIN_ENVELOPES)
   })
   it('records its provenance', () => {
     for (const h of [stations, entrances, equipment, envelopes]) {
@@ -28,7 +37,7 @@ describe('the pinned catalog', () => {
       expect(Date.parse(h.rowsUpdatedAt)).not.toBeNaN()
       expect(Date.parse(h.fetchedAt)).not.toBeNaN()
     }
-    expect(Date.parse(osm.baseTimestamp)).not.toBeNaN()
+    for (const o of [platforms, tracks]) expect(Date.parse(o.baseTimestamp)).not.toBeNaN()
   })
   it('ties every entrance to a station and a stop in the station list', () => {
     const stopIds = new Set(stations.rows.map((s) => s.gtfsStopId))
@@ -47,6 +56,15 @@ describe('the pinned catalog', () => {
   it('has unique keys', () => {
     expect(new Set(stations.rows.map((s) => s.gtfsStopId)).size).toBe(stations.rows.length)
     expect(new Set(equipment.rows.map((e) => e.code)).size).toBe(equipment.rows.length)
-    expect(new Set(osm.ways.map((w) => w.id)).size).toBe(osm.ways.length)
+    const ways = [...platforms.ways, ...tracks.ways]
+    expect(new Set(ways.map((w) => w.id)).size).toBe(ways.length)
+  })
+  it('has a platform way within range of every station (a timed-out fetch would not)', () => {
+    const bare = stationsWithoutPlatform(stations.rows, platforms.ways, platforms.platformRadiusM)
+    expect(bare.map((s) => `${s.gtfsStopId} ${s.name}`)).toEqual([])
+  })
+  it('keeps platforms and tracks apart', () => {
+    expect(platforms.ways.every((w) => w.tags.railway === 'platform')).toBe(true)
+    expect(tracks.ways.every((w) => w.tags.railway === 'subway')).toBe(true)
   })
 })

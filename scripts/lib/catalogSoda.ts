@@ -11,6 +11,12 @@ function optText(v: unknown, path: string): string | null {
   return v === undefined ? null : text(v, path)
 }
 
+function routes(v: unknown, path: string): string[] {
+  const out = text(v, path).trim().split(/\s+/)
+  if (out.some((r) => r === '')) throw new Error(`${path}: empty route in ${JSON.stringify(v)}`)
+  return out
+}
+
 /** `+` true, `-` false, absent null. */
 function flag(v: unknown, path: string): boolean | null {
   return v === undefined ? null : oneOf(v, ['+', '-'], path) === '+'
@@ -72,7 +78,7 @@ export function trimCatalogStations(rows: unknown): CatalogStation[] {
         line: text(row.line, `${at}.line`),
         name: text(row.stop_name, `${at}.stop_name`),
         borough: text(row.borough, `${at}.borough`),
-        routes: text(row.daytime_routes, `${at}.daytime_routes`).split(/\s+/),
+        routes: routes(row.daytime_routes, `${at}.daytime_routes`),
         structure: oneOf(row.structure, STRUCTURES, `${at}.structure`),
         lat: num(row.gtfs_latitude, `${at}.gtfs_latitude`),
         lon: num(row.gtfs_longitude, `${at}.gtfs_longitude`),
