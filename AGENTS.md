@@ -69,9 +69,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?lines=a|b|c` picks the lines look until the 8x4.3 options round is decided (default b)
   Interior tokens (`interiorStroke`, `interiorTrack`, `interiorEntrance`, `interiorFine`,
   `interiorElevator`, `interiorEscalator`, the two widths, `interiorDepthFade`) color the station interior.
-  TEMPORARY: `?machines=a|b|c` (rails and cab, plain band and box, plan symbols; default a) until the
-  9wc.8 card is decided, and the dev-only `?machinesDemo` (demo escalators and a three-level elevator at
-  Bedford Av, `src/data/machineDemo.ts`); the removal list is in `src/scene/machineLook.ts`
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
@@ -115,7 +112,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `StationInterior.tsx` the focused station's interior (two line layers, both dashed for a generated interior under `?approx=b`; `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides;
-    `machineLook.ts` TEMPORARY `?machines=` escalator/elevator look; `approxLook.ts` TEMPORARY `?approx=` look of
+    `approxLook.ts` TEMPORARY `?approx=` look of
     generated interiors
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
@@ -163,7 +160,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `interiorConnectors.ts` stairs, ramps, escalators (a zero-run one gets a 30 degree run along the
     station axis; on its listing entrance its street end sits there and the run heads toward the plan center,
     down below ground and up at an elevated station; else it is centered, descending toward the center) and elevators (shaft squared to the axis, a stop at each end in that level's pass; machines take
-    half the depth fade); `escalatorBanks.ts` `spreadBanks`: zero-run escalators whose bands would touch
+    half the depth fade). An escalator is a band with fine handrails and travel chevrons; an elevator is four
+    shaft verticals, a doored square at each stop and a fine cab inside it; `escalatorBanks.ts` `spreadBanks`: zero-run escalators whose bands would touch
     sit side by side across the axis in id order (an authored one off its entrance stays put; one listed
     by two entrances throws);
     `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;

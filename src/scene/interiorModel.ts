@@ -9,7 +9,6 @@ import { ISO_POLAR } from '../lib/tilt'
 import { MACHINE_DEPTH_FADE_SHARE, theme } from '../theme'
 import { approxLook } from './approxLook'
 import { interiorLook } from './interiorLook'
-import { machineLook } from './machineLook'
 
 /** A station interior, ready to draw: group origin, merged line buffers, labels, camera target. */
 export interface InteriorModel {
@@ -34,7 +33,7 @@ const ROLE_TOKEN: Record<InteriorRole, string> = {
   outline: theme.interiorStroke,
   stair: theme.interiorStroke,
   elevator: theme.interiorElevator,
-  escalator: machineLook.escalatorAccent ? theme.interiorEscalator : theme.interiorStroke,
+  escalator: theme.interiorEscalator,
   track: theme.interiorTrack,
   entrance: theme.interiorEntrance,
   step: theme.interiorFine,
@@ -118,7 +117,6 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     railDrop: RAIL_DROP_M,
     entranceSize: 2.5,
     guides: interiorLook.guides,
-    machines: machineLook.style,
     dashStructure: look === 'b',
     colorOf,
   })

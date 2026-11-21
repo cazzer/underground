@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Connector } from '../data/stationSchema'
 import { stationAxis } from './interiorAxis'
 import { doorSide, inclineEnds } from './interiorConnectors'
-import { buildInteriorBuffers, type Buffers, type InteriorRole, type MachineStyle } from './interiorGeometry'
+import { buildInteriorBuffers, type Buffers, type InteriorRole } from './interiorGeometry'
 import { count, ELEVATOR, fixture, opts, ROLES, seg } from './interiorFixture'
 
 const ESCALATOR: Connector = {
@@ -15,13 +15,9 @@ const ESCALATOR: Connector = {
   sources: ['nyopendata'],
 }
 
-const A: MachineStyle = { escalator: 'rails', elevator: 'cab' }
-const B: MachineStyle = { escalator: 'band', elevator: 'box' }
-const C: MachineStyle = { escalator: 'arrow', elevator: 'cross' }
-
 /** Buffers for the fixture with only these connectors, minus the fixture's own outlines, track, entrance and guides. */
-function machines(connectors: Connector[], style: MachineStyle = A): { strong: Buffers; fine: Buffers } {
-  return buildInteriorBuffers(fixture(connectors), opts({ machines: style, guides: false }))
+function machines(connectors: Connector[]): { strong: Buffers; fine: Buffers } {
+  return buildInteriorBuffers(fixture(connectors), opts({ guides: false }))
 }
 
 /** Segment indexes whose start color has this role. */
@@ -32,7 +28,7 @@ const withRole = (b: Buffers, role: InteriorRole) =>
 const BASE_STRONG = 4 + 1 + 4 + 4
 
 describe('elevators', () => {
-  it('look A: four shaft verticals, a doored square at each end, and a cab inside it', () => {
+  it('four shaft verticals, a doored square at each end, and a cab inside it', () => {
     const { strong, fine } = machines([ELEVATOR])
     expect(count(strong) - BASE_STRONG).toBe(4 + 5 + 5)
     expect(withRole(strong, 'elevator')).toHaveLength(14)
@@ -103,20 +99,10 @@ describe('elevators', () => {
     const verticals = withRole(strong, 'elevator').map((k) => seg(strong, k)).filter((s) => s[1] !== s[4])
     for (const s of verticals) expect([s[1], s[4]]).toEqual([-16, 0])
   })
-
-  it('look B is a 12-edge box; look C a crossed square per stop and one fine center line', () => {
-    const b = machines([ELEVATOR], B)
-    expect(count(b.strong) - BASE_STRONG).toBe(12)
-    expect(count(b.fine)).toBe(0)
-    const c = machines([ELEVATOR], C)
-    expect(count(c.strong) - BASE_STRONG).toBe(12)
-    expect(count(c.fine)).toBe(1)
-    expect(seg(c.fine, 0)).toEqual([3, -16, 0, 3, -8, 0])
-  })
 })
 
 describe('escalators', () => {
-  it('look A: a band in the escalator color, handrails at their real height, no step hatch', () => {
+  it('a band in the escalator color, handrails at their real height, no step hatch', () => {
     const { strong, fine } = machines([ESCALATOR])
     const band = withRole(strong, 'escalator')
     expect(seg(strong, band[0]!)).toEqual([0, -8, 11, 6, 0, 11])
@@ -230,7 +216,7 @@ describe('escalators', () => {
   it('draws a two-escalator bank at one entrance as two parallel bands, 0.3 m apart', () => {
     const second = { ...zeroRunAt(9), id: 'ES2' }
     const i = listedBy([{ ...second, travel: undefined }, { ...zeroRunAt(9), travel: undefined }], ['ES1', 'ES2'])
-    const { strong } = buildInteriorBuffers(i, opts({ guides: false, machines: B }))
+    const { strong } = buildInteriorBuffers(i, opts({ guides: false }))
     const sides = withRole(strong, 'escalator').map((k) => seg(strong, k)).filter((s) => s[1] !== s[4])
     expect(sides).toHaveLength(4)
     for (const s of sides) {
@@ -239,18 +225,6 @@ describe('escalators', () => {
     }
     const zs = sides.map((s) => s[2]!).sort((a, b) => a - b)
     expect(zs).toEqual([7.85, 9.85, 10.15, 12.15].map((z) => expect.closeTo(z)))
-  })
-
-  it('look B: band and chevrons, nothing fine; look C: band, centerline and one arrow head', () => {
-    const b = machines([ESCALATOR], B)
-    expect(count(b.strong) - BASE_STRONG).toBe(4 + 2)
-    expect(count(b.fine)).toBe(0)
-    const c = machines([ESCALATOR], C)
-    expect(count(c.strong) - BASE_STRONG).toBe(4 + 1 + 2)
-    expect(count(c.fine)).toBe(0)
-    const head = withRole(c.strong, 'escalator').slice(5).map((k) => seg(c.strong, k))
-    for (const s of head) expect(s[3]).toBeCloseTo(6)
-    expect(count(machines([{ ...ESCALATOR, travel: undefined }], C).strong) - BASE_STRONG).toBe(5)
   })
 })
 

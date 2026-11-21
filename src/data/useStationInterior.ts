@@ -5,7 +5,6 @@ import { deriveInteriorLoad, interiorIdOf, type IndexLoad, type InteriorLoad, ty
 import { showGenerated } from './generatedLook'
 import { loadStationIndex, withoutGenerated } from './loadStationIndex'
 import { loadStationInterior } from './loadStationInterior'
-import { withDemoMachines } from './machineDemo'
 
 export type { InteriorLoad } from './interiorLoad'
 
@@ -17,8 +16,6 @@ const BASE_URL = import.meta.env.BASE_URL
  */
 const cache = createInteriorCache((id) =>
   loadStationInterior(BASE_URL, id)
-    // TEMPORARY (machineLook.ts): dev-only demo escalators and elevators for the 9wc.8 look card.
-    .then((i) => (import.meta.env.DEV && new URLSearchParams(window.location.search).has('machinesDemo') ? withDemoMachines(i) : i))
     .then(buildInteriorModel),
 )
 
