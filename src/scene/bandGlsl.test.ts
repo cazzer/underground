@@ -24,9 +24,10 @@ const PINNED = `
 	float cross2 = abs( ts.x * ns.y - ts.y * ns.x );
 	float k = 2.0 / ( projectionMatrix[ 1 ][ 1 ] * resolution.y );
 	float metersPerPx = k * w * length( ts ) / max( cross2, ${f(MIN_FORESHORTEN)} );
+	float gapPx = 2.0 * trackOffsetM / metersPerPx;
 	float bundlePx = 2.0 * b.w * bandPitchPx;
-	float split = smoothstep( ${f(TRACK_MERGE_PX)} + bundlePx, ${f(TRACK_SPLIT_PX)} + bundlePx, 2.0 * trackOffsetM / metersPerPx );
-	float s = miter * ( b.z * bandPitchPx * metersPerPx - trackOffsetM * ( 1.0 - split ) );
+	float split = mix( smoothstep( ${f(TRACK_MERGE_PX)}, ${f(TRACK_SPLIT_PX)}, gapPx ), smoothstep( ${f(TRACK_MERGE_PX)} + bundlePx, ${f(TRACK_SPLIT_PX)} + bundlePx, gapPx ), bandEase );
+	float s = miter * ( b.z * bandPitchPx * bandEase * metersPerPx - trackOffsetM * ( 1.0 - split ) );
 	return p + vec3( n.x, 0.0, n.y ) * s;
 `
 
@@ -37,6 +38,7 @@ interface GlslInputs {
   projection: Matrix4
   resolutionY: number
   bandPitchPx: number
+  bandEase: number
   trackOffsetM: number
 }
 
@@ -60,9 +62,11 @@ function glslBandShift(u: GlslInputs, p: Vector3, b: [number, number, number, nu
   const cross2 = Math.abs(ts[0]! * ns[1]! - ts[1]! * ns[0]!)
   const k = 2 / (u.projection.elements[1 * 4 + 1]! * u.resolutionY)
   const metersPerPx = (k * w * Math.hypot(ts[0]!, ts[1]!)) / Math.max(cross2, MIN_FORESHORTEN)
+  const gapPx = (2 * u.trackOffsetM) / metersPerPx
   const bundlePx = 2 * b[3] * u.bandPitchPx
-  const split = glslSmoothstep(TRACK_MERGE_PX + bundlePx, TRACK_SPLIT_PX + bundlePx, (2 * u.trackOffsetM) / metersPerPx)
-  const s = miter * (b[2] * u.bandPitchPx * metersPerPx - u.trackOffsetM * (1 - split))
+  const mix = (x: number, y: number, a: number) => x * (1 - a) + y * a
+  const split = mix(glslSmoothstep(TRACK_MERGE_PX, TRACK_SPLIT_PX, gapPx), glslSmoothstep(TRACK_MERGE_PX + bundlePx, TRACK_SPLIT_PX + bundlePx, gapPx), u.bandEase)
+  const s = miter * (b[2] * u.bandPitchPx * u.bandEase * metersPerPx - u.trackOffsetM * (1 - split))
   return p.clone().add(new Vector3(n[0], 0, n[1]).multiplyScalar(s))
 }
 
@@ -102,13 +106,15 @@ describe('BAND_GLSL', () => {
       if (polar < 1e-3) cam.up.set(0, 0, -1)
       cam.lookAt(target)
       cam.updateMatrixWorld()
-      const view = writeBandView(createBandView(), cam.matrixWorldInverse.elements, cam.projectionMatrix.elements[5]!, height, distance, 2.5, 4.7)
+      // Half the trials mid ease-in.
+      const ease = trial % 2 === 0 ? 1 : rand()
+      const view = writeBandView(createBandView(), cam.matrixWorldInverse.elements, cam.projectionMatrix.elements[5]!, height, distance, 2.5, 4.7, ease)
       const heading = rand() * 2 * Math.PI
       const miter = 1 + rand()
       const b: [number, number, number, number] = [Math.cos(heading) * miter, Math.sin(heading) * miter, Math.round((rand() - 0.5) * 12) / 2, Math.round(rand() * 6) / 2]
       const p = target.clone().add(new Vector3((rand() - 0.5) * distance * 0.3, -rand() * 20, (rand() - 0.5) * distance * 0.3))
       const glsl = glslBandShift(
-        { modelView: cam.matrixWorldInverse, projection: cam.projectionMatrix, resolutionY: height, bandPitchPx: view.pitchPx, trackOffsetM: 4.7 },
+        { modelView: cam.matrixWorldInverse, projection: cam.projectionMatrix, resolutionY: height, bandPitchPx: view.pitchPx, bandEase: ease, trackOffsetM: 4.7 },
         p,
         b,
       )

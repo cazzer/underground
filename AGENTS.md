@@ -90,7 +90,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
-    shapes arrive, then eases the pitch in over 300 ms; writes the shared `BandView` (Scene owns it; LiveTrains reads
+    shapes arrive, then eases them in over 300 ms (`BandView.ease`: offset and split blend linearly from unbanded, so no fold); writes the shared `BandView` (Scene owns it; LiveTrains reads
     it) and the band uniforms per frame at priority -0.25); `usePlatformFade.ts` writes the loaded interior's
     per-segment platform fade for every band layer (the `?lines=` overlays too); `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
@@ -412,7 +412,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   The corridor search runs after the first paint, in a Web Worker (`src/data/loadBands.ts`; on the main thread when
   idle if the worker fails, logged): useNetwork's ready state carries `bands`, a promise of the banded shapes. The
   map draws the unbanded shapes until it resolves (a pitch of 0 draws exactly as no bands, so the swap is
-  invisible and the pitch then eases in), and the realtime join waits for it, so trains only ever ride the bands.
+  invisible and the bands then ease in), and the realtime join waits for it, so trains only ever ride the bands.
 - Each shape draws `trackOffsetM` to the right of its own travel direction (`trackLine` in
   `buildNetwork`), so the two directions are parallel tracks; zoomed out the pair reads as one line.
   The offset is `TRACK_OFFSET_M` (4.7 m, measured at Bedford Av); code that needs it reads `network.trackOffsetM`. Live trains ride the same `trackLine`

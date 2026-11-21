@@ -10,6 +10,7 @@ import { MIN_FORESHORTEN, TRACK_MERGE_PX, TRACK_SPLIT_PX } from '../lib/bandOffs
 /** Shared by every band material, so one per-frame write (SubwayLines) moves them all. */
 export const BAND_UNIFORMS = {
   bandPitchPx: { value: 0 },
+  bandEase: { value: 1 },
   trackOffsetM: { value: 0 },
   /** The revealed interior's opacity: segments with a platform fade weight (platformMask.ts) fade by it. */
   platformFade: { value: 0 },
@@ -30,6 +31,7 @@ const glslFloat = (v: number) => v.toFixed(4)
 /** bandShift (bandOffset.ts) in GLSL; `resolution` is LineMaterial's, in CSS pixels. */
 export const BAND_GLSL = /* glsl */ `
 uniform float bandPitchPx;
+uniform float bandEase;
 uniform float trackOffsetM;
 uniform float platformFade;
 attribute vec4 ${BAND_START};
@@ -51,9 +53,10 @@ vec3 bandShift( vec3 p, vec4 b ) {
 	float cross2 = abs( ts.x * ns.y - ts.y * ns.x );
 	float k = 2.0 / ( projectionMatrix[ 1 ][ 1 ] * resolution.y );
 	float metersPerPx = k * w * length( ts ) / max( cross2, ${glslFloat(MIN_FORESHORTEN)} );
+	float gapPx = 2.0 * trackOffsetM / metersPerPx;
 	float bundlePx = 2.0 * b.w * bandPitchPx;
-	float split = smoothstep( ${glslFloat(TRACK_MERGE_PX)} + bundlePx, ${glslFloat(TRACK_SPLIT_PX)} + bundlePx, 2.0 * trackOffsetM / metersPerPx );
-	float s = miter * ( b.z * bandPitchPx * metersPerPx - trackOffsetM * ( 1.0 - split ) );
+	float split = mix( smoothstep( ${glslFloat(TRACK_MERGE_PX)}, ${glslFloat(TRACK_SPLIT_PX)}, gapPx ), smoothstep( ${glslFloat(TRACK_MERGE_PX)} + bundlePx, ${glslFloat(TRACK_SPLIT_PX)} + bundlePx, gapPx ), bandEase );
+	float s = miter * ( b.z * bandPitchPx * bandEase * metersPerPx - trackOffsetM * ( 1.0 - split ) );
 	return p + vec3( n.x, 0.0, n.y ) * s;
 }
 `

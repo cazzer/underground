@@ -106,6 +106,18 @@ describe('bandShift', () => {
     expect(bandShift(view, target.x, 0, target.z, 0, 1, 0, 0)).toBeCloseTo(0, 9)
     expect(bandShift(view, target.x, 0, target.z, 0, 1, 0, 2)).toBeCloseTo(-OFFSET)
   })
+
+  it('eases bands in along a straight line from no bands, never folding the split', () => {
+    // 12 px apart: unbanded the tracks are split; with a 2-slot corridor they end merged and a slot over.
+    const d = distanceFor(12)
+    const at = (ease: number) => {
+      const v = writeBandView(createBandView(), camera(target, d, 0, 0).matrixWorldInverse.elements, camera(target, d, 0, 0).projectionMatrix.elements[5]!, H, d, PITCH, OFFSET, ease)
+      return bandShift(v, target.x, 0, target.z, 0, 1, 1, 2)
+    }
+    const unbanded = bandShift(viewOf(camera(target, d, 0, 0), d, OFFSET), target.x, 0, target.z, 0, 1, 0, 0)
+    expect(at(0)).toBeCloseTo(unbanded, 9)
+    for (const e of [0.25, 0.5, 0.75]) expect(at(e)).toBeCloseTo(at(0) + (at(1) - at(0)) * e, 9)
+  })
 })
 
 describe('writeBandView', () => {

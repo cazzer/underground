@@ -35,7 +35,7 @@ export function SubwayLines({ network, paths, interiorStationId, view }: SubwayL
   const buffers = useMemo(() => routeLineBuffers(network, paths, baseLineMix(theme, linesMode)), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lines)
   usePlatformFade(lines, buffers, paths, network, interiorStationId)
-  /** When `paths` last changed: new bands ease in from a pitch of 0, which draws exactly as no bands. */
+  /** When `paths` last changed: new bands ease in from 0 (BandView.ease), which draws exactly as no bands. */
   const swapped = useRef<{ paths: readonly ShapePath[]; atMs: number } | null>(null)
 
   // Priority -0.25: after CameraRig and the orbit (-2), drei's controls.update() (-1) and the orbit pivot (-0.5),
@@ -49,8 +49,9 @@ export function SubwayLines({ network, paths, interiorStationId, view }: SubwayL
     const ease = t * t * (3 - 2 * t)
     const distance = cameraDistance(state)
     const p11 = camera.projectionMatrix.elements[5]!
-    writeBandView(view, camera.matrixWorldInverse.elements, p11, state.size.height, distance, theme.bandPitchPx * ease, network.trackOffsetM)
+    writeBandView(view, camera.matrixWorldInverse.elements, p11, state.size.height, distance, theme.bandPitchPx, network.trackOffsetM, ease)
     BAND_UNIFORMS.bandPitchPx.value = view.pitchPx
+    BAND_UNIFORMS.bandEase.value = view.ease
     BAND_UNIFORMS.trackOffsetM.value = view.trackOffsetM
     BAND_UNIFORMS.platformFade.value = interiorStationId === null ? 0 : interiorOpacity(distance)
   }, -0.25)

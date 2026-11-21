@@ -27,6 +27,11 @@ export interface BandView {
   k: number
   /** Gap between neighbouring bands, CSS pixels (0 at the overview). */
   pitchPx: number
+  /**
+   * How far the bands have eased in after arriving (0 to 1; SubwayLines). The offset and the split both blend
+   * linearly from no bands (0) to full bands (1), so each point moves straight to its band: no fold on the way.
+   */
+  ease: number
   trackOffsetM: number
 }
 
@@ -40,7 +45,7 @@ export const TRACK_SPLIT_PX = 8.5
 export const MIN_FORESHORTEN = 0.25
 
 export function createBandView(): BandView {
-  return { view: new Float64Array(16), k: 0, pitchPx: 0, trackOffsetM: 0 }
+  return { view: new Float64Array(16), k: 0, pitchPx: 0, ease: 1, trackOffsetM: 0 }
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -71,10 +76,12 @@ export function writeBandView(
   distance: number,
   pitchPx: number,
   trackOffsetM: number,
+  ease = 1,
 ): BandView {
   for (let i = 0; i < 16; i++) out.view[i] = viewElements[i]!
   out.k = 2 / (p11 * heightPx)
   out.pitchPx = bandPitchAt(distance, pitchPx)
+  out.ease = ease
   out.trackOffsetM = trackOffsetM
   return out
 }
@@ -103,6 +110,8 @@ export function bandShift(v: BandView, x: number, y: number, z: number, mx: numb
   const metersPerPx = (v.k * w * Math.hypot(tsx, tsy)) / Math.max(cross, MIN_FORESHORTEN)
   // A view not written yet (all zeros) has no scale: nothing moves. Never the case on the GPU.
   if (!(metersPerPx > 0)) return 0
-  const split = trackSplit((2 * v.trackOffsetM) / metersPerPx, 2 * half * v.pitchPx)
-  return miter * (band * v.pitchPx * metersPerPx - v.trackOffsetM * (1 - split))
+  const gapPx = (2 * v.trackOffsetM) / metersPerPx
+  // At ease 0 this is the unbanded split (no bundle width), so the frame the bands arrive draws as before.
+  const split = trackSplit(gapPx, 0) * (1 - v.ease) + trackSplit(gapPx, 2 * half * v.pitchPx) * v.ease
+  return miter * (band * v.pitchPx * v.ease * metersPerPx - v.trackOffsetM * (1 - split))
 }
