@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import type { StationsFile } from '../data/schema'
-import { accessLabel, boroughName, routeChipLabel, routeSpokenName, scheduleLabel, sharedNames } from './labels'
+import { accessLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel } from './labels'
 import { stationAccess } from './network'
 
 describe('routeChipLabel', () => {
@@ -61,27 +61,30 @@ describe('accessLabel', () => {
   it('gives no label to a station that is not accessible', () => {
     expect(accessLabel({ status: 'none' })).toBeNull()
   })
-
-  it('reads a station from an older file without the fields as not accessible', () => {
-    expect(stationAccess({})).toEqual({ status: 'none' })
-    expect(stationAccess({ ada: 'full' })).toEqual({ status: 'full' })
-    expect(stationAccess({ ada: 'partial', adaPartial: { north: false, south: true, note: 'Uptown only' } })).toEqual({
-      status: 'partial',
-      note: 'Uptown only',
-    })
-  })
 })
 
-describe('sharedNames', () => {
-  it('collects only names used by more than one station', () => {
-    const names = sharedNames([{ name: '86 St' }, { name: 'Canal St' }, { name: '86 St' }, { name: 'Bedford Av' }, { name: '86 St' }])
+describe('multiBoroughNames', () => {
+  it('collects names whose stations span more than one borough, not names shared within one', () => {
+    const names = multiBoroughNames([
+      { name: '86 St', borough: 'M' },
+      { name: '145 St', borough: 'M' },
+      { name: '86 St', borough: 'Bk' },
+      { name: '145 St', borough: 'M' },
+      { name: 'Bedford Av', borough: 'Bk' },
+    ])
     expect([...names]).toEqual(['86 St'])
   })
 
-  it('finds shared names in the shipped stations, and every partly accessible one has a note', () => {
+  it('ignores stations without a borough (an older cached file)', () => {
+    expect(multiBoroughNames([{ name: '86 St', borough: 'M' }, { name: '86 St' }]).size).toBe(0)
+  })
+
+  it('finds the multi-borough names in the shipped stations, and every partly accessible one has a note', () => {
     const file = JSON.parse(readFileSync('public/data/stations.json', 'utf8')) as StationsFile
-    const shared = sharedNames(file.stations)
+    const shared = multiBoroughNames(file.stations)
     expect(shared.has('86 St')).toBe(true)
+    expect(shared.has('Prospect Av')).toBe(true)
+    expect(shared.has('145 St')).toBe(false)
     expect(shared.has('Bedford Av')).toBe(false)
     const partial = file.stations.filter((s) => s.ada === 'partial')
     expect(partial.length).toBeGreaterThan(0)

@@ -40,6 +40,8 @@ describe('access tokens', () => {
         expect(contrastRatio(color, panel), `${t.name} ${name} ${color} on ${panel}`).toBeGreaterThanOrEqual(3)
       }
       expect(contrastRatio(t.accessBadgeInk, t.accessBadge), `${t.name} badge glyph`).toBeGreaterThanOrEqual(4.5)
+      // inkDim also sets the small text beside the glyph (the partial note, "partly", the borough line).
+      expect(contrastRatio(t.inkDim, panel), `${t.name} inkDim text on ${panel}`).toBeGreaterThanOrEqual(4.5)
     }
   })
 })

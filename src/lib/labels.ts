@@ -1,7 +1,7 @@
 import type { Borough } from '../data/schema'
 import type { StationAccessInfo } from './network'
 
-const MONTHS =['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** "FX" → "F◆": express variants are written as the base route plus a diamond, as on signage. */
 export function routeChipLabel(shortName: string): string {
@@ -38,13 +38,17 @@ export function accessLabel(access: StationAccessInfo): string | null {
   return null
 }
 
-/** Names used by more than one station; search rows show the borough under these. */
-export function sharedNames(stations: readonly { name: string }[]): Set<string> {
-  const seen = new Set<string>()
-  const shared = new Set<string>()
-  for (const { name } of stations) {
-    if (seen.has(name)) shared.add(name)
-    else seen.add(name)
+/**
+ * Names whose stations lie in more than one borough; search rows show the borough under these. A name shared
+ * within one borough (every "145 St" is in Manhattan) gets none: the borough wouldn't tell them apart.
+ */
+export function multiBoroughNames(stations: readonly { name: string; borough?: Borough }[]): Set<string> {
+  const boroughs = new Map<string, Set<Borough>>()
+  for (const { name, borough } of stations) {
+    if (borough === undefined) continue
+    const seen = boroughs.get(name) ?? new Set<Borough>()
+    seen.add(borough)
+    boroughs.set(name, seen)
   }
-  return shared
+  return new Set([...boroughs].filter(([, seen]) => seen.size > 1).map(([name]) => name))
 }
