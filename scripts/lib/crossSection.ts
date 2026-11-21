@@ -1,0 +1,140 @@
+/** Cross-sections of a station perpendicular to its axis: where tracks cross a line of constant u,
+ *  and which v-intervals the platform polygons cover there. All inputs are in [u, v]. */
+import type { UV } from './platformAxis.ts'
+
+export const SECTION_FRACTIONS = [0.15, 0.3, 0.5, 0.7, 0.85]
+/** Only track segments within this angle of the axis count; a steep crossing ramp is ignored. */
+const MAX_TRACK_ANGLE_DEG = 30
+const MAX_ABS_V_M = 40
+const DEDUPE_M = 1.5
+/** Intervals closer than this with no track between them are one platform (split islands, OSM slop). */
+export const MERGE_GAP_M = 4
+const BLOCK_SLACK_M = 0.25
+
+/** A track beside a platform's long edge sits from this far inside it to this far outside it. */
+export const EDGE_INSIDE_M = 1.5
+export const EDGE_OUTSIDE_M = 5
+
+export interface UVTrack {
+  ref: string
+  pts: UV[]
+  /** A siding, spur or yard way: counted as a track only between the outermost platform edges. */
+  service?: boolean
+}
+export interface Crossing {
+  v: number
+  ref: string
+  service: boolean
+}
+export interface SectionInterval {
+  v0: number
+  v1: number
+  /** Indexes into the platform list. */
+  platforms: number[]
+}
+export interface Section {
+  u: number
+  crossings: Crossing[]
+  intervals: SectionInterval[]
+  /** Two neighbouring intervals at least MERGE_GAP_M apart with no track between them. */
+  gapWithoutTrack: boolean
+}
+
+export function trackCrossings(tracks: UVTrack[], u0: number): Crossing[] {
+  const tan = Math.tan((MAX_TRACK_ANGLE_DEG * Math.PI) / 180)
+  const found: Crossing[] = []
+  for (const t of tracks) {
+    for (let i = 0; i + 1 < t.pts.length; i++) {
+      const a = t.pts[i]!
+      const b = t.pts[i + 1]!
+      if (a[0] <= u0 === b[0] <= u0) continue
+      if (Math.abs(b[1] - a[1]) > tan * Math.abs(b[0] - a[0])) continue
+      const v = a[1] + ((u0 - a[0]) / (b[0] - a[0])) * (b[1] - a[1])
+      if (Math.abs(v) <= MAX_ABS_V_M) found.push({ v, ref: t.ref, service: t.service === true })
+    }
+  }
+  found.sort((x, y) => x.v - y.v)
+  const kept: Crossing[] = []
+  for (const c of found) {
+    const last = kept[kept.length - 1]
+    if (last === undefined || c.v - last.v >= DEDUPE_M) kept.push(c)
+    else if (last.service && !c.service) kept[kept.length - 1] = c // one track: the main-line way wins
+  }
+  return kept
+}
+
+/** Even-odd intervals of the polygon along the line u = u0. */
+export function polygonIntervals(ring: UV[], u0: number): [number, number][] {
+  const vs: number[] = []
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!
+    const b = ring[(i + 1) % ring.length]!
+    if (a[0] <= u0 === b[0] <= u0) continue
+    vs.push(a[1] + ((u0 - a[0]) / (b[0] - a[0])) * (b[1] - a[1]))
+  }
+  vs.sort((x, y) => x - y)
+  const out: [number, number][] = []
+  for (let i = 0; i + 1 < vs.length; i += 2) out.push([vs[i]!, vs[i + 1]!])
+  return out
+}
+
+/** Merges neighbouring intervals that are closer than MERGE_GAP_M with no track crossing between them. */
+export function mergeIntervals(raw: SectionInterval[], crossings: Crossing[]): { intervals: SectionInterval[]; gapWithoutTrack: boolean } {
+  const sorted = [...raw].sort((a, b) => a.v0 - b.v0)
+  const out: SectionInterval[] = []
+  let gapWithoutTrack = false
+  for (const next of sorted) {
+    const cur = out[out.length - 1]
+    if (!cur) {
+      out.push({ ...next, platforms: [...next.platforms] })
+      continue
+    }
+    const lo = Math.min(cur.v1, next.v0) - BLOCK_SLACK_M
+    const hi = Math.max(cur.v1, next.v0) + BLOCK_SLACK_M
+    const blocked = crossings.some((c) => c.v >= lo && c.v <= hi)
+    if (next.v0 - cur.v1 < MERGE_GAP_M && !blocked) {
+      cur.v1 = Math.max(cur.v1, next.v1)
+      cur.platforms.push(...next.platforms)
+    } else {
+      if (!blocked) gapWithoutTrack = true
+      out.push({ ...next, platforms: [...next.platforms] })
+    }
+  }
+  return { intervals: out, gapWithoutTrack }
+}
+
+const MIN_CUT_SPACING_M = 0.5
+
+/** Cut positions: fractions of the union u-extent and, so a short or staggered platform is sampled
+ *  too, of each platform's own u-range. Cuts closer than half a meter are one cut. */
+export function cutPositions(rings: UV[][], fractions: number[], perPlatform: boolean): number[] {
+  const rangeOf = (rs: UV[][]): [number, number] => {
+    const us = rs.flatMap((r) => r.map((p) => p[0]))
+    return [Math.min(...us), Math.max(...us)]
+  }
+  const ranges = [rangeOf(rings), ...(perPlatform ? rings.map((r) => rangeOf([r])) : [])]
+  const us = ranges.flatMap(([lo, hi]) => fractions.map((f) => lo + f * (hi - lo))).sort((a, b) => a - b)
+  return us.filter((u, i) => i === 0 || u - us[i - 1]! >= MIN_CUT_SPACING_M)
+}
+
+export function buildSections(rings: UV[][], tracks: UVTrack[], fractions: number[] = SECTION_FRACTIONS, perPlatform = true): Section[] {
+  return cutPositions(rings, fractions, perPlatform).map((u) => {
+    const crossings = trackCrossings(tracks, u)
+    const raw = rings.flatMap((ring, i) => polygonIntervals(ring, u).map(([v0, v1]): SectionInterval => ({ v0, v1, platforms: [i] })))
+    const { intervals, gapWithoutTrack } = mergeIntervals(raw, crossings)
+    return { u, crossings, intervals, gapWithoutTrack }
+  })
+}
+
+function nearestTo(cs: Crossing[], v: number): Crossing | undefined {
+  return cs.reduce<Crossing | undefined>((best, c) => (best === undefined || Math.abs(c.v - v) < Math.abs(best.v - v) ? c : best), undefined)
+}
+
+/** The track beside one long edge of a platform interval (side +1 is the edge at larger v): the nearest
+ *  main-line crossing in the edge window, or, with none there, the nearest siding, spur or yard crossing.
+ *  OSM sometimes tags a platform's own tracks that way (Hudson Yards, 2 Av). */
+export function edgeCrossing(crossings: Crossing[], iv: { v0: number; v1: number }, side: -1 | 1): Crossing | undefined {
+  const edge = side > 0 ? iv.v1 : iv.v0
+  const inWindow = (c: Crossing): boolean => (side > 0 ? c.v >= edge - EDGE_INSIDE_M && c.v <= edge + EDGE_OUTSIDE_M : c.v >= edge - EDGE_OUTSIDE_M && c.v <= edge + EDGE_INSIDE_M)
+  return nearestTo(crossings.filter((c) => !c.service && inWindow(c)), edge) ?? nearestTo(crossings.filter((c) => c.service && inWindow(c)), edge)
+}
