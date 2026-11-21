@@ -48,7 +48,7 @@ function fillGaps(normals: readonly (Ground | null)[]): Ground[] | null {
 
 /**
  * Offsets `points` by `offsetM` meters, positive to the right of travel. Interior vertices use miter
- * joins, capped at MITER_LIMIT × offset; a full reversal keeps the incoming normal. The result has
+ * joins, capped at MITER_LIMIT × offset (a full reversal too). The result has
  * the same point count as the input. Fewer than two distinct points, or offset 0, returns a copy.
  */
 export function offsetPolyline(points: readonly Ground[], offsetM: number): Ground[] {
@@ -64,7 +64,12 @@ export function offsetPolyline(points: readonly Ground[], offsetM: number): Grou
     const sx = a.x + b.x
     const sz = a.z + b.z
     const sumLen = Math.hypot(sx, sz)
-    if (sumLen < 1e-6) return { x: p.x + a.x * offsetM, z: p.z + a.z * offsetM }
+    if (sumLen < 1e-6) {
+      // An exact reversal has no bisector: put the tip on the miter cap along the incoming
+      // tangent (a.z, -a.x), as a near-reversal would be.
+      const len = offsetM * MITER_LIMIT
+      return { x: p.x + a.z * len, z: p.z - a.x * len }
+    }
     const mx = sx / sumLen
     const mz = sz / sumLen
     // cos of the half-angle between the two normals; the miter is offset / cos, capped.

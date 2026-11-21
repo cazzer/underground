@@ -78,8 +78,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
-    `trackOffset.ts` `offsetPolyline` (miter joins, capped at 2× on sharp bends; type-only `.ts`
-    imports because a scripts/ test loads it) plus the TEMPORARY `?tracks=` resolver;
+    `trackLine.ts` a shape's drawn track (decode, project, `dropSpurs` removes out-and-back tips of
+    160°+ turns, then offset); `trackOffset.ts` `offsetPolyline` (miter joins, capped at 2× on sharp
+    bends) plus the TEMPORARY `?tracks=` resolver. Both use explicit `.ts` imports because a scripts/
+    test loads them;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts`, `pickStation.ts`: pure render helpers; `labels.ts`
@@ -120,7 +122,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `prepareTrips.ts` per poll: filter, join, plan; returns live trips (each with its `HopPlan`) and
     per-reason drop counts
 - `src/data/loadNetwork.ts` fetches stations/routes/shapes JSON and validates their outer shape;
-  `useNetwork.ts` is the loading/error/ready hook (ready also carries the raw `files` the realtime join needs)
+  `useNetwork.ts` is the loading/error/ready hook (ready also carries the raw `files` the realtime join needs);
+  `trackLook.ts` TEMPORARY `?tracks=` value, passed to `buildNetwork` (never import it elsewhere: it reads `window`)
 - `src/data/useLive.ts` composes live trains for `App`: `useRealtimeStatic` (trip-index + segments, only when
   `RT_URL` is set), `useRealtimeFeed` (one request at a time; a hidden tab aborts and stops polling, becoming
   visible polls at once), `prepareTrips` once per snapshot, and `deriveLiveStatus`. `realtimeFetch.ts` fetches and
@@ -182,9 +185,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - All route shapes draw as one merged `LineSegments2` (one draw call, per-vertex colors in linear
   space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then
   route_sort_order. Don't add per-route `<Line>`s.
-- Each shape draws `trackOffsetM` to the right of its own travel direction (`offsetPolyline` in
+- Each shape draws `trackOffsetM` to the right of its own travel direction (`trackLine` in
   `buildNetwork`), so the two directions are parallel tracks; zoomed out the pair reads as one line.
-  Live dots stay on the centerline until pah.3 moves them onto their track.
+  Code that needs the offset reads `network.trackOffsetM`. Live dots stay on the centerline until
+  pah.3 moves them onto their track (through `trackLine`, so dots and lines agree).
   TEMPORARY: `?tracks=a|b|off` (4.7 m, measured at Bedford Av; 3 m; off = one line; default a); the
   removal list is in `src/data/trackLook.ts`
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.

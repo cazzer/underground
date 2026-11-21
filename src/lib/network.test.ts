@@ -109,8 +109,8 @@ describe('buildNetwork track offset', () => {
     expect(shifted.points[0]!.x).toBeCloseTo(a.x - ((b.z - a.z) / len) * 4.7)
     expect(shifted.points[0]!.z).toBeCloseTo(a.z + ((b.x - a.x) / len) * 4.7)
     expect(shifted.points).toHaveLength(plain.points.length)
-    expect(shifted.length).not.toBe(plain.length)
     expect(shifted.cumulative.at(-1)).toBe(shifted.length)
+    expect(buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7).trackOffsetM).toBe(4.7)
   })
 })
 

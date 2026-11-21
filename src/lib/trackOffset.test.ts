@@ -33,9 +33,10 @@ describe('offsetPolyline', () => {
     expect(dist(out[1]!, corner)).toBeCloseTo(MITER_LIMIT * D)
   })
 
-  it('keeps the incoming normal on a full reversal', () => {
+  it('puts the tip of a full reversal on the miter cap along the incoming tangent', () => {
     const out = offsetPolyline([{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 0, z: 0 }], D)
-    expect(out[1]).toEqual({ x: 10, z: D })
+    expect(out[1]!.x).toBeCloseTo(10 + MITER_LIMIT * D)
+    expect(out[1]!.z).toBeCloseTo(0)
     expect(out).toHaveLength(3)
   })
 
