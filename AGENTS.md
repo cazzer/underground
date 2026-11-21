@@ -76,6 +76,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
     their instances, consists and per-frame writes; `carGeometry.ts` the shaded body; `carLook.ts` TEMPORARY);
+    `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
+    accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
@@ -84,6 +86,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
+  `LocateButton.tsx` the header's location button (shows locating and located); `LocateStatus.tsx` its message (the sentence alone is the always-mounted live region)
+  with a "Go to <nearest station>" action and a clear ×
   `InteriorStatus.tsx` the panel's station-layout line (loading, error with Retry, ready, zoom-in hint)
   `OrbitHint.tsx` the panel's turn hint (right- or Shift-drag; two fingers on a coarse pointer)
 - `src/lib/`: pure logic
@@ -103,8 +107,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always 180 m,
     at the current azimuth) in the screen area the header, footer and station panel leave free;
     `orbitLimits.ts` azimuth window, spring to north-up, soft pan radius, focus-point pivot
-  - `focus.tsx` focused/dismissed-station React context (not pure). In dev only it exposes
+  - `focus.tsx` focused/dismissed-station React context (not pure); it also carries point flights
+    (`flyToPoint`, used by the location button; drops focus, so an orbited view springs back north-up during the flight). In dev only it exposes
     `window.__underground.select(stationId)` for screenshots and Playwright checks
+  - `locate.ts` a geolocation fix to a placement (near a station: frame the fix; inside the network but far:
+    frame the fix and its nearest station; outside: nearest station only, no marker), failure codes, and the
+    state transitions (the last good fix stays drawn through a re-locate or a failure); `locateMessage.ts` its HUD text (never
+    coordinates); `framing.ts` `framePoint` frames a radius around a point between the HUD insets
 - `src/lib/live/`: pure helpers for the live layer (no React or three.js; tests colocated)
   - `clock.ts` the live clock: `now = offsetS + performance.now()/1000`, where `offsetS` is the maximum over
     polls of `generatedAt - receivedPerfMs/1000`. Monotone (a poll served from the Worker's 15 s memo
@@ -152,7 +161,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `data:stations` writes a new file (`scripts/lib/interiorRegistry.test.ts` enforces it);
   `loadStationInterior.ts` fetch and outer-shape check; `interiorCache.ts` one promise per id, failures
   evicted; `interiorLoad.ts` the load type and its pure derivation; `useStationInterior.ts` the focused
-  station's interior load (other stations never fetch)
+  station's interior load (other stations never fetch); `useLocate.ts` the location button's one-shot
+  geolocation (on press only, never watched; the fix lives in React state and nowhere else)
 - `src/data/schema.ts`: types of the six `public/data/*.json` files; `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
@@ -211,7 +221,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   positive `useFrame` priority (it takes over rendering).
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
-  station fill 3, station ring 4, train halo 5, car halo 5.5, trains 6, cars 6.5, focused ring 10
+  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car halo 5.5,
+  trains 6, you-are-here halo 6.4, cars 6.5, you-are-here reticle 6.55, focused ring 10
   (whenever a station is focused, so a train never covers it).
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
@@ -299,6 +310,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **The client never fetches MTA servers directly.** The MTA terms require serving
   through a non-MTA host, even though the feeds send ACAO `*`. Realtime goes through
   the `worker/` proxy, which returns decoded JSON with a 15 s edge cache.
+- **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
+  `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip

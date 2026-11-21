@@ -15,6 +15,11 @@ export const RENDER_ORDER = {
   // Zoomed in, each train is a consist of cars: background-colored footprints, then the bodies.
   carHalo: 5.5,
   cars: 6.5,
+  // "You are here": the accuracy disc and its edge sit under the lines; the reticle sits over the trains, under the veil.
+  hereAccuracy: 0.5,
+  hereAccuracyEdge: 0.6,
+  hereHalo: 6.4,
+  here: 6.55,
   // Station interior. Look C (?interior=c, temporary) draws it under the street layers.
   interiorUnderFine: -0.6,
   interiorUnder: -0.3,

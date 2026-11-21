@@ -18,6 +18,11 @@ export interface Theme {
   stationStroke: string
   stationFocus: string
   train: string
+  /** "You are here" marker and its accuracy disc; at least 3:1 on the background and distinct from the focus and train colors (theme.test.ts). */
+  here: string
+  /** 0..1 fill of the accuracy disc, and the width in screen pixels of its edge and the reticle. */
+  hereAccuracyOpacity: number
+  hereLineWidth: number
   /** Train car shading: linear multipliers of the car color on its sides and ends (the roof is 1). */
   trainCarSideShade: number
   trainCarEndShade: number
@@ -59,6 +64,9 @@ export const THEMES = {
     stationStroke: '#ffffff',
     stationFocus: '#ffd166',
     train: '#ffffff',
+    here: '#5ce1ff',
+    hereAccuracyOpacity: 0.15,
+    hereLineWidth: 1.5,
     trainCarSideShade: 0.55,
     trainCarEndShade: 0.75,
     statusLive: '#7cf5a6',
@@ -90,6 +98,9 @@ export const THEMES = {
     stationStroke: '#2b2b2b',
     stationFocus: '#a63d2f',
     train: '#2b2b2b',
+    here: '#c71f7a',
+    hereAccuracyOpacity: 0.15,
+    hereLineWidth: 1.5,
     trainCarSideShade: 0.6,
     trainCarEndShade: 0.8,
     statusLive: '#2f6b3a',
@@ -121,6 +132,9 @@ export const THEMES = {
     stationStroke: '#33ff66',
     stationFocus: '#ffffff',
     train: '#eaffef',
+    here: '#5ce1ff',
+    hereAccuracyOpacity: 0.15,
+    hereLineWidth: 1.5,
     trainCarSideShade: 0.45,
     trainCarEndShade: 0.7,
     statusLive: '#33ff66',
@@ -186,6 +200,7 @@ export function applyThemeCss(t: Theme, root: HTMLElement = document.documentEle
     '--ug-panel': t.panel,
     '--ug-panel-border': t.panelBorder,
     '--ug-focus': t.stationFocus,
+    '--ug-here': t.here,
     '--ug-status-live': t.statusLive,
     '--ug-status-warn': t.statusWarn,
     '--ug-status-error': t.statusError,

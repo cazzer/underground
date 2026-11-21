@@ -2,16 +2,18 @@ import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
-import { useFocus } from '../lib/focus'
+import { useFocus, type FlyRequest } from '../lib/focus'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
-import { nextFocus, type FocusInput } from '../lib/focusMachine'
+import { EXIT_DISTANCE, nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightDuration, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
-import { frameBounds, type Insets, type Viewport } from '../lib/framing'
+import { frameBounds, framePoint, type Insets, type Viewport } from '../lib/framing'
 import { frameInterior, interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
 import type { InteriorModel } from './interiorModel'
 import { useStationOrbit } from './useStationOrbit'
+
+type PointRequest = Extract<FlyRequest, { kind: 'point' }>
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
@@ -22,7 +24,8 @@ const MAX_ZOOM_OUT = 1.3
 const FOCUS_DISTANCE = 170
 
 interface Destination {
-  stationId: string
+  /** Null for a flight to a point (a location fix): no station to hold focus on when interrupted. */
+  stationId: string | null
   target: Vector3
   distance: number
 }
@@ -49,6 +52,12 @@ function interiorFlight(
   const free = interiorFreeRect(viewport, insets, panel)
   const { distance, target } = frameInterior({ ...model.focusAnchor, azimuth, viewport, free, fovDeg })
   return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance }
+}
+
+/** Fly-to for a ground point (a location fix): `radiusM` in view, never closer than the focus range. */
+function pointFlight(req: PointRequest, viewport: Viewport, insets: Insets, fovDeg: number, maxDistance: number): Destination {
+  const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, EXIT_DISTANCE * 1.2, maxDistance)
+  return { stationId: null, target: new Vector3(target.x, 0, target.z), distance }
 }
 
 interface CameraRigProps {
@@ -95,15 +104,33 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   }, [camera, maxDistance])
 
   // Read by the fly effect through a ref: depending on these would re-fire a stale fly request.
-  const latest = useRef({ interior, panel, size, insets })
+  const latest = useRef({ interior, panel, size, insets, maxDistance })
   useLayoutEffect(() => {
-    latest.current = { interior, panel, size, insets }
-  }, [interior, panel, size, insets])
+    latest.current = { interior, panel, size, insets, maxDistance }
+  }, [interior, panel, size, insets, maxDistance])
 
   // Layout effect, not a passive one: a frame between the select and a passive effect would see
   // the new focus with no flight and drop it again (the camera is still far out).
   useLayoutEffect(() => {
     if (!flyRequest) return
+    if (flyRequest.kind === 'point') {
+      const c = controls.current
+      if (!c) throw new Error('Fly request before the map controls mounted')
+      hold.current = null
+      const l = latest.current
+      const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
+      const fromDistance = camera.position.distanceTo(c.target)
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      flight.current = {
+        ...dest,
+        from: c.target.clone(),
+        fromDistance,
+        elapsed: 0,
+        duration: reduced ? 0 : flightDuration(fromDistance, dest.distance),
+        e0: 0,
+      }
+      return
+    }
     const station = network.stationById.get(flyRequest.stationId)
     if (!station) throw new Error(`Fly request for unknown station "${flyRequest.stationId}"`)
     hold.current = null
@@ -206,7 +233,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   const onStart = useCallback(() => {
     const f = flight.current
     const c = controls.current
-    if (f && c) {
+    if (f && c && f.stationId !== null) {
       hold.current = {
         stationId: f.stationId,
         distance: camera.position.distanceTo(c.target),

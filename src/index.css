@@ -8,6 +8,7 @@
   --color-panel: var(--ug-panel);
   --color-edge: var(--ug-panel-border);
   --color-focus: var(--ug-focus);
+  --color-here: var(--ug-here);
   --color-status-live: var(--ug-status-live);
   --color-status-warn: var(--ug-status-warn);
   --color-status-error: var(--ug-status-error);

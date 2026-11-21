@@ -1,8 +1,10 @@
 import { useCallback, useState } from 'react'
 import { useLive } from './data/useLive'
 import { useNetwork } from './data/useNetwork'
+import { useLocate } from './data/useLocate'
 import { useStationInterior } from './data/useStationInterior'
 import { FocusProvider, useFocus } from './lib/focus'
+import { markedPlacement } from './lib/locate'
 import type { Insets } from './lib/framing'
 import type { ScreenRect } from './lib/interiorCamera'
 import type { Network } from './lib/network'
@@ -19,7 +21,8 @@ interface MapViewProps {
 
 /** The map and its HUD; owns the focused station's interior load. */
 function MapView({ network, live }: MapViewProps) {
-  const { focusedId } = useFocus()
+  const { focusedId, flyToPoint } = useFocus()
+  const locate = useLocate(network, flyToPoint)
   const interior = useStationInterior(focusedId)
   // The scene waits for the HUD's measured insets so its opening view can frame around them.
   const [insets, setInsets] = useState<Insets | null>(null)
@@ -27,6 +30,8 @@ function MapView({ network, live }: MapViewProps) {
   const defaultInsets = useCallback(() => setInsets((prev) => prev ?? { top: 0, bottom: 0 }), [])
   const [panel, setPanel] = useState<ScreenRect | null>(null)
   const [interiorRevealed, setInteriorRevealed] = useState(false)
+  const placement = markedPlacement(locate.state)
+  const here = placement && { ground: placement.ground, accuracyM: placement.accuracyM }
   const model = interior.load.status === 'ready' ? interior.load.model : null
   return (
     <>
@@ -40,6 +45,7 @@ function MapView({ network, live }: MapViewProps) {
             panel={panel}
             interior={model}
             onInteriorRevealed={setInteriorRevealed}
+            here={here}
           />
         )}
       </ErrorBoundary>
@@ -50,6 +56,7 @@ function MapView({ network, live }: MapViewProps) {
           arrivals={live.arrivals}
           onInsets={setInsets}
           onPanel={setPanel}
+          locate={locate}
           interior={{ load: interior.load, revealed: interiorRevealed, onRetry: interior.retry }}
         />
       </ErrorBoundary>
