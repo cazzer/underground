@@ -189,7 +189,7 @@ platforms stay identifiable.
 **Decisions (the user, 2026-11-21)**
 - (a) Whole-file ODbL station outputs may contain OPEN-NY rows. We ship them with a split attribution
   line: the OSM-derived parts are ODbL, and the MTA-sourced elements are NY Open Data under the
-  OPEN-NY Terms of Use. The attribution line itself lands with the 9wc.2 schema change.
+  OPEN-NY Terms of Use. Landed with 9wc.2: `StationInterior.attribution` (and so `station-depths.json`) gains the line "Elements with source nyopendata are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL" after the MTA credit.
 - (b) OPEN-NY governs the pinned data.ny.gov extracts. The MTA developer terms (§5) stay in force for
   the realtime feeds and GTFS, and the "may not be real time" and no-endorsement notices stay
   everywhere.

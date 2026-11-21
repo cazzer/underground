@@ -1,13 +1,20 @@
-/** Keeps the client's interior registry in sync with the committed interior files, and checks they all draw. */
+/** Checks the committed public/data/stations/ files: the index lists exactly them, and they all draw. */
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { INTERIOR_STATION_IDS } from '../../src/data/interiorRegistry.ts'
-import type { StationInterior } from '../../src/data/stationSchema.ts'
+import type { StationIndex, StationInterior } from '../../src/data/stationSchema.ts'
 import { buildInteriorBuffers, RAIL_DROP_M } from '../../src/lib/interiorGeometry.ts'
+import { toStableJson } from './stableJson.ts'
+import { buildStationIndex } from './stationIndex.ts'
 
 const dir = new URL('../../public/data/stations/', import.meta.url)
-const files = readdirSync(dir).filter((f) => f.endsWith('.json'))
+const INDEX_FILE = 'index.json'
+const ids = readdirSync(dir)
+  .filter((f) => f.endsWith('.json') && f !== INDEX_FILE)
+  .map((f) => f.replace(/\.json$/, ''))
+  .sort()
 const read = (id: string) => JSON.parse(readFileSync(new URL(`${id}.json`, dir), 'utf8')) as StationInterior
+const indexText = readFileSync(new URL(INDEX_FILE, dir), 'utf8')
+const index = JSON.parse(indexText) as StationIndex
 
 const OPTIONS = {
   yScale: 2,
@@ -19,12 +26,24 @@ const OPTIONS = {
   colorOf: () => [1, 1, 1] as const,
 }
 
-describe('interior registry', () => {
+describe('station index', () => {
   it('lists exactly the stations with a public/data/stations file', () => {
-    expect([...INTERIOR_STATION_IDS].sort()).toEqual(files.map((f) => f.replace(/\.json$/, '')).sort())
+    expect(Object.keys(index.stations)).toEqual(ids)
   })
 
-  it.each(INTERIOR_STATION_IDS)('%s builds non-empty interior buffers', (id) => {
+  it.each(ids)('%s: the entry matches the interior file', (id) => {
+    const interior = read(id)
+    expect(interior.stationId).toBe(id)
+    expect(index.stations[id]?.provenance).toBe(interior.generated ? 'generated' : 'authored')
+  })
+
+  it('is fresh: rebuilding from the committed files reproduces index.json byte for byte', () => {
+    expect(toStableJson(buildStationIndex(ids.map(read)), 2)).toBe(indexText)
+  })
+})
+
+describe('station interior files', () => {
+  it.each(ids)('%s builds non-empty interior buffers', (id) => {
     const { strong, fine } = buildInteriorBuffers(read(id), OPTIONS)
     expect(strong.positions.length).toBeGreaterThan(0)
     expect(fine.positions.length).toBeGreaterThan(0)

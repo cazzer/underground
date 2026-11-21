@@ -1,29 +1,60 @@
 import { useCallback, useEffect, useState } from 'react'
 import { buildInteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
-import { deriveInteriorLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
-import { hasInterior } from './interiorRegistry'
+import { deriveInteriorLoad, interiorIdOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
+import { loadStationIndex } from './loadStationIndex'
 import { loadStationInterior } from './loadStationInterior'
 import { withDemoMachines } from './machineDemo'
 
 export type { InteriorLoad } from './interiorLoad'
+
+const BASE_URL = import.meta.env.BASE_URL
 
 /**
  * One fetch per station per page load. The model is built inside the promise, so a data error
  * becomes an `error` load rather than a render crash; failures are evicted so Retry refetches.
  */
 const cache = createInteriorCache((id) =>
-  loadStationInterior(import.meta.env.BASE_URL, id)
+  loadStationInterior(BASE_URL, id)
     // TEMPORARY (machineLook.ts): dev-only demo escalators and elevators for the 9wc.8 look card.
     .then((i) => (import.meta.env.DEV && new URLSearchParams(window.location.search).has('machinesDemo') ? withDemoMachines(i) : i))
     .then(buildInteriorModel),
 )
 
-/** Interior for the focused station; stations without an interior file never fetch. */
+/** The station index, fetched once per page load (a constant key); a failure is evicted so Retry refetches. */
+const INDEX_KEY = 'index'
+const indexCache = createInteriorCache(() => loadStationIndex(BASE_URL))
+
+const INDEX_LOADING: IndexLoad = { status: 'loading' }
+
+function initialIndexLoad(): IndexLoad {
+  const index = indexCache.peek(INDEX_KEY)
+  return index ? { status: 'ready', index } : INDEX_LOADING
+}
+
+/** Interior for the focused station; stations the index doesn't list never fetch. */
 export function useStationInterior(stationId: string | null): { load: InteriorLoad; retry: () => void } {
-  const id = stationId && hasInterior(stationId) ? stationId : null
+  const [indexLoad, setIndexLoad] = useState<IndexLoad>(initialIndexLoad)
   const [settled, setSettled] = useState<SettledLoad | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const id = interiorIdOf(stationId, indexLoad)
+
+  useEffect(() => {
+    if (indexCache.peek(INDEX_KEY)) return
+    let cancelled = false
+    indexCache.get(INDEX_KEY).then(
+      (index) => {
+        if (!cancelled) setIndexLoad({ status: 'ready', index })
+      },
+      (err: unknown) => {
+        console.error('Failed to load the station index', err)
+        if (!cancelled) setIndexLoad({ status: 'error', message: err instanceof Error ? err.message : String(err) })
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [attempt])
 
   useEffect(() => {
     if (!id || cache.peek(id)) return
@@ -47,8 +78,9 @@ export function useStationInterior(stationId: string | null): { load: InteriorLo
 
   const retry = useCallback(() => {
     setSettled(null)
+    setIndexLoad((prev) => (prev.status === 'error' ? INDEX_LOADING : prev))
     setAttempt((n) => n + 1)
   }, [])
 
-  return { load: deriveInteriorLoad(id, cache.peek, settled), retry }
+  return { load: deriveInteriorLoad(stationId, indexLoad, cache.peek, settled), retry }
 }

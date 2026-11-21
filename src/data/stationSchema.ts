@@ -7,19 +7,39 @@ import type { StationId, StopId } from './schema.ts'
 /** Station-local meters from `anchor`, scene axes: [x east, z south]. Rounded to 0.01. */
 export type LocalPoint = [x: number, z: number]
 export type LevelId = string
-export type InteriorSource = 'osm' | 'nyopendata' | 'authored'
+export type InteriorSource = 'osm' | 'nyopendata' | 'authored' | 'generated'
+/** Whether a station's interior is hand-built or generated from an archetype template. */
+export type InteriorProvenance = 'authored' | 'generated'
+export type Archetype =
+  | 'elevated-2-track'
+  | 'elevated-3-track'
+  | 'shallow-per-direction'
+  | 'cut-cover-mezzanine'
+  | 'underground-express'
+  | 'deep'
+  | 'open-air'
+  | 'unknown'
+export type DepthSource = 'ee-rise' | 'deep-list' | 'osm-level' | 'structure-default'
 export type LevelKind = 'street' | 'mezzanine' | 'platform'
 export type ConnectorKind = 'stair' | 'escalator' | 'elevator' | 'ramp'
+
+export interface GeneratedInfo {
+  archetype: Exclude<Archetype, 'unknown'>
+  /** 0..1, at or above the pipeline's interior bar. */
+  confidence: number
+}
 
 export interface StationInterior {
   stationId: StationId
   name: string
   /** Local origin. Render in a group at toGround(anchor); children use local x/z as-is. */
   anchor: LatLon
-  /** The whole file is a derivative database of OpenStreetMap. */
+  /** The whole file is a derivative database of OpenStreetMap. OSM-derived parts are ODbL 1.0; `nyopendata` elements are MTA data under the OPEN-NY Terms of Use (see attribution). */
   license: 'ODbL-1.0'
   /** Credits required by the sources present, fixed order (OSM first). */
   attribution: string[]
+  /** Present only on generated interiors; absent = hand-authored. */
+  generated?: GeneratedInfo
   /** Sorted by y, highest first. Exactly one 'street' level, at y = 0. */
   levels: Level[]
   platforms: Platform[] // all arrays below sorted by id
@@ -35,6 +55,8 @@ export interface Level {
   kind: LevelKind
   /** Walking-surface elevation, meters relative to the street (0); negative is below. */
   y: number
+  /** Generated, non-street levels only. 'ee-rise' is measured; anything else is an estimate (label "≈"). */
+  depthSource?: DepthSource
 }
 
 /** Outlines are open rings (no repeated closing point), >= 3 points, any winding. */
@@ -102,6 +124,15 @@ export interface FareLine {
   level: LevelId
   path: LocalPoint[]
   sources: InteriorSource[]
+}
+
+/** public/data/stations/index.json: every station that has an interior file. Lazily fetched, not part of the startup budget. */
+export interface StationIndexEntry {
+  provenance: InteriorProvenance
+}
+export interface StationIndex {
+  /** Sorted by id. */
+  stations: Record<StationId, StationIndexEntry>
 }
 
 /**

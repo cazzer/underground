@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import type { StationDepthsFile, StationInterior } from '../../src/data/stationSchema.ts'
 import { toStableJson } from './stableJson.ts'
 import { buildStationDepths } from './stationDepths.ts'
+import { OPEN_NY_NOTE } from './stationMerge.ts'
 
 const interiorDir = new URL('../../public/data/stations/', import.meta.url)
 const interiors = readdirSync(interiorDir)
-  .filter((f) => f.endsWith('.json'))
+  .filter((f) => f.endsWith('.json') && f !== 'index.json')
   .map((f) => JSON.parse(readFileSync(new URL(f, interiorDir), 'utf8')) as StationInterior)
 const l08 = interiors.find((i) => i.stationId === 'L08')!
 const committed = readFileSync(new URL('../../public/data/station-depths.json', import.meta.url), 'utf8')
@@ -35,7 +36,7 @@ describe('buildStationDepths', () => {
     const other: StationInterior = { ...l08, stationId: 'A01', attribution: ['Someone else', '© OpenStreetMap contributors'] }
     const out = buildStationDepths([l08, other])
     expect(out.stations.map((s) => s.stationId)).toEqual(['A01', 'L08'])
-    expect(out.attribution).toEqual(['© OpenStreetMap contributors', 'Someone else', 'Metropolitan Transportation Authority, data.ny.gov'])
+    expect(out.attribution).toEqual(['© OpenStreetMap contributors', 'Someone else', 'Metropolitan Transportation Authority, data.ny.gov', OPEN_NY_NOTE])
   })
 
   it('throws on a platform on an unknown level or a duplicated stop', () => {

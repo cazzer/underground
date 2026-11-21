@@ -1,6 +1,6 @@
 /** Input types for scripts/build-stations.ts and scripts/fetch-station-sources.ts. Not shipped. */
 import type { LatLon } from '../../src/lib/projection.ts'
-import type { Level, LevelId } from '../../src/data/stationSchema.ts'
+import type { DepthSource, GeneratedInfo, Level, LevelId } from '../../src/data/stationSchema.ts'
 
 /** [u, v] meters: u along frame.bearingDeg (clockwise from north) from the anchor, v to its right. */
 export type FramePoint = [u: number, v: number]
@@ -43,6 +43,20 @@ export interface EquipmentOverride {
   /** Required when the station has two levels of the same kind (e.g. Hudson Yards). */
   levels?: { lower: LevelId; upper: LevelId }
   width?: number
+}
+
+/** What a template generator knows about a station beyond its authored-shaped geometry. */
+export interface GeneratedMeta {
+  archetype: GeneratedInfo['archetype']
+  confidence: number
+  /** Where each non-street level's depth came from. */
+  levelDepths: Record<LevelId, DepthSource>
+}
+/** A generated station: the same inputs as a hand-authored one, plus its provenance. */
+export interface GeneratedStation {
+  authored: AuthoredStation
+  sources: StationSources
+  meta: GeneratedMeta
 }
 
 /** data/stations/<id>.sources.json: pinned extracts written by fetch-station-sources.ts. */

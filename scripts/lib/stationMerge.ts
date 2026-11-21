@@ -18,6 +18,9 @@ const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
   nyopendata: 'Metropolitan Transportation Authority, data.ny.gov',
 }
 
+/** Appended after the MTA credit: the nyopendata elements are not ODbL (user's licensing decision, card 9wc.1.1 option A). */
+export const OPEN_NY_NOTE = 'Elements with source nyopendata are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
+
 const byId = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 
 function points(ctx: Ctx, v: unknown, path: string, min: number): LocalPoint[] {
@@ -211,7 +214,10 @@ export function buildStationInterior(authored: AuthoredStation, sources: Station
     name: text(authored.name, 'name'),
     anchor: { lat: authored.frame.anchor.lat, lon: authored.frame.anchor.lon },
     license: 'ODbL-1.0',
-    attribution: (['osm', 'nyopendata'] as const).filter((s) => used.has(s)).map((s) => ATTRIBUTION[s]),
+    attribution: [
+      ...(['osm', 'nyopendata'] as const).filter((s) => used.has(s)).map((s) => ATTRIBUTION[s]),
+      ...(used.has('nyopendata') ? [OPEN_NY_NOTE] : []),
+    ],
     levels,
     platforms: platforms.sort(byId),
     slabs: slabs.sort(byId),
