@@ -49,13 +49,38 @@ interface Hop {
   fraction?: number
 }
 
+/**
+ * The part of a position that doesn't change between frames: which hop, its run time and its
+ * arrival. Built once per poll by `planHop`; `hopDistance` then evaluates it per frame without allocating.
+ */
+export interface HopPlan {
+  /** Stop indices (into geometry.stops) of the hop; equal when the train is at a stop. */
+  from: number
+  to: number
+  /** Predicted arrival at `to`; null when the fraction is fixed. */
+  arriveAt: number | null
+  /** Scheduled seconds for the hop. */
+  runS: number
+  /** Progress along the hop when it doesn't depend on time (dwelling, overdue at the next stop); else null. */
+  fixedFraction: number | null
+  /** Floor on the progress (INCOMING_AT trains are never shown early in the hop). */
+  minFraction: number
+  /** Seconds until the origin stop's predicted time when the train hasn't left it (not STOPPED_AT); else null. */
+  departsInS: number | null
+}
+
+export interface PlanFailure {
+  ok: false
+  reason: 'off-pattern' | 'no-arrival'
+}
+
 const clamp01 = (v: number): number => Math.min(Math.max(v, 0), 1)
 
 /** Picks the hop (previous stop → next stop) the train is on, or a fixed stop. */
-function chooseHop(input: PositionInput): Hop | PositionResult {
+function chooseHop(input: PositionInput): Hop | PlanFailure {
   const { geometry, status, stopId, arrivals, now } = input
   const stops = geometry.stops
-  // Linear scans per call are fine at ~340 trips; 8x4.7 can cache the hop per trip per poll if profiling asks.
+  // Linear scans per call are fine at ~340 trips and one call per poll.
   const arrivalAt = (stop: StopId): number | undefined => arrivals.find((a) => a[0] === stop)?.[1]
   const atOrigin = (tN: number): Hop => ({ from: 0, to: 0, arriveAt: null, departsInS: tN - now, fraction: 0 })
 
@@ -89,35 +114,61 @@ function chooseHop(input: PositionInput): Hop | PositionResult {
 }
 
 /**
+ * Chooses the hop and looks up its run time. Pass `input.now` as the time of the poll: the hop is
+ * frozen between polls, so a trip with no VehiclePosition does not advance to its next hop until
+ * the next poll (it waits at its next stop for at most one poll interval).
+ */
+export function planHop(input: PositionInput): HopPlan | PlanFailure {
+  const hop = chooseHop(input)
+  if ('ok' in hop) return hop
+  const { geometry, segments, status } = input
+  const { stops, stopDistances: D } = geometry
+  const runS =
+    segments[segmentKey(stops[hop.from]!, stops[hop.to]!)] ??
+    Math.max(MIN_RUN_S, (D[hop.to]! - D[hop.from]!) / FALLBACK_SPEED_MPS)
+  return {
+    from: hop.from,
+    to: hop.to,
+    arriveAt: hop.arriveAt,
+    runS,
+    fixedFraction: hop.fraction ?? null,
+    minFraction: hop.fraction === undefined && status === 'INCOMING_AT' ? INCOMING_MIN_FRACTION : 0,
+    departsInS: hop.departsInS,
+  }
+}
+
+/** Progress along the planned hop at `now`, 0..1. Pure arithmetic: runs per frame. */
+export function hopFraction(plan: HopPlan, now: number): number {
+  if (plan.fixedFraction !== null) return plan.fixedFraction
+  return Math.max(plan.minFraction, clamp01(1 - (plan.arriveAt! - now) / plan.runS))
+}
+
+/** Meters along the shape at `now`. No allocation: runs per frame. */
+export function hopDistance(plan: HopPlan, geometry: ShapeGeometry, now: number): number {
+  const D = geometry.stopDistances
+  return D[plan.from]! + hopFraction(plan, now) * (D[plan.to]! - D[plan.from]!)
+}
+
+/**
  * Where a train is along its shape: interpolated from the hop's scheduled run time and the
  * predicted arrival at its next stop. Overdue trains wait at the next platform, delayed or
  * dwelling ones hold at the previous stop. STOPPED_AT still interpolates toward the next stop,
  * because B-division feeds leave STOPPED_AT set after the train departs.
  */
 export function positionAlongShape(input: PositionInput): PositionResult {
-  const hop = chooseHop(input)
-  if ('ok' in hop) return hop
-  const { geometry, segments, now, status } = input
-  const { stops, stopDistances: D } = geometry
-
-  let fraction = hop.fraction
-  if (fraction === undefined) {
-    const run =
-      segments[segmentKey(stops[hop.from]!, stops[hop.to]!)] ??
-      Math.max(MIN_RUN_S, (D[hop.to]! - D[hop.from]!) / FALLBACK_SPEED_MPS)
-    fraction = clamp01(1 - (hop.arriveAt! - now) / run)
-    if (status === 'INCOMING_AT') fraction = Math.max(fraction, INCOMING_MIN_FRACTION)
-  }
-  const distance = D[hop.from]! + fraction * (D[hop.to]! - D[hop.from]!)
+  const plan = planHop(input)
+  if ('ok' in plan) return plan
+  const { geometry, now } = input
+  const distance = hopDistance(plan, geometry, now)
   const { point, heading } = pointAtDistance(geometry.line, distance)
   return {
     ok: true,
     distance,
     point,
     heading,
-    fromIndex: hop.from,
-    toIndex: hop.to,
-    fraction,
-    departsInS: hop.departsInS,
+    fromIndex: plan.from,
+    toIndex: plan.to,
+    fraction: hopFraction(plan, now),
+    departsInS: plan.departsInS,
   }
 }

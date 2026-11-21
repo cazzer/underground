@@ -39,10 +39,11 @@ function segmentHeading(line: Polyline, s: number): number | null {
 }
 
 /**
- * Ground point at `distance` along the line (clamped to [0, length]) and the heading of the segment there,
- * in radians clockwise from north (-z): 0 is north, PI/2 east. Unit vector: { x: sin h, z: -cos h }.
+ * Writes the ground point at `distance` along the line (clamped to [0, length]) into `out` and returns
+ * the heading of the segment there, in radians clockwise from north (-z): 0 is north, PI/2 east.
+ * Unit vector: { x: sin h, z: -cos h }. Does not allocate, so it can run per frame.
  */
-export function pointAtDistance(line: Polyline, distance: number): { point: Ground; heading: number } {
+export function pointAtDistanceInto(line: Polyline, distance: number, out: Ground): number {
   const first = line.points[0]
   if (!first) throw new Error('pointAtDistance: empty polyline')
   const d = Math.min(Math.max(distance, 0), line.length)
@@ -54,10 +55,23 @@ export function pointAtDistance(line: Polyline, distance: number): { point: Grou
 
   const a = line.points[s]!
   const b = line.points[s + 1]
-  if (!b) return { point: { x: a.x, z: a.z }, heading: heading ?? 0 }
-  const segLen = line.cumulative[s + 1]! - line.cumulative[s]!
-  const t = segLen > 0 ? (d - line.cumulative[s]!) / segLen : 0
-  return { point: { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }, heading: heading ?? 0 }
+  if (!b) {
+    out.x = a.x
+    out.z = a.z
+  } else {
+    const segLen = line.cumulative[s + 1]! - line.cumulative[s]!
+    const t = segLen > 0 ? (d - line.cumulative[s]!) / segLen : 0
+    out.x = a.x + (b.x - a.x) * t
+    out.z = a.z + (b.z - a.z) * t
+  }
+  return heading ?? 0
+}
+
+/** Ground point at `distance` along the line and the heading there; see `pointAtDistanceInto`. */
+export function pointAtDistance(line: Polyline, distance: number): { point: Ground; heading: number } {
+  const point = { x: 0, z: 0 }
+  const heading = pointAtDistanceInto(line, distance, point)
+  return { point, heading }
 }
 
 /** Stop scanning once the line is this far past a candidate that is already close to the point. */

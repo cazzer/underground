@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { expectDataFile, loadNetwork } from './loadNetwork'
+import { expectDataFile, expectDataRecord, loadNetwork } from './loadNetwork'
 
 const URL = '/underground/data/stations.json'
 
@@ -21,6 +21,19 @@ describe('expectDataFile', () => {
   it('throws when the key is not an array', () => {
     expect(() => expectDataFile({ feedVersion: 'v1', stations: {} }, 'stations', URL)).toThrow(URL)
     expect(() => expectDataFile({ feedVersion: 'v1', routes: [] }, 'stations', URL)).toThrow(URL)
+  })
+})
+
+describe('expectDataRecord', () => {
+  it('returns a file whose key holds an object', () => {
+    const raw = { feedVersion: 'v1', segments: { 'a>b': 30 } }
+    expect(expectDataRecord(raw, 'segments', URL)).toBe(raw)
+  })
+
+  it('throws, naming the url, for null, a missing key, an array, or a missing feedVersion', () => {
+    for (const raw of [null, { feedVersion: 'v1' }, { feedVersion: 'v1', segments: [] }, { feedVersion: 'v1', segments: null }, { segments: {} }]) {
+      expect(() => expectDataRecord(raw, 'segments', URL)).toThrow(`${URL}: not a segments file`)
+    }
   })
 })
 
@@ -52,7 +65,8 @@ describe('loadNetwork', () => {
 
   it('fetches the three files without the browser cache and builds the network', async () => {
     const fetch = stubFetch()
-    const network = await loadNetwork('/underground/', new AbortController().signal)
+    const { network, files } = await loadNetwork('/underground/', new AbortController().signal)
+    expect(files.shapes.shapes).toHaveLength(1)
     expect(network.stations.map((s) => s.id)).toEqual(['101'])
     expect(fetch.mock.calls.map(([url]) => url).sort()).toEqual([
       '/underground/data/routes.json',

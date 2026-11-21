@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Arrival, VehicleStatus } from '../../data/realtime'
 import { buildPolyline } from './polyline'
-import { positionAlongShape, type PositionResult } from './position'
+import { hopDistance, planHop, positionAlongShape, type PositionResult } from './position'
 import type { ShapeGeometry } from './shapeGeometry'
 
 const NOW = 1_795_228_554
@@ -127,5 +127,44 @@ describe('positionAlongShape failures and direction', () => {
     )
     expect(r.distance).toBeCloseTo(1500)
     expect(r.heading).toBeCloseTo(Math.PI)
+  })
+})
+
+describe('planHop and hopDistance', () => {
+  const cases: [string, VehicleStatus | null, string | null, Arrival[], { segments?: Record<string, number> }?][] = [
+    ['dwelling', 'STOPPED_AT', '102N', [['103N', NOW + 150]]],
+    ['status lag', 'STOPPED_AT', '102N', [['103N', NOW + 40]]],
+    ['terminal', 'STOPPED_AT', '103N', []],
+    ['in transit', 'IN_TRANSIT_TO', '103N', [['103N', NOW + 25]]],
+    ['overdue', 'IN_TRANSIT_TO', '103N', [['103N', NOW - 10]]],
+    ['far off', 'IN_TRANSIT_TO', '103N', [['103N', NOW + 500]]],
+    ['incoming floor', 'INCOMING_AT', '103N', [['103N', NOW + 80]]],
+    ['incoming late', 'INCOMING_AT', '103N', [['103N', NOW + 5]]],
+    ['unknown segment', 'IN_TRANSIT_TO', '102N', [['102N', NOW + 62.5]], { segments: {} }],
+    ['at origin', 'IN_TRANSIT_TO', '101N', [['101N', NOW + 90]]],
+    ['no status', null, null, [['101N', NOW - 30], ['102N', NOW + 50], ['103N', NOW + 150]]],
+    ['all past', null, null, [['102N', NOW - 60], ['103N', NOW - 20]]],
+  ]
+
+  it.each(cases)('%s: evaluating the plan matches positionAlongShape', (_name, status, stopId, arrivals, opts) => {
+    const input = { geometry: northbound, status, stopId, arrivals, segments: opts?.segments ?? SEGMENTS, now: NOW }
+    const plan = planHop(input)
+    if ('ok' in plan) throw new Error(`unexpected ${plan.reason}`)
+    expect(hopDistance(plan, northbound, NOW)).toBe(ok(positionAlongShape(input)).distance)
+  })
+
+  it('advances with time without re-planning', () => {
+    const arrivals: Arrival[] = [['103N', NOW + 50]]
+    const plan = planHop({ geometry: northbound, status: 'IN_TRANSIT_TO', stopId: '103N', arrivals, segments: SEGMENTS, now: NOW })
+    if ('ok' in plan) throw new Error('unexpected failure')
+    expect(hopDistance(plan, northbound, NOW)).toBeCloseTo(1500)
+    expect(hopDistance(plan, northbound, NOW + 25)).toBeCloseTo(1750)
+    expect(hopDistance(plan, northbound, NOW + 80)).toBeCloseTo(2000)
+  })
+
+  it('passes failure reasons through', () => {
+    const base = { geometry: northbound, segments: SEGMENTS, now: NOW }
+    expect(planHop({ ...base, status: 'IN_TRANSIT_TO', stopId: 'Z99N', arrivals: [] })).toEqual({ ok: false, reason: 'off-pattern' })
+    expect(planHop({ ...base, status: 'IN_TRANSIT_TO', stopId: '103N', arrivals: [] })).toEqual({ ok: false, reason: 'no-arrival' })
   })
 })

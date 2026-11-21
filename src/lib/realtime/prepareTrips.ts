@@ -2,7 +2,7 @@ import { FEED_IDS, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from 
 import type { ShapeId } from '../../data/schema'
 import { GHOST, ghostReason, type GhostReason } from './filters'
 import { joinTrip, type JoinResult, type JoinStage } from './joinTrip'
-import { positionAlongShape, type PositionResult } from './position'
+import { planHop, type HopPlan, type PlanFailure } from './position'
 import type { ShapeGeometry } from './shapeGeometry'
 import type { TripLookup } from './tripLookup'
 
@@ -20,6 +20,8 @@ export interface LiveTrip {
   shapeId: ShapeId
   stage: JoinStage
   geometry: ShapeGeometry
+  /** The hop as of this poll; evaluate it per frame with `hopDistance`. */
+  plan: HopPlan
 }
 
 export interface PreparedTrips {
@@ -28,7 +30,7 @@ export interface PreparedTrips {
 }
 
 type JoinFailure = Extract<JoinResult, { matched: false }>['reason']
-type PositionFailure = Extract<PositionResult, { ok: false }>['reason']
+type PositionFailure = PlanFailure['reason']
 
 /** Every reason a trip can be dropped. The type is derived from this list, and `satisfies` keeps it to known reasons. */
 const DROP_REASONS = [
@@ -46,7 +48,7 @@ export type DropReason = (typeof DROP_REASONS)[number]
 
 /**
  * Once per poll: drops ghosts, joins each remaining trip to a shape, and drops what can't be placed.
- * Every drop is counted by reason. The caller then runs positionAlongShape per frame on `trips`.
+ * Every drop is counted by reason. The caller then runs hopDistance per frame on each trip's plan.
  */
 export function prepareTrips(snapshot: RealtimeSnapshot, data: StaticRealtimeData, now: number): PreparedTrips {
   const dropped = Object.fromEntries(DROP_REASONS.map((r) => [r, 0])) as Record<DropReason, number>
@@ -67,7 +69,7 @@ export function prepareTrips(snapshot: RealtimeSnapshot, data: StaticRealtimeDat
       const geometry = data.geometries.get(join.shapeId)
       if (!geometry) throw new Error(`no geometry for joined shape ${join.shapeId}`)
 
-      const pos = positionAlongShape({
+      const plan = planHop({
         geometry,
         status: trip.status,
         stopId: trip.stopId,
@@ -75,15 +77,15 @@ export function prepareTrips(snapshot: RealtimeSnapshot, data: StaticRealtimeDat
         segments: data.segments,
         now,
       })
-      if (!pos.ok) {
-        dropped[pos.reason]++
+      if ('ok' in plan) {
+        dropped[plan.reason]++
         continue
       }
-      if (pos.departsInS !== null && pos.departsInS > GHOST.notDepartedS) {
+      if (plan.departsInS !== null && plan.departsInS > GHOST.notDepartedS) {
         dropped['not-departed']++
         continue
       }
-      trips.push({ key: `${feed}:${trip.tripId}`, feed, trip, shapeId: join.shapeId, stage: join.stage, geometry })
+      trips.push({ key: `${feed}:${trip.tripId}`, feed, trip, shapeId: join.shapeId, stage: join.stage, geometry, plan })
     }
   }
   return { trips, dropped }

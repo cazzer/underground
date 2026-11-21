@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPolyline, pointAtDistance, projectForward } from './polyline'
+import { buildPolyline, pointAtDistance, pointAtDistanceInto, projectForward } from './polyline'
 
 const north = buildPolyline([{ x: 0, z: 0 }, { x: 0, z: -1000 }, { x: 0, z: -2000 }])
 
@@ -50,5 +50,21 @@ describe('projectForward', () => {
   it('breaks ties toward the earliest segment', () => {
     const bend = buildPolyline([{ x: 0, z: 0 }, { x: 0, z: -100 }, { x: 10, z: -100 }])
     expect(projectForward(bend, { x: 0, z: -100 }, { segment: 0, t: 0 }).segment).toBe(0)
+  })
+})
+
+describe('pointAtDistanceInto', () => {
+  it('matches pointAtDistance and writes into the object it is given', () => {
+    const bend = buildPolyline([{ x: 0, z: 0 }, { x: 0, z: -1000 }, { x: 600, z: -1000 }])
+    const out = { x: 99, z: 99 }
+    for (const d of [-5, 0, 400, 1000, 1300, 1600, 9999]) {
+      const heading = pointAtDistanceInto(bend, d, out)
+      const expected = pointAtDistance(bend, d)
+      expect(out).toEqual(expected.point)
+      expect(heading).toBe(expected.heading)
+    }
+  })
+  it('throws on an empty polyline', () => {
+    expect(() => pointAtDistanceInto(buildPolyline([]), 0, { x: 0, z: 0 })).toThrow('empty polyline')
   })
 })

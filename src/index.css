@@ -8,6 +8,9 @@
   --color-panel: var(--ug-panel);
   --color-edge: var(--ug-panel-border);
   --color-focus: var(--ug-focus);
+  --color-status-live: var(--ug-status-live);
+  --color-status-warn: var(--ug-status-warn);
+  --color-status-error: var(--ug-status-error);
   --font-sans: var(--ug-font-sans);
   --font-mono: var(--ug-font-mono);
 }

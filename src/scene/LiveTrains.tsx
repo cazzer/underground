@@ -1,0 +1,149 @@
+import { useFrame } from '@react-three/fiber'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { CircleGeometry, Color, DynamicDrawUsage, type InstancedMesh } from 'three'
+import type { LiveLayer } from '../data/useLive'
+import { clockNow } from '../lib/live/clock'
+import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, TRAIN_CAPACITY } from '../lib/live/slots'
+import { trainRouteId } from '../lib/live/trainRoute'
+import { writeInstanceMatrix } from '../lib/markerMatrices'
+import type { Network } from '../lib/network'
+import { hopDistance } from '../lib/realtime/position'
+import { pointAtDistanceInto } from '../lib/realtime/polyline'
+import { routeLineColor } from '../lib/routeColor'
+import { smoothDistance } from '../lib/realtime/smoothing'
+import { theme } from '../theme'
+import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
+import { RENDER_ORDER } from './renderOrder'
+
+/** Dot radius relative to station markers, so dots never outsize stations at the overview. */
+const DOT_TO_MARKER = 0.5
+const DOT_MIN_METERS = 2.5
+/** The background-colored disc behind each dot, as a multiple of the dot's radius, so a dot stays visible on its own line. */
+const HALO_RATIO = 1.5
+const DOT_Y = 0.5
+const SEGMENTS = 16
+
+interface LiveTrainsProps extends LiveLayer {
+  network: Network
+}
+
+/**
+ * One instanced dot per live trip, plus a background-colored halo behind it. Slots are stable per
+ * trip, so a dot keeps its color and smoothed position across polls; each frame evaluates the
+ * poll's hop plan at the live clock and writes matrices without allocating.
+ */
+export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProps) {
+  const dots = useRef<InstancedMesh>(null)
+  const halo = useRef<InstancedMesh>(null)
+  const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
+  const point = useMemo(() => ({ x: 0, z: 0 }), [])
+  const geometry = useMemo(
+    () => ({
+      dot: new CircleGeometry(1, SEGMENTS).rotateX(-Math.PI / 2),
+      halo: new CircleGeometry(HALO_RATIO, SEGMENTS).rotateX(-Math.PI / 2),
+    }),
+    [],
+  )
+  const colors = useMemo(
+    () => ({
+      byRoute: new Map(
+        network.routes.map((r) => [r.id, new Color(routeLineColor(r.color, theme.routeLineMix, theme.background))]),
+      ),
+      fallback: new Color(theme.train),
+    }),
+    [network],
+  )
+
+  useEffect(
+    () => () => {
+      geometry.dot.dispose()
+      geometry.halo.dispose()
+    },
+    [geometry],
+  )
+
+  const colorSlot = useCallback(
+    (d: InstancedMesh, i: number) => {
+      const trip = table.trips[i]
+      const routeId = trip ? trainRouteId(trip, network.routeById, patterns) : null
+      d.setColorAt(i, (routeId !== null && colors.byRoute.get(routeId)) || colors.fallback)
+    },
+    [table, network, patterns, colors],
+  )
+
+  // Instance colors must exist before the first frame, or the shader compiles without them.
+  // Every slot is colored from the table, so a remount (StrictMode) restores the colors it resets.
+  useLayoutEffect(() => {
+    const d = dots.current
+    const h = halo.current
+    if (!d || !h) return
+    d.instanceMatrix.setUsage(DynamicDrawUsage)
+    h.instanceMatrix.setUsage(DynamicDrawUsage)
+    for (let i = 0; i < TRAIN_CAPACITY; i++) colorSlot(d, i)
+    d.instanceColor!.needsUpdate = true
+    d.count = h.count = 0
+  }, [colorSlot])
+
+  useLayoutEffect(() => {
+    const d = dots.current
+    if (!d) return
+    const { needsColor, overflow } = reconcileSlots(table, trips, performance.now() / 1000)
+    for (const i of needsColor) colorSlot(d, i)
+    if (needsColor.length > 0) d.instanceColor!.needsUpdate = true
+    if (overflow > 0) console.warn(`Live trains: ${overflow} trips over the ${TRAIN_CAPACITY}-slot capacity are not drawn`)
+  }, [trips, table, colorSlot])
+
+  useFrame((state, dt) => {
+    const d = dots.current
+    const h = halo.current
+    if (!d || !h) return
+    const perfMs = performance.now()
+    const now = clockNow(offsetS, perfMs)
+    const localS = perfMs / 1000
+    const camera = cameraDistance(state)
+    const scale = screenScale(camera, markerRadiusPx(camera) * DOT_TO_MARKER, DOT_MIN_METERS)
+    const out = d.instanceMatrix.array as Float32Array
+
+    for (let i = 0; i < table.high; i++) {
+      const trip = table.trips[i]
+      if (!trip) continue
+      const prev = table.displayed[i]!
+      const shown = smoothDistance(Number.isNaN(prev) ? null : prev, hopDistance(trip.plan, trip.geometry, now), dt)
+      table.displayed[i] = shown
+      pointAtDistanceInto(trip.geometry.line, shown, point)
+      const k = slotScale(table, i, localS, FADE_S)
+      if (k === 0 && isLeaving(table, i)) {
+        writeInstanceMatrix(out, i, 0, 0, 0, 0)
+        freeSlot(table, i)
+      } else {
+        writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k)
+      }
+    }
+    h.instanceMatrix.array.set(out)
+    d.count = h.count = table.high
+    d.instanceMatrix.needsUpdate = true
+    h.instanceMatrix.needsUpdate = true
+  })
+
+  return (
+    <>
+      <instancedMesh
+        ref={halo}
+        args={[geometry.halo, undefined, TRAIN_CAPACITY]}
+        frustumCulled={false}
+        renderOrder={RENDER_ORDER.trainHalo}
+      >
+        <meshBasicMaterial color={theme.background} transparent depthTest={false} depthWrite={false} />
+      </instancedMesh>
+      <instancedMesh
+        ref={dots}
+        args={[geometry.dot, undefined, TRAIN_CAPACITY]}
+        frustumCulled={false}
+        renderOrder={RENDER_ORDER.trains}
+      >
+        {/* Default white material: the per-instance colors are the dot colors. */}
+        <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
+      </instancedMesh>
+    </>
+  )
+}
