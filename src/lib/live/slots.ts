@@ -38,7 +38,7 @@ export interface SlotTable {
   leavingSince: Float64Array
   /** Smoothed distance along the shape; NaN means "no value yet" (the next frame takes the target). */
   displayed: Float64Array
-  /** A glide closes `glideE0` meters over `glideT` seconds of the live clock starting at `glideAt`; glideT NaN means none. */
+  /** A glide closes `glideE0` meters (eased) over `glideT` seconds of the live clock from `glideAt`; glideT NaN means none. */
   glideE0: Float64Array
   glideAt: Float64Array
   glideT: Float64Array
@@ -92,7 +92,8 @@ export interface ReconcileOptions {
 function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o: ReconcileOptions): void {
   const fadeS = o.fadeS ?? FADE_S
   const { plan, geometry } = trip
-  const glideLeftS = t.glideAt[slot]! + t.glideT[slot]! - o.dataNow
+  const runningT = t.glideT[slot]!
+  const glideLeftS = t.glideAt[slot]! + runningT - o.dataNow
   t.glideT[slot] = NaN
   let shown = t.displayed[slot]!
   if (Number.isNaN(shown)) {
@@ -125,6 +126,10 @@ function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o:
   if (c.kind === 'crossfade') {
     t.phase[slot] = SHRINK
     t.phaseAt[slot] = nowS
+  } else if (c.kind === 'glide' && c.durationS === glideLeftS) {
+    // Continue the running glide on its own curve, rescaled so it starts from the new gap: no restart from rest.
+    t.glideT[slot] = runningT
+    t.glideE0[slot] = (target - shown) / (1 - smoothstep((o.dataNow - t.glideAt[slot]!) / runningT))
   } else if (c.kind === 'glide') {
     t.glideE0[slot] = target - shown
     t.glideAt[slot] = o.dataNow
@@ -226,7 +231,8 @@ export function stepSlot(t: SlotTable, i: number, target: number, dataNow: numbe
       t.glideT[i] = NaN
       shown = smoothDistance(prev, target, dtS, FRAME_SMOOTHING)
     } else {
-      shown = Math.max(prev, target - t.glideE0[i]! * (1 - u))
+      // Smoothstep on the closed share: the catch-up speeds up from and settles back to the train's own speed.
+      shown = Math.max(prev, target - t.glideE0[i]! * (1 - smoothstep(u)))
     }
   } else shown = smoothDistance(prev, target, dtS, FRAME_SMOOTHING)
   t.displayed[i] = shown

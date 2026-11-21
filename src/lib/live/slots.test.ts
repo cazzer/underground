@@ -158,7 +158,7 @@ describe('corrections', () => {
       maxStep = Math.max(maxStep, shown - prev)
       prev = shown
     }
-    expect(maxStep / DT).toBeLessThanOrEqual(GLIDE_CATCHUP_MPS + 10 + 1) // the train's own 10 m/s plus the catch-up
+    expect(maxStep / DT).toBeLessThanOrEqual(1.5 * GLIDE_CATCHUP_MPS + 10 + 1) // the train's 10 m/s plus the eased peak
     expect(dist(1006) - prev).toBeLessThan(10)
   })
 

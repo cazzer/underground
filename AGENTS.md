@@ -216,9 +216,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `liveStatus.ts` `deriveLiveStatus` for the HUD (off/connecting/live/stale/error; one failed poll with
     a snapshot is not shown, two show a delay while trains stay drawn; technical text never appears)
   - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
-    poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, a glide sized
-    from the gap at 60 m/s catch-up within 3-10 s that a new poll continues rather than restarts, or cross-fade past
-    1200 m; reduced motion cross-fades). On a shape change the dot's ground point is
+    poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, a smoothstep-eased
+    glide sized from the gap at 60 m/s catch-up within 3-10 s that a new poll continues on its curve rather than
+    restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change the dot's ground point is
     projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
   - `trackPoint.ts` `trackPointInto`: a train's drawn point at a distance, on its route's band as the band line
@@ -251,8 +251,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
     first `dwellFor(runS)` (30 s, at most 35% of the hop) of every hop is held at its origin stop: the train
     leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status. The predicted arrival is
-    capped by the schedule from the trip's last stop (`stopVisit.ts`): MTA final-approach predictions run about 40 s
-    late
+    capped by the schedule from the trip's last stop plus `SCHEDULE_CAP_SLACK_S` (6 s) (`stopVisit.ts`): MTA
+    final-approach predictions run about 40 s late
   - `stopVisit.ts` `nextVisit`: the last stop a train was seen at (STOPPED_AT time, and when it was last seen there
     on the 1234567 and L feeds, whose STOPPED_AT ends on departure), carried across polls
   - `smoothing.ts` smoothDistance: per-frame ease that never goes backward

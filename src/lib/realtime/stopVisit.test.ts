@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Arrival, RealtimeTrip, VehicleStatus } from '../../data/realtime'
 import { buildPolyline } from './polyline'
-import { planHop, type HopPlan } from './position'
+import { planHop, SCHEDULE_CAP_SLACK_S as SLACK, type HopPlan } from './position'
 import type { ShapeGeometry } from './shapeGeometry'
 import { nextVisit, type StopVisit } from './stopVisit'
 import { EMPTY_PROFILE } from '../trackProfile'
@@ -68,8 +68,8 @@ describe('planHop caps a late prediction with the schedule from the last stop', 
   const arrived = (arrivedAt: number, seenAt = arrivedAt): StopVisit => ({ stopId: '102N', arrivedAt, seenAt })
 
   it('takes the arrival at the last stop plus the run when that is sooner than the prediction', () => {
-    // At 102N since NOW - 60, so due at 103N at NOW + 40; the feed says NOW + 80.
-    expect(plan('IN_TRANSIT_TO', '103N', [['103N', NOW + 80]], arrived(NOW - 60)).arriveAt).toBe(NOW + 40)
+    // At 102N since NOW - 60, so due at 103N at NOW + 40 (plus the slack); the feed says NOW + 80.
+    expect(plan('IN_TRANSIT_TO', '103N', [['103N', NOW + 80]], arrived(NOW - 60)).arriveAt).toBe(NOW + 40 + SLACK)
   })
 
   it('keeps the prediction when it is the sooner', () => {
@@ -78,7 +78,7 @@ describe('planHop caps a late prediction with the schedule from the last stop', 
 
   it('never has a train that overstayed its dwell arrive sooner than its run from when it was last seen', () => {
     // Arrived at NOW - 60 but still at the platform at NOW - 10: it can't be at 103N before NOW - 10 + 70.
-    expect(plan('STOPPED_AT', '102N', [['103N', NOW + 120]], arrived(NOW - 60, NOW - 10)).arriveAt).toBe(NOW + 60)
+    expect(plan('STOPPED_AT', '102N', [['103N', NOW + 120]], arrived(NOW - 60, NOW - 10)).arriveAt).toBe(NOW + 60 + SLACK)
   })
 
   it('ignores a visit to any stop but the one the hop leaves', () => {

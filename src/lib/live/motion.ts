@@ -20,8 +20,13 @@ export const GLIDE_CATCHUP_MPS = 60
 export const GLIDE_MIN_S = 3
 /** Longest glide. Well under the 20 s poll, so a glide usually ends before the next plan. */
 export const GLIDE_MAX_S = 10
-/** A forward gap beyond this cross-fades instead (it would close at more than 120 m/s). */
+/** A forward gap beyond this cross-fades instead (it would close at more than 120 m/s on average). */
 export const GLIDE_MAX_M = 1200
+/**
+ * A running glide continues (keeps its end, rescaled to the new gap) while the rest of it needs no more than
+ * this average closing speed: the eased glide's own peak, 1.5x its average. Faster than that, it starts over.
+ */
+export const GLIDE_CONTINUE_MPS = 1.5 * GLIDE_CATCHUP_MPS
 
 export type Correction = { kind: 'none' } | { kind: 'glide'; durationS: number } | { kind: 'crossfade' }
 
@@ -47,6 +52,7 @@ export function decideCorrection(i: CorrectionInput): Correction {
   if (i.errM < -HOLD_BACK_M || (i.fixedPlan && i.errM < -EASE_MAX_M)) return CROSSFADE
   if (i.errM <= EASE_MAX_M) return NONE
   if (i.reducedMotion || i.errM > GLIDE_MAX_M) return CROSSFADE
-  // A running glide continues toward the new target: it keeps its end unless the new gap needs longer.
-  return { kind: 'glide', durationS: Math.max(glideDurationFor(i.errM), i.glideLeftS ?? 0) }
+  // A running glide continues toward the new target, keeping its end, unless the new gap needs it to rush.
+  const continues = i.glideLeftS !== null && i.errM / i.glideLeftS <= GLIDE_CONTINUE_MPS
+  return { kind: 'glide', durationS: continues ? i.glideLeftS! : glideDurationFor(i.errM) }
 }

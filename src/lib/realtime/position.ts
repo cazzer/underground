@@ -17,6 +17,13 @@ export const DWELL_S = 30
 /** A short hop never spends more than this share of its run time dwelling. */
 export const DWELL_MAX_SHARE = 0.35
 
+/**
+ * Added to the schedule bound on an arrival (see `scheduledCap`). Trains run a median 6 s slower than the
+ * scheduled segment between consecutive STOPPED_ATs (replay of 32 polls, underground-d80), and a dot that sits
+ * in a station its train hasn't reached reads as more wrong than a few seconds of lag.
+ */
+export const SCHEDULE_CAP_SLACK_S = 6
+
 /** Seconds of a `runS` hop spent held at the origin stop before the train moves. */
 export const dwellFor = (runS: number): number => Math.min(DWELL_S, DWELL_MAX_SHARE * runS)
 
@@ -136,12 +143,12 @@ function chooseHop(input: PositionInput): Hop | PlanFailure {
 
 /**
  * The predicted arrival, capped by the schedule from the stop the train was last seen at: no later than its
- * arrival there plus the run (arrival to arrival), nor than when it was last there plus the run less the dwell.
- * The later of those two bounds wins, so a train that overstays its dwell isn't shown leaving early.
+ * arrival there plus the run (arrival to arrival), nor than when it was last there plus the run less the dwell,
+ * plus a slack. The later of those two bounds wins, so a train that overstays its dwell isn't shown leaving early.
  */
 function scheduledCap(hop: Hop, stops: readonly StopId[], runS: number, dwellS: number, visit: StopVisit | null): number | null {
   if (hop.arriveAt === null || hop.from === hop.to || visit === null || stops[hop.from] !== visit.stopId) return hop.arriveAt
-  return Math.min(hop.arriveAt, Math.max(visit.arrivedAt + runS, visit.seenAt + runS - dwellS))
+  return Math.min(hop.arriveAt, Math.max(visit.arrivedAt + runS, visit.seenAt + runS - dwellS) + SCHEDULE_CAP_SLACK_S)
 }
 
 /**

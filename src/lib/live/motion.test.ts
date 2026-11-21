@@ -3,6 +3,7 @@ import {
   decideCorrection,
   EASE_MAX_M,
   GLIDE_CATCHUP_MPS,
+  GLIDE_CONTINUE_MPS,
   GLIDE_MAX_M,
   GLIDE_MAX_S,
   GLIDE_MIN_S,
@@ -38,8 +39,9 @@ describe('decideCorrection', () => {
     expect(decide({ errM: 300, fixedPlan: true })).toEqual({ kind: 'glide', durationS: 300 / GLIDE_CATCHUP_MPS })
   })
 
-  it('continues a running glide: it keeps its end unless the new gap needs longer', () => {
+  it('continues a running glide: it keeps its end unless the rest would close faster than an eased glide peaks', () => {
     expect(decide({ errM: 300, glideLeftS: 8 })).toEqual({ kind: 'glide', durationS: 8 })
+    expect(decide({ errM: GLIDE_CONTINUE_MPS * 4, glideLeftS: 4 })).toEqual({ kind: 'glide', durationS: 4 })
     expect(decide({ errM: 300, glideLeftS: 1 })).toEqual({ kind: 'glide', durationS: 300 / GLIDE_CATCHUP_MPS })
   })
 
