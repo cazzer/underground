@@ -88,7 +88,9 @@ describe('BAND_GLSL', () => {
   })
 
   it('agrees with bandShift over random views, points, miters, slots and half-widths', () => {
-    // Normalized, so a rotation-only modelViewMatrix (an identity world matrix, as the route lines have) is assumed.
+    // The route lines' world matrix is a y scale only (the depth factor, tilt.ts), so modelViewMatrix is the view
+    // times scale(1, depth, 1): ground directions (y = 0) keep their length, and the port's normalizing
+    // transformDirection matches the shader's mat3 product. bandShift takes the point at its drawn height, y * depth.
     const rand = random(7)
     for (let trial = 0; trial < 300; trial++) {
       const height = 400 + rand() * 800
@@ -108,17 +110,20 @@ describe('BAND_GLSL', () => {
       cam.updateMatrixWorld()
       // Half the trials mid ease-in.
       const ease = trial % 2 === 0 ? 1 : rand()
-      const view = writeBandView(createBandView(), cam.matrixWorldInverse.elements, cam.projectionMatrix.elements[5]!, height, distance, 2.5, 4.7, ease)
+      // A third of the trials flat-ish or mid-tilt (the depth factor), the rest at full depth.
+      const depth = trial % 3 === 0 ? 1 : trial % 3 === 1 ? 1e-3 + rand() * 0.2 : rand()
+      const view = writeBandView(createBandView(), cam.matrixWorldInverse.elements, cam.projectionMatrix.elements[5]!, height, distance, 2.5, 4.7, ease, depth)
+      const modelView = cam.matrixWorldInverse.clone().multiply(new Matrix4().makeScale(1, depth, 1))
       const heading = rand() * 2 * Math.PI
       const miter = 1 + rand()
       const b: [number, number, number, number] = [Math.cos(heading) * miter, Math.sin(heading) * miter, Math.round((rand() - 0.5) * 12) / 2, Math.round(rand() * 6) / 2]
       const p = target.clone().add(new Vector3((rand() - 0.5) * distance * 0.3, -rand() * 20, (rand() - 0.5) * distance * 0.3))
       const glsl = glslBandShift(
-        { modelView: cam.matrixWorldInverse, projection: cam.projectionMatrix, resolutionY: height, bandPitchPx: view.pitchPx, bandEase: ease, trackOffsetM: 4.7 },
+        { modelView, projection: cam.projectionMatrix, resolutionY: height, bandPitchPx: view.pitchPx, bandEase: ease, trackOffsetM: 4.7 },
         p,
         b,
       )
-      const s = bandShift(view, p.x, p.y, p.z, b[0], b[1], b[2], b[3])
+      const s = bandShift(view, p.x, p.y * view.depth, p.z, b[0], b[1], b[2], b[3])
       const ts = new Vector3(b[0] / miter, 0, b[1] / miter).multiplyScalar(s).add(p)
       expect(glsl.distanceTo(ts)).toBeLessThan(1e-6 * Math.max(1, Math.abs(s)))
     }

@@ -63,8 +63,8 @@ export function SubwayLines({ network, paths, interiorStationId, view }: SubwayL
   return (
     <>
       {lines && <primitive object={lines} />}
-      {linesMode === 'a' && <LineHighlight network={network} paths={paths} interiorStationId={interiorStationId} view={view} />}
-      {linesMode === 'c' && <LineFade network={network} paths={paths} interiorStationId={interiorStationId} view={view} />}
+      {linesMode === 'a' && <LineHighlight network={network} paths={paths} interiorStationId={interiorStationId} />}
+      {linesMode === 'c' && <LineFade network={network} paths={paths} interiorStationId={interiorStationId} />}
     </>
   )
 }

@@ -45,7 +45,8 @@ export function depthFactor(distance: number, opts: TiltOptions = DEFAULT_TILT):
 
 /**
  * The smallest y scale an object is drawn at, so a flat (depth 0) object never has a singular matrix. A track
- * 20 m down sits 2 cm off the street at it, which no view can show.
+ * 20 m down sits 2 cm off the street at it, which no view can show. Trains and picks use the raw depth
+ * (BandView.depth), so near depth 0 they sit up to 2 cm above the floored lines: a known, invisible mismatch.
  */
 export const DEPTH_FLOOR = 1e-3
 

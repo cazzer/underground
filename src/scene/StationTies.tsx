@@ -12,6 +12,14 @@ import { cameraDistance } from './cameraDistance'
 import { MARKER_Y } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
+/**
+ * Ties fade in from TIE_FROM_DEPTH of the depth factor, fully shown TIE_RAMP later: below that a tie is shorter on
+ * screen than the ring radius, a stray tick under the ring rather than a connection.
+ */
+const TIE_FROM_DEPTH = 0.3
+const TIE_RAMP = 0.3
+const tieOpacity = (depth: number): number => Math.min(Math.max((depth - TIE_FROM_DEPTH) / TIE_RAMP, 0), 1)
+
 interface StationTiesProps {
   network: Network
 }
@@ -21,8 +29,8 @@ interface StationTiesProps {
  * tracks descend to a station depth (network.stationTrackY), so a tilted view shows which sunken line the
  * marker belongs to. It drops straight down from the GTFS station point, which sits between the tracks: right
  * for island platforms, roughly right for side platforms. One merged LineSegments2 drawn at the depth factor
- * (tilt.ts): scale.y follows it as the lines' does, so each tie ends on its sunken track, and so does the opacity,
- * so a flat (top-down) view, where the tie would be a stray tick under the ring, shows none.
+ * (tilt.ts): scale.y follows it as the lines' does, so each tie ends on its sunken track; the opacity ramps in
+ * once the tie is long enough to read (tieOpacity).
  * The focused station draws no marker, so its tie is left out too (swapped to the end and not drawn).
  */
 export function StationTies({ network }: StationTiesProps) {
@@ -78,9 +86,10 @@ export function StationTies({ network }: StationTiesProps) {
     const depth = depthFactor(cameraDistance(state))
     if (depth === lastDepth.current) return
     lastDepth.current = depth
-    lines.visible = depth > 0
+    const opacity = tieOpacity(depth)
+    lines.visible = opacity > 0
     lines.scale.y = depthScaleY(depth)
-    lines.material.opacity = depth
+    lines.material.opacity = opacity
   })
 
   return lines && <primitive object={lines} />
