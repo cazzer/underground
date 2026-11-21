@@ -3,20 +3,15 @@ import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { routeChipLabel, scheduleLabel } from '../lib/labels'
+import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import type { Network, Route } from '../lib/network'
 import { routeLineColor } from '../lib/routeColor'
 import { theme } from '../theme'
+import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
 import { LiveStatus } from './LiveStatus'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
-
-/** Placeholder rows until real arrivals exist. */
-const PLACEHOLDER_ARRIVALS = [
-  { line: 'L1', destination: 'Houston St', minutes: 2 },
-  { line: 'L2', destination: 'Union Sq', minutes: 5 },
-  { line: 'L1', destination: 'Battery Park', minutes: 9 },
-]
 
 interface RouteChipProps {
   route: Route
@@ -41,12 +36,14 @@ function RouteChip({ route }: RouteChipProps) {
 interface ArrivalsPanelProps {
   network: Network
   stationId: string
+  live: LiveStatusValue
+  arrivals: ArrivalsSource | null
   onClose: () => void
   interior: InteriorStatusInfo
   ref: Ref<HTMLElement>
 }
 
-function ArrivalsPanel({ network, stationId, onClose, interior, ref }: ArrivalsPanelProps) {
+function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, ref }: ArrivalsPanelProps) {
   const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   return (
@@ -74,17 +71,7 @@ function ArrivalsPanel({ network, stationId, onClose, interior, ref }: ArrivalsP
         })}
       </ul>
       <InteriorStatus info={interior} />
-      <p className="mt-3 text-xs uppercase tracking-widest text-ink-dim">Arrivals (placeholder)</p>
-      <ul className="mt-1 divide-y divide-edge/30 text-sm">
-        {PLACEHOLDER_ARRIVALS.map((a) => (
-          <li key={`${a.line}-${a.destination}`} className="flex justify-between py-1.5">
-            <span>
-              {a.line} <span className="text-ink-dim">to</span> {a.destination}
-            </span>
-            <span className="font-mono">{a.minutes} min</span>
-          </li>
-        ))}
-      </ul>
+      <ArrivalsList network={network} station={station} source={arrivals} status={live} />
     </aside>
   )
 }
@@ -93,6 +80,8 @@ interface HudProps {
   network: Network
   /** Live-trains state, shown under the schedule line. */
   live: LiveStatusValue
+  /** What the station panel lists arrivals from. */
+  arrivals: ArrivalsSource | null
   /** Reports the screen bands the header and footer cover. */
   onInsets: (insets: Insets) => void
   /** The focused station's interior load and reveal, shown in its panel. */
@@ -101,7 +90,7 @@ interface HudProps {
   onPanel: (rect: ScreenRect | null) => void
 }
 
-export function Hud({ network, live, onInsets, interior, onPanel }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, onPanel }: HudProps) {
   const { focusedId, dismiss } = useFocus()
   const root = useRef<HTMLDivElement>(null)
   const header = useRef<HTMLElement>(null)
@@ -163,6 +152,8 @@ export function Hud({ network, live, onInsets, interior, onPanel }: HudProps) {
           <ArrivalsPanel
             network={network}
             stationId={focusedId}
+            live={live}
+            arrivals={arrivals}
             onClose={dismiss}
             interior={interior}
             ref={panel}

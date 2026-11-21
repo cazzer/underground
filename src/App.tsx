@@ -47,6 +47,7 @@ function MapView({ network, live }: MapViewProps) {
         <Hud
           network={network}
           live={live.status}
+          arrivals={live.arrivals}
           onInsets={setInsets}
           onPanel={setPanel}
           interior={{ load: interior.load, revealed: interiorRevealed, onRetry: interior.retry }}

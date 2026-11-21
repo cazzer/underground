@@ -1,6 +1,6 @@
 /** public/data → render model: projected stations, routes, and shape paths. Pure. */
 import { decodeShapePoints } from '../data/codec'
-import type { Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile } from '../data/schema'
+import type { Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
 import { boundsCenter } from './framing'
 import { toGround, type Ground } from './projection'
 
@@ -10,6 +10,8 @@ export interface Station {
   pos: Ground
   /** In route_sort_order. */
   routeIds: readonly RouteId[]
+  /** Child stop ids (one per platform direction), sorted. */
+  stops: readonly StopId[]
 }
 
 export interface Route {
@@ -87,7 +89,7 @@ export function buildNetwork(stationsFile: StationsFile, routesFile: RoutesFile,
   const stations = stationsFile.stations.map((s): Station => {
     const pos = toGround(s)
     extend(bounds, pos)
-    return { id: s.id, name: s.name, pos, routeIds: s.routes }
+    return { id: s.id, name: s.name, pos, routeIds: s.routes, stops: s.stops }
   })
 
   const shapes = shapesFile.shapes.map((s): ShapePath => {

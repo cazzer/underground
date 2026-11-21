@@ -1,0 +1,103 @@
+import { FEED_IDS, type RealtimeSnapshot } from '../../data/realtime'
+import type { Direction, RouteId, StationId, StopId } from '../../data/schema'
+import { ghostReason } from '../realtime/filters'
+import { joinTrip } from '../realtime/joinTrip'
+import type { TripLookup } from '../realtime/tripLookup'
+import { trainRouteId } from './trainRoute'
+
+/** Arrivals further out than this are not listed. */
+export const ARRIVAL_WINDOW_S = 1800
+/** Times listed per route, direction and destination. */
+export const MAX_TIMES_PER_GROUP = 3
+/** A train this far past its predicted time is still at the platform: "Now", not gone. */
+export const PAST_GRACE_S = 30
+/** Under this many seconds away reads "Now". */
+export const NOW_UNDER_S = 30
+
+export interface ArrivalGroup {
+  routeId: RouteId
+  direction: Direction
+  /** Name of the trip's last stop. */
+  headsign: string
+  /** Predicted epoch seconds at this station, ascending; at most MAX_TIMES_PER_GROUP. */
+  times: number[]
+}
+
+/** What the station panel reads arrivals from: the latest snapshot, the clock to evaluate it on, and the join data. */
+export interface ArrivalsSource {
+  snapshot: RealtimeSnapshot
+  offsetS: number
+  lookup: TripLookup
+}
+
+export interface ArrivalOptions {
+  lookup: TripLookup
+  routeById: ReadonlyMap<RouteId, unknown>
+  /** Parent station id to its name. */
+  stationName: (id: StationId) => string | undefined
+}
+
+/** Child stop ids are the station id plus the direction letter ("L08N"). */
+const stationOfStop = (stop: StopId): StationId => stop.slice(0, -1)
+const directionOfStop = (stop: StopId): Direction => (stop.endsWith('N') ? 'N' : 'S')
+
+/**
+ * The next arrivals at `station`, grouped by route, direction and destination, groups ordered by their soonest
+ * time. A trip is kept unless it is stale or has nothing ahead of it: the "unassigned" ghost rule is not
+ * applied, because a scheduled train that has not been dispatched yet is still a real next arrival (at a
+ * terminal it is often the only one), even though the map does not draw it. A trip that ends at this
+ * station is skipped: nobody boards it.
+ *
+ * The destination is the last stop of the pattern the trip joins to (the feed's own arrival list is cut at
+ * 30 minutes, so its last stop is not the terminal). If the join fails, the last stop the feed predicts is
+ * the best name left.
+ */
+export function arrivalsAt(
+  snapshot: RealtimeSnapshot,
+  station: { id: StationId; stops: readonly StopId[] },
+  nowS: number,
+  opts: ArrivalOptions,
+): ArrivalGroup[] {
+  const stops = new Set(station.stops)
+  const groups = new Map<string, ArrivalGroup>()
+
+  for (const feed of FEED_IDS) {
+    for (const trip of snapshot.feeds[feed].trips) {
+      const here = trip.arrivals.filter(
+        ([stop, t]) => stops.has(stop) && t >= nowS - PAST_GRACE_S && t <= nowS + ARRIVAL_WINDOW_S,
+      )
+      if (here.length === 0) continue
+      if (ghostReason({ ...trip, assigned: true }, nowS)) continue
+
+      const join = joinTrip(trip, opts.lookup, nowS)
+      const shapeId = join.matched ? join.shapeId : ''
+      const terminal = opts.lookup.patterns[shapeId]?.stops.at(-1) ?? trip.arrivals.at(-1)?.[0]
+      if (terminal === undefined || stationOfStop(terminal) === station.id) continue
+      const headsign = opts.stationName(stationOfStop(terminal))
+      const routeId = trainRouteId({ trip, shapeId }, opts.routeById, opts.lookup.patterns)
+      if (headsign === undefined || routeId === null) continue
+
+      const [stop, time] = here.reduce((a, b) => (b[1] < a[1] ? b : a))
+      const direction = directionOfStop(stop)
+      const key = `${routeId}|${direction}|${headsign}`
+      const group = groups.get(key)
+      if (group) group.times.push(time)
+      else groups.set(key, { routeId, direction, headsign, times: [time] })
+    }
+  }
+
+  return [...groups.values()]
+    .map((g) => ({ ...g, times: g.times.toSorted((a, b) => a - b).slice(0, MAX_TIMES_PER_GROUP) }))
+    .sort((a, b) => a.times[0]! - b.times[0]! || a.routeId.localeCompare(b.routeId) || a.headsign.localeCompare(b.headsign))
+}
+
+/** "Now" under 30 seconds (or already past), else whole minutes, never less than 1. */
+function minutesText(deltaS: number): string {
+  return deltaS < NOW_UNDER_S ? 'Now' : String(Math.max(1, Math.round(deltaS / 60)))
+}
+
+/** "4, 9, 15 min", or "Now, 6 min"; a lone "Now" has no unit. */
+export function formatArrivalTimes(times: readonly number[], nowS: number): string {
+  const parts = times.map((t) => minutesText(t - nowS)).filter((p, i, all) => p !== 'Now' || i === all.indexOf('Now'))
+  return parts.at(-1) === 'Now' ? parts.join(', ') : `${parts.join(', ')} min`
+}
