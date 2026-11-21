@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boundsCenter, fitDistance, frameBounds } from './framing'
+import { boundsCenter, fitDistance, frameBounds, framePoint } from './framing'
 
 const square = (half: number) => ({ minX: -half, maxX: half, minZ: -half, maxZ: half })
 const TAN = Math.tan((35 * Math.PI) / 360)
@@ -65,5 +65,34 @@ describe('frameBounds', () => {
     const portrait = { width: 390, height: 844 }
     const plain = frameBounds(city, portrait, { top: 0, bottom: 0 })
     expect(frameBounds(city, portrait, { top: 50, bottom: 110 }).distance).toBeCloseTo(plain.distance)
+  })
+})
+
+describe('framePoint', () => {
+  const viewport = { width: 1440, height: 900 }
+  const none = { top: 0, bottom: 0 }
+  const center = { x: 500, z: -300 }
+
+  it('grows with the radius', () => {
+    const small = framePoint(center, 300, viewport, none, 35, 100, 1e6)
+    const big = framePoint(center, 900, viewport, none, 35, 100, 1e6)
+    expect(big.distance).toBeGreaterThan(small.distance)
+  })
+
+  it('clamps to the minimum and maximum distance', () => {
+    expect(framePoint(center, 10, viewport, none, 35, 504, 1e6).distance).toBe(504)
+    expect(framePoint(center, 1e6, viewport, none, 35, 504, 5000).distance).toBe(5000)
+  })
+
+  it('centers the point with equal insets', () => {
+    expect(framePoint(center, 300, viewport, { top: 80, bottom: 80 }, 35, 100, 1e6).target).toEqual(center)
+  })
+
+  it('shifts the target south by the clamped meters-per-pixel for a top inset', () => {
+    const f = framePoint(center, 10, viewport, { top: 200, bottom: 0 }, 35, 504, 1e6)
+    const metersPerPx = (2 * 504 * TAN) / viewport.height
+    expect(f.distance).toBe(504)
+    expect(f.target.x).toBe(center.x)
+    expect(f.target.z).toBeCloseTo(center.z - 100 * metersPerPx)
   })
 })

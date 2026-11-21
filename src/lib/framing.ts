@@ -47,3 +47,25 @@ export function frameBounds(
   // Screen down is +z. The free band's center is (top - bottom) / 2 px below the viewport center.
   return { distance, target: { x: center.x, z: center.z - ((insets.top - insets.bottom) / 2) * metersPerPx } }
 }
+
+/**
+ * Top-down framing of a circle of `radiusM` around `center` in the band between the HUD insets,
+ * with the distance clamped to [minDistance, maxDistance]. The inset shift is recomputed at the
+ * clamped distance (frameBounds' own target belongs to its unclamped distance), so `center` stays
+ * centered in the free band even when the clamp bites.
+ */
+export function framePoint(
+  center: Ground,
+  radiusM: number,
+  viewport: Viewport,
+  insets: Insets,
+  fovDeg: number,
+  minDistance: number,
+  maxDistance: number,
+): { distance: number; target: Ground } {
+  const square = { minX: center.x - radiusM, maxX: center.x + radiusM, minZ: center.z - radiusM, maxZ: center.z + radiusM }
+  const fitted = frameBounds(square, viewport, insets, fovDeg).distance
+  const distance = Math.min(Math.max(fitted, minDistance), maxDistance)
+  const metersPerPx = (2 * distance * Math.tan((fovDeg * Math.PI) / 360)) / viewport.height
+  return { distance, target: { x: center.x, z: center.z - ((insets.top - insets.bottom) / 2) * metersPerPx } }
+}

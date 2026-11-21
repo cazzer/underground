@@ -3,6 +3,7 @@ import type { LiveLayer } from '../data/useLive'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
+import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { CameraRig } from './CameraRig'
@@ -12,6 +13,7 @@ import { MapGrid } from './MapGrid'
 import { StationInterior } from './StationInterior'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
+import { YouAreHere } from './YouAreHere'
 
 interface SceneProps {
   network: Network
@@ -25,9 +27,11 @@ interface SceneProps {
   /** The station panel's screen rect; interior fly-tos frame beside it. */
   panel: ScreenRect | null
   onInteriorRevealed: (revealed: boolean) => void
+  /** The user's location, once found inside the covered area; null draws no marker. */
+  here: { ground: Ground; accuracyM: number } | null
 }
 
-export function Scene({ network, insets, live, onLiveError, interior, panel, onInteriorRevealed }: SceneProps) {
+export function Scene({ network, insets, live, onLiveError, interior, panel, onInteriorRevealed, here }: SceneProps) {
   return (
     <Canvas
       // No tone mapping, so every theme token renders as the exact color it names.
@@ -47,6 +51,7 @@ export function Scene({ network, insets, live, onLiveError, interior, panel, onI
           <LiveTrains {...live} network={network} />
         </ErrorBoundary>
       )}
+      {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
       {interior && (
         <StationInterior key={interior.stationId} model={interior} network={network} onRevealed={onInteriorRevealed} />
       )}

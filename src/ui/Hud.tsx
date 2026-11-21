@@ -1,15 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, type Ref } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, type Ref } from 'react'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { scheduleLabel } from '../lib/labels'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
+import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
+import type { LocateControls } from '../data/useLocate'
 import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
 import { LiveStatus } from './LiveStatus'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
+import { LocateButton } from './LocateButton'
+import { LocateStatus } from './LocateStatus'
 import { OrbitHint } from './OrbitHint'
 import { RouteChip } from './RouteChip'
 
@@ -75,14 +79,23 @@ interface HudProps {
   interior: InteriorStatusInfo
   /** Reports where the station panel sits (viewport px), or null when it closes. */
   onPanel: (rect: ScreenRect | null) => void
+  /** The location button's state and actions. */
+  locate: LocateControls
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, onPanel }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, onPanel, locate }: HudProps) {
   const { focusedId, dismiss } = useFocus()
   const root = useRef<HTMLDivElement>(null)
   const header = useRef<HTMLElement>(null)
   const bottom = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLElement>(null)
+  const locateButton = useRef<HTMLButtonElement>(null)
+  // Clearing removes the × the user just pressed; focus goes back to the button that started it.
+  const { clear } = locate
+  const onClearLocation = useCallback(() => {
+    clear()
+    locateButton.current?.focus()
+  }, [clear])
 
   // Measured once, before the scene mounts, for its opening view.
   useLayoutEffect(() => {
@@ -131,10 +144,19 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel }: Hu
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
-      <header ref={header}>
-        <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
-        <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)}</p>
-        <LiveStatus status={live} />
+      <header ref={header} className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
+          <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)}</p>
+          <LiveStatus status={live} />
+          <LocateStatus state={locate.state} onClear={onClearLocation} />
+        </div>
+        <LocateButton
+          ref={locateButton}
+          onLocate={locate.locate}
+          locating={locate.state.status === 'locating'}
+          located={markedPlacement(locate.state) !== null}
+        />
       </header>
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
       <div ref={bottom} className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
