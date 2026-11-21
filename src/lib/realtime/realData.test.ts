@@ -1,5 +1,5 @@
 // Structural checks against the committed public/data, so schedule refreshes don't break them.
-// Geometry is built on the default track offset (?tracks=a), the line the map draws.
+// Geometry is built on every ?tracks= offset, since each is a line the map can draw; the L08 check uses the default (a).
 import { describe, expect, it } from 'vitest'
 import shapesRaw from '../../../public/data/shapes.json?raw'
 import l08Raw from '../../../public/data/stations/L08.json?raw'
@@ -20,8 +20,10 @@ const shapes = JSON.parse(shapesRaw) as ShapesFile
 const stations = JSON.parse(stationsRaw) as StationsFile
 const index = JSON.parse(tripIndexRaw) as TripIndexFile
 
-describe('real public/data', () => {
-  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSETS.a)
+const OFFSETS = Object.entries(TRACK_OFFSETS)
+
+describe.each(OFFSETS)('real public/data at ?tracks=%s (%s m)', (_name, offsetM) => {
+  const geometries = buildShapeGeometries(shapes, index, stations, offsetM)
 
   it('builds one geometry per pattern', () => {
     expect(geometries.size).toBe(Object.keys(index.patterns).length)
@@ -83,8 +85,8 @@ describe('primary fallback join on real data', () => {
   })
 })
 
-describe('a trip moving between two shapes of the same route', () => {
-  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSETS.a)
+describe.each(OFFSETS)('a trip moving between two shapes of the same route at ?tracks=%s (%s m)', (_name, offsetM) => {
+  const geometries = buildShapeGeometries(shapes, index, stations, offsetM)
   const lookup = buildTripLookup(index, shapes)
 
   it('never draws the dot somewhere else: it carries over within 25 m, or shrinks in place on the old shape', () => {
