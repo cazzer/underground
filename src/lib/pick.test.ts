@@ -79,4 +79,13 @@ describe('trainHitPx', () => {
     expect(trainHitPx(true, { index: 0, distancePx: 10 })).toBe(TRAIN_HIT_PX)
     expect(trainHitPx(false, null)).toBe(TRAIN_HIT_PX)
   })
+
+  it('gives a touch the bigger train target at the open station, whose marker is hidden', () => {
+    expect(trainHitPx(true, { index: 4, distancePx: 3 }, 4)).toBe(TRAIN_TOUCH_HIT_PX)
+    expect(trainHitPx(true, { index: 4, distancePx: 3 }, 2)).toBe(TRAIN_HIT_PX)
+    expect(trainHitPx(false, { index: 4, distancePx: 3 }, 4)).toBe(TRAIN_HIT_PX)
+    // A train within the touch target beside the hidden open station wins; with none, the station is picked.
+    expect(choosePick({ index: 4, distancePx: 2 }, { index: 9, distancePx: TRAIN_TOUCH_HIT_PX - 1 }, 4)).toEqual({ kind: 'train', index: 9 })
+    expect(choosePick({ index: 4, distancePx: 2 }, null, 4)).toEqual({ kind: 'station', index: 4 })
+  })
 })

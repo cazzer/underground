@@ -1,18 +1,24 @@
 import { useSyncExternalStore } from 'react'
+import { useFocus } from '../lib/focus'
+import { hasTurned, subscribeTurned } from '../lib/orbitTurned'
 
 const coarse = window.matchMedia('(pointer: coarse)')
 
-function subscribe(onChange: () => void): () => void {
+function subscribeCoarse(onChange: () => void): () => void {
   coarse.addEventListener('change', onChange)
   return () => coarse.removeEventListener('change', onChange)
 }
 
 const isCoarse = () => coarse.matches
 
-/** The station panel's one-line hint for turning the view (rotation only works while a station is focused). */
+/**
+ * The header's muted turn hint: shown while a station is focused (rotation only works then), until the
+ * visitor's first turn this session.
+ */
 export function OrbitHint() {
-  const touch = useSyncExternalStore(subscribe, isCoarse)
-  return (
-    <p className="mt-2 text-xs text-ink-dim">{touch ? 'Drag two fingers sideways to turn' : 'Right-drag or Shift-drag to turn'}</p>
-  )
+  const { focusedId } = useFocus()
+  const touch = useSyncExternalStore(subscribeCoarse, isCoarse)
+  const turned = useSyncExternalStore(subscribeTurned, hasTurned)
+  if (!focusedId || turned) return null
+  return <p className="text-xs text-ink-dim">{touch ? 'Drag two fingers sideways to turn' : 'Right-drag or Shift-drag to turn'}</p>
 }

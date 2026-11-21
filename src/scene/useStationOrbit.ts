@@ -11,17 +11,24 @@ import {
   panRadius,
   pivotShift,
   softClampToRadius,
+  wrapAngle,
   type AzimuthBounds,
   type AzimuthInput,
 } from '../lib/orbitLimits'
+import { markTurned } from '../lib/orbitTurned'
 import type { Ground } from '../lib/projection'
 import { ISO_POLAR } from '../lib/tilt'
 import type { InteriorModel } from './interiorModel'
-import { orbitLook } from './orbitLook'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
 const TAN_ISO = Math.tan(ISO_POLAR)
+/**
+ * Turn (radians, summed while focused) that counts as the visitor's first turn and retires the hint:
+ * about 17°, past what a drifting pinch adds.
+ */
+const TURN_SEEN = 0.3
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
 interface StationOrbitOptions {
   controls: RefObject<MapControlsImpl | null>
@@ -50,12 +57,13 @@ interface OrbitFocus {
 }
 
 /**
- * Station orbit: azimuth window, a turn that pivots on the focus point, and a soft pan radius. All
+ * Station orbit: a full spin while focused (a spring to north-up otherwise), a turn that pivots on the
+ * focus point, and a soft pan radius. It also flags the session's first turn for the HUD hint. All
  * frames write the controls imperatively: passing these as props or on* handlers would re-run drei's
  * connect effect and could lock the controls (underground-by0). Nothing here allocates per frame.
  */
 export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, flying, busy }: StationOrbitOptions): void {
-  const input = useRef<AzimuthInput>({ theta: 0, focused: false, distance: 0, limit: orbitLook.limit, dt: 0 })
+  const input = useRef<AzimuthInput>({ theta: 0, focused: false, distance: 0, dt: 0, reducedMotion: false })
   const bounds = useRef<AzimuthBounds>({ min: 0, max: 0 })
   const lastTheta = useRef(0)
   const shift = useRef<ScreenShift>({ right: 0, toward: 0 })
@@ -64,12 +72,13 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
   const clamped = useRef<Ground>({ x: 0, z: 0 })
   const armed = useRef(false)
   const armedFor = useRef<Ground | null>(null)
+  const turnedBy = useRef(0)
 
   const focus = useMemo<OrbitFocus | null>(() => {
     if (!focusPos) return null
     if (!interior) return { center: focusPos, radius: panRadius(null), towardCamera: 0, useFree: false }
     const a = interior.focusAnchor
-    return { center: a.center, radius: panRadius(a.halfExtent), towardCamera: a.towardCamera, useFree: true }
+    return { center: a.center, radius: panRadius(a.reach), towardCamera: a.towardCamera, useFree: true }
   }, [focusPos, interior])
 
   // Before drei's controls.update() (priority -1), beside the polar lock in CameraRig.
@@ -81,10 +90,12 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     inp.focused = focusPos !== null
     inp.distance = camera.position.distanceTo(c.target)
     inp.dt = delta
+    inp.reducedMotion = reduceMotion.matches
     const b = azimuthBounds(inp, bounds.current)
     // enableRotate stays on: OrbitControls seeds a rotate only when it is on at gesture start, so
     // toggling it mid-gesture applied a stale start (a pinch into a station swung the view). The
-    // window alone holds the angle when unfocused (min = max) and top-down (0).
+    // window alone holds the angle when unfocused (min = max) and top-down (0); focused and close
+    // it is ±Infinity, which the controls leave unclamped (a full spin).
     // Safe mid-gesture: OrbitControls updates rotateStart on every move whatever the speed, so no
     // stale start; and at 0 no sphericalDelta accumulates while the window is shut, so a drifting
     // pinch can't replay as a turn once focus opens the window.
@@ -118,6 +129,8 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     }
     // The controls turned about the target; slide target and camera so the turn pivots on the focus point.
     if (!isFlying && theta !== theta0) {
+      turnedBy.current += Math.abs(wrapAngle(theta - theta0))
+      if (turnedBy.current > TURN_SEEN) markTurned()
       const m = pivotShift(s.right, s.toward, theta0, theta, move.current)
       c.target.x += m.x
       c.target.z += m.z

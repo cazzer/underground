@@ -34,6 +34,4 @@ export const RENDER_ORDER = {
   interiorVeil: 7,
   interiorFine: 8,
   interior: 9,
-  // The focused station's ring, redrawn over the trains and the interior veil.
-  focusRing: 10,
 } as const

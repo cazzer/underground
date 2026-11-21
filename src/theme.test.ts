@@ -82,8 +82,8 @@ describe('trainSelectedRim', () => {
   it('reads at 3:1 on the background and stands apart from every drawn line color', async () => {
     for (const t of Object.values(await themes())) {
       expect(contrastRatio(t.trainSelectedRim, t.background), t.name).toBeGreaterThanOrEqual(3)
-      // Nor may it pass for another marker: the location marker, the focused ring, station rings.
-      for (const [name, color] of [['here', t.here], ['focus', t.stationFocus], ['station', t.stationStroke], ['train', t.train]] as const) {
+      // Nor may it pass for another marker or the focus outline: the location marker, keyboard focus, station rings.
+      for (const [name, color] of [['here', t.here], ['focus outline', t.stationFocus], ['station', t.stationStroke], ['train', t.train]] as const) {
         expect(oklabDistance(t.trainSelectedRim, color), `${t.name} rim vs ${name} ${color}`).toBeGreaterThanOrEqual(0.1)
       }
       const lines = new Set(routes.map((r) => routeLineColor(`#${r.color}`, t.routeLineMix, t.background)))

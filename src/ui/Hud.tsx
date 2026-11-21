@@ -17,7 +17,6 @@ import { LinkNotice } from './LinkNotice'
 import { LocateButton } from './LocateButton'
 import { LocateStatus } from './LocateStatus'
 import { OrbitHint } from './OrbitHint'
-import { RouteChip } from './RouteChip'
 import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
@@ -56,21 +55,7 @@ function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, 
           ×
         </button>
       </div>
-      <ul aria-label="Routes" className="mt-1 flex flex-wrap gap-1.5">
-        {station.routeIds.map((id) => {
-          const route = network.routeById.get(id)
-          if (!route) throw new Error(`Station ${station.id} lists unknown route "${id}"`)
-          return (
-            <RouteChip key={id} route={route} as="li">
-              <span className="sr-only">
-                {route.shortName}: {route.longName}
-              </span>
-            </RouteChip>
-          )
-        })}
-      </ul>
       <InteriorStatus info={interior} />
-      <OrbitHint />
       <ArrivalsList network={network} station={station} source={arrivals} status={live} />
     </aside>
   )
@@ -208,6 +193,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
           <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)}</p>
           <LiveStatus status={live} />
           <LocateStatus state={locate.state} onClear={onClearLocation} />
+          <OrbitHint />
           <p role="status" aria-live="polite" className="sr-only">
             {notice ?? ''}
           </p>

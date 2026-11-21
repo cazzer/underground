@@ -30,8 +30,11 @@ export interface FocusAnchor {
   center: Ground
   /** Meters the camera target must sit toward the camera so the mid-depth center is mid-screen. */
   towardCamera: number
-  /** Half the longer side of the plan extent, meters: sizes the station orbit's pan radius. */
-  halfExtent: number
+  /**
+   * Plan distance (meters) from `center` to the farthest outline vertex or entrance (a hull vertex):
+   * sizes the station orbit's pan radius, so every part can be brought to the middle of the view.
+   */
+  reach: number
 }
 
 /**
@@ -42,10 +45,19 @@ export interface FocusAnchor {
 export function interiorFocusAnchor(origin: Ground, interior: StationInterior, yScale: number, tanPolar: number): FocusAnchor {
   const b = interiorBounds(interior)
   const minY = Math.min(...interior.levels.map((l) => l.y))
+  const cx = (b.minX + b.maxX) / 2
+  const cz = (b.minZ + b.maxZ) / 2
+  let reach = 0
+  const add = (x: number, z: number) => {
+    reach = Math.max(reach, Math.hypot(x - cx, z - cz))
+  }
+  for (const p of interior.platforms) for (const [x, z] of p.outline) add(x, z)
+  for (const s of interior.slabs) for (const [x, z] of s.outline) add(x, z)
+  for (const e of interior.entrances) add(e.x, e.z)
   return {
-    center: { x: origin.x + (b.minX + b.maxX) / 2, z: origin.z + (b.minZ + b.maxZ) / 2 },
+    center: { x: origin.x + cx, z: origin.z + cz },
     towardCamera: ((-minY * yScale) / 2) * tanPolar,
-    halfExtent: Math.max(b.maxX - b.minX, b.maxZ - b.minZ) / 2,
+    reach,
   }
 }
 
@@ -64,9 +76,8 @@ export interface LevelLabel {
 
 /**
  * Midpoint of the outline edge that faces south (toward the camera) the most, weighted by length,
- * pushed `gap` meters outward. Deliberately fixed to south rather than following the station orbit:
- * within the ±60 degree window the south edge still faces the camera, so labels stay legible and
- * don't hop between edges mid-turn (revisit with the pah.5 orbit-limit decision).
+ * pushed `gap` meters outward. Deliberately fixed to south rather than following the station orbit,
+ * so labels don't hop between edges mid-turn; turned past ±90° they sit on the far edge.
  */
 function southEdgeAnchor(outline: readonly LocalPoint[], gap: number): LocalPoint {
   // Shoelace: twice the signed area. Its sign says which side of each edge is outside, for

@@ -71,7 +71,7 @@ export function ArrivalsList({ network, station, source, status }: ArrivalsListP
   const announce = status.kind !== 'stale' ? ({ role: 'status', 'aria-live': 'polite' } as const) : {}
   return (
     <section className="mt-3 min-h-24">
-      <h3 className="text-xs uppercase tracking-widest text-ink-dim">Arrivals</h3>
+      <h3 className="sr-only">Arrivals</h3>
       <div {...announce}>
         {stateLines.map((line) => (
           <p key={line} className="mt-1 text-xs text-ink-dim">

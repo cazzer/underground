@@ -3,8 +3,10 @@ import { PerspectiveCamera, Vector3 } from 'three'
 import { EXIT_DISTANCE, EXIT_RADIUS } from './focusMachine'
 import { freeCenterShift, interiorFreeRect } from './interiorCamera'
 import {
+  AZIMUTH_SPRING,
+  AZIMUTH_SPRING_MAX_SPEED,
   azimuthBounds,
-  azimuthLimit,
+  azimuthCap,
   focusPoint,
   PAN_GIVE,
   PAN_MARGIN,
@@ -15,15 +17,15 @@ import {
   pivotShift,
   rotateScreenOffset,
   softClampToRadius,
+  springToNorth,
   springToward,
+  wrapAngle,
   type AzimuthBounds,
 } from './orbitLimits'
 import { ISO_POLAR, tiltForDistance } from './tilt'
 
-const LIMIT = Math.PI / 4
-
 describe('panRadius', () => {
-  it('is the bare radius without an interior, else the half-extent plus the margin', () => {
+  it('is the bare radius without an interior, else the reach plus the margin', () => {
     expect(panRadius(null)).toBe(PAN_RADIUS_BARE)
     expect(panRadius(90)).toBe(90 + PAN_MARGIN)
   })
@@ -63,42 +65,106 @@ describe('springToward', () => {
   })
 })
 
-describe('azimuthLimit', () => {
-  it('is the full limit through EXIT_DISTANCE', () => {
-    expect(azimuthLimit(180, LIMIT)).toBe(LIMIT)
-    expect(azimuthLimit(EXIT_DISTANCE, LIMIT)).toBe(LIMIT)
+describe('wrapAngle', () => {
+  it('maps any angle into (-π, π]', () => {
+    expect(wrapAngle(0.4)).toBeCloseTo(0.4, 12)
+    expect(wrapAngle(Math.PI)).toBe(Math.PI)
+    expect(wrapAngle(-Math.PI)).toBe(Math.PI)
+    expect(wrapAngle(3.3)).toBeCloseTo(3.3 - 2 * Math.PI, 12)
+    expect(wrapAngle(-3.3)).toBeCloseTo(2 * Math.PI - 3.3, 12)
+    expect(wrapAngle(7 * Math.PI + 0.2)).toBeCloseTo(-Math.PI + 0.2, 9)
+  })
+})
+
+describe('azimuthCap', () => {
+  it('is unlimited through EXIT_DISTANCE', () => {
+    expect(azimuthCap(180)).toBe(Infinity)
+    expect(azimuthCap(EXIT_DISTANCE)).toBe(Infinity)
   })
 
-  it('falls linearly to zero at the top-down distance and stays there', () => {
-    expect(azimuthLimit((EXIT_DISTANCE + 1400) / 2, LIMIT)).toBeCloseTo(LIMIT / 2)
-    expect(azimuthLimit(1400, LIMIT)).toBe(0)
-    expect(azimuthLimit(5000, LIMIT)).toBe(0)
+  it('falls linearly from π to zero at the top-down distance and stays there', () => {
+    expect(azimuthCap(EXIT_DISTANCE + 1e-9)).toBeCloseTo(Math.PI, 6)
+    expect(azimuthCap((EXIT_DISTANCE + 1400) / 2)).toBeCloseTo(Math.PI / 2)
+    expect(azimuthCap(1400)).toBe(0)
+    expect(azimuthCap(5000)).toBe(0)
   })
 })
 
 describe('azimuthBounds', () => {
   const out = (): AzimuthBounds => ({ min: 0, max: 0 })
 
-  it('focused: a symmetric window', () => {
-    const b = azimuthBounds({ theta: 0.3, focused: true, distance: 180, limit: LIMIT, dt: 0.016 }, out())
-    expect(b).toEqual({ min: -LIMIT, max: LIMIT })
+  it('focused and close: no window at all, so the view spins a full turn', () => {
+    for (const theta of [0, 2, Math.PI, -3]) {
+      const b = azimuthBounds({ theta, focused: true, distance: 180, dt: 0.016, reducedMotion: false }, out())
+      expect(b).toEqual({ min: -Infinity, max: Infinity })
+    }
   })
 
   it('focused but top-down: the window is closed', () => {
-    const b = azimuthBounds({ theta: 0, focused: true, distance: 1500, limit: LIMIT, dt: 0.016 }, out())
+    const b = azimuthBounds({ theta: 0, focused: true, distance: 1500, dt: 0.016, reducedMotion: false }, out())
     expect(b.min).toBeCloseTo(0, 12)
     expect(b.max).toBeCloseTo(0, 12)
   })
 
   it('unfocused: min = max walks theta to exactly 0', () => {
-    let theta = -LIMIT
+    let theta = -Math.PI / 4
     const b = out()
     for (let i = 0; i < 600 && theta !== 0; i++) {
-      azimuthBounds({ theta, focused: false, distance: 600, limit: LIMIT, dt: 1 / 60 }, b)
+      azimuthBounds({ theta, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, b)
       expect(b.min).toBe(b.max)
       theta = b.min
     }
     expect(theta).toBe(0)
+  })
+
+  it('unfocused near ±π: springs the short way, never sweeping through the long way', () => {
+    // 3.3 rad past π is -2.98 the short way: the spring must go up through -2.9, not down through 3.
+    const b = azimuthBounds({ theta: 3.3, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, out())
+    expect(b.min).toBeLessThan(0)
+    expect(b.min).toBeGreaterThan(wrapAngle(3.3))
+    const c = azimuthBounds({ theta: -3.3, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, out())
+    expect(c.min).toBeGreaterThan(0)
+    expect(c.min).toBeLessThan(wrapAngle(-3.3))
+  })
+
+  it('unfocused from 180 degrees while zooming out: north-up by the top-down distance whatever the pace', () => {
+    let theta = Math.PI
+    const b = out()
+    // A fast zoom out: 420 m to 1400 m in a third of a second, far quicker than the spring.
+    for (let i = 0; i <= 20; i++) {
+      const distance = EXIT_DISTANCE + ((1400 - EXIT_DISTANCE) * i) / 20
+      azimuthBounds({ theta, focused: false, distance, dt: 1 / 60, reducedMotion: false }, b)
+      expect(Math.abs(b.min)).toBeLessThanOrEqual(azimuthCap(distance))
+      theta = b.min
+    }
+    expect(theta).toBe(0)
+  })
+})
+
+describe('springToNorth', () => {
+  it('never turns faster than the speed cap after a big turn', () => {
+    const dt = 1 / 60
+    let theta = Math.PI - 0.01
+    for (let i = 0; i < 60; i++) {
+      const next = springToNorth(theta, dt, false)
+      expect(Math.abs(next - theta)).toBeLessThanOrEqual(AZIMUTH_SPRING_MAX_SPEED * dt + 1e-12)
+      theta = next
+    }
+    // A second at the cap brings 179° down to about 0, no further.
+    expect(theta).toBeGreaterThan(0)
+  })
+
+  it('keeps the plain exponential ease for small angles, and lands exactly on 0', () => {
+    expect(springToNorth(0.5, 1 / 60, false)).toBeCloseTo(springToward(0.5, 0, 1 / 60, AZIMUTH_SPRING), 12)
+    let theta = 2
+    for (let i = 0; i < 600 && theta !== 0; i++) theta = springToNorth(theta, 1 / 60, false)
+    expect(theta).toBe(0)
+  })
+
+  it('snaps straight to north-up under reduced motion', () => {
+    expect(springToNorth(2.5, 1 / 60, true)).toBe(0)
+    const b = azimuthBounds({ theta: -3, focused: false, distance: 430, dt: 1 / 60, reducedMotion: true }, { min: 1, max: 1 })
+    expect(b).toEqual({ min: 0, max: 0 })
   })
 })
 
