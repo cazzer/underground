@@ -3,7 +3,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { CircleGeometry, Color, DynamicDrawUsage, RingGeometry, type InstancedMesh } from 'three'
 import { useFocus } from '../lib/focus'
 import { writeMarkerMatrices } from '../lib/markerMatrices'
-import { nearestHit } from '../lib/pickStation'
 import type { Station } from '../lib/network'
 import { theme } from '../theme'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
@@ -11,25 +10,15 @@ import { FocusRing } from './FocusRing'
 import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
-/** Tap target radius: a pick within this many screen pixels of a station selects it. */
-const HIT_PX = 22
-/** Pointer travel (px) above which a release on a station is a pan, not a click; r3f's own miss threshold is 2.
- * Fingertip taps drift more than a mouse. */
-const CLICK_SLOP_PX = { mouse: 6, touch: 10 }
-
 interface StationsProps {
   stations: readonly Station[]
 }
 
-/**
- * All station markers as two instanced meshes (fill, then ring). Picking raycasts a third,
- * invisible instanced disc of at least HIT_PX radius and takes the nearest hit station.
- */
+/** All station markers as two instanced meshes (fill, then ring). ScenePicker handles clicks on them, in screen space. */
 export function Stations({ stations }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
-  const hit = useRef<InstancedMesh>(null)
-  const { focusedId, select } = useFocus()
+  const { focusedId } = useFocus()
   const focusedIndex = useMemo(
     () => (focusedId ? stations.findIndex((s) => s.id === focusedId) : -1),
     [stations, focusedId],
@@ -44,7 +33,7 @@ export function Stations({ stations }: StationsProps) {
     [],
   )
   const colors = useMemo(() => ({ stroke: new Color(theme.stationStroke), focus: new Color(theme.stationFocus) }), [])
-  const drawn = useRef({ scale: NaN, focusScale: NaN, hitScale: NaN, focusedIndex: -1 })
+  const drawn = useRef({ scale: NaN, focusScale: NaN, focusedIndex: -1 })
   const coloredIndex = useRef(-1)
 
   useEffect(
@@ -80,29 +69,15 @@ export function Stations({ stations }: StationsProps) {
   useFrame((state) => {
     const f = fill.current
     const r = ring.current
-    const h = hit.current
-    if (!f || !r || !h) return
+    if (!f || !r) return
     const d = cameraDistance(state)
     const scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
     const focusScale = focusScaleFactor(d, scale)
-    const hitScale = Math.max(scale * focusScale, screenScale(d, HIT_PX, 0))
     const last = drawn.current
-    if (
-      scale === last.scale &&
-      focusScale === last.focusScale &&
-      hitScale === last.hitScale &&
-      focusedIndex === last.focusedIndex
-    ) {
-      return
-    }
+    if (scale === last.scale && focusScale === last.focusScale && focusedIndex === last.focusedIndex) return
     last.scale = scale
     last.focusScale = focusScale
-    last.hitScale = hitScale
     last.focusedIndex = focusedIndex
-    writeMarkerMatrices(h.instanceMatrix.array as Float32Array, positions, MARKER_Y, hitScale, -1, 1)
-    h.instanceMatrix.needsUpdate = true
-    // Raycasting recomputes it lazily from the new matrices.
-    h.boundingSphere = null
     writeMarkerMatrices(f.instanceMatrix.array as Float32Array, positions, MARKER_Y, scale, focusedIndex, focusScale)
     r.instanceMatrix.array.set(f.instanceMatrix.array)
     f.instanceMatrix.needsUpdate = true
@@ -118,25 +93,6 @@ export function Stations({ stations }: StationsProps) {
         renderOrder={RENDER_ORDER.stationFill}
       >
         <meshBasicMaterial color={theme.stationFill} transparent depthTest={false} depthWrite={false} />
-      </instancedMesh>
-      <instancedMesh
-        ref={hit}
-        args={[geometry.fill, undefined, stations.length]}
-        frustumCulled={false}
-        onClick={(e) => {
-          e.stopPropagation()
-          // r3f fires click on a hit even after a long drag (all hit discs are one mesh), so a pan
-          // that starts and ends on stations would select one. Only a near-still press selects.
-          if (e.delta > CLICK_SLOP_PX[(e.nativeEvent as PointerEvent).pointerType === 'touch' ? 'touch' : 'mouse']) return
-          const ids = e.intersections.flatMap((i) => (i.object === hit.current && i.instanceId !== undefined ? [i.instanceId] : []))
-          const station = stations[nearestHit(ids, positions, e.point)]
-          if (station) select(station.id)
-        }}
-        onPointerOver={() => (document.body.style.cursor = 'pointer')}
-        onPointerOut={() => (document.body.style.cursor = '')}
-      >
-        {/* Never drawn; it only gives the raycaster a touch-sized target. */}
-        <meshBasicMaterial visible={false} />
       </instancedMesh>
       <instancedMesh
         ref={ring}

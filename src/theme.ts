@@ -23,6 +23,11 @@ export interface Theme {
   /** 0..1 fill of the accuracy disc, and the width in screen pixels of its edge and the reticle. */
   hereAccuracyOpacity: number
   hereLineWidth: number
+  /**
+   * Rim drawn around the selected train (dot and cars), outside a background-colored gap. A hue no line uses,
+   * at least 3:1 on the background; theme.test.ts holds it apart from every line color.
+   */
+  trainSelectedRim: string
   /** Train car shading: linear multipliers of the car color on its sides and ends (the roof is 1). */
   trainCarSideShade: number
   trainCarEndShade: number
@@ -67,6 +72,7 @@ export const THEMES = {
     here: '#5ce1ff',
     hereAccuracyOpacity: 0.15,
     hereLineWidth: 1.5,
+    trainSelectedRim: '#ff5cf0',
     trainCarSideShade: 0.55,
     trainCarEndShade: 0.75,
     statusLive: '#7cf5a6',
@@ -101,6 +107,7 @@ export const THEMES = {
     here: '#c71f7a',
     hereAccuracyOpacity: 0.15,
     hereLineWidth: 1.5,
+    trainSelectedRim: '#6a00c8',
     trainCarSideShade: 0.6,
     trainCarEndShade: 0.8,
     statusLive: '#2f6b3a',
@@ -135,6 +142,7 @@ export const THEMES = {
     here: '#5ce1ff',
     hereAccuracyOpacity: 0.15,
     hereLineWidth: 1.5,
+    trainSelectedRim: '#d07800',
     trainCarSideShade: 0.45,
     trainCarEndShade: 0.7,
     statusLive: '#33ff66',

@@ -40,7 +40,7 @@ export interface ArrivalOptions {
 }
 
 /** Child stop ids are the station id plus the direction letter ("L08N"). */
-const stationOfStop = (stop: StopId): StationId => stop.slice(0, -1)
+export const stationOfStop = (stop: StopId): StationId => stop.slice(0, -1)
 const directionOfStop = (stop: StopId): Direction => (stop.endsWith('N') ? 'N' : 'S')
 
 /**

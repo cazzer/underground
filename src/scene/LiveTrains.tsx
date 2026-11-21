@@ -1,16 +1,18 @@
 import { useFrame } from '@react-three/fiber'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { CircleGeometry, Color, DynamicDrawUsage, type InstancedMesh } from 'three'
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { CircleGeometry, Color, DynamicDrawUsage, type InstancedMesh, type Mesh } from 'three'
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix } from '../lib/live/consist'
 import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
+import type { TrainPickSource } from '../lib/live/trainPick'
 import { trainRouteId } from '../lib/live/trainRoute'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
 import { hopDistance } from '../lib/realtime/position'
 import { pointAtDistanceInto } from '../lib/realtime/polyline'
 import { routeLineColor } from '../lib/routeColor'
+import { useTrainSelection } from '../lib/trainSelection'
 import { theme } from '../theme'
 import { cameraDistance, getControls, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
@@ -25,9 +27,14 @@ const DOT_Y = 0.5
 const SEGMENTS = 16
 /** Cars are laid out only for trains within this many camera distances (plus 300 m slack) of the view center. */
 const CARS_WITHIN = { distances: 3, plusM: 300 }
+/** The selected train's dot (and its background halo, the gap) draws this much larger, with a rim of RIM_PX outside. */
+const SELECTED_GROWTH = 1.6
+const RIM_PX = 2.5
 
 interface LiveTrainsProps extends LiveLayer {
   network: Network
+  /** Filled while mounted, so a click can be tested against the trains as drawn. */
+  trainPick: RefObject<TrainPickSource | null>
 }
 
 /**
@@ -36,17 +43,22 @@ interface LiveTrainsProps extends LiveLayer {
  * poll's hop plan at the live clock and writes matrices without allocating. Zoomed in, each dot
  * unfolds into its train's cars (carMix): the dot shrinks by 1 - mix as the train lengthens by mix.
  */
-export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProps) {
+export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: LiveTrainsProps) {
   const dots = useRef<InstancedMesh>(null)
   const halo = useRef<InstancedMesh>(null)
+  const rim = useRef<Mesh>(null)
   const cars = useTrainCars()
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
+  const { selectedKey } = useTrainSelection()
+  /** The slot drawn as selected, -1 for none. Read once per frame. */
+  const selectedSlot = useRef(-1)
   const point = useMemo(() => ({ x: 0, z: 0 }), [])
   const range = useMemo(() => ({ start: 0, count: 0 }), [])
   const geometry = useMemo(
     () => ({
       dot: new CircleGeometry(1, SEGMENTS).rotateX(-Math.PI / 2),
       halo: new CircleGeometry(HALO_RATIO, SEGMENTS).rotateX(-Math.PI / 2),
+      rim: new CircleGeometry(1, SEGMENTS).rotateX(-Math.PI / 2),
     }),
     [],
   )
@@ -67,6 +79,7 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     () => () => {
       geometry.dot.dispose()
       geometry.halo.dispose()
+      geometry.rim.dispose()
     },
     [geometry],
   )
@@ -92,9 +105,17 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     h.instanceMatrix.setUsage(DynamicDrawUsage)
     cars.prepare()
     for (let i = 0; i < TRAIN_CAPACITY; i++) colorSlot(d, i)
+    cars.setSelected(selectedSlot.current)
     d.instanceColor!.needsUpdate = true
     d.count = h.count = 0
   }, [colorSlot, cars])
+
+  useLayoutEffect(() => {
+    trainPick.current = { table, consistOf: cars.consistOf, y: DOT_Y, carHeightM: cars.carHeightM }
+    return () => {
+      trainPick.current = null
+    }
+  }, [trainPick, table, cars])
 
   useLayoutEffect(() => {
     const d = dots.current
@@ -109,10 +130,19 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     if (overflow > 0) console.warn(`Live trains: ${overflow} trips over the ${TRAIN_CAPACITY}-slot capacity are not drawn`)
   }, [trips, offsetS, table, colorSlot])
 
+  // After the reconcile above, so a slot reused by another trip since the last poll loses the highlight.
+  useLayoutEffect(() => {
+    const slot = selectedKey === null ? -1 : (table.byKey.get(selectedKey) ?? -1)
+    if (slot === selectedSlot.current) return
+    cars.setSelected(slot)
+    selectedSlot.current = slot
+  }, [selectedKey, trips, table, cars])
+
   useFrame((state, dt) => {
     const d = dots.current
     const h = halo.current
-    if (!d || !h) return
+    const r = rim.current
+    if (!d || !h || !r) return
     const perfMs = performance.now()
     const now = clockNow(offsetS, perfMs)
     const localS = perfMs / 1000
@@ -124,6 +154,8 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     const center = getControls(state)?.target
     const reach = camera * CARS_WITHIN.distances + CARS_WITHIN.plusM
     const out = d.instanceMatrix.array as Float32Array
+    const selected = selectedSlot.current
+    let rimRadius = 0
 
     for (let i = 0; i < table.high; i++) {
       const trip = table.trips[i]
@@ -136,7 +168,12 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
         cars.clear(i)
         freeSlot(table, i)
       } else {
-        writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k)
+        if (i === selected) {
+          writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k * SELECTED_GROWTH)
+          // Fades out with the dot as the cars (which carry their own rim) unfold.
+          rimRadius = scale * k * SELECTED_GROWTH * HALO_RATIO + screenScale(camera, RIM_PX, 0) * k * (1 - mix)
+          r.position.set(point.x, DOT_Y, point.z)
+        } else writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k)
         if (!carsOn) continue
         const dx = center ? point.x - center.x : 0
         const dz = center ? point.z - center.z : 0
@@ -146,6 +183,8 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
       }
     }
     h.instanceMatrix.array.set(out)
+    r.visible = rimRadius > 0
+    if (rimRadius > 0) r.scale.setScalar(rimRadius)
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
@@ -158,6 +197,9 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
 
   return (
     <>
+      <mesh ref={rim} geometry={geometry.rim} visible={false} frustumCulled={false} renderOrder={RENDER_ORDER.trainRim}>
+        <meshBasicMaterial color={theme.trainSelectedRim} transparent depthTest={false} depthWrite={false} />
+      </mesh>
       <instancedMesh
         ref={halo}
         args={[geometry.halo, undefined, TRAIN_CAPACITY]}

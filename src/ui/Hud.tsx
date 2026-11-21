@@ -5,8 +5,10 @@ import type { ScreenRect } from '../lib/interiorCamera'
 import { scheduleLabel } from '../lib/labels'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
+import { selectedAnnouncement } from '../lib/live/trainSummary'
 import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
+import { useTrainSelection } from '../lib/trainSelection'
 import type { LocateControls } from '../data/useLocate'
 import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
@@ -16,6 +18,7 @@ import { LocateButton } from './LocateButton'
 import { LocateStatus } from './LocateStatus'
 import { OrbitHint } from './OrbitHint'
 import { RouteChip } from './RouteChip'
+import { TrainGonePanel, TrainPanel } from './TrainPanel'
 
 interface ArrivalsPanelProps {
   network: Network
@@ -85,6 +88,11 @@ interface HudProps {
 
 export function Hud({ network, live, arrivals, onInsets, interior, onPanel, locate }: HudProps) {
   const { focusedId, dismiss } = useFocus()
+  const { selectedKey, selectedSummary, selections, notice, dismissNotice, clearTrain } = useTrainSelection()
+  const trainOpen = selectedSummary !== null
+  const noticeOpen = notice !== null
+  // Spoken only: the gone notice also shows in the panel slot, a pick is shown by the panel itself.
+  const announcement = notice ?? (selectedSummary ? selectedAnnouncement(selectedSummary) : '')
   const root = useRef<HTMLDivElement>(null)
   const header = useRef<HTMLElement>(null)
   const bottom = useRef<HTMLDivElement>(null)
@@ -131,16 +139,20 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
       observer.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [focusedId, onPanel])
+  }, [focusedId, trainOpen, noticeOpen, onPanel])
 
+  // Esc closes what covers the station panel first (the train panel, then the notice), then the station's.
   useEffect(() => {
-    if (!focusedId) return
+    if (!focusedId && !selectedKey && !noticeOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismiss()
+      if (e.key !== 'Escape') return
+      if (selectedKey) clearTrain()
+      else if (noticeOpen) dismissNotice()
+      else dismiss()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedId, dismiss])
+  }, [focusedId, selectedKey, noticeOpen, dismiss, clearTrain, dismissNotice])
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
@@ -150,6 +162,9 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
           <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)}</p>
           <LiveStatus status={live} />
           <LocateStatus state={locate.state} onClear={onClearLocation} />
+          <p role="status" aria-live="polite" className="sr-only">
+            {announcement}
+          </p>
         </div>
         <LocateButton
           ref={locateButton}
@@ -161,7 +176,11 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
       <div ref={bottom} className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <Attribution />
-        {focusedId && (
+        {selectedSummary ? (
+          <TrainPanel network={network} summary={selectedSummary} focusKey={selections} onClose={clearTrain} ref={panel} />
+        ) : notice ? (
+          <TrainGonePanel notice={notice} onDismiss={dismissNotice} ref={panel} />
+        ) : focusedId ? (
           <ArrivalsPanel
             network={network}
             stationId={focusedId}
@@ -171,7 +190,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
             interior={interior}
             ref={panel}
           />
-        )}
+        ) : null}
       </div>
     </div>
   )

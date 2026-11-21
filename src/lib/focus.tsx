@@ -38,9 +38,18 @@ interface FocusProviderProps {
   children: ReactNode
 }
 
+/** Dev-only console and Playwright hooks; each provider adds and removes only its own. */
+export interface UndergroundDevHooks {
+  select?: (stationId: string) => void
+  selectTrain?: (key: string) => void
+  trainKeys?: () => string[]
+  /** Viewport px of a live train's dot and, with cars unfolded, its rear and front ends; null if not drawn. */
+  trainAt?: (key: string) => { x: number; y: number; rear: { x: number; y: number } | null; front: { x: number; y: number } | null } | null
+}
+
 declare global {
   interface Window {
-    __underground?: { select: (stationId: string) => void }
+    __underground?: UndergroundDevHooks
   }
 }
 
@@ -79,9 +88,9 @@ export function FocusProvider({ children }: FocusProviderProps) {
   // Dev-only screenshot and test tooling: `__underground.select('127')` from the console or Playwright.
   useEffect(() => {
     if (!import.meta.env.DEV) return
-    window.__underground = { select }
+    window.__underground = { ...window.__underground, select }
     return () => {
-      delete window.__underground
+      if (window.__underground) delete window.__underground.select
     }
   }, [select])
 

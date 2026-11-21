@@ -17,14 +17,38 @@ export interface CarFrame {
   y: number
 }
 
-/** Two reused ground points: the chord ends of the car being written. */
+/** Where a train's cars sit along its shape: car c spans [rear + c * step, rear + (c + 1) * step]. */
+export interface ConsistSpan {
+  cars: number
+  /** Car pitch at full size, meters: the consist's, shortened so the train fits a short shape. */
+  pitch: number
+  /** Pitch scaled by the unfold (mix times fade). */
+  step: number
+  rear: number
+}
+
+/**
+ * The span of a `consist` drawn at `shown` along a shape `lineLength` long, unfolded by `mixK` (0..1): what
+ * writeConsist lays the cars out on, and what a pick tests against. No allocation.
+ */
+export function consistSpanInto(out: ConsistSpan, lineLength: number, shown: number, consist: Consist, mixK: number): ConsistSpan {
+  const n = Math.min(consist.cars, MAX_CARS)
+  out.cars = n
+  out.pitch = Math.min(consist.pitchM, lineLength / n)
+  out.step = out.pitch * mixK
+  out.rear = consistCenter(lineLength, shown, n * out.step) - (n * out.step) / 2
+  return out
+}
+
+/** Reused per-frame state: the chord ends of the car being written, and the train's span. */
 export interface ConsistScratch {
   a: Ground
   b: Ground
+  span: ConsistSpan
 }
 
 export function createConsistScratch(): ConsistScratch {
-  return { a: { x: 0, z: 0 }, b: { x: 0, z: 0 } }
+  return { a: { x: 0, z: 0 }, b: { x: 0, z: 0 }, span: { cars: 0, pitch: 0, step: 0, rear: 0 } }
 }
 
 /**
@@ -54,9 +78,7 @@ export function writeConsist(
   const n = line.points.length === 0 ? 0 : Math.min(consist.cars, MAX_CARS)
   if (n > 0) {
     const u = mix * k
-    const pitch = Math.min(consist.pitchM, line.length / n)
-    const step = pitch * u
-    const rear = consistCenter(line.length, shown, n * step) - (n * step) / 2
+    const { pitch, step, rear } = consistSpanInto(scratch.span, line.length, shown, consist, u)
     const cross = k * frame.crossScale * widen
     // Height grows in over the first quarter of the handoff, so a stub of a train can't pop up at a tilt.
     const height = cross * Math.min(1, 4 * mix)
