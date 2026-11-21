@@ -18,8 +18,8 @@ export interface InteriorModel {
   origin: Ground
   strong: Buffers
   fine: Buffers
-  /** TEMPORARY (?approx=b, approxLook.ts): a generated interior's outlines and tracks, drawn dashed; else empty. */
-  dashed: Buffers
+  /** TEMPORARY (?approx=b, approxLook.ts): draw both layers with a dashed material, cutting the segments `distances` marks. */
+  dashed: boolean
   /** Generated from an archetype template rather than surveyed: the panel says it is approximate. */
   approximate: boolean
   labels: LevelLabel[]
@@ -75,8 +75,10 @@ function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buff
   const n = hull.length
   const positions = new Float32Array(fine.positions.length + n * 6)
   const colors = new Float32Array(positions.length)
+  const distances = new Float32Array(fine.distances.length + n * 2)
   positions.set(fine.positions)
   colors.set(fine.colors)
+  distances.set(fine.distances)
   let o = fine.positions.length
   for (let i = 0; i < n; i++) {
     const a = hull[i]!
@@ -85,7 +87,7 @@ function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buff
     colors.set([...rgb, ...rgb], o)
     o += 6
   }
-  return { positions, colors }
+  return { positions, colors, distances }
 }
 
 /** Look C: everything in one fine-width layer, fine strokes first (the order the two layers drew in). */
@@ -96,10 +98,13 @@ function concat(a: Buffers, b: Buffers): Buffers {
   positions.set(b.positions, a.positions.length)
   colors.set(a.colors)
   colors.set(b.colors, a.colors.length)
-  return { positions, colors }
+  const distances = new Float32Array(a.distances.length + b.distances.length)
+  distances.set(a.distances)
+  distances.set(b.distances, a.distances.length)
+  return { positions, colors, distances }
 }
 
-const EMPTY: Buffers = { positions: new Float32Array(0), colors: new Float32Array(0) }
+const EMPTY: Buffers = { positions: new Float32Array(0), colors: new Float32Array(0), distances: new Float32Array(0) }
 
 /** Builds the drawable model; throws (naming the element) on inconsistent interior data or nothing to draw. */
 export function buildInteriorModel(interior: StationInterior): InteriorModel {
@@ -130,7 +135,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     origin,
     strong,
     fine: hull ? withCutLine(fine, hull, colorOf('fare', 0)) : fine,
-    dashed: built.dashed,
+    dashed: look === 'b',
     approximate,
     labels: levelLabels(interior, yScale),
     focusAnchor: interiorFocusAnchor(origin, interior, yScale, Math.tan(ISO_POLAR)),

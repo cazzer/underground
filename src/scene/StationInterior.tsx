@@ -1,6 +1,6 @@
 import { Html } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
 import type { Network } from '../lib/network'
 import { interiorOpacity } from '../lib/interiorReveal'
@@ -22,36 +22,32 @@ function showLabel(el: HTMLDivElement, opacity: number): void {
 interface StationInteriorProps {
   model: InteriorModel
   network: Network
-  /** Called when the interior starts or stops showing (camera inside or past the reveal distance). */
-  onRevealed: (revealed: boolean) => void
 }
 
 /**
  * The focused station's interior as two merged line layers (fine, then strong) in a group at
  * its anchor, plus the street veil and DOM level labels. Everything fades in with the tilt.
  */
-export function StationInterior({ model, network, onRevealed }: StationInteriorProps) {
+export function StationInterior({ model, network }: StationInteriorProps) {
   const station = network.stationById.get(model.stationId)
   if (!station) throw new Error(`Interior for unknown station "${model.stationId}"`)
   const group = useRef<Group>(null)
   const veil = useRef<Mesh>(null)
   const labels = useRef<(HTMLDivElement | null)[]>([])
   const shown = useRef(-1)
-  const revealed = useRef<boolean | null>(null)
-  // Unmounting (focus moved on, or the load was replaced) hides the interior.
-  useEffect(() => () => onRevealed(false), [onRevealed])
   const { under } = interiorLook
-  const strong = useLineLayer(model.strong, under ? RENDER_ORDER.interiorUnder : RENDER_ORDER.interior, theme.interiorLineWidth)
+  const dash = model.dashed ? DASH : undefined
+  const strong = useLineLayer(
+    model.strong,
+    under ? RENDER_ORDER.interiorUnder : RENDER_ORDER.interior,
+    theme.interiorLineWidth,
+    dash,
+  )
   const fine = useLineLayer(
     model.fine,
     under ? RENDER_ORDER.interiorUnderFine : RENDER_ORDER.interiorFine,
     theme.interiorFineWidth,
-  )
-  const dashed = useLineLayer(
-    model.dashed,
-    under ? RENDER_ORDER.interiorUnderDashed : RENDER_ORDER.interiorDashed,
-    theme.interiorLineWidth,
-    DASH,
+    dash,
   )
 
   useFrame((state) => {
@@ -60,14 +56,9 @@ export function StationInterior({ model, network, onRevealed }: StationInteriorP
     const o = interiorOpacity(cameraDistance(state))
     if (o === shown.current) return
     shown.current = o
-    if (revealed.current !== o > 0) {
-      revealed.current = o > 0
-      onRevealed(o > 0)
-    }
     g.visible = o > 0
     if (strong) strong.material.opacity = o
     if (fine) fine.material.opacity = o
-    if (dashed) dashed.material.opacity = o
     if (veil.current) (veil.current.material as MeshBasicMaterial).opacity = interiorLook.veilOpacity * o
     for (const el of labels.current) if (el) showLabel(el, o)
   })
@@ -77,7 +68,6 @@ export function StationInterior({ model, network, onRevealed }: StationInteriorP
       <group ref={group} position={[model.origin.x, 0, model.origin.z]} visible={false}>
       {interiorLook.veil !== 'none' && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
-      {dashed && <primitive object={dashed} />}
       {strong && <primitive object={strong} />}
       {model.labels.map((label, i) => (
         // zIndexRange [0, 0]: drei's default z-index would paint labels over the HUD panel.

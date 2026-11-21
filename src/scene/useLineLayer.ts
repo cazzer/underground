@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Color } from 'three'
+import { Color, InstancedInterleavedBuffer, InterleavedBufferAttribute } from 'three'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
@@ -31,14 +31,20 @@ export interface LineDash {
   gap: number
 }
 
+/** Line buffers plus, for a dashed layer, two dash distances per segment (start, end; 0, 0 stays solid). */
+export interface DashableLineBuffers extends LineBuffers {
+  distances?: Float32Array
+}
+
 /**
  * One merged LineSegments2 (a single draw call) for `buffers`; null when there is nothing to
  * draw. Rebuilt when `buffers` changes, disposed on change and unmount. LineSegments2 sets its
  * material's resolution from the viewport (CSS pixels) before each render, so linewidth is in
- * CSS pixels at any dpr. With `dash`, the segments are dashed in world meters along their running length.
+ * CSS pixels at any dpr. With `dash`, the material is dashed in world meters along `buffers.distances` (written
+ * as-is, not by computeLineDistances); a dashed material drops every segment's round end caps.
  */
 export function useLineLayer(
-  buffers: LineBuffers | null,
+  buffers: DashableLineBuffers | null,
   renderOrder: number,
   linewidth = theme.lineWidth,
   dash?: LineDash,
@@ -55,13 +61,16 @@ export function useLineLayer(
       depthTest: false,
       depthWrite: false,
     })
-    const l = new LineSegments2(geometry, material)
     if (dashSize !== undefined && gapSize !== undefined) {
+      if (buffers.distances?.length !== buffers.positions.length / 3) throw new Error('A dashed line layer needs two distances per segment')
+      const d = new InstancedInterleavedBuffer(buffers.distances, 2, 1)
+      geometry.setAttribute('instanceDistanceStart', new InterleavedBufferAttribute(d, 1, 0))
+      geometry.setAttribute('instanceDistanceEnd', new InterleavedBufferAttribute(d, 1, 1))
       material.dashed = true
       material.dashSize = dashSize
       material.gapSize = gapSize
-      l.computeLineDistances()
     }
+    const l = new LineSegments2(geometry, material)
     l.renderOrder = renderOrder
     return l
   }, [buffers, renderOrder, linewidth, dashSize, gapSize])

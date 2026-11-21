@@ -31,12 +31,11 @@ interface SceneProps {
   interior: InteriorModel | null
   /** The station panel's screen rect; interior fly-tos frame beside it. */
   panel: ScreenRect | null
-  onInteriorRevealed: (revealed: boolean) => void
   /** The user's location, once found inside the covered area; null draws no marker. */
   here: { ground: Ground; accuracyM: number } | null
 }
 
-export function Scene({ network, insets, live, onLiveError, interior, panel, onInteriorRevealed, here }: SceneProps) {
+export function Scene({ network, insets, live, onLiveError, interior, panel, here }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   return (
     <Canvas
@@ -61,9 +60,7 @@ export function Scene({ network, insets, live, onLiveError, interior, panel, onI
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
-      {interior && (
-        <StationInterior key={interior.stationId} model={interior} network={network} onRevealed={onInteriorRevealed} />
-      )}
+      {interior && <StationInterior key={interior.stationId} model={interior} network={network} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} />
     </Canvas>
   )

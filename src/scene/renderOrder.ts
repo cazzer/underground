@@ -31,13 +31,10 @@ export const RENDER_ORDER = {
   here: 6.55,
   // Station interior. Look C (?interior=c, temporary) draws it under the street layers.
   interiorUnderFine: -0.6,
-  interiorUnderDashed: -0.45,
   interiorUnder: -0.3,
   // The veil dims everything above (live trains included), then fine and strong interior strokes.
   interiorVeil: 7,
   interiorFine: 8,
-  // TEMPORARY (?approx=b, approxLook.ts): a generated interior's dashed outlines and tracks, under its solid strokes.
-  interiorDashed: 8.5,
   interior: 9,
   // Trains on a revealed station's platforms, redrawn above the veil and the interior strokes: rim, footprints,
   // bodies (depth-tested against the street cars they copy). Keep 10 and up free for anything that must top them.

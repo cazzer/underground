@@ -3,8 +3,6 @@ import type { InteriorModel } from '../scene/interiorModel'
 
 export interface InteriorStatusInfo {
   load: InteriorLoad
-  /** False while the camera is too far out for the interior to show (past the reveal). */
-  revealed: boolean
   onRetry: () => void
 }
 
@@ -17,13 +15,19 @@ interface ReadyLineProps {
 }
 
 /**
- * The line for a loaded interior. The card stays just name and arrivals, so an authored (surveyed) interior
- * shows nothing here and the live region collapses. A generated one says it is approximate; the line shows
- * whether or not the interior is in view, so the live region announces it once per station, not per zoom.
+ * The line for a loaded interior. The card stays just name and arrivals, so an authored interior shows nothing
+ * here and the live region collapses. A generated one says it is estimated; the line shows whether or not the
+ * interior is in view, so the live region announces it once per station, not per zoom. Keyed by station: going
+ * from one generated station to another whose interior is cached keeps the same text, and only a new node
+ * makes the region speak again.
  */
 function ReadyLine({ model }: ReadyLineProps) {
   if (!model.approximate) return null
-  return <p className="text-ink-dim">Approximate layout from station type</p>
+  return (
+    <p key={model.stationId} className="text-ink-dim">
+      Estimated layout
+    </p>
+  )
 }
 
 function StatusLine({ info: { load, onRetry } }: InteriorStatusProps) {

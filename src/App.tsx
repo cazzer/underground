@@ -33,7 +33,6 @@ function MapView({ network, live }: MapViewProps) {
   // If the HUD crashes before measuring itself, the scene still mounts, framed with no HUD bands.
   const defaultInsets = useCallback(() => setInsets((prev) => prev ?? { top: 0, bottom: 0 }), [])
   const [panel, setPanel] = useState<ScreenRect | null>(null)
-  const [interiorRevealed, setInteriorRevealed] = useState(false)
   const placement = markedPlacement(locate.state)
   const here = placement && { ground: placement.ground, accuracyM: placement.accuracyM }
   const model = interior.load.status === 'ready' ? interior.load.model : null
@@ -48,7 +47,6 @@ function MapView({ network, live }: MapViewProps) {
             onLiveError={live.onLayerError}
             panel={panel}
             interior={model}
-            onInteriorRevealed={setInteriorRevealed}
             here={here}
           />
         )}
@@ -62,7 +60,7 @@ function MapView({ network, live }: MapViewProps) {
           onPanel={setPanel}
           locate={locate}
           linkNotice={{ show: stationHash.linkNotice, onDismiss: stationHash.dismissLinkNotice }}
-          interior={{ load: interior.load, revealed: interiorRevealed, onRetry: interior.retry }}
+          interior={{ load: interior.load, onRetry: interior.retry }}
         />
       </ErrorBoundary>
       <LiveDebug debug={live.debug} technical={live.technical} />
