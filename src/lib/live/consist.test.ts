@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { carMix, CARS_AT_M, consistCenter, consistFor, DEFAULT_CONSIST, DOTS_FROM_M, MAX_CARS } from './consist'
+import { tiltT } from '../tilt'
+import { carMix, carsReach, CARS_AT_M, consistCenter, consistFor, DEFAULT_CONSIST, DOTS_FROM_M, MAX_CARS } from './consist'
 
 describe('consistFor', () => {
   it('gives each division its car count and length', () => {
@@ -56,7 +57,7 @@ describe('carMix', () => {
 
   it('rises monotonically as the camera comes in', () => {
     let prev = -1
-    for (let d = 2000; d >= 500; d -= 5) {
+    for (let d = 3000; d >= 500; d -= 5) {
       const m = carMix(d)
       expect(m).toBeGreaterThanOrEqual(prev)
       prev = m
@@ -67,5 +68,26 @@ describe('carMix', () => {
     for (const d of [CARS_AT_M, DOTS_FROM_M]) {
       expect(Math.abs(carMix(d - 0.01) - carMix(d + 0.01))).toBeLessThan(1e-6)
     }
+  })
+})
+
+describe('stage distances', () => {
+  it('trains are footprints (cars) by the time the camera starts to tilt, and only dots before 2400 m', () => {
+    expect(DOTS_FROM_M).toBe(2400)
+    expect(CARS_AT_M).toBe(1600)
+    expect(carMix(1400)).toBe(1)
+    expect(tiltT(1400)).toBe(0)
+  })
+})
+
+describe('carsReach', () => {
+  it('is three camera distances plus 300 m at full tilt and one plus 300 m top-down', () => {
+    expect(carsReach(1000, 1)).toBe(3300)
+    expect(carsReach(1000, 0)).toBe(1300)
+  })
+
+  it('grows with tilt at a fixed distance, and with distance at a fixed tilt', () => {
+    expect(carsReach(800, 0.5)).toBeGreaterThan(carsReach(800, 0.2))
+    expect(carsReach(900, 0.5)).toBeGreaterThan(carsReach(800, 0.5))
   })
 })
