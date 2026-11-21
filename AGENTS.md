@@ -7,8 +7,9 @@ wireframe map with small dots for moving trains. Pinch/scroll zooms. Zooming tow
 a station continuously tilts the camera from top-down to isometric; later that view
 shows the station's levels, stairways, and upcoming arrivals.
 
-Status: scaffold. All data is hand-made sample data (`src/data/sample.ts`). The
-realtime Worker (`worker/`) is built and not yet deployed; the client doesn't call it yet.
+Status: the real static network (every route shape and station from `public/data/`) renders;
+trains are still fake motion and arrivals are placeholders until the client calls the realtime
+Worker (`worker/`), which is built and not yet deployed.
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -44,16 +45,27 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 
 ## Directory map
 - `src/main.tsx`, `src/App.tsx`, `src/index.css`: entry, root layout, Tailwind + theme CSS vars
-- `src/theme.ts`: all colors, line widths, fonts; presets selected by `?theme=`
+- `src/theme.ts`: all colors, line widths, fonts; presets selected by `?theme=`. Route colors are
+  GTFS data drawn through `theme.routeLineMix` (mixed toward a theme color; amount 1 = mono), then
+  pushed to at least 3:1 against `theme.background`.
+  TEMPORARY: `?lines=a|b|c` picks the lines look until the 8x4.3 options round is decided (default b)
 - `src/scene/`: the r3f scene
-  - `Scene.tsx` canvas and grid; `CameraRig.tsx` MapControls, zoom-driven tilt, fly-to, auto focus
-  - `SubwayLines.tsx`, `Stations.tsx`, `Trains.tsx` (instanced dots); `cameraDistance.ts` helpers
-- `src/ui/Hud.tsx`: Tailwind overlay (title, arrivals panel)
+  - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
+    HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold
+  - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
+    temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; picks raycast an invisible
+    22 px hit disc per station and take the nearest);
+    `Trains.tsx` (instanced dots); `cameraDistance.ts` helpers; `renderOrder.ts`
+- `src/ui/Hud.tsx`: Tailwind overlay (title, arrivals panel); `LoadStatus.tsx` loading/error panel
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
-  - `network.ts` sample data to routes/stations; `focusMachine.ts` camera-driven focus
-    transitions; `pingPong.ts` triangle wave
-  - `focus.tsx` focused/dismissed-station React context (not pure)
+  - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
+    `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
+  - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
+    between HUD insets), `markerMatrices.ts`, `pickStation.ts`: pure render helpers; `labels.ts`
+    HUD text (route chips, schedule date); `pingPong.ts` triangle wave
+  - `focus.tsx` focused/dismissed-station React context (not pure). In dev only it exposes
+    `window.__underground.select(stationId)` for screenshots and Playwright checks
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
@@ -65,7 +77,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `smoothing.ts` smoothDistance: per-frame ease that never goes backward
   - `filters.ts` ghostReason: unassigned, stale vehicle, no future arrival
   - `prepareTrips.ts` per poll: filter, join, place; returns live trips and per-reason drop counts
-- `src/data/sample.ts`: sample lines and stations in lat/lon
+- `src/data/loadNetwork.ts` fetches stations/routes/shapes JSON and validates their outer shape;
+  `useNetwork.ts` is the loading/error/ready hook
 - `src/data/schema.ts`: types of the six `public/data/*.json` files; `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
@@ -102,15 +115,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Scene units are meters. x = east, z = south (north is up top-down), y = up.
   Convert lat/lon only through `src/lib/projection.ts`.
 - Every color, line width, and font comes from `src/theme.ts`. Never hardcode them.
+- The Canvas is `flat` (no tone mapping), so theme tokens render exactly as written.
   HUD uses Tailwind tokens (`bg-panel`, `text-ink`, ...) backed by theme CSS variables.
 - Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`).
   User rotation is disabled. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
-  an explicit `renderOrder`: grid -1, lines 1, station fill 2, station ring 3, trains 4.
+  an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
+  station fill 3, station ring 4, trains 5.
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
+- All route shapes draw as one merged `LineSegments2` (one draw call, per-vertex colors in linear
+  space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then
+  route_sort_order. Don't add per-route `<Line>`s.
+- Station markers are instanced: matrices are rewritten only when the scale or focus changes.
 
 ## Station interior format
 `public/data/stations/<id>.json`, type `StationInterior` in `src/data/stationSchema.ts`. Built by

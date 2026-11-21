@@ -1,3 +1,5 @@
+import type { RouteLineMix } from './lib/routeColor'
+
 /** Every color, line width, and font token lives here. Never hardcode these elsewhere. */
 export interface Theme {
   name: string
@@ -6,8 +8,10 @@ export interface Theme {
   /** Faint ground grid (cell lines, then every-10th section lines). */
   gridCell: string
   gridSection: string
-  /** Subway line colors, indexed by line order (wraps). */
-  lines: readonly string[]
+  /** How a route's GTFS color is drawn: mixed toward a theme color (amount 1 = mono). */
+  routeLineMix: RouteLineMix
+  /** TEMPORARY (removed with ?lines=, see LineHighlight.tsx): single line color for the mono looks a and c. */
+  lineMono: string
   /** Line width in screen pixels. */
   lineWidth: number
   stationFill: string
@@ -31,7 +35,8 @@ export const THEMES = {
     background: '#0b2147',
     gridCell: '#16376e',
     gridSection: '#2a5aa8',
-    lines: ['#5ce1ff', '#ffffff', '#ffd166'],
+    routeLineMix: { toward: '#ffffff', amount: 0.3 },
+    lineMono: '#5ce1ff',
     lineWidth: 1.5,
     stationFill: '#0b2147',
     stationStroke: '#ffffff',
@@ -49,7 +54,8 @@ export const THEMES = {
     background: '#f3efe4',
     gridCell: '#e2dccb',
     gridSection: '#cfc7b0',
-    lines: ['#2b2b2b', '#a63d2f', '#2f5d8a'],
+    routeLineMix: { toward: '#2b2b2b', amount: 0.15 },
+    lineMono: '#2b2b2b',
     lineWidth: 1.25,
     stationFill: '#f3efe4',
     stationStroke: '#2b2b2b',
@@ -67,7 +73,8 @@ export const THEMES = {
     background: '#000000',
     gridCell: '#06210f',
     gridSection: '#0d4a22',
-    lines: ['#33ff66', '#b6ff33', '#33ffd0'],
+    routeLineMix: { toward: '#33ff66', amount: 1 },
+    lineMono: '#33ff66',
     lineWidth: 1.5,
     stationFill: '#000000',
     stationStroke: '#33ff66',
@@ -97,6 +104,25 @@ export function resolveTheme(search: string): Theme {
 }
 
 export const theme: Theme = resolveTheme(window.location.search)
+
+/**
+ * TEMPORARY until the lines look is picked (8x4.3 options round); remove with the unchosen
+ * variants. `?lines=a`: mono lines plus the focused station's routes in color; `b` (default):
+ * route colors via routeLineMix; `c`: mono at overview, route colors fade in when zoomed in.
+ */
+export type LinesMode = 'a' | 'b' | 'c'
+
+export function resolveLinesMode(search: string): LinesMode {
+  const requested = new URLSearchParams(search).get('lines')
+  return requested === 'a' || requested === 'c' ? requested : 'b'
+}
+
+export const linesMode: LinesMode = resolveLinesMode(window.location.search)
+
+/** Mix rule for the always-on line layer under the current lines mode. */
+export function baseLineMix(t: Theme, mode: LinesMode): RouteLineMix {
+  return mode === 'b' ? t.routeLineMix : { toward: t.lineMono, amount: 1 }
+}
 
 /** Expose HUD tokens as CSS variables; Tailwind reads them via `@theme inline` in index.css. */
 export function applyThemeCss(t: Theme, root: HTMLElement = document.documentElement): void {

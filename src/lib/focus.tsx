@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { nextFocus, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'
@@ -29,6 +29,12 @@ interface FocusProviderProps {
   children: ReactNode
 }
 
+declare global {
+  interface Window {
+    __underground?: { select: (stationId: string) => void }
+  }
+}
+
 const FocusContext = createContext<FocusValue | null>(null)
 
 export function FocusProvider({ children }: FocusProviderProps) {
@@ -53,6 +59,15 @@ export function FocusProvider({ children }: FocusProviderProps) {
       }),
     [],
   )
+
+  // Dev-only screenshot and test tooling: `__underground.select('127')` from the console or Playwright.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    window.__underground = { select }
+    return () => {
+      delete window.__underground
+    }
+  }, [select])
 
   const { focusedId, dismissedId } = state
   const value = useMemo<FocusValue>(

@@ -1,6 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useFocus } from '../lib/focus'
-import { network } from '../lib/network'
+import type { Insets } from '../lib/framing'
+import { routeChipLabel, scheduleLabel } from '../lib/labels'
+import type { Network, Route } from '../lib/network'
+import { routeLineColor } from '../lib/routeColor'
 import { theme } from '../theme'
 import { Attribution } from './Attribution'
 
@@ -11,18 +14,34 @@ const PLACEHOLDER_ARRIVALS = [
   { line: 'L1', destination: 'Battery Park', minutes: 9 },
 ]
 
-function lineColor(lineId: string): string {
-  const route = network.routes.find((r) => r.id === lineId)
-  return theme.lines[(route?.colorIndex ?? 0) % theme.lines.length] ?? theme.ink
+interface RouteChipProps {
+  route: Route
+}
+
+/** Ink text on a route-colored border; the full name is in the tooltip and for screen readers. */
+function RouteChip({ route }: RouteChipProps) {
+  return (
+    <li
+      title={route.longName}
+      className="border-2 px-1.5 text-xs text-ink"
+      style={{ borderColor: routeLineColor(route.color, theme.routeLineMix, theme.background) }}
+    >
+      <span aria-hidden="true">{routeChipLabel(route.shortName)}</span>
+      <span className="sr-only">
+        {route.shortName}: {route.longName}
+      </span>
+    </li>
+  )
 }
 
 interface ArrivalsPanelProps {
+  network: Network
   stationId: string
   onClose: () => void
 }
 
-function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
-  const station = network.stations.find((s) => s.id === stationId)
+function ArrivalsPanel({ network, stationId, onClose }: ArrivalsPanelProps) {
+  const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   return (
     <aside
@@ -40,13 +59,13 @@ function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
           ×
         </button>
       </div>
-      <div className="mt-1 flex gap-1.5">
-        {station.lineIds.map((id) => (
-          <span key={id} className="border px-1.5 text-xs" style={{ borderColor: lineColor(id), color: lineColor(id) }}>
-            {id}
-          </span>
-        ))}
-      </div>
+      <ul aria-label="Routes" className="mt-1 flex flex-wrap gap-1.5">
+        {station.routeIds.map((id) => {
+          const route = network.routeById.get(id)
+          if (!route) throw new Error(`Station ${station.id} lists unknown route "${id}"`)
+          return <RouteChip key={id} route={route} />
+        })}
+      </ul>
       <p className="mt-3 text-xs uppercase tracking-widest text-ink-dim">Arrivals (placeholder)</p>
       <ul className="mt-1 divide-y divide-edge/30 text-sm">
         {PLACEHOLDER_ARRIVALS.map((a) => (
@@ -62,8 +81,27 @@ function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
   )
 }
 
-export function Hud() {
+interface HudProps {
+  network: Network
+  /** Reports the screen bands the header and footer cover. */
+  onInsets: (insets: Insets) => void
+}
+
+export function Hud({ network, onInsets }: HudProps) {
   const { focusedId, dismiss } = useFocus()
+  const root = useRef<HTMLDivElement>(null)
+  const header = useRef<HTMLElement>(null)
+  const bottom = useRef<HTMLDivElement>(null)
+
+  // Measured once, before the scene mounts, for its opening view.
+  useLayoutEffect(() => {
+    if (!root.current || !header.current || !bottom.current) return
+    const r = root.current.getBoundingClientRect()
+    onInsets({
+      top: header.current.getBoundingClientRect().bottom - r.top,
+      bottom: r.bottom - bottom.current.getBoundingClientRect().top,
+    })
+  }, [onInsets])
 
   useEffect(() => {
     if (!focusedId) return
@@ -75,15 +113,15 @@ export function Hud() {
   }, [focusedId, dismiss])
 
   return (
-    <div className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
-      <header>
+    <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
+      <header ref={header}>
         <h1 className="text-xl tracking-[0.3em] uppercase">underground</h1>
-        <p className="text-xs text-ink-dim">sample data / theme: {theme.name}</p>
+        <p className="text-xs text-ink-dim">{scheduleLabel(network.feedVersion)} / theme: {theme.name}</p>
       </header>
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
-      <div className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+      <div ref={bottom} className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <Attribution />
-        {focusedId && <ArrivalsPanel stationId={focusedId} onClose={dismiss} />}
+        {focusedId && <ArrivalsPanel network={network} stationId={focusedId} onClose={dismiss} />}
       </div>
     </div>
   )
