@@ -39,15 +39,18 @@ describe('decideCorrection', () => {
     expect(decide({ errM: 300, fixedPlan: true })).toEqual({ kind: 'glide', durationS: 300 / GLIDE_CATCHUP_MPS })
   })
 
-  it('continues a running glide: it keeps its end unless the rest would close faster than an eased glide peaks', () => {
-    expect(decide({ errM: 300, glideLeftS: 8 })).toEqual({ kind: 'glide', durationS: 8 })
-    expect(decide({ errM: GLIDE_CONTINUE_MPS * 4, glideLeftS: 4 })).toEqual({ kind: 'glide', durationS: 4 })
+  it('continues a running glide unless the rest would close faster than an eased glide peaks', () => {
+    expect(decide({ errM: 300, glideLeftS: 8 })).toEqual({ kind: 'continue' })
+    expect(decide({ errM: GLIDE_CONTINUE_MPS * 4, glideLeftS: 4 })).toEqual({ kind: 'continue' })
+    // A small gap mid-glide stays on the glide rather than stepping down to the ease; none ahead stops it.
+    expect(decide({ errM: 40, glideLeftS: 2 })).toEqual({ kind: 'continue' })
+    expect(decide({ errM: 0, glideLeftS: 2 })).toEqual({ kind: 'none' })
     expect(decide({ errM: 300, glideLeftS: 1 })).toEqual({ kind: 'glide', durationS: 300 / GLIDE_CATCHUP_MPS })
   })
 
   it('cross-fades a forward gap too large to glide', () => {
     expect(decide({ errM: GLIDE_MAX_M + 1 })).toEqual({ kind: 'crossfade' })
-    expect(decide({ errM: GLIDE_MAX_M + 1, glideLeftS: 5 })).toEqual({ kind: 'crossfade' })
+    expect(decide({ errM: GLIDE_MAX_M + 1, glideLeftS: 5 })).toEqual({ kind: 'crossfade' }) // 240 m/s: too fast to continue
   })
 
   it('cross-fades every correction past the ease range under reduced motion', () => {

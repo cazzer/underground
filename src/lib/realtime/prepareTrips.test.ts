@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { FEED_IDS, RT_SCHEMA_VERSION, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import { geometries, lookup, segments } from './fixture'
-import { hopDistance, positionAlongShape, SCHEDULE_CAP_SLACK_S } from './position'
+import { hopDistance, positionAlongShape } from './position'
+import { SCHEDULE_CAP_SLACK_S } from './stopVisit'
 import { prepareTrips } from './prepareTrips'
 
 const NOW = 1_795_228_554
@@ -109,10 +110,11 @@ describe('prepareTrips across polls', () => {
     // feed still saying 103N at NOW + 130.
     const stopped = trip('129900_1..N03R', '1', { status: 'STOPPED_AT', timestamp: NOW - 20, arrivals: [['102N', NOW - 20], ['103N', NOW + 150]] })
     const first = prepareTrips(snapshot({ '1234567': [stopped] }), data, NOW)
-    expect(first.trips[0]!.visit).toEqual({ stopId: '102N', arrivedAt: NOW - 20, seenAt: NOW })
+    expect(first.trips[0]!.visit).toEqual({ stopId: '102N', arrivedAt: NOW - 20, leftAfter: NOW, here: true })
+    expect(first.trips[0]!.plan.arriveAt).toBe(NOW + 150) // still at the platform: not capped
     const moving = trip('129900_1..N03R', '1', { stopId: '103N', timestamp: NOW + 15, arrivals: [['103N', NOW + 130]] })
     const later = prepareTrips(snapshot({ '1234567': [moving] }), data, NOW + 20, new Map(first.trips.map((t) => [t.key, t])))
-    expect(later.trips[0]!.visit).toBe(first.trips[0]!.visit)
+    expect(later.trips[0]!.visit).toEqual({ ...first.trips[0]!.visit, here: false })
     expect(later.trips[0]!.plan.arriveAt).toBe(NOW + 80 + SCHEDULE_CAP_SLACK_S)
     // Without the previous poll there is nothing to cap it with.
     expect(prepareTrips(snapshot({ '1234567': [moving] }), data, NOW + 20).trips[0]!.plan.arriveAt).toBe(NOW + 130)

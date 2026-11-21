@@ -28,7 +28,8 @@ export const GLIDE_MAX_M = 1200
  */
 export const GLIDE_CONTINUE_MPS = 1.5 * GLIDE_CATCHUP_MPS
 
-export type Correction = { kind: 'none' } | { kind: 'glide'; durationS: number } | { kind: 'crossfade' }
+/** `continue`: the running glide keeps its end and is rescaled to the new gap. */
+export type Correction = { kind: 'none' } | { kind: 'glide'; durationS: number } | { kind: 'continue' } | { kind: 'crossfade' }
 
 export interface CorrectionInput {
   /** Plan distance minus displayed distance (m); positive means the dot is behind. */
@@ -43,6 +44,7 @@ export interface CorrectionInput {
 
 const NONE: Correction = { kind: 'none' }
 const CROSSFADE: Correction = { kind: 'crossfade' }
+const CONTINUE: Correction = { kind: 'continue' }
 
 /** Seconds a glide takes to close `errM`: at the catch-up speed, within the min and max. */
 export const glideDurationFor = (errM: number): number =>
@@ -50,9 +52,9 @@ export const glideDurationFor = (errM: number): number =>
 
 export function decideCorrection(i: CorrectionInput): Correction {
   if (i.errM < -HOLD_BACK_M || (i.fixedPlan && i.errM < -EASE_MAX_M)) return CROSSFADE
+  // A running glide continues toward the new target, even a small one, unless the new gap needs it to rush.
+  if (i.glideLeftS !== null && i.errM > 0 && i.errM / i.glideLeftS <= GLIDE_CONTINUE_MPS) return CONTINUE
   if (i.errM <= EASE_MAX_M) return NONE
   if (i.reducedMotion || i.errM > GLIDE_MAX_M) return CROSSFADE
-  // A running glide continues toward the new target, keeping its end, unless the new gap needs it to rush.
-  const continues = i.glideLeftS !== null && i.errM / i.glideLeftS <= GLIDE_CONTINUE_MPS
-  return { kind: 'glide', durationS: continues ? i.glideLeftS! : glideDurationFor(i.errM) }
+  return { kind: 'glide', durationS: glideDurationFor(i.errM) }
 }

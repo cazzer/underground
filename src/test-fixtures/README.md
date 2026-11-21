@@ -4,14 +4,23 @@
 
 18 consecutive `/rt` responses from the deployed Worker (about 20 s apart, 2026-11-21 around 21:56 UTC),
 each with the wall-clock time it arrived (`receivedAt`, epoch s). `src/lib/live/lagReplay.test.ts` replays
-them to time how far dots trail the feed (underground-d80).
+them to time how far dots trail the feed and to check they don't leave a platform early (underground-d80).
 
-Trimmed from the full recording (about 180 KB a poll) to 14 trips that appear in every poll and turn
-STOPPED_AT at least twice: 5 from the 1234567 feed, 6 across the B-division and SI feeds, and 3 L trains.
+Trimmed from the full recording (about 180 KB a poll) to 21 trips:
+- 17 that appear in every poll and turn STOPPED_AT at least twice, most first, spread over feeds: 6 from the
+  1234567 feed, 8 across the B-division and SI feeds, 3 L trains;
+- 4 picked because they sit at a platform across polls (two 1234567, two L), where a cap that ignored the
+  hold let dots leave about 250 m early.
+
 Arrivals more than 15 minutes past `generatedAt` are dropped (the first two are always kept, like the
 Worker's `ARRIVALS_MIN`). Feed headers, errors and staleness are as recorded; `droppedEntities` is 0.
 
-The test joins these trips against the committed `public/data`. If a new schedule pick stops them joining,
-record a fresh run of polls and trim it the same way.
+## `rt-static.json`
 
-MTA realtime data, served through the Worker; see `docs/research/data-sources.md` for its terms.
+The static data those trips need, cut from `public/data` (feed version `20261028-fall-2026-pick-with-long-term-
+supplements`) so schedule refreshes can't move the test: the shapes the trips join to, the primary shape of each
+of their routes and directions, every shape of their routes with one of their trip origins (origins trimmed to
+those), the stations on those shapes, and the segments between their stops. The replay gives the same numbers
+on it as on the full `public/data`.
+
+Both are MTA data (realtime through the Worker; static GTFS); see `docs/research/data-sources.md` for terms.

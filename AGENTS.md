@@ -251,16 +251,18 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
     first `dwellFor(runS)` (30 s, at most 35% of the hop) of every hop is held at its origin stop: the train
     leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status. The predicted arrival is
-    capped by the schedule from the trip's last stop plus `SCHEDULE_CAP_SLACK_S` (6 s) (`stopVisit.ts`): MTA
-    final-approach predictions run about 40 s late
-  - `stopVisit.ts` `nextVisit`: the last stop a train was seen at (STOPPED_AT time, and when it was last seen there
-    on the 1234567 and L feeds, whose STOPPED_AT ends on departure), carried across polls
+    capped by the schedule from the trip's last stop (`capArrival` in `stopVisit.ts`): MTA final-approach
+    predictions run about 40 s late
+  - `stopVisit.ts` `nextVisit`: the last stop a train was seen at (STOPPED_AT time; `here` and `leftAfter` on the
+    1234567 and L feeds, whose STOPPED_AT ends on departure), carried across polls. `capArrival`: a train still
+    `here` never leaves before `leftAfter`; once gone, arrival = min(prediction, schedule from the stop + 6 s),
+    pulled in by at most 45 s; never from the origin stop. `?debug` counts capped plans
   - `smoothing.ts` smoothDistance: per-frame ease that never goes backward
   - `filters.ts` ghostReason: unassigned, stale vehicle, no future arrival
   - `prepareTrips.ts` per poll: filter, join, plan; returns live trips (each with its `HopPlan` and `visit`) and
     per-reason drop counts. Takes last poll's trips (shape for join ties, visit for the cap)
-- `src/test-fixtures/`: `rt-polls.json`, 18 recorded `/rt` polls trimmed to 14 trips, which
-  `src/lib/live/lagReplay.test.ts` replays to bound how far dots trail the feed (see its README)
+- `src/test-fixtures/`: `rt-polls.json` (18 recorded `/rt` polls trimmed to 21 trips) and `rt-static.json` (their
+  static subset), which `src/lib/live/lagReplay.test.ts` replays to bound lag both ways and early departures
 - `src/data/loadNetwork.ts` fetches stations/routes/shapes/station-depths JSON and validates their outer shape (a
   missing depths file fails the load like the others); `depthsCodec.ts` (pure, `.ts` imports for the scripts'
   encoder) decodes the packed depths in `buildNetwork` against stations.json and the drawn lines into the per-track

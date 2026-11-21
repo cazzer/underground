@@ -1,19 +1,15 @@
 // Train lag on recorded polls (underground-d80): replays src/test-fixtures/rt-polls.json through the client's own
 // per-poll and per-frame code (prepareTrips, reconcileSlots, stepSlot at 30 fps) and times when each dot reaches a
-// stop against when the feed first reported the train STOPPED_AT there. Uses the committed public/data, like
-// dwellReplay.test.ts, so it runs in the daily data refresh: a failure there after a new schedule pick may mean
-// the recorded trips no longer join, and the fixture needs re-recording (see src/test-fixtures/README.md).
+// stop against when the feed first reported the train STOPPED_AT there. The static data is the subset these trips
+// need, cut from public/data when the polls were recorded (rt-static.json), so schedule refreshes can't move it.
 import { describe, expect, it } from 'vitest'
-import segmentsRaw from '../../../public/data/segments.json?raw'
-import shapesRaw from '../../../public/data/shapes.json?raw'
-import stationsRaw from '../../../public/data/stations.json?raw'
-import tripIndexRaw from '../../../public/data/trip-index.json?raw'
 import pollsRaw from '../../test-fixtures/rt-polls.json?raw'
-import { FEED_IDS, type RealtimeSnapshot } from '../../data/realtime'
-import type { SegmentsFile, ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
+import staticRaw from '../../test-fixtures/rt-static.json?raw'
+import { FEED_IDS, type FeedId, type RealtimeSnapshot } from '../../data/realtime'
+import type { ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
 import { pointAtDistance } from '../realtime/polyline'
 import { hopDistance } from '../realtime/position'
-import { prepareTrips, type StaticRealtimeData, type TripMemory } from '../realtime/prepareTrips'
+import { prepareTrips, type LiveTrip, type StaticRealtimeData, type TripMemory } from '../realtime/prepareTrips'
 import { buildShapeGeometries, type ShapeGeometry } from '../realtime/shapeGeometry'
 import { buildTripLookup } from '../realtime/tripLookup'
 import { TRACK_OFFSET_M } from '../trackOffset'
@@ -26,13 +22,16 @@ interface RecordedPoll {
   snapshot: RealtimeSnapshot
 }
 
-const shapes = JSON.parse(shapesRaw) as ShapesFile
-const stations = JSON.parse(stationsRaw) as StationsFile
-const index = JSON.parse(tripIndexRaw) as TripIndexFile
+const fixed = JSON.parse(staticRaw) as {
+  shapes: ShapesFile
+  stations: StationsFile
+  tripIndex: TripIndexFile
+  segments: Record<string, number>
+}
 const data: StaticRealtimeData = {
-  lookup: buildTripLookup(index, shapes),
-  geometries: buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, new Map()),
-  segments: (JSON.parse(segmentsRaw) as SegmentsFile).segments,
+  lookup: buildTripLookup(fixed.tripIndex, fixed.shapes),
+  geometries: buildShapeGeometries(fixed.shapes, fixed.tripIndex, fixed.stations, TRACK_OFFSET_M, new Map()),
+  segments: fixed.segments,
 }
 const polls = (JSON.parse(pollsRaw) as { polls: RecordedPoll[] }).polls
 
@@ -42,6 +41,8 @@ const REACH_M = 5
 /** Only stops the dot was already drawn this long before are timed (it needs a plan to be late against). */
 const DRAWN_BEFORE_S = 60
 const MAX_STEP_M = 50
+/** How far past a platform a dot may get while the next poll still has the train there. */
+const PAST_PLATFORM_M = 50
 
 interface Arrival {
   key: string
@@ -82,6 +83,30 @@ interface Replay {
   firstDrawn: Map<string, number>
   maxStepM: number
   maxBackM: number
+  /** The furthest a dot got past a platform between two polls that both have the train at it. */
+  maxPastPlatformM: number
+}
+
+/**
+ * Trips at a platform in poll `k` that are still there in the next one, by key: the distance of that stop on
+ * their shape. "At the platform" is STOPPED_AT with the stop's own time at or after the feed header; B-division
+ * STOPPED_AT lingers after departure, so a bare status proves nothing there.
+ */
+function stillAtPlatform(k: number, trips: readonly LiveTrip[]): Map<string, number> {
+  const out = new Map<string, number>()
+  const next = polls[k + 1]?.snapshot
+  if (!next) return out
+  const at = (feed: FeedId, tripId: string, stopId: string) => {
+    const f = next.feeds[feed]
+    const t = f.trips.find((x) => x.tripId === tripId)
+    const own = t?.arrivals.find((a) => a[0] === stopId)?.[1]
+    return t?.status === 'STOPPED_AT' && t.stopId === stopId && own !== undefined && f.headerTimestamp !== null && own >= f.headerTimestamp
+  }
+  for (const t of trips) {
+    const s = t.trip.stopId === null ? -1 : t.geometry.stops.indexOf(t.trip.stopId)
+    if (t.trip.status === 'STOPPED_AT' && s >= 0 && at(t.feed, t.trip.tripId, t.trip.stopId!)) out.set(t.key, t.geometry.stopDistances[s]!)
+  }
+  return out
 }
 
 /** Runs the polls through the client's code frame by frame, the way LiveTrains does. */
@@ -102,6 +127,8 @@ function replay(): Replay {
   let next = 0
   let maxStepM = 0
   let maxBackM = 0
+  let maxPastPlatformM = 0
+  let held = new Map<string, number>()
   const end = polls[polls.length - 1]!.receivedAt + 30
   for (let wall = polls[0]!.receivedAt; wall < end; wall += FRAME_S) {
     const perfMs = (wall - perf0) * 1000
@@ -111,6 +138,7 @@ function replay(): Replay {
       offset = updateClockOffset(offset, p.snapshot.generatedAt, (p.receivedAt - perf0) * 1000)
       const { trips } = prepareTrips(p.snapshot, data, clockNow(offset, perfMs), previous)
       previous = new Map(trips.map((t) => [t.key, t]))
+      held = stillAtPlatform(next - 1, trips)
       reconcileSlots(table, trips, localS, { dataNow: clockNow(offset, perfMs), reducedMotion: false })
       for (const t of trips) if (!firstDrawn.has(t.key)) firstDrawn.set(t.key, wall)
     }
@@ -137,6 +165,8 @@ function replay(): Replay {
       last.z[i] = point.z
       last.d[i] = shown
       last.g[i] = g
+      const platform = held.get(trip.key)
+      if (platform !== undefined && scale > 0 && g === trip.geometry) maxPastPlatformM = Math.max(maxPastPlatformM, shown - platform)
       if (table.phase[i] === 1) continue
       for (let s = 0; s < g.stops.length && g.stopDistances[s]! - REACH_M <= shown; s++) {
         const k = `${trip.key}|${g.stops[s]}`
@@ -144,7 +174,7 @@ function replay(): Replay {
       }
     }
   }
-  return { reached, firstDrawn, maxStepM, maxBackM }
+  return { reached, firstDrawn, maxStepM, maxBackM, maxPastPlatformM }
 }
 
 const quantile = (xs: readonly number[], q: number): number => {
@@ -164,10 +194,15 @@ describe('replaying recorded polls', () => {
     expect(lags.length).toBeGreaterThanOrEqual(25)
   })
 
-  it('shows a train reaching its stop within 15 s (median) and 30 s (p90) of the feed', () => {
+  it('shows a train reaching its stop within 15 s (median) and 30 s (p90) of the feed, and not 15 s early (p10)', () => {
     // The feed itself is seen about 15 s late (its own ~20 s header cadence plus the 20 s poll).
     expect(quantile(lags, 0.5)).toBeLessThanOrEqual(15)
     expect(quantile(lags, 0.9)).toBeLessThanOrEqual(30)
+    expect(quantile(lags, 0.1)).toBeGreaterThanOrEqual(-15)
+  })
+
+  it(`keeps a dot within ${PAST_PLATFORM_M} m of a platform the next poll still has the train at`, () => {
+    expect(run.maxPastPlatformM).toBeLessThanOrEqual(PAST_PLATFORM_M)
   })
 
   it(`never moves a visible dot more than ${MAX_STEP_M} m in one frame, or backward`, () => {

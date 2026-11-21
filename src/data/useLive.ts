@@ -24,6 +24,8 @@ export interface LiveDebugInfo {
   drawn: number
   dropped: Record<DropReason, number>
   stages: Record<JoinStage, number>
+  /** Drawn trips whose arrival comes from the schedule from their last stop, not the feed's prediction. */
+  capped: number
   perFeed: Record<FeedId, { trips: number; stale: boolean; error: string | null }>
   cache: string | null
   prepareMs: number
@@ -78,7 +80,7 @@ export function useLive(
     try {
       const now = clockNow(offsetS, started)
       const result = prepareTrips(snapshot, data, now, previousTrips.current)
-      previousTrips.current = new Map(result.trips.map((t) => [t.key, t]))
+      previousTrips.current = new Map(result.trips.map((t) => [t.key, { shapeId: t.shapeId, visit: t.visit }]))
       return { ok: true as const, ...result, ms: performance.now() - started, now }
     } catch (err) {
       console.error('Failed to place live trips', err)
@@ -113,6 +115,7 @@ export function useLive(
       drawn: placed.trips.length,
       dropped: placed.dropped,
       stages,
+      capped: placed.trips.filter((t) => t.plan.capped).length,
       perFeed,
       cache: feed.cache,
       prepareMs: placed.ms,

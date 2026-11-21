@@ -126,7 +126,7 @@ function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o:
   if (c.kind === 'crossfade') {
     t.phase[slot] = SHRINK
     t.phaseAt[slot] = nowS
-  } else if (c.kind === 'glide' && c.durationS === glideLeftS) {
+  } else if (c.kind === 'continue') {
     // Continue the running glide on its own curve, rescaled so it starts from the new gap: no restart from rest.
     t.glideT[slot] = runningT
     t.glideE0[slot] = (target - shown) / (1 - smoothstep((o.dataNow - t.glideAt[slot]!) / runningT))
