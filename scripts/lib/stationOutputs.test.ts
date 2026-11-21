@@ -8,8 +8,10 @@ import { buildStationIndex } from './stationIndex.ts'
 
 const dir = new URL('../../public/data/stations/', import.meta.url)
 const INDEX_FILE = 'index.json'
+/** Not interiors: the index and the generated stations' track depths. */
+const NOT_INTERIORS = new Set([INDEX_FILE, 'depths-generated.json'])
 const ids = readdirSync(dir)
-  .filter((f) => f.endsWith('.json') && f !== INDEX_FILE)
+  .filter((f) => f.endsWith('.json') && !NOT_INTERIORS.has(f))
   .map((f) => f.replace(/\.json$/, ''))
   .sort()
 const read = (id: string) => JSON.parse(readFileSync(new URL(`${id}.json`, dir), 'utf8')) as StationInterior

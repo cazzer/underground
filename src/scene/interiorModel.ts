@@ -1,5 +1,6 @@
 import { Color } from 'three'
-import type { LocalPoint, StationInterior } from '../data/stationSchema'
+import type { Level, LocalPoint, StationInterior } from '../data/stationSchema'
+import { levelFadeShares } from '../lib/interiorFade'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { buildInteriorBuffers, RAIL_DROP_M, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
 import { toGround, type Ground } from '../lib/projection'
@@ -17,7 +18,7 @@ export interface InteriorModel {
   strong: Buffers
   fine: Buffers
   labels: LevelLabel[]
-  /** Plan center and the toward-camera shift that puts it at mid-depth mid-screen, seen isometrically. */
+  /** Plan center and the toward-camera shift that puts it at mid-height mid-screen, seen isometrically. */
   focusAnchor: FocusAnchor
   /** Look B's cutaway outline (group-local), or null. */
   hull: LocalPoint[] | null
@@ -38,13 +39,17 @@ const ROLE_TOKEN: Record<InteriorRole, string> = {
 
 const HULL_PAD = 6
 
-/** Linear RGB per role and level: deeper levels mix toward the background (mixed in sRGB); machines fade less. */
-function colorTable(levels: number): (role: InteriorRole, levelIndex: number) => Rgb {
+/**
+ * Linear RGB per role and level: levels farther from the street (deeper, or higher at an elevated station) mix
+ * toward the background (mixed in sRGB); machines fade less.
+ */
+function colorTable(levels: readonly Level[]): (role: InteriorRole, levelIndex: number) => Rgb {
   const table = new Map<string, Rgb>()
+  const shares = levelFadeShares(levels)
   for (const [role, token] of Object.entries(ROLE_TOKEN)) {
-    for (let i = 0; i < levels; i++) {
+    for (let i = 0; i < levels.length; i++) {
       const share = role === 'elevator' || role === 'escalator' ? MACHINE_DEPTH_FADE_SHARE : 1
-      const fade = levels > 1 ? (theme.interiorDepthFade * share * i) / (levels - 1) : 0
+      const fade = theme.interiorDepthFade * share * shares[i]!
       const c = new Color(mixHex(token, theme.background, fade))
       table.set(`${role}:${i}`, [c.r, c.g, c.b])
     }
@@ -77,7 +82,7 @@ function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buff
 /** Builds the drawable model; throws (naming the element) on inconsistent interior data or nothing to draw. */
 export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const { yScale } = interiorLook
-  const colorOf = colorTable(interior.levels.length)
+  const colorOf = colorTable(interior.levels)
   const { strong, fine } = buildInteriorBuffers(interior, {
     yScale,
     stepRise: 0.18,

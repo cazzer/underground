@@ -6,16 +6,23 @@ import { buildStationDepths, DEPTHS_OPEN_NY_NOTE } from './stationDepths.ts'
 import { OPEN_NY_NOTE } from './stationMerge.ts'
 
 const interiorDir = new URL('../../public/data/stations/', import.meta.url)
-const interiors = readdirSync(interiorDir)
-  .filter((f) => f.endsWith('.json') && f !== 'index.json')
+const GENERATED_DEPTHS = 'depths-generated.json'
+const all = readdirSync(interiorDir)
+  .filter((f) => f.endsWith('.json') && f !== 'index.json' && f !== GENERATED_DEPTHS)
   .map((f) => JSON.parse(readFileSync(new URL(f, interiorDir), 'utf8')) as StationInterior)
+const interiors = all.filter((i) => !i.generated)
 const l08 = interiors.find((i) => i.stationId === 'L08')!
 const committed = readFileSync(new URL('../../public/data/station-depths.json', import.meta.url), 'utf8')
+const committedGenerated = readFileSync(new URL(GENERATED_DEPTHS, interiorDir), 'utf8')
 
 describe('buildStationDepths', () => {
-  it('matches the committed station-depths.json (rerun npm run data:stations if not)', () => {
+  it('matches the committed station-depths.json, from the authored interiors only (rerun npm run data:stations if not)', () => {
     expect(interiors.length).toBeGreaterThan(0)
     expect(toStableJson(buildStationDepths(interiors), 2)).toBe(committed)
+  })
+
+  it('matches the committed stations/depths-generated.json, from the generated interiors only (empty but valid when none)', () => {
+    expect(toStableJson(buildStationDepths(all.filter((i) => i.generated)), 2)).toBe(committedGenerated)
   })
 
   it('puts the L08 rails 1.1 m below the platform (-9.1 m) and keeps the track ends', () => {

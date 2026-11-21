@@ -74,7 +74,10 @@ export function buildMachines(authored: AuthoredStation, sources: StationSources
     const serving = parseServing(servingText)
     const [lower, upper] = machineLevels(ctx, serving, o, at, servingText)
     const entrance = o.entrance === undefined ? undefined : entranceOf(entrances, o.entrance, `${at}.entrance`)
-    if (entrance && upper.kind !== 'street') throw new Error(`${at}.entrance: ${code} does not reach the street (its upper level is ${upper.id})`)
+    // The street end is the upper one below ground and the lower one at an elevated station.
+    if (entrance && upper.kind !== 'street' && lower.kind !== 'street') {
+      throw new Error(`${at}.entrance: ${code} does not reach the street (it joins ${lower.id} and ${upper.id})`)
+    }
     const [x, z] = o.at !== undefined ? ctx.frame.fromUV(pair(o.at, `${at}.at`)) : entrance ? [entrance.x, entrance.z] : ctx.frame.fromLatLon(lat, lon)
     entrance?.connectors.push(code)
     const width = o.width === undefined ? (kind === 'elevator' ? ELEVATOR_WIDTH_M : ESCALATOR_WIDTH_M) : finite(o.width, `${at}.width`)

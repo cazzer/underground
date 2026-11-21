@@ -73,3 +73,55 @@ export function fixture(): { authored: AuthoredStation; sources: StationSources 
   }
   return { authored, sources }
 }
+
+/**
+ * Synthetic elevated station: the street (0) is the lowest level, a station house sits at +4 and the platform
+ * at +8. Layout (meters): platform u -30..30, v -3..3; station house slab u -10..10, v 6..16. The street stair's
+ * lower end is its entrance; the elevator runs street to platform from an entrance under the platform.
+ */
+export function elevatedFixture(): { authored: AuthoredStation; sources: StationSources } {
+  const { authored: base, sources: baseSources } = fixture()
+  const authored: AuthoredStation = {
+    ...base,
+    stationId: 'T02',
+    name: 'Elevated St',
+    fetch: { osmWays: [1], entrancesGtfsStopId: 'T02', equipmentStationMrn: '2' },
+    levels: [
+      { id: 'street', name: 'Street', kind: 'street', y: 0 },
+      { id: 'platform', name: 'Platform', kind: 'platform', y: 8 },
+      { id: 'house', name: 'Station house', kind: 'mezzanine', y: 4 },
+    ],
+    platforms: [
+      { id: 'island', level: 'platform', osmWay: 1, tracks: [
+        { stopId: 'T02N', path: [[-40, -2.5], [40, -2.5]] },
+        { stopId: 'T02S', path: [[-40, 2.5], [40, 2.5]] },
+      ] },
+    ],
+    slabs: [{ id: 'house-slab', level: 'house', name: 'Station house', outline: [[-10, 6], [10, 6], [10, 16], [-10, 16]] }],
+    entrances: [
+      { id: 'stair-ent', source: ll(0, 20) },
+      { id: 'elev-ent', source: ll(-20, 2) },
+    ],
+    connectors: [
+      { id: 'st-street', kind: 'stair', width: 1.5, lower: { entrance: 'stair-ent' }, upper: { level: 'house', at: [0, 15] } },
+      { id: 'st-plat', kind: 'stair', width: 2.4, lower: { level: 'house', at: [0, 7] }, upper: { level: 'platform', at: [0, 2] } },
+    ],
+    equipment: [{ code: 'EL1', entrance: 'elev-ent' }],
+  }
+  const sources: StationSources = {
+    ...baseSources,
+    stationId: 'T02',
+    entrances: {
+      ...baseSources.entrances,
+      rows: [
+        { type: 'Stair', entry: true, exit: true, lat: ll(0, 20)[0], lon: ll(0, 20)[1] },
+        { type: 'Elevator', entry: true, exit: true, lat: ll(-20, 2)[0], lon: ll(-20, 2)[1] },
+      ],
+    },
+    equipment: {
+      ...baseSources.equipment,
+      rows: [{ code: 'EL1', kind: 'elevator', lat: ll(-21, 3)[0], lon: ll(-21, 3)[1], serving: 'Main St (NW corner) to platform for service in both directions' }],
+    },
+  }
+  return { authored, sources }
+}

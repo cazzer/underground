@@ -28,7 +28,7 @@ export function interiorBounds(interior: StationInterior): LocalBounds {
 export interface FocusAnchor {
   /** Ground point under the interior's plan center (no depth shift). */
   center: Ground
-  /** Meters the camera target must sit toward the camera so the mid-depth center is mid-screen. */
+  /** Meters the camera target must sit toward the camera so the mid-height center is mid-screen (negative above the street). */
   towardCamera: number
   /**
    * Plan distance (meters) from `center` to the farthest outline vertex or entrance (a hull vertex):
@@ -38,13 +38,15 @@ export interface FocusAnchor {
 }
 
 /**
- * Where to aim the camera so the interior's plan center at mid-depth sits mid-screen. Viewed at
- * polar angle θ, a point h meters down lines up with the ground point h·tanθ toward the camera, so
- * the target moves that far along the view azimuth (south at north-up); the caller rotates it.
+ * Where to aim the camera so the interior's plan center at mid-height (halfway between its lowest and highest
+ * level) sits mid-screen. Viewed at polar angle θ, a point h meters down lines up with the ground point h·tanθ
+ * toward the camera (away from it for a point above the street), so the target moves that far along the view
+ * azimuth (south at north-up); the caller rotates it.
  */
 export function interiorFocusAnchor(origin: Ground, interior: StationInterior, yScale: number, tanPolar: number): FocusAnchor {
   const b = interiorBounds(interior)
-  const minY = Math.min(...interior.levels.map((l) => l.y))
+  const ys = interior.levels.map((l) => l.y)
+  const midY = (Math.min(...ys) + Math.max(...ys)) / 2
   const cx = (b.minX + b.maxX) / 2
   const cz = (b.minZ + b.maxZ) / 2
   let reach = 0
@@ -56,7 +58,7 @@ export function interiorFocusAnchor(origin: Ground, interior: StationInterior, y
   for (const e of interior.entrances) add(e.x, e.z)
   return {
     center: { x: origin.x + cx, z: origin.z + cz },
-    towardCamera: ((-minY * yScale) / 2) * tanPolar,
+    towardCamera: -midY * yScale * tanPolar,
     reach,
   }
 }
