@@ -25,12 +25,18 @@ so dev and preview serve under that path.
 - `npm run typecheck`: `tsc --noEmit` for `src/`, then `tsc --noEmit -p scripts`
 - `npm run data [-- --zip path]`: rebuild `public/data/*.json` from the regular GTFS zip
   (downloads it unless `--zip` or `$GTFS_ZIP` is given; needs Node >= 22.18). Never commit the zip.
+  Also reads the pinned `data/stations/catalog/stations.json` for each station's borough and ADA status;
+  after `data:catalog:fetch` run `npm run data:access` instead (offline).
+  A station the catalog lacks, or an orphan catalog row, needs an entry in
+  `data/stations/access-exceptions.json` (see `data/README.md`); the join fails loudly otherwise.
+- `npm run data:access`: offline; reruns the borough/ADA join on the committed `public/data/stations.json`
+  with the pinned catalog and exceptions, prints the gzip total against the budget.
 - `npm run data:stations`: merge `data/stations/*.authored.json` with the pinned `*.sources.json`
   into `public/data/stations/*.json`. Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
   pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
-  `data/stations/catalog/`. Review the diff. `data:stations` stays offline and never reads it.
+  `data/stations/catalog/`. Review the diff. `data:stations` stays offline and never reads it (`npm run data` reads only `catalog/stations.json`).
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -187,7 +193,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   evicted; `interiorLoad.ts` the load type and its pure derivation; `useStationInterior.ts` the focused
   station's interior load (other stations never fetch); `useLocate.ts` the location button's one-shot
   geolocation (on press only, never watched; the fix lives in React state and nowhere else)
-- `src/data/schema.ts`: types of the six `public/data/*.json` files; `src/data/codec.ts`: shared
+- `src/data/schema.ts`: types of the six `public/data/*.json` files (`Station` carries `borough`, `ada`,
+  and `adaPartial` on the 8 partial stations, from 39hk-dx4f via `scripts/lib/stationAccess.ts`); `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
 - `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`
@@ -199,7 +206,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
     `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
     downstream), and OSM ways have none either (join by distance)
-- `scripts/`: `build-data.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
+- `scripts/`: `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge; `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)
 - `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`

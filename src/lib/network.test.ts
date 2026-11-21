@@ -10,8 +10,8 @@ function stationsFile(): StationsFile {
   return {
     feedVersion: FV,
     stations: [
-      { id: '101', name: 'North', lat: 40.8, lon: -73.9, stops: ['101N', '101S'], routes: ['1'] },
-      { id: '102', name: 'South', lat: 40.7, lon: -74.0, stops: ['102N', '102S'], routes: ['1', '2'] },
+      { id: '101', name: 'North', lat: 40.8, lon: -73.9, stops: ['101N', '101S'], routes: ['1'], borough: 'Bx', ada: 'full' },
+      { id: '102', name: 'South', lat: 40.7, lon: -74.0, stops: ['102N', '102S'], routes: ['1', '2'], borough: 'Bx', ada: 'none' },
     ],
   }
 }

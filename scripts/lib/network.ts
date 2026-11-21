@@ -1,10 +1,13 @@
-import type { Route, Station, StationId, RouteId, Transfer } from '../../src/data/schema.ts'
+import type { Route, Station, StationAccess, StationId, RouteId, Transfer } from '../../src/data/schema.ts'
 import { compareIds, parseNum, type GtfsFeed } from './gtfs.ts'
 
 const round5 = (degrees: number): number => Math.round(degrees * 1e5) / 1e5
 
+/** A station as the feed describes it, before `addAccess` joins borough and ADA status. */
+export type GtfsStation = Omit<Station, keyof StationAccess>
+
 /** Parent stations (location_type 1) with their platforms and the routes that call there. */
-export function buildStations(feed: GtfsFeed): Station[] {
+export function buildStations(feed: GtfsFeed): GtfsStation[] {
   const sortOrder = new Map(feed.routes.map((r) => [r.id, r.sortOrder]))
   const routeOfTrip = new Map(feed.trips.map((t) => [t.id, t.routeId]))
   const stationOfStop = new Map(feed.stops.map((s) => [s.id, s.locationType === 1 ? s.id : s.parent]))
