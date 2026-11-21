@@ -12,7 +12,12 @@ export const RENDER_ORDER = {
   stationRing: 4,
   trainHalo: 5,
   trains: 6,
+  // The selected train's dot, drawn on its own above the other dots: its rim, a background gap, the dot.
+  selectedTrainRim: 6.1,
+  selectedTrainHalo: 6.15,
+  selectedTrain: 6.2,
   // Zoomed in, each train is a consist of cars: background-colored footprints, then the bodies.
+  carRim: 5.25,
   carHalo: 5.5,
   cars: 6.5,
   // "You are here": the accuracy disc and its edge sit under the lines; the reticle sits over the trains, under the veil.

@@ -1,6 +1,8 @@
 import { Canvas } from '@react-three/fiber'
+import { useRef } from 'react'
 import type { LiveLayer } from '../data/useLive'
 import type { Insets } from '../lib/framing'
+import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
 import type { Ground } from '../lib/projection'
@@ -10,6 +12,7 @@ import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
+import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
@@ -32,6 +35,7 @@ interface SceneProps {
 }
 
 export function Scene({ network, insets, live, onLiveError, interior, panel, onInteriorRevealed, here }: SceneProps) {
+  const trainPick = useRef<TrainPickSource | null>(null)
   return (
     <Canvas
       // No tone mapping, so every theme token renders as the exact color it names.
@@ -46,9 +50,10 @@ export function Scene({ network, insets, live, onLiveError, interior, panel, onI
       <MapGrid />
       <SubwayLines network={network} />
       <Stations stations={network.stations} />
+      <ScenePicker stations={network.stations} trainPick={trainPick} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
-          <LiveTrains {...live} network={network} />
+          <LiveTrains {...live} network={network} trainPick={trainPick} />
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}

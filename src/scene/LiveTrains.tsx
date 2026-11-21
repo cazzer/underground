@@ -1,16 +1,18 @@
 import { useFrame } from '@react-three/fiber'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { CircleGeometry, Color, DynamicDrawUsage, type InstancedMesh } from 'three'
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { CircleGeometry, Color, DynamicDrawUsage, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial } from 'three'
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix } from '../lib/live/consist'
 import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
+import type { TrainPickSource } from '../lib/live/trainPick'
 import { trainRouteId } from '../lib/live/trainRoute'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
 import { hopDistance } from '../lib/realtime/position'
 import { pointAtDistanceInto } from '../lib/realtime/polyline'
 import { routeLineColor } from '../lib/routeColor'
+import { useTrainSelection } from '../lib/trainSelection'
 import { theme } from '../theme'
 import { cameraDistance, getControls, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
@@ -25,9 +27,14 @@ const DOT_Y = 0.5
 const SEGMENTS = 16
 /** Cars are laid out only for trains within this many camera distances (plus 300 m slack) of the view center. */
 const CARS_WITHIN = { distances: 3, plusM: 300 }
+/** The selected train's dot (and its background halo, the gap) draws this much larger, with a rim of RIM_PX outside. */
+const SELECTED_GROWTH = 1.6
+const RIM_PX = 2.5
 
 interface LiveTrainsProps extends LiveLayer {
   network: Network
+  /** Filled while mounted, so a click can be tested against the trains as drawn. */
+  trainPick: RefObject<TrainPickSource | null>
 }
 
 /**
@@ -36,17 +43,28 @@ interface LiveTrainsProps extends LiveLayer {
  * poll's hop plan at the live clock and writes matrices without allocating. Zoomed in, each dot
  * unfolds into its train's cars (carMix): the dot shrinks by 1 - mix as the train lengthens by mix.
  */
-export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProps) {
+export function LiveTrains({ trips, offsetS, patterns, network, trainPick }: LiveTrainsProps) {
   const dots = useRef<InstancedMesh>(null)
   const halo = useRef<InstancedMesh>(null)
+  // The selected train's dot is drawn on its own, above every other dot: rim, background gap, then the dot.
+  const selected = useRef<Group>(null)
+  const rim = useRef<Mesh>(null)
+  const selectedHalo = useRef<Mesh>(null)
+  const selectedDot = useRef<Mesh<CircleGeometry, MeshBasicMaterial>>(null)
   const cars = useTrainCars()
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
+  const { selectedKey } = useTrainSelection()
+  /** The slot drawn as selected, -1 for none. Read once per frame. */
+  const selectedSlot = useRef(-1)
+  /** Each slot's dot color (shared Color objects), so the selected dot can take it without allocating. */
+  const slotColors = useMemo(() => new Array<Color | null>(TRAIN_CAPACITY).fill(null), [])
   const point = useMemo(() => ({ x: 0, z: 0 }), [])
   const range = useMemo(() => ({ start: 0, count: 0 }), [])
   const geometry = useMemo(
     () => ({
       dot: new CircleGeometry(1, SEGMENTS).rotateX(-Math.PI / 2),
       halo: new CircleGeometry(HALO_RATIO, SEGMENTS).rotateX(-Math.PI / 2),
+      rim: new CircleGeometry(1, SEGMENTS).rotateX(-Math.PI / 2),
     }),
     [],
   )
@@ -67,6 +85,7 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     () => () => {
       geometry.dot.dispose()
       geometry.halo.dispose()
+      geometry.rim.dispose()
     },
     [geometry],
   )
@@ -77,9 +96,10 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
       const routeId = trip ? trainRouteId(trip, network.routeById, patterns) : null
       const color = (routeId !== null && colors.byRoute.get(routeId)) || colors.fallback
       d.setColorAt(i, color)
+      slotColors[i] = color
       cars.setSlot(i, routeId, color)
     },
-    [table, network, patterns, colors, cars],
+    [table, network, patterns, colors, cars, slotColors],
   )
 
   // Instance colors must exist before the first frame, or the shader compiles without them.
@@ -92,9 +112,17 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     h.instanceMatrix.setUsage(DynamicDrawUsage)
     cars.prepare()
     for (let i = 0; i < TRAIN_CAPACITY; i++) colorSlot(d, i)
+    cars.setSelected(selectedSlot.current)
     d.instanceColor!.needsUpdate = true
     d.count = h.count = 0
   }, [colorSlot, cars])
+
+  useLayoutEffect(() => {
+    trainPick.current = { table, consistOf: cars.consistOf, y: DOT_Y, carHeightM: cars.carHeightM }
+    return () => {
+      trainPick.current = null
+    }
+  }, [trainPick, table, cars])
 
   useLayoutEffect(() => {
     const d = dots.current
@@ -109,10 +137,22 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     if (overflow > 0) console.warn(`Live trains: ${overflow} trips over the ${TRAIN_CAPACITY}-slot capacity are not drawn`)
   }, [trips, offsetS, table, colorSlot])
 
+  // After the reconcile above, so a slot reused by another trip since the last poll loses the highlight.
+  useLayoutEffect(() => {
+    const slot = selectedKey === null ? -1 : (table.byKey.get(selectedKey) ?? -1)
+    if (slot === selectedSlot.current) return
+    cars.setSelected(slot)
+    selectedSlot.current = slot
+  }, [selectedKey, trips, table, cars])
+
   useFrame((state, dt) => {
     const d = dots.current
     const h = halo.current
-    if (!d || !h) return
+    const r = rim.current
+    const g = selected.current
+    const sh = selectedHalo.current
+    const sd = selectedDot.current
+    if (!d || !h || !r || !g || !sh || !sd) return
     const perfMs = performance.now()
     const now = clockNow(offsetS, perfMs)
     const localS = perfMs / 1000
@@ -124,6 +164,9 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     const center = getControls(state)?.target
     const reach = camera * CARS_WITHIN.distances + CARS_WITHIN.plusM
     const out = d.instanceMatrix.array as Float32Array
+    const sel = selectedSlot.current
+    let dotScale = 0
+    let rimRadius = 0
 
     for (let i = 0; i < table.high; i++) {
       const trip = table.trips[i]
@@ -136,7 +179,16 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
         cars.clear(i)
         freeSlot(table, i)
       } else {
-        writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k)
+        if (i === sel) {
+          // Its instance is hidden; the selected meshes draw it above the rest.
+          writeInstanceMatrix(out, i, 0, 0, 0, 0)
+          dotScale = scale * k * SELECTED_GROWTH
+          // Fades out with the dot as the cars (which carry their own rim) unfold.
+          rimRadius = dotScale * HALO_RATIO + screenScale(camera, RIM_PX, 0) * k * (1 - mix)
+          g.position.set(point.x, DOT_Y, point.z)
+          const color = slotColors[i]
+          if (color) sd.material.color.copy(color)
+        } else writeInstanceMatrix(out, i, point.x, DOT_Y, point.z, scale * k)
         if (!carsOn) continue
         const dx = center ? point.x - center.x : 0
         const dz = center ? point.z - center.z : 0
@@ -146,6 +198,12 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
       }
     }
     h.instanceMatrix.array.set(out)
+    g.visible = rimRadius > 0
+    if (rimRadius > 0) {
+      r.scale.setScalar(rimRadius)
+      sh.scale.setScalar(Math.max(dotScale, 1e-6))
+      sd.scale.setScalar(Math.max(dotScale, 1e-6))
+    }
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
@@ -175,6 +233,17 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
         {/* Default white material: the per-instance colors are the dot colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
+      <group ref={selected} visible={false}>
+        <mesh ref={rim} geometry={geometry.rim} frustumCulled={false} renderOrder={RENDER_ORDER.selectedTrainRim}>
+          <meshBasicMaterial color={theme.trainSelectedRim} transparent depthTest={false} depthWrite={false} />
+        </mesh>
+        <mesh ref={selectedHalo} geometry={geometry.halo} frustumCulled={false} renderOrder={RENDER_ORDER.selectedTrainHalo}>
+          <meshBasicMaterial color={theme.background} transparent depthTest={false} depthWrite={false} />
+        </mesh>
+        <mesh ref={selectedDot} geometry={geometry.dot} frustumCulled={false} renderOrder={RENDER_ORDER.selectedTrain}>
+          <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
+        </mesh>
+      </group>
       <TrainCars layer={cars} />
     </>
   )

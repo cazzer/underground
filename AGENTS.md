@@ -71,11 +71,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `useStationOrbit.ts` the focused-station orbit (azimuth window per frame, pan-radius clamp);
     `orbitLook.ts` TEMPORARY `?orbit=` override
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `LineHighlight.tsx` holds the
-    temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; picks raycast an invisible
-    22 px hit disc per station and take the nearest; `FocusRing.tsx` redraws the focused ring above the
+    temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; `FocusRing.tsx` redraws the focused ring above the
     trains and the veil; `markerShape.ts` the shared marker constants);
+    `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
-    and out; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
+    and out; the selected train (dot 1.6×) gets a background gap and then a
+    `theme.trainSelectedRim` rim. Its dot is drawn on its own above every other dot; its cars get the top widen
+    level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
     their instances, consists and per-frame writes; `carGeometry.ts` the shaded body; `carLook.ts` TEMPORARY);
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
@@ -84,7 +86,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
-- `src/ui/Hud.tsx`: Tailwind overlay (title, live status, arrivals panel); `LoadStatus.tsx` loading/error panel
+- `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
+  panel; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
+  each pick, and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
+  notice, then the station, and closing either of the first two returns focus to the station heading or else
+  the location button); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
@@ -101,7 +107,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     test loads them;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
-    between HUD insets), `markerMatrices.ts` (incl. `writeYawMatrix`), `pickStation.ts`: pure render helpers; `labels.ts`
+    between HUD insets), `markerMatrices.ts` (incl. `writeYawMatrix`), `pick.ts` (hit radii, nearest station,
+    station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
   - `interiorGeometry.ts` interior to strong/fine line buffers; `interiorFraming.ts` bounds, focus
     anchor (plan center, toward-camera shift, half-extent), level labels, padded hull;
@@ -116,6 +123,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     frame the fix and its nearest station; outside: nearest station only, no marker), failure codes, and the
     state transitions (the last good fix stays drawn through a re-locate or a failure); `locateMessage.ts` its HUD text (never
     coordinates); `framing.ts` `framePoint` frames a radius around a point between the HUD insets
+  - `trainSelection.tsx` selected-train context keyed by trip key (the station focus and interior stay; a
+    station pick clears it). Dev only: `__underground.selectTrain(key)`, `trainKeys()`, and `trainAt(key)`
+    (viewport px of the dot and car ends, added by `ScenePicker`)
 - `src/lib/live/`: pure helpers for the live layer (no React or three.js; tests colocated)
   - `clock.ts` the live clock: `now = offsetS + performance.now()/1000`, where `offsetS` is the maximum over
     polls of `generatedAt - receivedPerfMs/1000`. Monotone (a poll served from the Worker's 15 s memo
@@ -130,9 +140,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     arrive on time, or cross-fade; reduced motion cross-fades). On a shape change the dot's ground point is
     projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
+  - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends);
+    `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice);
+    `trainSummary.ts` route and headsign for the train panel and the notice
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
-    (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape,
-    each on its chord, unfolding from the dot point (spacing and length by mix, section by the slot fade);
+    (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape
+    (`consistSpanInto`, shared with picking), each on its chord, unfolding from the dot point (spacing and length by mix, section by the slot fade);
     `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within about 3 camera distances
     of the view center are laid out; the rest are zeroed once
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
@@ -227,8 +240,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   positive `useFrame` priority (it takes over rendering).
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, line focus 2,
-  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car halo 5.5,
-  trains 6, you-are-here halo 6.4, cars 6.5, you-are-here reticle 6.55, focused ring 10
+  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
+  car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
+  you-are-here reticle 6.55, focused ring 10
   (whenever a station is focused, so a train never covers it).
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
@@ -244,6 +258,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   The offset is `TRACK_OFFSET_M` (4.7 m, measured at Bedford Av); code that needs it reads `network.trackOffsetM`. Live trains ride the same `trackLine`
   (passed through `useLive` to `buildShapeGeometries`), so dots and cars sit on their direction's track.
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
+- Picking is screen space, on click only: `ScenePicker` listens on the canvas (never stopping or
+  preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),
+  projects stations (22 px) and live trains (16 px, dot or car line, read from the slot table) to pixels,
+  and a station wins unless a train is 6 px closer or the station is the open one. A station's target grows
+  to its drawn marker at close zoom; a touch with no station in reach gets 22 px for trains; cars are tested
+  along their floor and roof lines. No meshes carry r3f pointer handlers.
 - Live train dots and cars are instanced too, with per-slot colors (`routeLineColor` like the lines; car
   instance `slot * MAX_CARS + c`). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.

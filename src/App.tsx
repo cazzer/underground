@@ -8,6 +8,7 @@ import { markedPlacement } from './lib/locate'
 import type { Insets } from './lib/framing'
 import type { ScreenRect } from './lib/interiorCamera'
 import type { Network } from './lib/network'
+import { TrainSelectionProvider } from './lib/trainSelection'
 import { Scene } from './scene/Scene'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { Hud } from './ui/Hud'
@@ -74,7 +75,13 @@ export function App() {
   return (
     <FocusProvider>
       <main className="relative h-full w-full bg-canvas">
-        {load.status === 'ready' ? <MapView network={load.network} live={live} /> : <LoadStatus load={load} onRetry={retry} />}
+        {load.status === 'ready' ? (
+          <TrainSelectionProvider layer={live.layer} network={load.network}>
+            <MapView network={load.network} live={live} />
+          </TrainSelectionProvider>
+        ) : (
+          <LoadStatus load={load} onRetry={retry} />
+        )}
       </main>
     </FocusProvider>
   )

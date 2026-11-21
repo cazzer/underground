@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Ground } from '../projection'
 import { buildPolyline, pointAtDistance, type Polyline } from '../realtime/polyline'
 import { MAX_CARS, type Consist } from './consist'
-import { createConsistScratch, writeConsist, type CarFrame } from './consistLayout'
+import { consistSpanInto, createConsistScratch, writeConsist, type CarFrame } from './consistLayout'
 
 const FRAME: CarFrame = { gapM: 1.2, rimM: 0.5, widthM: 3, crossScale: 1, y: 0.5 }
 const TEN: Consist = { cars: 10, pitchM: 15.5 }
@@ -172,5 +172,30 @@ describe('writeConsist', () => {
     expect(bodies.subarray((MAX_CARS + 4) * 16).every((v) => v === 0)).toBe(true)
     expect(halos.subarray((MAX_CARS + 4) * 16).every((v) => v === 0)).toBe(true)
     expect(bodies[(MAX_CARS + 3) * 16 + 15]).toBe(1)
+  })
+})
+
+describe('consistSpanInto', () => {
+  const span = () => ({ cars: 0, pitch: 0, step: 0, rear: 0 })
+
+  it('spans exactly the chords the cars are drawn on', () => {
+    for (const [mix, shown] of [
+      [1, 500],
+      [0.4, 500],
+      [1, 20],
+    ] as const) {
+      const { cars } = layout(straight(1000), shown, TEN, mix)
+      const s = consistSpanInto(span(), 1000, shown, TEN, mix)
+      expect(s.cars).toBe(10)
+      expect(cars[0]!.x - s.step / 2).toBeCloseTo(s.rear, 4)
+      expect(cars[9]!.x + s.step / 2).toBeCloseTo(s.rear + s.cars * s.step, 4)
+    }
+  })
+
+  it('collapses to the dot at mix 0 and fits a shape shorter than the train', () => {
+    expect(consistSpanInto(span(), 1000, 300, TEN, 0)).toEqual({ cars: 10, pitch: 15.5, step: 0, rear: 300 })
+    const short = consistSpanInto(span(), 50, 40, TEN, 1)
+    expect(short.rear).toBeCloseTo(0, 6)
+    expect(short.rear + short.cars * short.step).toBeCloseTo(50, 6)
   })
 })
