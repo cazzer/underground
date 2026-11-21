@@ -16,6 +16,9 @@ interface SpanCarsProps {
  * span) overlaps a lifted car on screen, the footprint paints over it and the lifted body fails the depth test
  * there: a background-colored hole. Bedford Av has one route on two parallel tracks, so it can't happen there; a
  * multi-route interior with crossing tracks would need the footprints depth-tested too.
+ * Any car with weight above 0 also draws (with its footprint) above the interior strokes, so a stroke crossing a car
+ * inside the 40 m ramp hides until the weight reaches 0, then returns. Bedford Av's interior barely reaches past its
+ * platform ends; an interior that extends past its platforms should check this.
  */
 export function SpanCars({ layer }: SpanCarsProps) {
   return (
