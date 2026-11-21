@@ -113,7 +113,7 @@ describe('trainSelectedRim', () => {
       const lines = new Set(routes.map((r) => routeLineColor(`#${r.color}`, t.routeLineMix, t.background)))
       for (const line of lines) {
         expect(oklabDistance(t.trainSelectedRim, line), `${t.name} vs ${line}`).toBeGreaterThanOrEqual(0.1)
-        // Blueprint and drafting lines span too wide a lightness range (each line is 3:1 on the background)
+        // Blueprint lines span too wide a lightness range (each line is 3:1 on the background)
         // for any color to reach 2:1 against all of them, so there the gap and the hue carry the rim.
         if (t.routeLineMix.amount >= 1) expect(contrastRatio(t.trainSelectedRim, line), `${t.name} vs ${line}`).toBeGreaterThanOrEqual(2)
       }
