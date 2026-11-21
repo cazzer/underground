@@ -149,6 +149,33 @@ describe('nearestTrain at a tilt', () => {
     expect(nearestTrain(input(t, 1), tilted, roofClick)?.index).toBe(0)
     expect(nearestTrain({ ...input(t, 1), carHeightM: () => 0 }, tilted, roofClick)).toBeNull()
   })
+
+  it('draws the roof at the depth factor: flat at depth 0, half height at 0.5', () => {
+    const tilted: ToScreen = (x, y, z, out) => {
+      out.x = x + 10 * y
+      out.y = z
+      return true
+    }
+    const t = createSlotTable(2)
+    place(t, 0, 'a', NORTH, 1000)
+    const floor = near(-40)
+    const at = (depth: number) => ({ ...input(t, 1), view: { ...createBandView(), depth } })
+    expect(nearestTrain(at(0), tilted, { x: floor.x + 5 + 40, y: floor.y })).toBeNull()
+    expect(nearestTrain(at(0.5), tilted, { x: floor.x + 5 + 20, y: floor.y })?.index).toBe(0)
+    expect(nearestTrain(at(0.5), tilted, { x: floor.x + 5 + 40, y: floor.y })).toBeNull()
+  })
+})
+
+describe('nearestTrain with depth', () => {
+  it('hits a sunken train at its depth-scaled height, as the line draws it', () => {
+    const t = createSlotTable(2)
+    place(t, 0, 'a', DEEP, 1000)
+    const ground = near(0)
+    const half = { ...input(t, 0), view: { ...createBandView(), depth: 0.5 } }
+    expect(nearestTrain(half, oblique, { x: ground.x, y: ground.y + 9.5 })).toEqual({ index: 0, distancePx: expect.closeTo(0, 6) })
+    const flat = { ...input(t, 0), view: { ...createBandView(), depth: 0 } }
+    expect(nearestTrain(flat, oblique, { x: ground.x, y: ground.y - 0.5 })).toEqual({ index: 0, distancePx: expect.closeTo(0, 6) })
+  })
 })
 
 describe('trainScreenPoints', () => {

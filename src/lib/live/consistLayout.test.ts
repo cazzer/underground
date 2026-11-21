@@ -11,7 +11,7 @@ import type { DrawnTrack } from './trackPoint'
 const track = (line: Polyline, profile: TrackProfile = EMPTY_PROFILE): DrawnTrack => ({ line, profile, bandInputs: new Float32Array(line.points.length * 4) })
 const VIEW = createBandView()
 
-const FRAME: CarFrame = { gapM: 1.2, rimM: 0.5, widthM: 3, crossScale: 1, y: 0.5 }
+const FRAME: CarFrame = { gapM: 1.2, rimM: 0.5, widthM: 3, crossScale: 1, y: 0.5, extrude: 1 }
 const TEN: Consist = { cars: 10, pitchM: 15.5 }
 
 interface Car {
@@ -110,6 +110,25 @@ describe('writeConsist', () => {
   it('ramps the body height in over the first quarter of the handoff', () => {
     const heights = [0.05, 0.125, 0.25, 0.6].map((mix) => layout(straight(1000), 500, TEN, mix).cars[0]!.height)
     expect(heights.map((h) => +h.toFixed(6))).toEqual([0.2, 0.5, 1, 1])
+  })
+
+  it('scales the body height by extrude: flat footprints at 0, at the same place and size', () => {
+    const write = (extrude: number) => {
+      const bodies = new Float32Array(MAX_CARS * 16)
+      const halos = new Float32Array(MAX_CARS * 16)
+      writeConsist(bodies, halos, 0, track(straight(1000)), VIEW, 500, TEN, 1, 1, 1, { ...FRAME, extrude }, createConsistScratch())
+      return { bodies, halos }
+    }
+    const full = write(1)
+    const flat = write(0)
+    const half = write(0.5)
+    for (let c = 0; c < TEN.cars; c++) {
+      const o = c * 16
+      expect(flat.bodies[o + 5]).toBe(0)
+      expect(half.bodies[o + 5]).toBeCloseTo(full.bodies[o + 5]! / 2, 6)
+      for (const j of [0, 2, 8, 10, 12, 13, 14]) expect(flat.bodies[o + j]).toBeCloseTo(full.bodies[o + j]!, 6)
+    }
+    expect(flat.halos).toEqual(full.halos)
   })
 
   it('shrinks to nothing at the dot point when the slot has faded (k = 0)', () => {

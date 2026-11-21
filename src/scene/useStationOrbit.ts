@@ -17,7 +17,7 @@ import {
 } from '../lib/orbitLimits'
 import { markTurned } from '../lib/orbitTurned'
 import type { Ground } from '../lib/projection'
-import { ISO_POLAR } from '../lib/tilt'
+import { depthFactor, ISO_POLAR } from '../lib/tilt'
 import type { InteriorModel } from './interiorModel'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
@@ -50,7 +50,7 @@ interface StationOrbitOptions {
 interface OrbitFocus {
   center: Ground
   radius: number
-  /** Interior depth term at ISO_POLAR (FocusAnchor.towardCamera); 0 for a bare station. */
+  /** Interior depth term at ISO_POLAR and full depth (FocusAnchor.towardCamera); 0 for a bare station. */
   towardCamera: number
   /** Pivot on the free area's middle (where an interior fly-to puts it) rather than the view center. */
   useFree: boolean
@@ -121,8 +121,10 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const s = shift.current
     if (f.useFree) {
       const polar = c.getPolarAngle()
-      freeCenterShift(viewport, free, camera.fov, camera.position.distanceTo(c.target), polar, s)
-      s.toward += (f.towardCamera * Math.tan(polar)) / TAN_ISO
+      const distance = camera.position.distanceTo(c.target)
+      freeCenterShift(viewport, free, camera.fov, distance, polar, s)
+      // The interior's mid-depth is drawn at the depth factor (StationInterior's scale.y), so its pivot shift is too.
+      s.toward += (f.towardCamera * depthFactor(distance) * Math.tan(polar)) / TAN_ISO
     } else {
       s.right = 0
       s.toward = 0

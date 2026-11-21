@@ -14,7 +14,7 @@ export interface TrainPickSource {
   consistOf: (slot: number) => Consist
   /** Height the dots and the car floors are drawn at, above the track (each shape's profile adds its own y). */
   y: number
-  /** Car body height this frame at full unfold, before the slot's fade (it grows with crossScale far out). */
+  /** Car body height this frame at full unfold, before the slot's fade and the depth factor (it grows with crossScale far out). */
   carHeightM: () => number
   /** The band view the trains were last drawn in (rewritten every frame), so picks test them where they are drawn. */
   view: BandView
@@ -77,9 +77,10 @@ export function nearestTrain(src: TrainPickInput, toScreen: ToScreen, click: Scr
     trackPointInto(geometry, shown, view, point)
     let d = toScreen(point.x, y + point.y, point.z, next) ? Math.hypot(next.x - click.x, next.y - click.y) : Infinity
     if (mix > 0) {
-      // The floor line and the roof line, so at a tilt the whole side of a car is a target.
+      // The floor line and the roof line, so at a tilt the whole side of a car is a target. The roof is drawn at
+      // the view's depth factor (CarFrame.extrude), so top-down it is the floor line.
       const consist = src.consistOf(i)
-      const roof = y + src.carHeightM() * k * Math.min(1, 4 * mix)
+      const roof = y + src.carHeightM() * k * Math.min(1, 4 * mix) * view.depth
       d = Math.min(d, consistDistancePx(geometry, view, shown, consist, mix * k, y, toScreen, click))
       d = Math.min(d, consistDistancePx(geometry, view, shown, consist, mix * k, roof, toScreen, click))
     }
