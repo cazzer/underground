@@ -13,29 +13,37 @@ export type Rgb = readonly [number, number, number]
 export type InteriorRole = 'outline' | 'track' | 'stair' | 'escalator' | 'elevator' | 'entrance' | 'step' | 'guide' | 'fare'
 export type Vec3 = readonly [number, number, number]
 
-/** Same shape as lineBuffers.ts's LineBuffers (not imported: that module has extensionless imports). */
+/** lineBuffers.ts's LineBuffers (not imported: that module has extensionless imports) plus dash distances. */
 export interface Buffers {
   /** Six floats per segment: start xyz, end xyz, group-local meters. */
   positions: Float32Array
   /** Six floats per segment, matching `positions`. */
   colors: Float32Array
+  /**
+   * TEMPORARY (approxLook.ts, look B). Two floats per segment: the dash distance at its start and end, meters. A
+   * dashed segment runs 0 to its length, so every edge starts on a dash and none falls wholly into a gap; a solid
+   * one is 0, 0, so a dashed material never cuts it. Read only when the layer's material is dashed.
+   */
+  distances: Float32Array
 }
 
 export class SegmentWriter {
   readonly positions: number[] = []
   readonly colors: number[] = []
+  readonly distances: number[] = []
 
-  segment(a: Vec3, b: Vec3, ca: Rgb, cb: Rgb = ca): void {
+  segment(a: Vec3, b: Vec3, ca: Rgb, cb: Rgb = ca, dashed = false): void {
     this.positions.push(a[0], a[1], a[2], b[0], b[1], b[2])
     this.colors.push(ca[0], ca[1], ca[2], cb[0], cb[1], cb[2])
+    this.distances.push(0, dashed ? Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) : 0)
   }
 
   /** Closed loop through `points` at height y: one segment per point. */
-  loop(points: readonly LocalPoint[], y: number, c: Rgb): void {
+  loop(points: readonly LocalPoint[], y: number, c: Rgb, dashed = false): void {
     for (let i = 0; i < points.length; i++) {
       const p = points[i]!
       const q = points[(i + 1) % points.length]!
-      this.segment([p[0], y, p[1]], [q[0], y, q[1]], c)
+      this.segment([p[0], y, p[1]], [q[0], y, q[1]], c, c, dashed)
     }
   }
 
@@ -48,7 +56,11 @@ export class SegmentWriter {
   }
 
   build(): Buffers {
-    return { positions: new Float32Array(this.positions), colors: new Float32Array(this.colors) }
+    return {
+      positions: new Float32Array(this.positions),
+      colors: new Float32Array(this.colors),
+      distances: new Float32Array(this.distances),
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 /** Pure framing and labelling helpers for a station interior. Type-only imports. */
-import type { LocalPoint, StationInterior } from '../data/stationSchema.ts'
+import type { Level, LocalPoint, StationInterior } from '../data/stationSchema.ts'
 import type { Ground } from './projection.ts'
 
 export interface LocalBounds {
@@ -69,6 +69,23 @@ export function formatDepth(y: number): string {
   return y < 0 && v !== '0.0' ? `−${v} m` : `${v} m`
 }
 
+/** `v` (already rounded text of |y|) signed: U+2212 minus below the street, "+" above; none when it rounds to zero. */
+function signed(y: number, v: string): string {
+  if (/^0(\.0)?$/.test(v)) return v
+  return y < 0 ? `−${v}` : `+${v}`
+}
+
+/**
+ * A level's height for its label. Authored levels keep `formatDepth`. On a generated interior a measured
+ * depth (`ee-rise`) is signed to one decimal ("−4.3 m", "+6.1 m" above the street); every other source is an
+ * estimate, signed whole meters after "≈" ("≈ −9 m").
+ */
+export function levelHeightText(level: Level, generated: boolean): string {
+  if (!generated) return formatDepth(level.y)
+  if (level.depthSource === 'ee-rise') return `${signed(level.y, Math.abs(level.y).toFixed(1))} m`
+  return `≈ ${signed(level.y, String(Math.round(Math.abs(level.y))))} m`
+}
+
 export interface LevelLabel {
   levelId: string
   text: string
@@ -117,6 +134,7 @@ function southEdgeAnchor(outline: readonly LocalPoint[], gap: number): LocalPoin
  */
 export function levelLabels(interior: StationInterior, yScale: number, gap = 2): LevelLabel[] {
   const labels: LevelLabel[] = []
+  const generated = interior.generated !== undefined
   for (const level of interior.levels) {
     if (level.kind === 'street') continue
     const outlines = [
@@ -127,7 +145,7 @@ export function levelLabels(interior: StationInterior, yScale: number, gap = 2):
     const minX = (o: readonly LocalPoint[]) => Math.min(...o.map((p) => p[0]))
     const west = outlines.reduce((w, o) => (minX(o) < minX(w) ? o : w))
     const [x, z] = southEdgeAnchor(west, gap)
-    labels.push({ levelId: level.id, text: `${level.name} ${formatDepth(level.y)}`, position: [x, level.y * yScale, z] })
+    labels.push({ levelId: level.id, text: `${level.name} ${levelHeightText(level, generated)}`, position: [x, level.y * yScale, z] })
   }
   return labels
 }

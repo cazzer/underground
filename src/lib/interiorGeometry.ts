@@ -38,6 +38,11 @@ export interface InteriorBufferOptions {
   guides: boolean
   /** How escalators and elevators are drawn (TEMPORARY choice, see machineLook.ts). */
   machines: MachineStyle
+  /**
+   * TEMPORARY (approxLook.ts, look B): mark platform and slab outlines, the slab guides and their street-level copy
+   * as dashed in `distances` (tracks stay solid). Positions and colors are the same either way.
+   */
+  dashStructure?: boolean
   /** Linear RGB for a role on the level at `levelIndex`, an index into `interior.levels` (highest first, so the
    *  street is 0 below ground and the last level at an elevated station). */
   colorOf: (role: InteriorRole, levelIndex: number) => Rgb
@@ -63,6 +68,7 @@ export function buildInteriorBuffers(
   const streetIndex = interior.levels.findIndex((l) => l.kind === 'street')
   const strong = new SegmentWriter()
   const fine = new SegmentWriter()
+  const dash = opts.dashStructure === true
 
   // Also throws for an interior with nothing to draw, so it becomes an error load.
   const bounds = interiorBounds(interior)
@@ -88,10 +94,10 @@ export function buildInteriorBuffers(
     const slabs = interior.slabs.filter((s) => indexOf(s.level, s.id) === li)
 
     for (const p of platforms) {
-      strong.loop(p.outline, y, colorOf('outline', li))
+      strong.loop(p.outline, y, colorOf('outline', li), dash)
       for (const t of p.tracks) strong.polyline(t.path, (level.y - opts.railDrop) * yScale, colorOf('track', li))
     }
-    for (const s of slabs) strong.loop(s.outline, y, colorOf('outline', li))
+    for (const s of slabs) strong.loop(s.outline, y, colorOf('outline', li), dash)
     for (const f of interior.fareLines) {
       if (indexOf(f.level, f.id) === li) fine.polyline(f.path, y, colorOf('fare', li))
     }
@@ -114,8 +120,8 @@ export function buildInteriorBuffers(
       const cBottom = colorOf('guide', li)
       const cTop = colorOf('guide', streetIndex)
       for (const s of slabs) {
-        for (const [x, z] of s.outline) fine.segment([x, y, z], [x, 0, z], cBottom, cTop)
-        fine.loop(s.outline, 0, cTop)
+        for (const [x, z] of s.outline) fine.segment([x, y, z], [x, 0, z], cBottom, cTop, dash)
+        fine.loop(s.outline, 0, cTop, dash)
       }
     }
 

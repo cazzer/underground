@@ -101,6 +101,35 @@ describe('buildInteriorBuffers', () => {
     expect(count(ramp.strong)).toBe(4 + 1 + 4 + 4 + 4)
   })
 
+  it('writes solid (0, 0) dash distances by default, and with dashStructure dashes only outlines and slab guides', () => {
+    for (const b of [strong, fine]) {
+      expect(b.distances.length).toBe(count(b) * 2)
+      expect(b.distances.every((d) => d === 0)).toBe(true)
+    }
+    const split = buildInteriorBuffers(fixture(), opts({ dashStructure: true }))
+    expect(split.strong.positions).toEqual(strong.positions)
+    expect(split.strong.colors).toEqual(strong.colors)
+    expect(split.fine.positions).toEqual(fine.positions)
+    const dashedRoles = (b: typeof strong) => {
+      const roles = new Set<string>()
+      for (let k = 0; k < count(b); k++) {
+        if (b.distances[k * 2] !== 0) throw new Error('A dash run starts at 0')
+        const s = seg(b, k)
+        const len = Math.hypot(s[3]! - s[0]!, s[4]! - s[1]!, s[5]! - s[2]!)
+        if (b.distances[k * 2 + 1] === 0) continue
+        expect(b.distances[k * 2 + 1]).toBeCloseTo(len)
+        roles.add(ROLES[color(b, k)[0]!]!)
+      }
+      return roles
+    }
+    // Platform and slab outlines; the track, stair, elevator and entrance stay solid.
+    expect(dashedRoles(split.strong)).toEqual(new Set(['outline']))
+    expect(split.strong.distances.filter((d) => d > 0)).toHaveLength(8)
+    // The slab's 4 guides and its 4-edge street-level copy; steps and cab edges stay solid.
+    expect(dashedRoles(split.fine)).toEqual(new Set(['guide']))
+    expect(split.fine.distances.filter((d) => d > 0)).toHaveLength(8)
+  })
+
   it('throws naming the element for an unknown level', () => {
     const bad = fixture([{ ...STAIR, upper: { ...STAIR.upper, level: 'roof' } }])
     expect(() => buildInteriorBuffers(bad, opts())).toThrow('Unknown level "roof" in ST1')

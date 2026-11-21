@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { LocalPoint, StationInterior } from '../data/stationSchema'
-import { formatDepth, interiorBounds, interiorFocusAnchor, levelLabels, paddedHull } from './interiorFraming'
+import type { Level, LocalPoint, StationInterior } from '../data/stationSchema'
+import { formatDepth, interiorBounds, interiorFocusAnchor, levelHeightText, levelLabels, paddedHull } from './interiorFraming'
 
 const interior: StationInterior = {
   stationId: 'X01',
@@ -85,6 +85,29 @@ describe('formatDepth', () => {
   })
 })
 
+describe('levelHeightText', () => {
+  const level = (y: number, depthSource?: Level['depthSource']): Level => ({ id: 'l', name: 'L', kind: 'platform', y, depthSource })
+
+  it('keeps formatDepth for authored levels, elevated ones included', () => {
+    expect(levelHeightText(level(-4.3), false)).toBe('−4.3 m')
+    expect(levelHeightText(level(6.2), false)).toBe('6.2 m')
+  })
+
+  it('signs a measured (ee-rise) depth to one decimal', () => {
+    expect(levelHeightText(level(-9.06, 'ee-rise'), true)).toBe('−9.1 m')
+    expect(levelHeightText(level(6.2, 'ee-rise'), true)).toBe('+6.2 m')
+    expect(levelHeightText(level(-0.01, 'ee-rise'), true)).toBe('0.0 m')
+  })
+
+  it('marks every other generated depth as an estimate in whole meters', () => {
+    expect(levelHeightText(level(-9.4, 'structure-default'), true)).toBe('≈ −9 m')
+    expect(levelHeightText(level(-30.6, 'deep-list'), true)).toBe('≈ −31 m')
+    expect(levelHeightText(level(7.5, 'osm-level'), true)).toBe('≈ +8 m')
+    expect(levelHeightText(level(-5), true)).toBe('≈ −5 m')
+    expect(levelHeightText(level(-0.3, 'structure-default'), true)).toBe('≈ 0 m')
+  })
+})
+
 describe('levelLabels', () => {
   it('labels each below-street level under the middle of its south edge, at scaled height', () => {
     expect(levelLabels(interior, 2)).toEqual([
@@ -143,6 +166,12 @@ describe('levelLabels', () => {
     ]
     const slabs = [...interior.slabs, { ...interior.slabs[0]!, id: 'S2', outline: east }]
     expect(levelLabels({ ...interior, slabs }, 1, 0)[0]!.position[0]).toBe(0)
+  })
+
+  it('marks a generated interior\'s estimated depths', () => {
+    const levels = interior.levels.map((l) => (l.kind === 'street' ? l : { ...l, depthSource: 'structure-default' as const }))
+    const generated = { ...interior, levels, generated: { archetype: 'cut-cover-mezzanine' as const, confidence: 0.8 } }
+    expect(levelLabels(generated, 2).map((l) => l.text)).toEqual(['Mezzanine ≈ −4 m', 'Platform ≈ −8 m'])
   })
 
   it('skips levels without outlines', () => {

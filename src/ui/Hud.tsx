@@ -71,7 +71,7 @@ interface HudProps {
   arrivals: ArrivalsSource | null
   /** Reports the screen bands the header and footer cover. */
   onInsets: (insets: Insets) => void
-  /** The focused station's interior load and reveal, shown in its panel. */
+  /** The focused station's interior load, shown in its panel. */
   interior: InteriorStatusInfo
   /** Reports where the station panel sits (viewport px), or null when it closes. */
   onPanel: (rect: ScreenRect | null) => void
