@@ -16,6 +16,9 @@ export const SEGMENTS = 24
 export const RING_INNER = 0.78
 /** Tap target radius: a pick within this many screen pixels of a station selects it. */
 const HIT_PX = 22
+/** Pointer travel (px) above which a release on a station is a pan, not a click; r3f's own miss threshold is 2.
+ * Fingertip taps drift more than a mouse. */
+const CLICK_SLOP_PX = { mouse: 6, touch: 10 }
 
 interface StationsProps {
   stations: readonly Station[]
@@ -125,6 +128,9 @@ export function Stations({ stations }: StationsProps) {
         frustumCulled={false}
         onClick={(e) => {
           e.stopPropagation()
+          // r3f fires click on a hit even after a long drag (all hit discs are one mesh), so a pan
+          // that starts and ends on stations would select one. Only a near-still press selects.
+          if (e.delta > CLICK_SLOP_PX[(e.nativeEvent as PointerEvent).pointerType === 'touch' ? 'touch' : 'mouse']) return
           const ids = e.intersections.flatMap((i) => (i.object === hit.current && i.instanceId !== undefined ? [i.instanceId] : []))
           const station = stations[nearestHit(ids, positions, e.point)]
           if (station) select(station.id)
