@@ -97,13 +97,11 @@ describe('arrivalsAt', () => {
     ])
   })
 
-  it('skips an unjoined trip whose predictions end here, unless they run to the horizon', () => {
+  it('skips an unjoined trip whose predictions end here, even when cut at the horizon', () => {
     const ends = trip('bogus', '1', [['101N', NOW + 60], ['102N', NOW + 160]])
     const cut = trip('bogus', '1', [['101N', NOW + 60], ['102N', NOW + ARRIVAL_HORIZON_S - 10]])
     expect(arrivalsAt(snapshot([ends]), at102, NOW, opts)).toEqual([])
-    expect(arrivalsAt(snapshot([cut]), at102, NOW, opts)).toEqual([
-      { routeId: '1', direction: 'N', headsign: 'Stop 102', times: [NOW + ARRIVAL_HORIZON_S - 10] },
-    ])
+    expect(arrivalsAt(snapshot([cut]), at102, NOW, opts)).toEqual([])
   })
 
   it('uses the feed route when known, and drops a trip whose route and shape are both unknown', () => {

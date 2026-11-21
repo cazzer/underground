@@ -1,4 +1,4 @@
-import { ARRIVAL_HORIZON_S, FEED_IDS, type RealtimeSnapshot } from '../../data/realtime'
+import { FEED_IDS, type RealtimeSnapshot } from '../../data/realtime'
 import type { Direction, RouteId, StationId, StopId } from '../../data/schema'
 import { ghostReason } from '../realtime/filters'
 import { joinTrip } from '../realtime/joinTrip'
@@ -13,8 +13,6 @@ export const MAX_TIMES_PER_GROUP = 3
 export const PAST_GRACE_S = 30
 /** Under this many seconds away reads "Now". */
 export const NOW_UNDER_S = 30
-/** A last prediction this close to the Worker's horizon means the feed cut the list short, not that the trip ends. */
-export const HORIZON_SLACK_S = 30
 
 export interface ArrivalGroup {
   routeId: RouteId
@@ -81,8 +79,9 @@ export function arrivalsAt(
       const last = trip.arrivals.at(-1)
       const terminal = patternTerminal ?? last?.[0]
       if (terminal === undefined || last === undefined) continue
-      const cutShort = patternTerminal === undefined && last[1] >= snapshot.generatedAt + ARRIVAL_HORIZON_S - HORIZON_SLACK_S
-      if (stationOfStop(terminal) === station.id && !cutShort) continue
+      // A trip whose last known stop is this one is skipped: nobody boards it here, and a headsign naming
+      // this station would be wrong. That includes unjoined trips cut at the Worker horizon (rare, and ~30 min out).
+      if (stationOfStop(terminal) === station.id) continue
       const headsign = opts.stationName(stationOfStop(terminal))
       const routeId = trainRouteId({ trip, shapeId }, opts.routeById, opts.lookup.patterns)
       if (headsign === undefined || routeId === null) continue
