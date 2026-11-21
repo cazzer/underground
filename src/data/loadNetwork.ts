@@ -24,6 +24,7 @@ async function fetchJson(url: string, signal: AbortSignal): Promise<unknown> {
   try {
     return await res.json()
   } catch (err) {
+    if (signal.aborted) throw err
     throw new Error(`${url}: invalid JSON (${err instanceof Error ? err.message : String(err)})`)
   }
 }
