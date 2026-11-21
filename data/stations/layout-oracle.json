@@ -2,7 +2,7 @@
   "about": "Facts agent-checked against English Wikipedia (CC BY-SA 4.0); no text copied; not shipped.",
   "sourceLicense": "CC BY-SA 4.0",
   "verifiedBy": "agent (read from the article wikitext by an AI agent, not checked by a person)",
-  "mezzanineRule": "true if a level separate from the platforms (above or below, including a station house under an elevated line, an enclosed crossover or an overpass) connects both directions; false if the article says there is none or fare control is only at platform level; null if the article is silent.",
+  "mezzanineRule": "true if the article describes any level separate from the platforms (above or below, including a station house under an elevated line, a crossover, a crossunder or a passageway, paid or unpaid) that connects the platforms or the two street sides; this clause wins over the others. false only if the article says there is no such level and fare control is at platform level. null if the article is silent.",
   "retrievedAt": "2026-11-21",
   "stations": [
     {"stationId": "110", "name": "191 St", "platformType": "side", "platforms": 2, "tracks": 2, "mezzanine": true, "article": "191st Street station", "revision": 1386890914},
@@ -20,7 +20,7 @@
     {"stationId": "706", "name": "103 St-Corona Plaza", "platformType": "side", "platforms": 2, "tracks": 3, "mezzanine": true, "article": "103rd Street–Corona Plaza station", "revision": 1381733743},
     {"stationId": "712", "name": "61 St-Woodside", "platformType": "island", "platforms": 2, "tracks": 3, "mezzanine": true, "article": "61st Street–Woodside station", "revision": 1381734190},
     {"stationId": "713", "name": "52 St", "platformType": "side", "platforms": 2, "tracks": 3, "mezzanine": true, "article": "52nd Street station (IRT Flushing Line)", "revision": 1381734268},
-    {"stationId": "715", "name": "40 St-Lowery St", "platformType": "side", "platforms": 2, "tracks": 3, "mezzanine": false, "article": "40th Street–Lowery Street station", "revision": 1381734326},
+    {"stationId": "715", "name": "40 St-Lowery St", "platformType": "side", "platforms": 2, "tracks": 3, "mezzanine": null, "article": "40th Street–Lowery Street station", "revision": 1381734326},
     {"stationId": "A02", "name": "Inwood-207 St", "platformType": "island", "platforms": 1, "tracks": 2, "mezzanine": true, "article": "Inwood–207th Street station", "revision": 1381782665},
     {"stationId": "A05", "name": "190 St", "platformType": "side", "platforms": 2, "tracks": 2, "mezzanine": true, "article": "190th Street station", "revision": 1386792350},
     {"stationId": "A06", "name": "181 St", "platformType": "side", "platforms": 2, "tracks": 2, "mezzanine": true, "article": "181st Street station (IND Eighth Avenue Line)", "revision": 1386792333},

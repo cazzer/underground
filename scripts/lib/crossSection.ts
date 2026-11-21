@@ -11,6 +11,10 @@ const DEDUPE_M = 1.5
 export const MERGE_GAP_M = 4
 const BLOCK_SLACK_M = 0.25
 
+/** A track beside a platform's long edge sits from this far inside it to this far outside it. */
+export const EDGE_INSIDE_M = 1.5
+export const EDGE_OUTSIDE_M = 5
+
 export interface UVTrack {
   ref: string
   pts: UV[]
@@ -120,4 +124,17 @@ export function buildSections(rings: UV[][], tracks: UVTrack[], fractions: numbe
     const { intervals, gapWithoutTrack } = mergeIntervals(raw, crossings)
     return { u, crossings, intervals, gapWithoutTrack }
   })
+}
+
+function nearestTo(cs: Crossing[], v: number): Crossing | undefined {
+  return cs.reduce<Crossing | undefined>((best, c) => (best === undefined || Math.abs(c.v - v) < Math.abs(best.v - v) ? c : best), undefined)
+}
+
+/** The track beside one long edge of a platform interval (side +1 is the edge at larger v): the nearest
+ *  main-line crossing in the edge window, or, with none there, the nearest siding, spur or yard crossing.
+ *  OSM sometimes tags a platform's own tracks that way (Hudson Yards, 2 Av). */
+export function edgeCrossing(crossings: Crossing[], iv: { v0: number; v1: number }, side: -1 | 1): Crossing | undefined {
+  const edge = side > 0 ? iv.v1 : iv.v0
+  const inWindow = (c: Crossing): boolean => (side > 0 ? c.v >= edge - EDGE_INSIDE_M && c.v <= edge + EDGE_OUTSIDE_M : c.v >= edge - EDGE_OUTSIDE_M && c.v <= edge + EDGE_INSIDE_M)
+  return nearestTo(crossings.filter((c) => !c.service && inWindow(c)), edge) ?? nearestTo(crossings.filter((c) => c.service && inWindow(c)), edge)
 }

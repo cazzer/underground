@@ -29,15 +29,18 @@ function usage(): never {
   throw new Error('usage: node scripts/score-archetypes.ts <feedDir> [--oracle <file>]')
 }
 
-/** True when `dir` is inside a git work tree. git exits non-zero outside one; any other failure (no git
- *  on the PATH) means we cannot tell, so it is raised rather than read as "outside". */
+/** True when `dir` is inside a git work tree. Only git's own "not a git repository" answer (exit 128)
+ *  means outside; any other failure (no git on the PATH, dubious ownership) cannot show that the feed is
+ *  safe, so it refuses with git's message. */
 function insideGitWorkTree(dir: string): boolean {
   try {
-    execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { stdio: 'ignore' })
+    execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { stdio: ['ignore', 'ignore', 'pipe'] })
     return true
   } catch (err) {
-    if (typeof (err as { status?: unknown }).status === 'number') return false
-    throw new Error(`cannot run git to check that ${dir} is outside every repository: ${String(err)}`)
+    const { status, stderr } = err as { status?: unknown; stderr?: unknown }
+    const message = String(stderr ?? err).trim()
+    if (status === 128 && /not a git repository/i.test(message)) return false
+    throw new Error(`cannot confirm that ${dir} is outside every git work tree: ${message}`)
   }
 }
 

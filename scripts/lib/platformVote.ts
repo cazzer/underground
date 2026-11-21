@@ -1,12 +1,10 @@
 /** Per cross-section island/side calls, and the vote that turns them into one layout per physical platform. */
+import { EDGE_INSIDE_M, edgeCrossing } from './crossSection.ts'
 import type { Crossing, SectionInterval } from './crossSection.ts'
 import { capAt, deduct } from './platformLayout.ts'
 import type { Ledger, PlatformLayout } from './platformLayout.ts'
 import type { UV } from './platformAxis.ts'
 
-/** A track beside an edge sits from this far inside it to this far outside it. */
-const EDGE_INSIDE_M = 1.5
-const EDGE_OUTSIDE_M = 5
 const AGREE_PENALTY_BELOW = 0.8
 const AGREE_CAP_BELOW = 0.6
 const AGREE_CAP = 0.4
@@ -57,21 +55,17 @@ export function joinSplitPlatforms(rings: UV[][], groups: Groups): void {
   }
 }
 
-function nearest(cs: Crossing[], v: number): Crossing | undefined {
-  return cs.reduce<Crossing | undefined>((best, c) => (best === undefined || Math.abs(c.v - v) < Math.abs(best.v - v) ? c : best), undefined)
-}
-
 /** Classifies one merged interval; a track drawn inside the polygon voids it. */
 export function classifySection(iv: SectionInterval, allCrossings: Crossing[], group: number, u: number, notes: Set<string>): SectionRec {
-  const crossings = allCrossings.filter((c) => !c.service) // a siding or yard way is never a platform's track
+  const crossings = allCrossings.filter((c) => !c.service) // a way drawn inside a polygon voids it only if main-line
   const rec = { group, v0: iv.v0, v1: iv.v1 }
   const inside = crossings.find((c) => c.v > iv.v0 + EDGE_INSIDE_M && c.v < iv.v1 - EDGE_INSIDE_M)
   if (inside) {
     notes.add(`track ${inside.ref} drawn inside a platform polygon (u ${u.toFixed(0)} m); that section is ignored for the platform`)
     return { ...rec, kind: 'dropped', edges: [] }
   }
-  const right = nearest(crossings.filter((c) => c.v >= iv.v1 - EDGE_INSIDE_M && c.v <= iv.v1 + EDGE_OUTSIDE_M), iv.v1)
-  const left = nearest(crossings.filter((c) => c.v >= iv.v0 - EDGE_OUTSIDE_M && c.v <= iv.v0 + EDGE_INSIDE_M), iv.v0)
+  const right = edgeCrossing(allCrossings, iv, 1)
+  const left = edgeCrossing(allCrossings, iv, -1)
   const edges: EdgeHit[] = []
   if (left) edges.push({ side: -1, v: left.v, ref: left.ref })
   if (right) edges.push({ side: 1, v: right.v, ref: right.ref })

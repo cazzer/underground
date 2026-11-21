@@ -35,7 +35,9 @@ be accurate.
 - `stations/layout-holdout.json`: 30 more stations, drawn by a fixed rule from the catalog rows the oracle does
   not use and checked by a second agent. Never tune on it: run
   `node scripts/score-archetypes.ts <feedDir> --oracle data/stations/layout-holdout.json` against frozen code.
-  Entries flagged `complex` or `multiLevel` are expected to stay below the confidence bar.
+  Entries flagged `complex` or `multiLevel` are expected to stay below the confidence bar. It was scored
+  once, on 2026-11-21, with frozen code (precision at the bar 19/19), so any later change motivated by one of
+  its stations counts as tuning on it.
 
 ## Refreshing
 

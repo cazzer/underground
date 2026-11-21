@@ -147,12 +147,12 @@ describe('analyzePlatforms', () => {
     expect(a.trackOffsetsV[1]).toBeCloseTo(0, 1)
   })
 
-  it('does not count a service way in the margin outside the platforms, or let it stand in for a platform edge', () => {
+  it('does not count a service way in the margin when a main-line way is beside that edge', () => {
     const island = run(buildStation('S2', 'subway', 55, [[-3, 3]], [-4.7, 4.7], { serviceTracks: [7.5] }))
     expect(island.trackCount).toBe(2)
-    const side = run(buildStation('S3', 'subway', 55, [[-7.5, -3.5], [3.5, 7.5]], [-1.85, 1.85], { serviceTracks: [-10] }))
-    expect(side.layouts.map((l) => l.kind)).toEqual(['side', 'side'])
-    expect(side.trackCount).toBe(2)
+    const side = run(buildStation('S3', 'subway', 55, [[-7.5, -3.5], [3.5, 7.5]], [-1.85, 1.85, -9.5], { serviceTracks: [-11.5] }))
+    expect(side.trackCount).toBe(3)
+    expect(side.layouts.map((l) => l.kind)).toEqual(['island', 'side'])
   })
 
   it('prefers the main-line way when it coincides with a service way', () => {
@@ -165,5 +165,20 @@ describe('analyzePlatforms', () => {
     const a = run(buildStation('S5', 'subway', 55, [[-15, -11.6], [11.6, 15]], [-10, -2, 2, 10], { serviceTracks: [-6, 6] }))
     expect(a.trackCount).toBe(4)
     expect(a.reasons.join('\n')).toMatch(/2 siding, spur or yard ways between the platforms ignored: counting them gives 6 tracks/)
+  })
+
+  it('uses a siding, spur or yard way as a platform edge track when no main-line way is beside that edge', () => {
+    const both = run(buildStation('Y1', 'subway', 55, [[-5.3, 5.3]], [], { serviceTracks: [-6.8, 6.8] }))
+    expect(both.layouts[0]!.kind).toBe('island')
+    expect(both.trackCount).toBe(2)
+    expect(both.geometryOnly).toBe(false)
+    const one = run(buildStation('Y2', 'subway', 55, [[-3, 3]], [-4.7], { serviceTracks: [4.7] }))
+    expect(one.layouts[0]!.kind).toBe('island')
+    expect(one.trackCount).toBe(2)
+  })
+
+  it('prefers a main-line way beside an edge over a service way nearer to it', () => {
+    const a = run(buildStation('Y3', 'subway', 55, [[-3, 3]], [-4.7, 6.5], { serviceTracks: [3.5] }))
+    expect(a.layouts[0]!.edges.find((e) => e.side === 1)!.offsetV).toBeCloseTo(6.5, 0)
   })
 })
