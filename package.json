@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "data": "node scripts/build-data.ts",
+    "data:stations": "node scripts/build-stations.ts",
+    "data:stations:fetch": "node scripts/fetch-station-sources.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts"
   },
   "dependencies": {

@@ -23,6 +23,10 @@ so dev and preview serve under that path.
 - `npm run typecheck`: `tsc --noEmit` for `src/`, then `tsc --noEmit -p scripts`
 - `npm run data [-- --zip path]`: rebuild `public/data/*.json` from the regular GTFS zip
   (downloads it unless `--zip` or `$GTFS_ZIP` is given; needs Node >= 22.18). Never commit the zip.
+- `npm run data:stations`: merge `data/stations/*.authored.json` with the pinned `*.sources.json`
+  into `public/data/stations/*.json`. Offline.
+- `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
+  pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -65,8 +69,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/schema.ts`: types of the six `public/data/*.json` files; `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
-- `public/data/`: preprocessed static JSON (generated; `npm run data`)
-- `scripts/`: `build-data.ts` (the only IO) and pure transforms in `scripts/lib/`, tests colocated
+- `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`
+- `public/data/`: preprocessed static JSON (generated; `npm run data`, `npm run data:stations`)
+- `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
+- `scripts/`: `build-data.ts`, `build-stations.ts` and `fetch-station-sources.ts` (the only IO) and pure
+  transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station merge
 - `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`
   - `src/schema.ts` the JSON contract (types and consts only); the client re-exports it
   - `src/index.ts` routing, memo + Cache API (15 s), CORS; `cache.ts` pure memo/herd-guard
@@ -104,6 +111,24 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
+
+## Station interior format
+`public/data/stations/<id>.json`, type `StationInterior` in `src/data/stationSchema.ts`. Built by
+`scripts/build-stations.ts` from the hand-authored `data/stations/<id>.authored.json` plus pinned OSM,
+NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
+- Render in a group at `toGround(anchor)`. `x`/`z` are local meters (east, south); `y` comes from
+  `levels[].y`, relative to the street (0), negative below. Levels are sorted high to low.
+- `platforms` are OSM outlines (level + open ring) plus `tracks`, one centerline per served child stop.
+  `slabs` are mezzanines and other walkable floors.
+- `connectors` (stair, escalator, elevator, ramp) have `lower`/`upper` endpoints `{x, z, level}` and a
+  `width`. Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
+  outages. Elevators have identical x/z at both ends.
+- `entrances` are street-level points (raw NY Open Data type, entry/exit) listing the `connectors`
+  that reach them.
+- Every element has `sources` (`osm`, `nyopendata`, `authored`). The whole file is ODbL 1.0 and carries
+  `attribution`.
+- Authoring uses a `[u, v]` frame aligned to the platform; the merge converts it. Guesses are marked
+  `UNVERIFIED:` in the authored file's `notes`; they are not copied to the output.
 
 ## Agent model routing
 - opus: planning and architecture

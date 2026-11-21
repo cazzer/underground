@@ -1,0 +1,38 @@
+{
+  "stationId": "L08",
+  "fetchedAt": "2026-11-21T04:09:49.944Z",
+  "osm": {
+    "license": "ODbL-1.0",
+    "attribution": "© OpenStreetMap contributors",
+    "query": "[out:json][timeout:60];way(id:906963980);out geom meta;",
+    "baseTimestamp": "2026-11-21T04:07:51Z",
+    "ways": [
+      {"id":906963980,"version":4,"timestamp":"2026-10-26T15:48:12Z","tags":{"level":"-2","name":"Bedford Avenue","railway":"platform"},"ring":[[40.717841,-73.9576596],[40.7177973,-73.9577044],[40.7169545,-73.9563611],[40.7169985,-73.9563149],[40.717841,-73.9576596]]}
+    ]
+  },
+  "entrances": {
+    "dataset": "i9wp-a4ja",
+    "url": "https://data.ny.gov/resource/i9wp-a4ja.json?gtfs_stop_id=L08&%24limit=1000",
+    "rowsUpdatedAt": "2025-12-05T18:36:18.000Z",
+    "rows": [
+      {"type":"Stair","entry":true,"exit":true,"lat":40.7168959,"lon":-73.9565414},
+      {"type":"Stair","entry":true,"exit":true,"lat":40.7169125,"lon":-73.9563763},
+      {"type":"Stair","entry":true,"exit":true,"lat":40.7170278,"lon":-73.9562626},
+      {"type":"Stair","entry":true,"exit":true,"lat":40.7171349,"lon":-73.9562734},
+      {"type":"Stair","entry":true,"exit":true,"lat":40.7176329,"lon":-73.9578755},
+      {"type":"Stair","entry":true,"exit":true,"lat":40.717669,"lon":-73.957588},
+      {"type":"Stair","entry":true,"exit":true,"lat":40.717778,"lon":-73.9574692},
+      {"type":"Elevator","entry":true,"exit":true,"lat":40.7179059,"lon":-73.9575989},
+      {"type":"Stair","entry":true,"exit":true,"lat":40.7179977,"lon":-73.9574904}
+    ]
+  },
+  "equipment": {
+    "dataset": "94fv-bak7",
+    "url": "https://data.ny.gov/resource/94fv-bak7.json?station_mrn=120&%24limit=1000",
+    "rowsUpdatedAt": "2026-11-20T11:22:49.000Z",
+    "rows": [
+      {"code":"EL358","kind":"elevator","lat":40.717735,"lon":-73.95772,"serving":"mezzanine to platform for service in both directions"},
+      {"code":"EL359","kind":"elevator","lat":40.717854,"lon":-73.95769,"serving":"Bedford Av and N 7 St (NE corner) to mezzanine for service in both directions"}
+    ]
+  }
+}
