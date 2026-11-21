@@ -31,13 +31,17 @@ export function routeLineBuffers(network: Network, paths: readonly ShapePath[], 
  * material's resolution from the viewport (CSS pixels) before each render, so linewidth is in
  * CSS pixels at any dpr.
  */
-export function useLineLayer(buffers: LineBuffers | null, renderOrder: number): LineSegments2 | null {
+export function useLineLayer(
+  buffers: LineBuffers | null,
+  renderOrder: number,
+  linewidth = theme.lineWidth,
+): LineSegments2 | null {
   const lines = useMemo(() => {
     if (!buffers || buffers.positions.length === 0) return null
     const geometry = new LineSegmentsGeometry().setPositions(buffers.positions).setColors(buffers.colors)
     const material = new LineMaterial({
       vertexColors: true,
-      linewidth: theme.lineWidth,
+      linewidth,
       transparent: true,
       depthTest: false,
       depthWrite: false,
@@ -45,7 +49,7 @@ export function useLineLayer(buffers: LineBuffers | null, renderOrder: number): 
     const l = new LineSegments2(geometry, material)
     l.renderOrder = renderOrder
     return l
-  }, [buffers, renderOrder])
+  }, [buffers, renderOrder, linewidth])
 
   useEffect(
     () => () => {

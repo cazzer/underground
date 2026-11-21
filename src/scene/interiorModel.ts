@@ -1,0 +1,110 @@
+import { Color } from 'three'
+import type { LocalPoint, StationInterior } from '../data/stationSchema'
+import { interiorBounds, interiorFocusTarget, levelLabels, paddedHull, type LevelLabel } from '../lib/interiorFraming'
+import { buildInteriorBuffers, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
+import { toGround, type Ground } from '../lib/projection'
+import { mixHex } from '../lib/routeColor'
+import { ISO_POLAR } from '../lib/tilt'
+import { theme } from '../theme'
+import { interiorLook } from './interiorLook'
+
+/** A station interior, ready to draw: group origin, merged line buffers, labels, camera target. */
+export interface InteriorModel {
+  stationId: string
+  /** Scene position of the interior's local origin (its anchor). */
+  origin: Ground
+  strong: Buffers
+  fine: Buffers
+  labels: LevelLabel[]
+  /** Ground target that puts the plan center at mid-depth mid-screen, seen isometrically. */
+  focusCenter: Ground
+  /** Plan extent (meters east-west and north-south) and scaled depth, for framing beside the HUD. */
+  width: number
+  length: number
+  depth: number
+  /** Look B's cutaway outline (group-local), or null. */
+  hull: LocalPoint[] | null
+  yScale: number
+}
+
+const ROLE_TOKEN: Record<InteriorRole, string> = {
+  outline: theme.interiorStroke,
+  stair: theme.interiorStroke,
+  elevator: theme.interiorStroke,
+  track: theme.interiorTrack,
+  entrance: theme.interiorEntrance,
+  step: theme.interiorFine,
+  guide: theme.interiorFine,
+  fare: theme.interiorFine,
+}
+
+const HULL_PAD = 6
+
+/** Linear RGB per role and level: deeper levels mix toward the background (mixed in sRGB). */
+function colorTable(levels: number): (role: InteriorRole, levelIndex: number) => Rgb {
+  const table = new Map<string, Rgb>()
+  for (const [role, token] of Object.entries(ROLE_TOKEN)) {
+    for (let i = 0; i < levels; i++) {
+      const fade = levels > 1 ? (theme.interiorDepthFade * i) / (levels - 1) : 0
+      const c = new Color(mixHex(token, theme.background, fade))
+      table.set(`${role}:${i}`, [c.r, c.g, c.b])
+    }
+  }
+  return (role, i) => {
+    const c = table.get(`${role}:${i}`)
+    if (!c) throw new Error(`No interior color for ${role} on level ${i}`)
+    return c
+  }
+}
+
+/** Look B's cut line: the hull loop at street level, appended to the fine strokes. */
+function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buffers {
+  const n = hull.length
+  const positions = new Float32Array(fine.positions.length + n * 6)
+  const colors = new Float32Array(positions.length)
+  positions.set(fine.positions)
+  colors.set(fine.colors)
+  let o = fine.positions.length
+  for (let i = 0; i < n; i++) {
+    const a = hull[i]!
+    const b = hull[(i + 1) % n]!
+    positions.set([a[0], 0, a[1], b[0], 0, b[1]], o)
+    colors.set([...rgb, ...rgb], o)
+    o += 6
+  }
+  return { positions, colors }
+}
+
+/** Builds the drawable model; throws (naming the element) on inconsistent interior data. */
+export function buildInteriorModel(interior: StationInterior): InteriorModel {
+  const { yScale } = interiorLook
+  const colorOf = colorTable(interior.levels.length)
+  const { strong, fine } = buildInteriorBuffers(interior, {
+    yScale,
+    stepRise: 0.18,
+    railDrop: 1.1,
+    entranceSize: 2.5,
+    guides: interiorLook.guides,
+    colorOf,
+  })
+  // Throws for an interior with nothing to draw, so it becomes an error load.
+  const bounds = interiorBounds(interior)
+  const origin = toGround(interior.anchor)
+  const hull =
+    interiorLook.veil === 'footprint'
+      ? paddedHull([...interior.platforms.flatMap((p) => p.outline), ...interior.slabs.flatMap((s) => s.outline)], HULL_PAD)
+      : null
+  return {
+    stationId: interior.stationId,
+    origin,
+    strong,
+    fine: hull ? withCutLine(fine, hull, colorOf('fare', 0)) : fine,
+    labels: levelLabels(interior, yScale),
+    focusCenter: interiorFocusTarget(origin, interior, yScale, Math.tan(ISO_POLAR)),
+    width: bounds.maxX - bounds.minX,
+    length: bounds.maxZ - bounds.minZ,
+    depth: -Math.min(...interior.levels.map((l) => l.y)) * yScale,
+    hull,
+    yScale,
+  }
+}

@@ -29,6 +29,16 @@ export interface Theme {
   panelBorder: string
   fontSans: string
   fontMono: string
+  /** Station interior: outlines, stairs, elevators; track centerlines; street entrances; steps, guides, fare lines. */
+  interiorStroke: string
+  interiorTrack: string
+  interiorEntrance: string
+  interiorFine: string
+  /** Interior line widths in screen pixels (strong and fine strokes). */
+  interiorLineWidth: number
+  interiorFineWidth: number
+  /** 0..1: how far the deepest level's strokes mix toward the background (depth cue). */
+  interiorDepthFade: number
 }
 
 const mono = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
@@ -55,6 +65,13 @@ export const THEMES = {
     panelBorder: '#5ce1ff',
     fontSans: mono,
     fontMono: mono,
+    interiorStroke: '#e6f6ff',
+    interiorTrack: '#5ce1ff',
+    interiorEntrance: '#ffd166',
+    interiorFine: '#8fb4de',
+    interiorLineWidth: 1.5,
+    interiorFineWidth: 1,
+    interiorDepthFade: 0.5,
   },
   drafting: {
     name: 'drafting',
@@ -77,6 +94,13 @@ export const THEMES = {
     panelBorder: '#2b2b2b',
     fontSans: '"Iowan Old Style", "Palatino Linotype", Georgia, serif',
     fontMono: mono,
+    interiorStroke: '#2b2b2b',
+    interiorTrack: '#a63d2f',
+    interiorEntrance: '#a63d2f',
+    interiorFine: '#8a8370',
+    interiorLineWidth: 1.25,
+    interiorFineWidth: 1,
+    interiorDepthFade: 0.5,
   },
   terminal: {
     name: 'terminal',
@@ -99,6 +123,13 @@ export const THEMES = {
     panelBorder: '#33ff66',
     fontSans: mono,
     fontMono: mono,
+    interiorStroke: '#33ff66',
+    interiorTrack: '#eaffef',
+    interiorEntrance: '#ffffff',
+    interiorFine: '#1f9940',
+    interiorLineWidth: 1.5,
+    interiorFineWidth: 1,
+    interiorDepthFade: 0.5,
   },
 } as const satisfies Record<string, Theme>
 
