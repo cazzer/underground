@@ -1,8 +1,8 @@
 {
   "license": "ODbL-1.0",
   "attribution": "© OpenStreetMap contributors",
-  "fetchedAt": "2026-11-21T18:02:51.517Z",
-  "baseTimestamp": "2026-11-21T18:01:51Z",
+  "fetchedAt": "2026-11-21T18:07:58.859Z",
+  "baseTimestamp": "2026-11-21T18:06:50Z",
   "query": "[out:json][timeout:180][bbox:40.50827,-74.25789,40.90762,-73.74947];(way[\"railway\"=\"platform\"];way[\"railway\"=\"subway\"];);out geom;relation[\"railway\"=\"platform\"];out ids;",
   "platformRadiusM": 250,
   "trackRadiusM": 300,

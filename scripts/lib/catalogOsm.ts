@@ -10,15 +10,18 @@ import type { OsmCatalogWay } from './catalogTypes.ts'
 export const PLATFORM_TAGS = ['railway', 'public_transport', 'subway', 'train', 'level', 'layer', 'name', 'ref', 'local_ref', 'area', 'tunnel', 'indoor', 'operator', 'network']
 export const TRACK_TAGS = ['railway', 'level', 'layer', 'tunnel', 'bridge', 'service', 'usage', 'name', 'ref', 'railway:track_ref', 'network', 'operator']
 
-/** Track operator and network values that nearly every track carries; dropped so the file keeps only
- *  the tags that tell a track apart (a missing operator means NYCT, a missing network means NYC Subway). */
-const TRACK_DEFAULTS: Record<string, string> = { operator: 'New York City Transit Authority', network: 'NYC Subway' }
+/** Nearly every track carries this operator and the file drops it so only the odd ones show. Every kept
+ *  track must have the tag (a track without it throws), so a missing operator is never read as NYCT.
+ *  `network` is kept raw: 95% of tracks do not have it, so it cannot be required. */
+const NYCT_OPERATOR = 'New York City Transit Authority'
 
 export interface CatalogRadii {
   platformRadiusM: number
   trackRadiusM: number
   /** GTFS stop ids allowed to have no platform way within platformRadiusM (name them in a comment). */
   platformExceptions?: readonly string[]
+  /** Likewise for track ways within trackRadiusM. */
+  trackExceptions?: readonly string[]
 }
 
 export interface CatalogStationPoint extends LatLon {
@@ -79,10 +82,10 @@ export interface OverpassCatalog {
   skippedRelations: number[]
 }
 
-/** The stations with no platform vertex within `radiusM`: a response cut short by a timeout, or an area
- *  OSM does not map. Used on the fetch and on the committed file. */
-export function stationsWithoutPlatform(stations: readonly CatalogStationPoint[], platforms: readonly OsmCatalogWay[], radiusM: number): CatalogStationPoint[] {
-  const vertices = platforms.flatMap((w) => w.points.map(([lat, lon]) => toGround({ lat, lon })))
+/** The stations with no vertex of `ways` within `radiusM`: a response cut short by a timeout, or an area
+ *  OSM does not map. Used on the fetch and on the committed files. */
+export function stationsWithoutWay(stations: readonly CatalogStationPoint[], ways: readonly OsmCatalogWay[], radiusM: number): CatalogStationPoint[] {
+  const vertices = ways.flatMap((w) => w.points.map(([lat, lon]) => toGround({ lat, lon })))
   return stations.filter((s) => {
     const g = toGround(s)
     return !vertices.some((v) => Math.hypot(v.x - g.x, v.z - g.z) <= radiusM)
@@ -91,10 +94,18 @@ export function stationsWithoutPlatform(stations: readonly CatalogStationPoint[]
 
 const byId = (a: OsmCatalogWay, b: OsmCatalogWay): number => a.id - b.id
 
+function assertCovered(kind: string, stations: readonly CatalogStationPoint[], ways: readonly OsmCatalogWay[], radiusM: number, exceptions: readonly string[] = []): void {
+  const bare = stationsWithoutWay(stations, ways, radiusM).filter((s) => !exceptions.includes(s.gtfsStopId))
+  if (bare.length === 0) return
+  const names = bare.slice(0, 10).map((s) => `${s.gtfsStopId} ${s.name}`).join(', ')
+  throw new Error(`overpass: ${bare.length} of ${stations.length} stations have no ${kind} way within ${radiusM} m (${names}); the response may be incomplete`)
+}
+
 /** Overpass `out geom` JSON to the platform and track ways near a station, each sorted by id. Ways tagged
  *  railway=platform use the platform radius and tag list, railway=subway the track ones; any other way
  *  throws. Throws on a `remark` (Overpass answers HTTP 200 with a runtime error and partial elements) and
- *  when a station has no platform within the radius, unless it is in `platformExceptions`. */
+ *  when a station has no platform or track within its radius, unless it is in `platformExceptions` or
+ *  `trackExceptions`. */
 export function trimOverpassCatalog(json: unknown, stations: readonly CatalogStationPoint[], radii: CatalogRadii): OverpassCatalog {
   const root = record(json, 'overpass')
   if (typeof root.remark === 'string') throw new Error(`overpass remark (the answer may be partial): ${root.remark}`)
@@ -123,7 +134,8 @@ export function trimOverpassCatalog(json: unknown, stations: readonly CatalogSta
     if (!points.some(([lat, lon]) => near({ lat, lon }, platform ? radii.platformRadiusM : radii.trackRadiusM))) return
     const first = points[0]!
     const last = points[points.length - 1]!
-    const kept = (platform ? PLATFORM_TAGS : TRACK_TAGS).filter((k) => typeof tags[k] === 'string' && (platform || tags[k] !== TRACK_DEFAULTS[k]))
+    if (!platform && typeof tags.operator !== 'string') throw new Error(`${at}: track has no operator tag, so it cannot be told from an NYCT track`)
+    const kept = (platform ? PLATFORM_TAGS : TRACK_TAGS).filter((k) => typeof tags[k] === 'string' && (platform || tags[k] !== NYCT_OPERATOR))
     const way: OsmCatalogWay = {
       id,
       tags: Object.fromEntries(kept.map((k) => [k, tags[k] as string])),
@@ -134,11 +146,7 @@ export function trimOverpassCatalog(json: unknown, stations: readonly CatalogSta
   })
   platforms.sort(byId)
   tracks.sort(byId)
-  const exceptions = new Set(radii.platformExceptions ?? [])
-  const bare = stationsWithoutPlatform(stations, platforms, radii.platformRadiusM).filter((s) => !exceptions.has(s.gtfsStopId))
-  if (bare.length > 0) {
-    const names = bare.slice(0, 10).map((s) => `${s.gtfsStopId} ${s.name}`).join(', ')
-    throw new Error(`overpass: ${bare.length} of ${stations.length} stations have no platform way within ${radii.platformRadiusM} m (${names}); the response may be incomplete`)
-  }
+  assertCovered('platform', stations, platforms, radii.platformRadiusM, radii.platformExceptions)
+  assertCovered('track', stations, tracks, radii.trackRadiusM, radii.trackExceptions)
   return { baseTimestamp, platforms, tracks, skippedRelations: skippedRelations.sort((a, b) => a - b) }
 }

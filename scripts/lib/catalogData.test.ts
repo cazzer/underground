@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { MIN_ENVELOPES } from './catalogEnvelopes.ts'
-import { stationsWithoutPlatform } from './catalogOsm.ts'
+import { stationsWithoutWay } from './catalogOsm.ts'
 import type { CatalogEntrance, CatalogEnvelope, CatalogEquipment, CatalogStation, OsmCatalogWay, SodaHeader } from './catalogTypes.ts'
 
 function load<T extends object>(name: string): T {
@@ -16,6 +16,7 @@ const envelopes = load<SodaHeader & { kept: number; rows: CatalogEnvelope[] }>('
 interface OsmFile {
   baseTimestamp: string
   platformRadiusM: number
+  trackRadiusM: number
   ways: OsmCatalogWay[]
 }
 const platforms = load<OsmFile & { skippedRelations: number[] }>('osm-platforms')
@@ -60,7 +61,11 @@ describe('the pinned catalog', () => {
     expect(new Set(ways.map((w) => w.id)).size).toBe(ways.length)
   })
   it('has a platform way within range of every station (a timed-out fetch would not)', () => {
-    const bare = stationsWithoutPlatform(stations.rows, platforms.ways, platforms.platformRadiusM)
+    const bare = stationsWithoutWay(stations.rows, platforms.ways, platforms.platformRadiusM)
+    expect(bare.map((s) => `${s.gtfsStopId} ${s.name}`)).toEqual([])
+  })
+  it('has a track way within range of every station', () => {
+    const bare = stationsWithoutWay(stations.rows, tracks.ways, tracks.trackRadiusM)
     expect(bare.map((s) => `${s.gtfsStopId} ${s.name}`)).toEqual([])
   })
   it('keeps platforms and tracks apart', () => {

@@ -37,6 +37,14 @@ function retryAfterS(res: Response): number | undefined {
   return Number.isFinite(n) && n > 0 ? Math.min(n, 300) : undefined
 }
 
+/** undici reports a dropped connection as TypeError "fetch failed" (cause: the socket error) and a cut
+ *  body as TypeError "terminated"; a timeout is a TimeoutError, a stalled request an AbortError. Anything
+ *  else (a bug, bad JSON) is not retried. */
+function isTransient(err: unknown): boolean {
+  if (err instanceof TypeError) return err.message === 'fetch failed' || err.message === 'terminated'
+  return err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')
+}
+
 const sleep = (s: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, s * 1000))
 
 /** GET or POST returning JSON. Retries 429/502/503/504 and thrown network errors (reset, timeout) after
@@ -55,7 +63,7 @@ async function getJson(url: string, init: RequestInit = {}, timeoutMs = TIMEOUT_
       why = `HTTP ${res.status}`
       wait = retryAfterS(res)
     } catch (err) {
-      if (delay === undefined || !(err instanceof TypeError || (err instanceof DOMException && ['TimeoutError', 'AbortError'].includes(err.name)))) throw err
+      if (delay === undefined || !isTransient(err)) throw err
       why = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
     }
     console.log(`${what}: ${why}; retry ${attempt + 1} of ${RETRY_DELAYS_S.length} in ${wait ?? delay} s`)

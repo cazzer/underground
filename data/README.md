@@ -38,10 +38,14 @@ be accurate.
 ## Refreshing the catalog
 
 1. `npm run data:catalog:fetch` (needs network; Overpass is often busy, and the script retries
-   429, 502, 503, 504 and network errors after 30, 60 and 120 s, or the Retry-After). It writes nothing unless every request succeeds, each row count
-   matches `count(*)`, no file is over 2 MB (`osm-platforms.json` and `osm-tracks.json` are separate for headroom) and the total is under 5 MB.
-2. Review the diff of `stations/catalog/`. The E&E file changes most often (new machines).
-3. Commit. `catalogData.test.ts` checks the files against each other.
+   429, 502, 503, 504 and network errors after 30, 60 and 120 s, or the Retry-After). It writes
+   nothing unless every request succeeds, each row count matches `count(*)`, every station has a
+   platform and a track way nearby, no file is over 2 MB (the OSM data is split into
+   `osm-platforms.json` and `osm-tracks.json` for headroom) and the total is under 5 MB.
+2. Re-check the OPEN-NY Terms of Use and the datasets' overview PDFs for changes (links and quotes
+   in `../docs/research/data-sources.md` §5.1).
+3. Review the diff of `stations/catalog/`. The E&E file changes most often (new machines).
+4. Commit. `catalogData.test.ts` checks the files against each other.
 
 ## Licenses
 
@@ -52,6 +56,7 @@ be accurate.
   `catalog/envelopes.json` (39hk-dx4f, i9wp-a4ja, 94fv-bak7, vkng-7ivg). Attribution: Metropolitan
   Transportation Authority. No license is set on the datasets, so the OPEN-NY Terms of Use apply;
   see `../docs/research/data-sources.md` §5.1 (licensing decisions included).
-- `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors, available under the ODbL 1.0.
+- `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors,
+  available under the ODbL 1.0.
 - The `*.authored.json` files are offered under the ODbL 1.0, because their frame is registered to
   OpenStreetMap geometry.

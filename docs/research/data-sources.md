@@ -163,10 +163,13 @@ MODIFIED: March 8, 2013", read 2026-11-21):
   "arising out of or in any way connected with your access to or use of the OPEN-NY website".
 - Termination: the State may "terminate your access to OPEN-NY for any reason, without notice";
   "all licenses and other rights granted to you ... will immediately cease". It may also require
-  a user, by written notice, to stop using Content it believes is used unlawfully.
-- Public Participation: "You must not create accounts with OPEN-NY or access the site through
-  unauthorized means, including but not limited to, by using an automated device, script, bot,
-  spider, crawler or scraper."
+  a user, by written notice, to stop using Content it believes is used unlawfully or in breach of the
+  Terms of Use.
+- Public Participation, scoped by its opening sentence ("To the extent OPEN-NY activates a module or
+  forum for public comment or the uploading of Content or other information from members of the
+  general public, the following provisions concerning acceptable use apply"): "You must not create
+  accounts with OPEN-NY or access the site through unauthorized means, including but not limited to,
+  by using an automated device, script, bot, spider, crawler or scraper."
 
 Not pinned:
 - **DOS Track LRS** (`dyuj-5if7`) is a file geodatabase download only and needs GDAL, so it is not
@@ -178,8 +181,10 @@ Not pinned:
 The OSM parts (`osm-platforms.json`, `osm-tracks.json`) are © OpenStreetMap contributors under the
 ODbL 1.0 (§5 above). Each way keeps its OSM id; `baseTimestamp` is the Overpass database time. The
 fetch uses `out geom` without `meta`, so contributor names and ids are never downloaded. Tracks drop
-the two tags nearly every track carries (`operator` "New York City Transit Authority", `network`
-"NYC Subway") and keep any other value; platforms keep both raw, so PATH platforms stay identifiable.
+the operator "New York City Transit Authority" (nearly every track has it) and keep any other value;
+the fetch throws on a nearby track with no `operator` tag, so a missing one is never read as NYCT.
+`network` is kept raw where present (95% of tracks have none). Platforms keep both raw, so PATH
+platforms stay identifiable.
 
 **Decisions (the user, 2026-11-21)**
 - (a) Whole-file ODbL station outputs may contain OPEN-NY rows. We ship them with a split attribution
@@ -188,10 +193,13 @@ the two tags nearly every track carries (`operator` "New York City Transit Autho
 - (b) OPEN-NY governs the pinned data.ny.gov extracts. The MTA developer terms (§5) stay in force for
   the realtime feeds and GTFS, and the "may not be real time" and no-endorsement notices stay
   everywhere.
-- (c) The hand-run SODA scripts stay. The SODA API is data.ny.gov's documented programmatic interface,
-  so it is an authorized means under the Public Participation clause quoted above. The scripts are
-  run by hand, make about ten requests, send a descriptive `User-Agent`, and never run in CI or from
-  the site.
+- (c) The hand-run SODA scripts stay. This is our reading, not settled law. First, the Public
+  Participation bullets apply "to the extent OPEN-NY activates a module or forum for public comment
+  or the uploading of Content", so they govern those features, not downloading Content. Second, the
+  SODA API is data.ny.gov's documented programmatic interface, so it is not an "unauthorized means"
+  either. The scripts are run by hand, make 12 SODA requests (view metadata, `count(*)` and rows for
+  each of four datasets) plus one Overpass request, send a descriptive `User-Agent`, and never run in
+  CI or from the site.
 
 ## 6. Static-hosting fit and pipeline
 
