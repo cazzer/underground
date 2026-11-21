@@ -7,8 +7,6 @@ import { POLL_MS } from './backoff'
 import { decideCorrection } from './motion'
 import { carryOnto, clearCarry, createCarryTable, type CarryTable } from './shapeCarry'
 
-export { CARRY_M } from './shapeCarry'
-
 /** About 340 trips are live at once; this leaves headroom, and overflow is counted, never silent. */
 export const TRAIN_CAPACITY = 1024
 /** Seconds a dot takes to scale in or out (and each half of a cross-fade). */

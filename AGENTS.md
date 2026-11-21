@@ -218,8 +218,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
     poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, a smoothstep-eased
     glide sized from the gap at 60 m/s catch-up within 3-10 s that a new poll continues on its curve rather than
-    restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change the dot's ground point is
-    projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
+    restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change (`shapeCarry.ts`) the dot's
+    drawn point, in the last frame's `BandView`, is projected onto the new shape's drawn line (`nearestOnTrack`):
+    within 25 m it carries over and the gap left (a band pitch, or a junction's few meters) eases out as a world
+    offset at about 30 px/s on screen (0.6-2 s; dot, cars and picks add it), else it shrinks on the old shape
     (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
   - `trackPoint.ts` `trackPointInto`: a train's drawn point at a distance, on its route's band as the band line
     shader draws it (vertices shifted by `bandShift`, straight between) at the profile's height. Dots, cars (and so
