@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { toLatLon } from '../../src/lib/projection.ts'
 import type { CatalogEntrance, CatalogEquipment, CatalogStation, OsmCatalogWay } from './catalogTypes.ts'
-import { buildAllFacts, isMainTrack, isSubwayPlatform } from './catalogFacts.ts'
+import { buildAllFacts, isSubwayTrack, isSubwayPlatform } from './catalogFacts.ts'
 import type { Catalog } from './catalogFacts.ts'
 import { classifyStation } from './archetype.ts'
 
@@ -59,10 +59,10 @@ describe('platform and track filters', () => {
 
   it('keeps NYCT (no operator tag) and SIR tracks, siding or spur included; drops crossovers, PATH and other operators', () => {
     const c = catalog()
-    expect(c.tracks.map(isMainTrack)).toEqual([true, true, false, false, true])
-    expect(isMainTrack(track(1, 0, -1, 1, { operator: 'Staten Island Rapid Transit Operating Authority' }))).toBe(true)
-    expect(isMainTrack(track(1, 0, -1, 1, { operator: 'South Brooklyn Railway' }))).toBe(false)
-    for (const service of ['siding', 'spur', 'yard']) expect(isMainTrack(track(1, 0, -1, 1, { service }))).toBe(true)
+    expect(c.tracks.map(isSubwayTrack)).toEqual([true, true, false, false, true])
+    expect(isSubwayTrack(track(1, 0, -1, 1, { operator: 'Staten Island Rapid Transit Operating Authority' }))).toBe(true)
+    expect(isSubwayTrack(track(1, 0, -1, 1, { operator: 'South Brooklyn Railway' }))).toBe(false)
+    for (const service of ['siding', 'spur', 'yard']) expect(isSubwayTrack(track(1, 0, -1, 1, { service }))).toBe(true)
   })
 })
 

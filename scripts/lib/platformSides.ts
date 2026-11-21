@@ -13,6 +13,7 @@ import type { LayoutAnalysis } from './platformLayout.ts'
 import { Groups, buildLayouts, classifySection, joinSplitPlatforms } from './platformVote.ts'
 import { trackSpan } from './trackSpan.ts'
 import type { PlatformFact, TrackFact } from './stationFacts.ts'
+import { distanceToSegment } from './stationGeometry.ts'
 
 export type { LayoutAnalysis, PlatformLayout } from './platformLayout.ts'
 
@@ -24,20 +25,13 @@ const WIDTH_PRIOR_M = { island: [5, 15], side: [2.5, 8] } as const
 const SPREAD_PENALTY_M = 1
 const SPREAD_CAP_M = 3
 const SPREAD_CAP = 0.5
-/** Side platforms come one per direction; a lone one puts the station below the interior bar. */
+/** Side platforms come one per direction; a lone one with 2 or more tracks around it (the other platform
+ *  missing from the data) puts the station below the interior bar. Park Pl and Aqueduct really have one. */
 const LONE_SIDE_CAP = 0.6
 
 function distanceToPath(p: LocalPoint, path: LocalPoint[]): number {
   let best = Infinity
-  for (let i = 0; i + 1 < path.length; i++) {
-    const a = path[i]!
-    const b = path[i + 1]!
-    const dx = b[0] - a[0]
-    const dz = b[1] - a[1]
-    const len2 = dx * dx + dz * dz
-    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / len2))
-    best = Math.min(best, Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dz))
-  }
+  for (let i = 0; i + 1 < path.length; i++) best = Math.min(best, distanceToSegment(p, path[i]!, path[i + 1]!))
   return best
 }
 
@@ -69,7 +63,7 @@ export function analyzePlatforms(platforms: PlatformFact[], tracks: TrackFact[])
     return done({ platformType: f.platformType, trackCount: f.trackCount, trackOffsetsV: f.trackOffsetsV, layouts: f.layouts, geometryOnly: true })
   }
 
-  const uvTracks: UVTrack[] = tracks.map((t) => ({ ref: t.ref, pts: t.path.map((pt) => toUV(pt, frame)) }))
+  const uvTracks: UVTrack[] = tracks.map((t) => ({ ref: t.ref, pts: t.path.map((pt) => toUV(pt, frame)), service: t.service === true }))
   const sections = buildSections(rings, uvTracks)
   const groups = new Groups(platforms.length)
   joinSplitPlatforms(rings, groups)
@@ -82,6 +76,7 @@ export function analyzePlatforms(platforms: PlatformFact[], tracks: TrackFact[])
 
   const { layouts, spreadM: centerSpread, keptGroups } = buildLayouts(ways, rings, recs, groups, ledger)
   const span = trackSpan(sections, (iv) => keptGroups.has(groups.find(iv.platforms[0]!)))
+  if (span.note) ledger.reasons.push(span.note)
   const spread = Math.max(centerSpread, span.spreadM)
   if (spread > SPREAD_PENALTY_M) deduct(ledger, 0.2, `platform centers or tracks wander ${spread.toFixed(1)} m across the station (curved or skewed)`)
   if (spread > SPREAD_CAP_M) capAt(ledger, SPREAD_CAP, `platforms are curved (${spread.toFixed(1)} m of wander)`)
@@ -96,7 +91,7 @@ export function analyzePlatforms(platforms: PlatformFact[], tracks: TrackFact[])
     }
   }
   const only = layouts[0]
-  if (layouts.length === 1 && only?.kind === 'side') {
+  if (layouts.length === 1 && only?.kind === 'side' && span.count >= 2) {
     deduct(ledger, 0.3, `platform ${only.osmWays.join('+')} is a lone side platform; the one for the other direction may be missing from the data`)
     capAt(ledger, LONE_SIDE_CAP, 'a lone side platform')
   }

@@ -62,7 +62,8 @@ function nearest(cs: Crossing[], v: number): Crossing | undefined {
 }
 
 /** Classifies one merged interval; a track drawn inside the polygon voids it. */
-export function classifySection(iv: SectionInterval, crossings: Crossing[], group: number, u: number, notes: Set<string>): SectionRec {
+export function classifySection(iv: SectionInterval, allCrossings: Crossing[], group: number, u: number, notes: Set<string>): SectionRec {
+  const crossings = allCrossings.filter((c) => !c.service) // a siding or yard way is never a platform's track
   const rec = { group, v0: iv.v0, v1: iv.v1 }
   const inside = crossings.find((c) => c.v > iv.v0 + EDGE_INSIDE_M && c.v < iv.v1 - EDGE_INSIDE_M)
   if (inside) {

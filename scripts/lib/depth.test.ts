@@ -126,6 +126,9 @@ describe('stationDepths', () => {
     const el = stationDepths({ ...base, structure: 'elevated', platformLevel: 1 })
     expect(el.platform.y).toBe(4.5)
     expect(el.mezzanine).toEqual({ y: 2.25, source: 'structure-default' })
+    expect(el.reasons.join('\n')).toMatch(/half the platform height/)
+    expect(el.reasons.join('\n')).toMatch(/too low to fit a mezzanine/)
+    expect(el.reasons.join('\n')).not.toMatch(/depth|shallow/)
   })
 
   it('puts an unmeasured platform below a deeper, measured E&E mezzanine (deep stations with long elevators)', () => {
@@ -134,6 +137,14 @@ describe('stationDepths', () => {
     expect(d.platform.source).toBe('ee-rise')
     expect(d.platform.y).toBeCloseTo(-172.75 * 0.3048 - 4.5, 3)
     expect(d.reasons.join('\n')).toMatch(/platform set 4.5 m below it/)
+  })
+
+  it('moves an elevated platform up, not down, below a higher measured E&E mezzanine', () => {
+    const d = stationDepths({ ...base, structure: 'elevated', equipment: [eq('EL1', 'street to mezzanine', "40'")] })
+    expect(d.mezzanine?.source).toBe('ee-rise')
+    expect(d.mezzanine!.y).toBeCloseTo(40 * 0.3048, 3)
+    expect(d.platform.y).toBeCloseTo(40 * 0.3048 + 4.5, 3)
+    expect(d.reasons.join('\n')).toMatch(/higher than the structure-default platform 8 m; platform set 4.5 m above it/)
   })
 
   it('has no mezzanine when the station has none', () => {

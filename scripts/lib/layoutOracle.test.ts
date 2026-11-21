@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { CatalogStation } from './catalogTypes.ts'
-import { parseOracle } from './layoutOracle.ts'
+import { parseOracle, splitOracle } from './layoutOracle.ts'
 
 const sample = () => ({
   about: 'a',
-  license: 'CC BY-SA 4.0',
+  sourceLicense: 'CC BY-SA 4.0',
   verifiedBy: 'agent',
   retrievedAt: '2026-11-21',
   declined: [{ stationId: 'Y01', name: 'Y', reason: 'complex', article: 'Y station', revision: 7 }],
@@ -30,34 +30,63 @@ describe('parseOracle', () => {
     const badReason = sample()
     ;(badReason.declined[0] as Record<string, unknown>).reason = 'odd'
     expect(() => parseOracle(badReason)).toThrow(/oracle.declined\[0\].reason/)
+    const oldKey = { ...sample(), license: 'CC BY-SA 4.0', sourceLicense: undefined }
+    expect(() => parseOracle(oldKey)).toThrow(/oracle.sourceLicense/)
+  })
+
+  it('reads the optional held-out fields and rejects a wrong type', () => {
+    const o = sample()
+    Object.assign(o.stations[0]!, { multiLevel: false, complex: true, tracksInService: 2, deep: true, note: 'n', components: [{ line: 'L', platformType: 'side', platforms: 2, tracks: 2 }] })
+    expect(parseOracle(o).stations[0]).toMatchObject({ complex: true, tracksInService: 2, components: [{ line: 'L', tracks: 2 }] })
+    const bad = sample()
+    Object.assign(bad.stations[0]!, { complex: 'yes' })
+    expect(() => parseOracle(bad)).toThrow(/complex: expected a boolean/)
   })
 })
 
-describe('committed layout-oracle.json', () => {
-  const read = (rel: string): unknown => JSON.parse(readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8'))
-  const oracle = parseOracle(read('data/stations/layout-oracle.json'))
-  const catalog = (read('data/stations/catalog/stations.json') as { rows: CatalogStation[] }).rows
+describe('splitOracle', () => {
+  it('moves complex and multi-level stations to the declined list', () => {
+    const o = sample()
+    o.stations.push({ stationId: 'X02', name: 'X2', platformType: 'side', platforms: 2, tracks: 2, mezzanine: null, article: 'a', revision: 1, complex: true } as never, { stationId: 'X03', name: 'X3', platformType: 'side', platforms: 2, tracks: 2, mezzanine: null, article: 'a', revision: 1, multiLevel: true } as never)
+    const { judged, declined } = splitOracle(parseOracle(o))
+    expect(judged.map((s) => s.stationId)).toEqual(['X01'])
+    expect(declined.map((d) => `${d.stationId}:${d.reason}`)).toEqual(['Y01:complex', 'X02:complex', 'X03:multi-level'])
+  })
+})
 
-  it('states its provenance honestly', () => {
-    expect(oracle.about).toBe('Facts hand-checked against English Wikipedia (CC BY-SA 4.0); no text copied; not shipped.')
-    expect(oracle.verifiedBy).toMatch(/agent/)
+describe('committed oracle files', () => {
+  const read = (rel: string): unknown => JSON.parse(readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8'))
+  const catalog = (read('data/stations/catalog/stations.json') as { rows: CatalogStation[] }).rows
+  const tuning = parseOracle(read('data/stations/layout-oracle.json'))
+  const holdout = parseOracle(read('data/stations/layout-holdout.json'))
+
+  it('state their provenance honestly', () => {
+    expect(tuning.about).toBe('Facts agent-checked against English Wikipedia (CC BY-SA 4.0); no text copied; not shipped.')
+    expect(tuning.verifiedBy).toMatch(/agent/)
+    expect(tuning.mezzanineRule).toMatch(/station house under an elevated line/)
+    expect(holdout.verifiedBy).toMatch(/agent/)
+    expect(holdout.about).toMatch(/held out from tuning/)
   })
 
-  it('names catalog stations with the same name, and an article with a revision', () => {
-    for (const s of oracle.stations) {
-      const c = catalog.find((r) => r.gtfsStopId === s.stationId)
-      expect(c, `${s.stationId} is in the catalog`).toBeDefined()
-      expect(c!.name, `${s.stationId} name`).toBe(s.name)
-      expect(s.article.length).toBeGreaterThan(3)
+  it('name catalog stations with the same name, and an article with a revision', () => {
+    for (const o of [tuning, holdout]) {
+      for (const s of [...o.stations, ...o.declined]) {
+        const c = catalog.find((r) => r.gtfsStopId === s.stationId)
+        expect(c, `${s.stationId} is in the catalog`).toBeDefined()
+        expect(c!.name, `${s.stationId} name`).toBe(s.name)
+        expect(s.article.length).toBeGreaterThan(3)
+      }
     }
   })
 
-  it('lists declined stations that exist in the catalog', () => {
-    for (const d of oracle.declined) expect(catalog.find((r) => r.gtfsStopId === d.stationId)?.name, d.stationId).toBe(d.name)
-    expect(oracle.declined.length).toBeGreaterThanOrEqual(5)
+  it('keep the held-out stations out of the tuning oracle', () => {
+    const tuned = new Set([...tuning.stations, ...tuning.declined].map((s) => s.stationId))
+    expect(holdout.stations.filter((s) => tuned.has(s.stationId)).map((s) => s.stationId)).toEqual([])
   })
 
-  it('is big enough to mean something', () => {
-    expect(oracle.stations.length).toBeGreaterThanOrEqual(35)
+  it('are big enough to mean something', () => {
+    expect(tuning.stations.length).toBeGreaterThanOrEqual(35)
+    expect(tuning.declined.length).toBeGreaterThanOrEqual(5)
+    expect(holdout.stations.length).toBe(30)
   })
 })

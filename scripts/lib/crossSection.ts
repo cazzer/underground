@@ -14,10 +14,13 @@ const BLOCK_SLACK_M = 0.25
 export interface UVTrack {
   ref: string
   pts: UV[]
+  /** A siding, spur or yard way: counted as a track only between the outermost platform edges. */
+  service?: boolean
 }
 export interface Crossing {
   v: number
   ref: string
+  service: boolean
 }
 export interface SectionInterval {
   v0: number
@@ -43,12 +46,16 @@ export function trackCrossings(tracks: UVTrack[], u0: number): Crossing[] {
       if (a[0] <= u0 === b[0] <= u0) continue
       if (Math.abs(b[1] - a[1]) > tan * Math.abs(b[0] - a[0])) continue
       const v = a[1] + ((u0 - a[0]) / (b[0] - a[0])) * (b[1] - a[1])
-      if (Math.abs(v) <= MAX_ABS_V_M) found.push({ v, ref: t.ref })
+      if (Math.abs(v) <= MAX_ABS_V_M) found.push({ v, ref: t.ref, service: t.service === true })
     }
   }
   found.sort((x, y) => x.v - y.v)
   const kept: Crossing[] = []
-  for (const c of found) if (kept.length === 0 || c.v - kept[kept.length - 1]!.v >= DEDUPE_M) kept.push(c)
+  for (const c of found) {
+    const last = kept[kept.length - 1]
+    if (last === undefined || c.v - last.v >= DEDUPE_M) kept.push(c)
+    else if (last.service && !c.service) kept[kept.length - 1] = c // one track: the main-line way wins
+  }
   return kept
 }
 

@@ -39,7 +39,7 @@ export function openRing(points: LocalPoint[], what: string): LocalPoint[] {
   return open
 }
 
-function distanceToSegment(p: LocalPoint, a: LocalPoint, b: LocalPoint): number {
+export function distanceToSegment(p: LocalPoint, a: LocalPoint, b: LocalPoint): number {
   const dx = b[0] - a[0]
   const dz = b[1] - a[1]
   const len2 = dx * dx + dz * dz

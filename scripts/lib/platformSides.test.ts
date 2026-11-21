@@ -37,7 +37,7 @@ describe('cross-section pieces', () => {
   it('merges across a gap under 4 m only when no track is between', () => {
     const raw = [{ v0: -3, v1: -0.2, platforms: [0] }, { v0: 0.2, v1: 3, platforms: [1] }]
     expect(mergeIntervals(raw, []).intervals).toHaveLength(1)
-    expect(mergeIntervals(raw, [{ v: 0, ref: 'T' }]).intervals).toHaveLength(2)
+    expect(mergeIntervals(raw, [{ v: 0, ref: 'T', service: false }]).intervals).toHaveLength(2)
     const far = [{ v0: -3, v1: -0.5, platforms: [0] }, { v0: MERGE_GAP_M, v1: 8, platforms: [1] }]
     expect(mergeIntervals(far, []).gapWithoutTrack).toBe(true)
   })
@@ -72,13 +72,13 @@ describe('analyzePlatforms', () => {
     expect(a.trackCount).toBe(2)
   })
 
-  it('takes the majority when a track runs beside only part of an island', () => {
-    const f = buildStation('D', 'subway', 55, [[-3, 3]], [-4.7, 4.7])
-    clipTrack(f, 1, 0, 0.5) // the right track ends at mid-station: 2 cuts see an island, 3 see a side platform
+  it('takes the majority when a track runs beside only part of a side platform, and 60% does not cap', () => {
+    const f = buildStation('D', 'subway', 55, [[-7.5, -3.5], [3.5, 7.5]], [-9.5, -1.85, 1.85])
+    clipTrack(f, 0, 0, 0.45) // an outer track beside the left platform ends before mid-station: 2 cuts see an island, 3 a side
     const a = run(f)
-    expect(a.layouts[0]!.kind).toBe('side')
+    expect(a.layouts.map((l) => l.kind)).toEqual(['side', 'side'])
     expect(a.reasons.join('\n')).toMatch(/60% of cross-sections agree on side: -0.2/)
-    expect(a.cap).toBe(0.6) // it now reads as a lone side platform
+    expect(a.cap).toBe(1)
   })
 
   it('caps the confidence when the cross-sections split below 60%', () => {
@@ -122,8 +122,14 @@ describe('analyzePlatforms', () => {
     expect(a.reasons.join('\n')).toMatch(/put its one track on different edges; kept the right one: -0.2/)
   })
 
+  it('leaves a lone side platform with one track alone (Park Pl, Aqueduct)', () => {
+    const a = run(buildStation('K1', 'subway', 55, [[-7.5, -3.5]], [-1.85]))
+    expect(a.cap).toBe(1)
+    expect(a.reasons.join('\n')).not.toMatch(/lone side/)
+  })
+
   it('penalizes a lone side platform whose partner may be missing', () => {
-    const a = run(buildStation('K', 'subway', 55, [[-14, -9]], [-6.6, -2.9, 2.9, 6.6]))
+    const a = run(buildStation('K', 'subway', 55, [[-9, -5]], [-3.2, -0.5, 3, 6.5]))
     expect(a.layouts).toHaveLength(1)
     expect(a.cap).toBe(0.6)
     expect(a.reasons.join('\n')).toMatch(/lone side platform.*may be missing from the data: -0.3/)
@@ -133,5 +139,31 @@ describe('analyzePlatforms', () => {
     const a = run(buildStation('J', 'subway', 55, [[-12, -7], [7, 12]], []))
     expect(a.platformType).toBeNull()
     expect(a.reasons.join('\n')).toMatch(/neither an island .* nor two narrow side platforms/)
+  })
+
+  it('counts a siding, spur or yard way between the outermost platform edges (an unused center track)', () => {
+    const a = run(buildStation('S1', 'subway', 55, [[-14, -9], [9, 14]], [-6.6, 6.6], { serviceTracks: [0] }))
+    expect(a.trackCount).toBe(3)
+    expect(a.trackOffsetsV[1]).toBeCloseTo(0, 1)
+  })
+
+  it('does not count a service way in the margin outside the platforms, or let it stand in for a platform edge', () => {
+    const island = run(buildStation('S2', 'subway', 55, [[-3, 3]], [-4.7, 4.7], { serviceTracks: [7.5] }))
+    expect(island.trackCount).toBe(2)
+    const side = run(buildStation('S3', 'subway', 55, [[-7.5, -3.5], [3.5, 7.5]], [-1.85, 1.85], { serviceTracks: [-10] }))
+    expect(side.layouts.map((l) => l.kind)).toEqual(['side', 'side'])
+    expect(side.trackCount).toBe(2)
+  })
+
+  it('prefers the main-line way when it coincides with a service way', () => {
+    const a = run(buildStation('S4', 'subway', 55, [[-3, 3]], [-4.7, 4.7], { serviceTracks: [-4.7] }))
+    expect(a.trackCount).toBe(2)
+    expect(a.layouts[0]!.kind).toBe('island')
+  })
+
+  it('ignores layup ways between the platforms when counting them would give more than 4 tracks', () => {
+    const a = run(buildStation('S5', 'subway', 55, [[-15, -11.6], [11.6, 15]], [-10, -2, 2, 10], { serviceTracks: [-6, 6] }))
+    expect(a.trackCount).toBe(4)
+    expect(a.reasons.join('\n')).toMatch(/2 siding, spur or yard ways between the platforms ignored: counting them gives 6 tracks/)
   })
 })

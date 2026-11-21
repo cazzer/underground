@@ -148,7 +148,7 @@ export function stationDepths(i: DepthInput, deepList: DeepStation[] = DEEP_STAT
   if (mezzanine?.source === 'ee-rise' && sign !== 0 && platform.source !== 'ee-rise' && platform.source !== 'deep-list' && mezzanine.y * sign > platform.y * sign - MIN_SEPARATION_M) {
     // A measured mezzanine deeper than an unmeasured platform: the platform lies below the mezzanine.
     const y = mezzanine.y + sign * PLATFORM_BELOW_MEZZANINE_M
-    reasons.push(`E&E puts the mezzanine at ${mezzanine.y.toFixed(1)} m, deeper than the ${platform.source} platform ${platform.y} m; platform set ${PLATFORM_BELOW_MEZZANINE_M} m below it`)
+    reasons.push(`E&E puts the mezzanine at ${mezzanine.y.toFixed(1)} m, ${sign < 0 ? 'deeper' : 'higher'} than the ${platform.source} platform ${platform.y} m; platform set ${PLATFORM_BELOW_MEZZANINE_M} m ${sign < 0 ? 'below' : 'above'} it`)
     platform = { y, source: 'ee-rise' }
   }
   if (mezzanine && sign !== 0) {
@@ -156,11 +156,11 @@ export function stationDepths(i: DepthInput, deepList: DeepStation[] = DEEP_STAT
     const away = mezzanine.y * sign
     const platformAway = platform.y * sign
     if (away < MIN_SEPARATION_M || away > platformAway - MIN_SEPARATION_M) {
-      reasons.push(`mezzanine ${mezzanine.y} m is not ${MIN_SEPARATION_M} m from both the street and the platform ${platform.y} m; set to half the platform depth`)
+      reasons.push(`mezzanine ${mezzanine.y} m is not ${MIN_SEPARATION_M} m from both the street and the platform ${platform.y} m; set to half the platform ${sign < 0 ? 'depth' : 'height'}`)
       mezzanine = { y: platform.y / 2, source: 'structure-default' }
       if (Math.abs(mezzanine.y) < MIN_SEPARATION_M) {
         penalty = DOUBTFUL_MEZZANINE_PENALTY
-        reasons.push(`platform ${platform.y} m is too shallow to fit a mezzanine ${MIN_SEPARATION_M} m from both street and platform; the mezzanine is doubtful: -${DOUBTFUL_MEZZANINE_PENALTY}`)
+        reasons.push(`platform ${platform.y} m is too ${sign < 0 ? 'shallow' : 'low'} to fit a mezzanine ${MIN_SEPARATION_M} m from both street and platform; the mezzanine is doubtful: -${DOUBTFUL_MEZZANINE_PENALTY}`)
       }
     }
   }

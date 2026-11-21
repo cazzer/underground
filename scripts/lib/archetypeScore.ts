@@ -51,15 +51,14 @@ export function judge(oracle: OracleStation, result: ArchetypeResult): OracleOut
 export function oracleReport(outcomes: OracleOutcome[], bar: number): string[] {
   const lines = [`Oracle: ${outcomes.length} stations (agent-checked against Wikipedia, not human-checked)`]
   const kinds = ['island', 'side', 'mixed'] as const
-  const real = outcomes
   lines.push('Platform type, rows = article, columns = classifier (none = no params):')
   lines.push(`  ${pad('', 8)}${[...kinds, 'none'].map((k) => pad(k, 8)).join('')}`)
   for (const k of kinds) {
-    const row = real.filter((o) => o.oracle.platformType === k)
+    const row = outcomes.filter((o) => o.oracle.platformType === k)
     const cell = (c: string): number => row.filter((o) => (o.result.params?.platformType ?? 'none') === c).length
     lines.push(`  ${pad(k, 8)}${[...kinds, 'none'].map((c) => pad(cell(c), 8)).join('')}`)
   }
-  const withParams = real.filter((o) => o.result.params)
+  const withParams = outcomes.filter((o) => o.result.params)
   const trackOk = withParams.filter((o) => o.result.params!.trackCount === o.oracle.tracks).length
   const stated = withParams.filter((o) => o.oracle.mezzanine !== null)
   const mezzOk = stated.filter((o) => o.result.params!.hasMezzanine === o.oracle.mezzanine).length
@@ -67,7 +66,7 @@ export function oracleReport(outcomes: OracleOutcome[], bar: number): string[] {
   lines.push(`Mezzanine agreement (where the article says): ${pct(mezzOk, stated.length)}`)
   const above = outcomes.filter((o) => o.result.confidence >= bar)
   lines.push(`Precision at or above ${bar} (platform type and track count right): ${pct(above.filter((o) => o.correct).length, above.length)}`)
-  lines.push(`Recall of clearing the bar among non-declined: ${pct(real.filter((o) => o.result.confidence >= bar).length, real.length)}`)
+  lines.push(`Recall of clearing the bar among non-declined: ${pct(outcomes.filter((o) => o.result.confidence >= bar).length, outcomes.length)}`)
   lines.push('Per oracle station (archetype, confidence, problems):')
   for (const o of outcomes) {
     lines.push(`  ${o.correct && o.problems.length === 0 ? 'ok  ' : o.correct ? 'mezz' : 'MISS'} ${pad(o.oracle.stationId, 5)}${pad(o.oracle.name, 34)}${pad(o.result.archetype, 24)}${o.result.confidence.toFixed(2)}  ${o.problems.join('; ')}`)
@@ -88,7 +87,7 @@ export function pathwaysReport(all: Classified[], topo: Map<string, StationTopol
   const lines = [`Pathways cross-check on ${rows.length} classified 2-track stations that have pathways data:`]
   const checks: [string, (c: Classified, t: StationTopology) => boolean][] = [
     ['hasMezzanine', (c, t) => c.result.params!.hasMezzanine === t.hasMezzanine],
-    ['perDirection (side platforms <-> disjoint links)', (c, t) => (c.result.params!.platformType === 'side') === (t.perDirection === true)],
+    ['perDirection (shallow-per-direction <-> disjoint links)', (c, t) => (c.result.archetype === 'shallow-per-direction') === (t.perDirection === true)],
     ['sharedConnector (island <-> one connector for both)', (c, t) => (c.result.params!.platformType === 'island') === t.sharedConnector],
   ]
   const bad: string[] = []
@@ -97,7 +96,7 @@ export function pathwaysReport(all: Classified[], topo: Map<string, StationTopol
     lines.push(`  ${label}: agree ${pct(rows.length - wrong.length, rows.length)}`)
     for (const c of wrong) {
       const t = topo.get(c.stationId)!
-      bad.push(`  ${pad(label.split(' ')[0]!, 14)}${pad(c.stationId, 5)}${pad(c.name, 34)}classifier ${c.result.params!.platformType}/mezz ${c.result.params!.hasMezzanine} (${c.result.confidence.toFixed(2)}); pathways mezz ${t.hasMezzanine} count ${t.mezzanineCount} perDirection ${t.perDirection} shared ${t.sharedConnector}`)
+      bad.push(`  ${pad(label.split(' ')[0]!, 14)}${pad(c.stationId, 5)}${pad(c.name, 34)}classifier ${c.result.archetype} ${c.result.params!.platformType}/mezz ${c.result.params!.hasMezzanine} (${c.result.confidence.toFixed(2)}); pathways mezz ${t.hasMezzanine} count ${t.mezzanineCount} perDirection ${t.perDirection} shared ${t.sharedConnector}`)
     }
   }
   lines.push('Pathways disagreements:', ...bad)

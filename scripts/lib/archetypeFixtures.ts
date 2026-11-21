@@ -16,6 +16,8 @@ export const equipmentFact = (code: string, serving: string, rise: string | null
 
 export interface BuildOptions {
   complex?: boolean
+  /** v positions of siding, spur or yard ways (marked `service`). */
+  serviceTracks?: number[]
   /** u range of every track; default -110..110. */
   trackU?: [number, number]
   levelTags?: (string | null)[]
@@ -47,7 +49,12 @@ export function buildStation(
       outline: [fromUV([u0, v0]), fromUV([u1, v0]), fromUV([u1, v1]), fromUV([u0, v1])],
       levelTag: o.levelTags?.[i] ?? o.levelTags?.[0] ?? null,
     })),
-    tracks: tracks.map((v, i): TrackFact => ({ ref: `T${i + 1}`, source: 'osm', path: [fromUV([o.trackU?.[0] ?? TRACK_U[0], v]), fromUV([o.trackU?.[1] ?? TRACK_U[1], v])] })),
+    tracks: [...tracks.map((v) => [v, false] as const), ...(o.serviceTracks ?? []).map((v) => [v, true] as const)].map(([v, service], i): TrackFact => ({
+      ref: `${service ? 'S' : 'T'}${i + 1}`,
+      source: 'osm',
+      path: [fromUV([o.trackU?.[0] ?? TRACK_U[0], v]), fromUV([o.trackU?.[1] ?? TRACK_U[1], v])],
+      ...(service ? { service: true } : {}),
+    })),
     equipment: o.equipment ?? [],
     entrances: entrances.map(([u, v]) => ({ at: fromUV([u, v]), type: 'Stair' })),
   }

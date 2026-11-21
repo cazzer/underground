@@ -54,5 +54,6 @@ describe('reports', () => {
     const text = pathwaysReport(all, topo).join('\n')
     expect(text).toMatch(/hasMezzanine: agree 0.0% \(0\/1\)/)
     expect(text).toMatch(/sharedConnector.*: agree 0.0% \(0\/1\)/)
+    expect(text).toMatch(/perDirection \(shallow-per-direction.*: agree 0.0% \(0\/1\)/)
   })
 })

@@ -18,6 +18,8 @@ export interface TrackFact {
    *  tracks by direction is the template step's job (9wc.4), not the classifier's. */
   ref: string
   source: 'osm' | 'lrs'
+  /** A siding, spur or yard way (OSM tags an unused center track that way). */
+  service?: boolean
   path: LocalPoint[]
 }
 
