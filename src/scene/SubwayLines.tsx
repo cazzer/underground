@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import type { StationId } from '../data/schema'
 import { writeBandView, type BandView } from '../lib/bandOffset'
+import { depthFactor, depthScaleY } from '../lib/tilt'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { Network, ShapePath } from '../lib/network'
 import { baseLineMix, linesMode, theme } from '../theme'
@@ -22,7 +23,7 @@ interface SubwayLinesProps {
   paths: readonly ShapePath[]
   /** The station whose interior is loaded (null for none): its platform tracks fade out as the interior reveals. */
   interiorStationId: StationId | null
-  /** This frame's band view, written here for every band layer and for the trains (LiveTrains reads it). */
+  /** This frame's band view (incl. its depth factor), written here for every band layer and for the trains (LiveTrains reads it). */
   view: BandView
 }
 
@@ -49,7 +50,10 @@ export function SubwayLines({ network, paths, interiorStationId, view }: SubwayL
     const ease = t * t * (3 - 2 * t)
     const distance = cameraDistance(state)
     const p11 = camera.projectionMatrix.elements[5]!
-    writeBandView(view, camera.matrixWorldInverse.elements, p11, state.size.height, distance, theme.bandPitchPx, network.trackOffsetM, ease)
+    const depth = depthFactor(distance)
+    writeBandView(view, camera.matrixWorldInverse.elements, p11, state.size.height, distance, theme.bandPitchPx, network.trackOffsetM, ease, depth)
+    // The profile's depth shows with the tilt; scale.y only, so the band shader's horizontal math is unchanged.
+    if (lines) lines.scale.y = depthScaleY(depth)
     BAND_UNIFORMS.bandPitchPx.value = view.pitchPx
     BAND_UNIFORMS.bandEase.value = view.ease
     BAND_UNIFORMS.trackOffsetM.value = view.trackOffsetM

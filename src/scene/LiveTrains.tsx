@@ -10,7 +10,7 @@ import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale
 import type { TrainPickSource } from '../lib/live/trainPick'
 import { createTrackPoint, trackPointInto } from '../lib/live/trackPoint'
 import { trainRouteId } from '../lib/live/trainRoute'
-import { interiorOpacity } from '../lib/interiorReveal'
+import { interiorOpacity, veilWeight } from '../lib/interiorReveal'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
 import { hopDistance } from '../lib/realtime/position'
@@ -172,7 +172,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     const mix = carMix(camera)
     const scale = screenScale(camera, trainRadiusPx(camera), DOT_MIN_METERS) * (1 - mix)
     const carsOn = mix > 0
-    if (carsOn) cars.beginFrame(camera)
+    if (carsOn) cars.beginFrame(camera, view.depth)
     const center = getControls(state)?.target
     const reach = camera * CARS_WITHIN.distances + CARS_WITHIN.plusM
     const out = d.instanceMatrix.array as Float32Array
@@ -221,7 +221,8 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     }
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn)
-    spanCars.write(table, spans, interiorOpacity(camera), mix, localS, sel, slotColors, cars.consistOf)
+    const reveal = interiorOpacity(camera)
+    spanCars.write(table, spans, reveal, veilWeight(reveal, view.depth), mix, localS, sel, slotColors, cars.consistOf)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
     range.count = table.high * 16
     d.instanceMatrix.updateRanges.push(range)

@@ -13,6 +13,7 @@ import { useMemo } from 'react'
 import type { StationId } from '../data/schema'
 import { useFocus } from '../lib/focus'
 import type { Network, ShapePath } from '../lib/network'
+import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
@@ -38,6 +39,10 @@ export function LineHighlight({ network, paths, interiorStationId }: LayerProps)
   }, [network, paths, focusedId])
   const lines = useLineLayer(buffers, RENDER_ORDER.lineFocus)
   usePlatformFade(lines, buffers, paths, network, interiorStationId)
+  // Depth computed here, not read from SubwayLines' band view: a child's frame runs before its parent writes it.
+  useFrame((state) => {
+    if (lines) lines.scale.y = depthScaleY(depthFactor(cameraDistance(state)))
+  })
   return lines && <primitive object={lines} />
 }
 
@@ -56,6 +61,7 @@ export function LineFade({ network, paths, interiorStationId }: LayerProps) {
     const opacity = Math.min(Math.max(t, 0), 1)
     lines.material.opacity = opacity
     lines.visible = opacity > 0
+    lines.scale.y = depthScaleY(depthFactor(d))
   })
   return lines && <primitive object={lines} />
 }

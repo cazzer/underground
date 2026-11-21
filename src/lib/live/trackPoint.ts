@@ -1,7 +1,8 @@
 /**
  * Where a train at a distance along its shape is drawn: on the map line as the band line shader draws it (each
- * vertex shifted by bandShift, straight between them), at the track's height. Every train position (dots, cars,
- * the platform copies, picks) goes through trackPointInto, so trains ride their route's band. No allocation.
+ * vertex shifted by bandShift, straight between them), at the track's drawn height (profile y times the view's
+ * depth factor, as the lines' scale.y draws it). Every train position (dots, cars, the platform copies, picks) goes
+ * through trackPointInto, so trains ride their route's band at the lines' height. No allocation.
  */
 import { bandShift, type BandView } from '../bandOffset'
 import { BAND_INPUTS } from '../lineBuffers'
@@ -49,7 +50,7 @@ function shiftedVertex(track: DrawnTrack, i: number, view: BandView, out: TrackP
   out.z = p.z
   // No normal (a degenerate line, or no inputs written): drawn unshifted, as the shader draws it.
   if (!(miter > 0)) return
-  const y = profileAt(track.profile, track.line.cumulative[i]!)
+  const y = profileAt(track.profile, track.line.cumulative[i]!) * view.depth
   const s = bandShift(view, p.x, y, p.z, mx, mz, b[o + 2]!, b[o + 3]!)
   out.x += (mx / miter) * s
   out.z += (mz / miter) * s
@@ -60,12 +61,12 @@ const c: TrackPoint = createTrackPoint()
 
 /**
  * Writes the drawn point at `distance` (clamped to the line) into `out` and returns it: x and z on the shifted line
- * between the two vertices around it, y the profile's height there. An empty line gives the origin.
+ * between the two vertices around it, y the profile's drawn height there. An empty line gives the origin.
  */
 export function trackPointInto(track: DrawnTrack, distance: number, view: BandView, out: TrackPoint): TrackPoint {
   const { points, cumulative, length } = track.line
   const d = Math.min(Math.max(distance, 0), length)
-  out.y = profileAt(track.profile, d)
+  out.y = profileAt(track.profile, d) * view.depth
   if (points.length === 0) {
     out.x = out.z = 0
     return out

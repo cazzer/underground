@@ -6,17 +6,19 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { useFocus } from '../lib/focus'
 import type { Network } from '../lib/network'
+import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
 import { MARKER_Y } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
 /**
- * Full strength up close, gone by FADE_END. Farther out the tie is only a few pixels long, a stray tick under
- * the ring rather than a connection: at 600 m it is shorter on screen than the ring radius.
+ * Ties fade in from TIE_FROM_DEPTH of the depth factor, fully shown TIE_RAMP later: below that a tie is shorter on
+ * screen than the ring radius, a stray tick under the ring rather than a connection.
  */
-const FADE_START = 350
-const FADE_END = 550
+const TIE_FROM_DEPTH = 0.3
+const TIE_RAMP = 0.3
+const tieOpacity = (depth: number): number => Math.min(Math.max((depth - TIE_FROM_DEPTH) / TIE_RAMP, 0), 1)
 
 interface StationTiesProps {
   network: Network
@@ -26,7 +28,9 @@ interface StationTiesProps {
  * A thin vertical tie from each street-level station marker down to its platform tracks, for stations whose
  * tracks descend to a station depth (network.stationTrackY), so a tilted view shows which sunken line the
  * marker belongs to. It drops straight down from the GTFS station point, which sits between the tracks: right
- * for island platforms, roughly right for side platforms. One merged LineSegments2, faded out by distance.
+ * for island platforms, roughly right for side platforms. One merged LineSegments2 drawn at the depth factor
+ * (tilt.ts): scale.y follows it as the lines' does, so each tie ends on its sunken track; the opacity ramps in
+ * once the tie is long enough to read (tieOpacity).
  * The focused station draws no marker, so its tie is left out too (swapped to the end and not drawn).
  */
 export function StationTies({ network }: StationTiesProps) {
@@ -54,7 +58,7 @@ export function StationTies({ network }: StationTiesProps) {
     return { lines: l, all: new Float32Array(positions), indexOf }
   }, [network])
   const lines = ties?.lines ?? null
-  const lastFade = useRef(NaN)
+  const lastDepth = useRef(NaN)
 
   // Every tie but the focused one: its segment trades places with the last, which is then not drawn.
   useLayoutEffect(() => {
@@ -79,11 +83,13 @@ export function StationTies({ network }: StationTiesProps) {
 
   useFrame((state) => {
     if (!lines) return
-    const fade = Math.min(Math.max((cameraDistance(state) - FADE_START) / (FADE_END - FADE_START), 0), 1)
-    if (fade === lastFade.current) return
-    lastFade.current = fade
-    lines.visible = fade < 1
-    lines.material.opacity = 1 - fade
+    const depth = depthFactor(cameraDistance(state))
+    if (depth === lastDepth.current) return
+    lastDepth.current = depth
+    const opacity = tieOpacity(depth)
+    lines.visible = opacity > 0
+    lines.scale.y = depthScaleY(depth)
+    lines.material.opacity = opacity
   })
 
   return lines && <primitive object={lines} />

@@ -58,6 +58,19 @@ describe('trackPointInto', () => {
     expect(end.z).toBeCloseTo(-1000, 6)
   })
 
+  it('draws the height at the view depth factor, flat at 0, and shifts the band from that height', () => {
+    const track = { ...banded(1), profile: buildTrackProfile([{ d0: 400, d1: 600, yReal: -10 }], { grade: GRADE, yScale: 2 }).profile }
+    const { cam } = view(500)
+    const at = (depth: number) =>
+      writeBandView(createBandView(), cam.matrixWorldInverse.elements, cam.projectionMatrix.elements[5]!, H, 500, PITCH, 4.7, 1, depth)
+    expect(trackPointInto(track, 500, at(1), createTrackPoint()).y).toBeCloseTo(-20, 9)
+    expect(trackPointInto(track, 500, at(0.25), createTrackPoint()).y).toBeCloseTo(-5, 9)
+    expect(trackPointInto(track, 500, at(0), createTrackPoint()).y).toBeCloseTo(0, 9)
+    // At a vertex, x is the band shift of the point at the drawn height, as the shader sees it under scale.y.
+    const v = at(0.25)
+    expect(trackPointInto(track, 500, v, createTrackPoint()).x).toBeCloseTo(bandShift(v, 0, -5, -500, 1, 0, 1, 0), 9)
+  })
+
   it('leaves an unwritten view and an empty line in place', () => {
     const p = trackPointInto(banded(1), 300, createBandView(), createTrackPoint())
     expect([p.x, p.z]).toEqual([0, -300])
@@ -70,7 +83,7 @@ describe('trackPointInto', () => {
     const { v } = view(500)
     const bodies = new Float32Array(MAX_CARS * 16)
     const halos = new Float32Array(MAX_CARS * 16)
-    const frame = { gapM: 1, rimM: 0.5, widthM: 3, crossScale: 1, y: 0.5 }
+    const frame = { gapM: 1, rimM: 0.5, widthM: 3, crossScale: 1, y: 0.5, extrude: 1 }
     writeConsist(bodies, halos, 0, banded(-1), v, 500, { cars: 4, pitchM: 15 }, 1, 1, 1, frame, createConsistScratch())
     const shift = bandShift(v, 0, 0, -500, 1, 0, -1, 0)
     expect(shift).toBeLessThan(0)

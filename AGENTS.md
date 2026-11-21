@@ -90,7 +90,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
     if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
-    LineSegments2, `theme.stationTieWidth`, faded out between 350 and 550 m); `LineHighlight.tsx` holds the
+    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.3 to 0.6); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
     instance is scaled to 0, so it has no marker; `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
@@ -355,7 +355,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Every color, line width, and font comes from `src/theme.ts`. Never hardcode them.
 - The Canvas is `flat` (no tone mapping), so theme tokens render exactly as written.
   HUD uses Tailwind tokens (`bg-panel`, `text-ink`, ...) backed by theme CSS variables.
-- Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`).
+- Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`): `ISO_POLAR × tiltT(d)`. The same
+  `tiltT` is `depthFactor`, the one parameter for every drawn depth (track profile, car height, ties, interior
+  levels, veil, level labels), so depth only shows as the camera tips: 0 top-down, 1 (the authored ×yScale) fully tilted.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
   focused: a full spin (azimuth bounds ±Infinity inside EXIT_DISTANCE), and the turn pivots on the focus point
   (the interior's mid-depth center at the middle of the free area, or the view center for a bare station).
@@ -411,12 +413,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`network.shapeById` passed through `useLive` to `buildShapeGeometries`), so dots and cars sit on their direction's track.
 - Tracks follow a vertical profile y(d) per shape (`trackProfile.ts`), and the lines and the trains share it:
   `ShapePath.y` feeds the line buffers, the shapes go through `useLive` to `buildShapeGeometries`, and
-  dots, cars and picks take `profileAt` through trackPointInto (never blended by interior opacity). It is anchored only at authored
+  dots, cars and picks take `profileAt` × `BandView.depth` through trackPointInto (never blended by interior opacity);
+  the line layers draw it with `scale.y` = the depth factor (floored at 1e-3, `depthScaleY`), and car height
+  (`CarFrame.extrude`) and the pick roof scale by it too, so cars are flat footprints top-down. It is anchored only at authored
   interiors (`station-depths.json`): flat at the rail height (`level.y - RAIL_DROP_M`, × the interior's yScale)
   along each platform track a shape rides (route serves the station, direction is the stop suffix, both track
   ends within 6 m), smoothstep ramps at a 3% average real grade (horizontal true, so 340 m for Bedford Av's
   10.2 m) to 0, and 0 everywhere else. Close stations ease from one depth to the next. Ramps are resampled every
-  10 m, so the line and the trains (same distances) agree. Top-down nothing moves.
+  10 m, so the line and the trains (same distances) agree. Top-down everything is flat.
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
 - Picking is screen space, on click only: `ScenePicker` listens on the canvas (never stopping or
   preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),
@@ -428,17 +432,18 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Live train dots and cars are instanced too, with per-slot colors (`routeLineColor` like the lines; car
   instance `slot * MAX_CARS + c`). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
-- The station interior is a group at `toGround(anchor)` with depths drawn ×2 (x/z true; labels give
-  real depths). Two merged `LineSegments2` (fine, then strong strokes) are built from the deepest
+- The station interior is a group at `toGround(anchor)` with depths drawn ×2 × the depth factor (the group's
+  `scale.y`; x/z true and never rescaled, since dashes are object-space; labels give real depths). Two merged `LineSegments2` (fine, then strong strokes) are built from the deepest
   level up, so upper levels paint over lower ones; levels farther from the street (in level count; deeper, or
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
   in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
-  layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong);
+  layer, live trains included, in one draw call, at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
+  level labels show by `labelOpacity` (gated between depth 0.3 and 0.6); the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
   are redrawn above the veil and strokes (`SpanCars.tsx`, 9.4 to 9.5; not in look C): every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
-  toward the background after shading by `veilTint` (veil opacity × reveal × (1 − weight), look A only), so a car
+  toward the background after shading by `veilTint` (veil opacity × veilWeight × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal
   (the route lines' alpha times 1 − weight × reveal in the band line shader, the weight easing back to 0 over the
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a

@@ -6,7 +6,9 @@
  * a line-by-line port of the GLSL against this). Pure, no allocation per call.
  *
  * The GLSL transforms by modelViewMatrix and this by the camera's view matrix: they agree because the route
- * lines' object sits at the origin with no rotation or scale (an identity world matrix).
+ * lines' object sits at the origin with no rotation and only a y scale, the depth factor, which callers apply to
+ * y before calling (trackPointInto multiplies by BandView.depth). A y scale leaves the ground normal and tangent
+ * as they are.
  *
  * For a point p (view space, depth w = -p.z) on a track whose miter normal is n and tangent t (ground), the
  * screen images of t and n are J t and J n, with J v = (v.xy + (p.xy / w) v.z) / w (perspective's Jacobian, in
@@ -33,6 +35,11 @@ export interface BandView {
    */
   ease: number
   trackOffsetM: number
+  /**
+   * The frame's depth factor (tilt.ts depthFactor, 0 flat to 1 full): every track height is drawn at its profile
+   * y times this, as the line layers' scale.y draws it on the GPU. Trains and picks apply it in trackPointInto.
+   */
+  depth: number
 }
 
 /** The band pitch fades from full at FADE_NEAR_M to 0 at FADE_FAR_M of camera distance (the city overview). */
@@ -45,7 +52,7 @@ export const TRACK_SPLIT_PX = 8.5
 export const MIN_FORESHORTEN = 0.25
 
 export function createBandView(): BandView {
-  return { view: new Float64Array(16), k: 0, pitchPx: 0, ease: 1, trackOffsetM: 0 }
+  return { view: new Float64Array(16), k: 0, pitchPx: 0, ease: 1, trackOffsetM: 0, depth: 1 }
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -66,7 +73,7 @@ export function trackSplit(gapPx: number, bundlePx: number): number {
 /**
  * The frame's view, into `out`. `viewElements` is camera.matrixWorldInverse.elements after
  * camera.updateMatrixWorld(), `p11` is camera.projectionMatrix.elements[5], `heightPx` the canvas CSS height and
- * `distance` the camera's distance to its target.
+ * `distance` the camera's distance to its target, `depth` its depth factor (tilt.ts).
  */
 export function writeBandView(
   out: BandView,
@@ -77,12 +84,14 @@ export function writeBandView(
   pitchPx: number,
   trackOffsetM: number,
   ease = 1,
+  depth = 1,
 ): BandView {
   for (let i = 0; i < 16; i++) out.view[i] = viewElements[i]!
   out.k = 2 / (p11 * heightPx)
   out.pitchPx = bandPitchAt(distance, pitchPx)
   out.ease = ease
   out.trackOffsetM = trackOffsetM
+  out.depth = depth
   return out
 }
 

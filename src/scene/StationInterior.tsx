@@ -3,7 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
 import type { Network } from '../lib/network'
-import { interiorOpacity } from '../lib/interiorReveal'
+import { interiorOpacity, labelOpacity, veilWeight } from '../lib/interiorReveal'
+import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
 import { interiorLook } from './interiorLook'
@@ -26,7 +27,8 @@ interface StationInteriorProps {
 
 /**
  * The focused station's interior as two merged line layers (fine, then strong) in a group at
- * its anchor, plus the street veil and DOM level labels. Everything fades in with the tilt.
+ * its anchor, plus the street veil and DOM level labels. Everything fades in with the tilt; the levels' depth,
+ * the veil and the labels come in with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
 export function StationInterior({ model, network }: StationInteriorProps) {
   const station = network.stationById.get(model.stationId)
@@ -35,6 +37,9 @@ export function StationInterior({ model, network }: StationInteriorProps) {
   const veil = useRef<Mesh>(null)
   const labels = useRef<(HTMLDivElement | null)[]>([])
   const shown = useRef(-1)
+  const shownDepth = useRef(-1)
+  /** The labels' opacity as last written, for a label div mounted after it. */
+  const labelShown = useRef(0)
   const { under } = interiorLook
   const dash = model.dashed ? DASH : undefined
   const strong = useLineLayer(
@@ -53,14 +58,20 @@ export function StationInterior({ model, network }: StationInteriorProps) {
   useFrame((state) => {
     const g = group.current
     if (!g) return
-    const o = interiorOpacity(cameraDistance(state))
-    if (o === shown.current) return
+    const distance = cameraDistance(state)
+    const o = interiorOpacity(distance)
+    // The levels separate with the tilt (y only: dashes are object-space, so x/z never rescale).
+    const depth = depthFactor(distance)
+    if (o === shown.current && depth === shownDepth.current) return
     shown.current = o
+    shownDepth.current = depth
     g.visible = o > 0
+    g.scale.y = depthScaleY(depth)
     if (strong) strong.material.opacity = o
     if (fine) fine.material.opacity = o
-    if (veil.current) (veil.current.material as MeshBasicMaterial).opacity = interiorLook.veilOpacity * o
-    for (const el of labels.current) if (el) showLabel(el, o)
+    if (veil.current) (veil.current.material as MeshBasicMaterial).opacity = interiorLook.veilOpacity * veilWeight(o, depth)
+    labelShown.current = labelOpacity(o, depth)
+    for (const el of labels.current) if (el) showLabel(el, labelShown.current)
   })
 
   return (
@@ -77,7 +88,7 @@ export function StationInterior({ model, network }: StationInteriorProps) {
               labels.current[i] = el
               // drei mounts Html content in its own root, often after the first frames have set
               // the opacity; a still camera would never update it again.
-              if (el) showLabel(el, Math.max(shown.current, 0))
+              if (el) showLabel(el, labelShown.current)
             }}
             style={{ opacity: 0, visibility: 'hidden' }}
             // pointer-events-none on the div itself: drei's pointerEvents prop only applies in
