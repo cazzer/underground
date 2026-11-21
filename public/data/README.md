@@ -38,7 +38,8 @@ where it came from.
 ## NY Open Data / MTA Elevator and Escalator feeds
 
 Attribution: Metropolitan Transportation Authority, https://www.mta.info/open-data.
-License terms are not yet verified.
+These datasets carry no license field, so the OPEN-NY Terms of Use (2013-03-08) apply
+(see `docs/research/data-sources.md` §5.1).
 
 - MTA Subway Stations (dataset 39hk-dx4f, pinned in `data/stations/catalog/stations.json`) gives
   `borough`, `ada` and `adaPartial` in `stations.json`. MTA data under the OPEN-NY Terms of Use

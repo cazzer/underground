@@ -20,7 +20,7 @@ be accurate.
   by `npm run data:catalog:fetch`. Station, entrance and equipment rows share the keys `gtfsStopId`,
   `stationId` (the E&E station MRN without leading zeros) and `complexId`; envelopes and OSM ways
   carry no station key. `catalog/stations.json` is also read by `npm run data` (borough and ADA status
-  for `public/data/stations.json`); after a catalog refresh, rerun `npm run data`. Nothing here is read by
+  for `public/data/stations.json`) together with `stations/access-exceptions.json`; after a catalog refresh, run `npm run data:access` (offline). Nothing here is read by
   `npm run data:stations`; the rest is input for the planned station generator. The DOS Track LRS is not pinned (see `../docs/research/data-sources.md` §5.1).
   **E&E coordinates are unreliable:** the dataset's own overview says they are the station center
   when a machine's exact location is not known, and some are plainly wrong (25 machines are over 500 m
@@ -46,9 +46,21 @@ be accurate.
 2. Re-check the OPEN-NY Terms of Use and the datasets' overview PDFs for changes (links and quotes
    in `../docs/research/data-sources.md` §5.1).
 3. Review the diff of `stations/catalog/`. The E&E file changes most often (new machines).
-4. Rerun `npm run data` so `public/data/stations.json` picks up borough and ADA changes
-   (`stationAccess.test.ts` fails while it is stale).
+4. Run `npm run data:access` (offline, no GTFS download) so `public/data/stations.json` picks up
+   borough and ADA changes (`stationAccess.test.ts` fails while it is stale). If it names a GTFS
+   station with no catalog row, or a catalog row with no GTFS station, edit
+   `stations/access-exceptions.json` (below).
 5. Commit. `catalogData.test.ts` checks the files against each other.
+
+## Access exceptions
+
+`stations/access-exceptions.json` is hand-written and empty today:
+`{ "missing": { "<gtfsStopId>": { "borough", "ada": "none|full|partial", "adaPartial"?, "reason" } }, "orphans": { "<gtfsStopId>": "reason" } }`.
+`missing` gives the borough and ADA status of a GTFS station that 39hk-dx4f doesn't list yet (for
+example a new station); `orphans` lets the join ignore a catalog row whose station the GTFS feed
+doesn't have. Without an entry the join fails, so the daily data refresh stops instead of shipping
+a station with no access fields. An entry that is no longer needed (the catalog now has the row, or
+the orphan now exists in GTFS) also fails, so remove it when that happens.
 
 ## Licenses
 

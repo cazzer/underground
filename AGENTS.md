@@ -26,7 +26,11 @@ so dev and preview serve under that path.
 - `npm run data [-- --zip path]`: rebuild `public/data/*.json` from the regular GTFS zip
   (downloads it unless `--zip` or `$GTFS_ZIP` is given; needs Node >= 22.18). Never commit the zip.
   Also reads the pinned `data/stations/catalog/stations.json` for each station's borough and ADA status;
-  rerun it after `data:catalog:fetch`.
+  after `data:catalog:fetch` run `npm run data:access` instead (offline).
+  A station the catalog lacks, or an orphan catalog row, needs an entry in
+  `data/stations/access-exceptions.json` (see `data/README.md`); the join fails loudly otherwise.
+- `npm run data:access`: offline; reruns the borough/ADA join on the committed `public/data/stations.json`
+  with the pinned catalog and exceptions, prints the gzip total against the budget.
 - `npm run data:stations`: merge `data/stations/*.authored.json` with the pinned `*.sources.json`
   into `public/data/stations/*.json`. Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
@@ -202,7 +206,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
     `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
     downstream), and OSM ways have none either (join by distance)
-- `scripts/`: `build-data.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
+- `scripts/`: `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge; `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)
 - `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`

@@ -5,18 +5,19 @@
  *  GTFS_ZIP=path.zip npm run data    same, via the environment (the flag wins)
  *
  *  Borough and ADA status per station come from the pinned data/stations/catalog/stations.json
- *  (39hk-dx4f; refresh it with `npm run data:catalog:fetch`, then rerun this).
+ *  (39hk-dx4f; refresh it with `npm run data:catalog:fetch`, then run the offline `npm run data:access`)
+ *  and data/stations/access-exceptions.json.
  *
  *  Everything is built in memory first; nothing is written if a build step throws or the
  *  gzipped total is over budget. */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
-import { gzipSync } from 'node:zlib'
 import { unzipSync } from 'fflate'
 import { readFeed } from './lib/gtfs.ts'
 import { buildRoutes, buildStations, buildTransfers } from './lib/network.ts'
 import { addAccess } from './lib/stationAccess.ts'
-import type { CatalogStation, SodaHeader } from './lib/catalogTypes.ts'
+import { readAccessExceptions, readCatalogStations } from './lib/accessInputs.ts'
+import { GZIP_BUDGET_BYTES, checkBudget, renderedFile } from './lib/budget.ts'
 import { buildSegments } from './lib/segments.ts'
 import { buildShapes } from './lib/shapes.ts'
 import { toStableJson } from './lib/stableJson.ts'
@@ -24,9 +25,7 @@ import { buildTripIndex } from './lib/tripIndex.ts'
 
 const FEED_URL = 'https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip'
 const OUT_DIR = new URL('../public/data/', import.meta.url)
-const CATALOG_STATIONS = new URL('../data/stations/catalog/stations.json', import.meta.url)
 const SIMPLIFY_TOLERANCE_M = 3
-const GZIP_BUDGET_BYTES = 60_000
 const NEEDED = new Set(
   ['stops', 'routes', 'trips', 'stop_times', 'shapes', 'transfers', 'calendar', 'calendar_dates', 'feed_info'].map(
     (name) => `${name}.txt`,
@@ -54,14 +53,6 @@ function decodeTables(zip: Uint8Array): Record<string, string> {
   return Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, decoder.decode(bytes)]))
 }
 
-function readCatalogStations(): CatalogStation[] {
-  const catalog = JSON.parse(readFileSync(CATALOG_STATIONS, 'utf8')) as Partial<SodaHeader> & { rows?: unknown }
-  if (catalog.dataset !== '39hk-dx4f' || !Array.isArray(catalog.rows)) {
-    throw new Error('data/stations/catalog/stations.json is not the 39hk-dx4f catalog (run npm run data:catalog:fetch)')
-  }
-  return catalog.rows as CatalogStation[]
-}
-
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { zip: { type: 'string' } }, strict: true })
   const feed = readFeed(decodeTables(await loadZip(values.zip ?? process.env.GTFS_ZIP)))
@@ -71,7 +62,7 @@ async function main(): Promise<void> {
   const { segments, skipped: skippedSegments } = buildSegments(feed.stopTimes)
   const { file: tripIndex, skippedNoShape } = buildTripIndex(feed)
   const outputs: [string, unknown, number][] = [
-    ['stations.json', { feedVersion, stations: addAccess(buildStations(feed), readCatalogStations()) }, 2],
+    ['stations.json', { feedVersion, stations: addAccess(buildStations(feed), readCatalogStations(), readAccessExceptions()) }, 2],
     ['routes.json', { feedVersion, routes: buildRoutes(feed) }, 2],
     ['shapes.json', { feedVersion, shapes: buildShapes(feed, SIMPLIFY_TOLERANCE_M) }, 2],
     ['segments.json', { feedVersion, segments }, 2],
@@ -79,15 +70,8 @@ async function main(): Promise<void> {
     ['trip-index.json', { feedVersion, ...tripIndex }, 3],
   ]
 
-  const rendered = outputs.map(([name, value, lineDepth]) => {
-    const text = toStableJson(value, lineDepth)
-    return { name, text, raw: Buffer.byteLength(text), gzip: gzipSync(text, { level: 9 }).length }
-  })
-  const totalGzip = rendered.reduce((sum, f) => sum + f.gzip, 0)
-  if (totalGzip > GZIP_BUDGET_BYTES) {
-    const sizes = rendered.map((f) => `${f.name} ${f.gzip}`).join(', ')
-    throw new Error(`Gzipped total ${totalGzip} B is over the ${GZIP_BUDGET_BYTES} B budget (${sizes}). Nothing written.`)
-  }
+  const rendered = outputs.map(([name, value, lineDepth]) => renderedFile(name, toStableJson(value, lineDepth)))
+  const totalGzip = checkBudget(rendered)
 
   mkdirSync(OUT_DIR, { recursive: true })
   for (const f of rendered) writeFileSync(new URL(f.name, OUT_DIR), f.text)
