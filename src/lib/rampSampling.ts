@@ -6,7 +6,7 @@
 import type { TrackProfile } from './trackProfile.ts'
 
 /** How far (drawn meters) the straight line may stray from the eased profile; trains read profileAt exactly. */
-export const RAMP_MAX_ERROR_M = 0.25
+export const RAMP_MAX_ERROR_M = 0.5
 
 const MAX_SEGMENTS = 64
 

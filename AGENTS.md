@@ -151,7 +151,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`) and its
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
     adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
-    `lineBreaks`, every extra vertex a drawn line needs (ramps, band tapers every 30 m but only once the slot
+    `lineBreaks`, every extra vertex a drawn line needs (ramps via `rampSampling.ts`, band tapers every 30 m but only once the slot
     moved 0.25, fade ramps);
     `corridors.ts` shared corridors at load (`corridorBands` gives each shape a `ShapeBands`: slot and corridor
     half-width as `TrackProfile`s. 30 m samples, other band keys within 18 m heading within 15 degrees, gaps under
@@ -419,8 +419,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   interiors (`station-depths.json`): flat at the rail height (`level.y - RAIL_DROP_M`, × the interior's yScale)
   along each platform track a shape rides (route serves the station, direction is the stop suffix, both track
   ends within 6 m), smoothstep ramps at a 3% average real grade (horizontal true, so 340 m for Bedford Av's
-  10.2 m) to 0, and 0 everywhere else. Close stations ease from one depth to the next. Ramps are resampled every
-  10 m, so the line and the trains (same distances) agree. Top-down everything is flat.
+  10.2 m) to 0, and 0 everywhere else. Close stations ease from one depth to the next. Ramps get the fewest
+  vertices that keep the drawn chords within 0.5 m of the ease (`rampSampling.ts`, densest where it curves most;
+  flat runs add none), and the platform fade one per ramp end; trains read `profileAt` exactly. Top-down everything is flat.
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
 - Picking is screen space, on click only: `ScenePicker` listens on the canvas (never stopping or
   preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),

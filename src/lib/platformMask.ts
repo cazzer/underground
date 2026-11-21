@@ -9,10 +9,13 @@ import type { ShapeId } from '../data/schema'
 import type { ShapePath } from './network'
 import { MASK_INSET_M, maskSpanWeight, type PlatformSpan, type StationSpans } from './platformSpan'
 
-/** Vertex spacing along each end ramp of a span, so the fade eases rather than steps. */
-const RAMP_STEP_M = 2
+/**
+ * Vertex spacing along each end ramp of a span. The shader interpolates the fade linearly between vertices, so one
+ * chord per ramp (the ramp's full length) strays under 0.1 in weight from the eased fade and costs two vertices per span.
+ */
+const RAMP_STEP_M = MASK_INSET_M
 
-/** Distances the drawn line needs vertices at for a span's fade: both ends and every RAMP_STEP_M through each ramp. */
+/** Distances the drawn line needs vertices at for a span's fade: both ends and each ramp's inner end. */
 export function maskBreaks(span: PlatformSpan): number[] {
   const out: number[] = []
   for (let d = 0; d <= MASK_INSET_M; d += RAMP_STEP_M) out.push(span.d0 + d, span.d1 - d)

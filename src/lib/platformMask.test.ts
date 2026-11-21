@@ -23,8 +23,8 @@ function path(id: string, xs: number[]): ShapePath {
 }
 
 describe('maskBreaks', () => {
-  it('puts a vertex at both span ends and every 2 m through each ramp', () => {
-    expect(maskBreaks({ d0: 160, d1: 240 })).toEqual([160, 162, 164, 166, 168, 170, 230, 232, 234, 236, 238, 240])
+  it('puts a vertex at both span ends and at the inner end of each ramp', () => {
+    expect(maskBreaks({ d0: 160, d1: 240 })).toEqual([160, 170, 230, 240])
   })
 
   it('stays inside a span shorter than two ramps', () => {
@@ -35,7 +35,7 @@ describe('maskBreaks', () => {
 })
 
 describe('writePlatformFade', () => {
-  const xs = [0, 100, ...maskBreaks({ d0: 160, d1: 240 }), 300, 400]
+  const xs = [0, 100, ...maskBreaks({ d0: 160, d1: 240 }).flatMap((d) => (d === 160 ? [160, 164] : [d])), 300, 400]
   const a = path('a', xs)
   const b = path('b', [0, 400])
   const first = new Map([
