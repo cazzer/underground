@@ -5,6 +5,7 @@ import { type CarFrame, clearCars, createConsistScratch, writeConsist } from '..
 import { createRangePool, pushDirtyRanges } from '../lib/live/dirtyRanges'
 import { TRAIN_CAPACITY } from '../lib/live/slots'
 import type { Polyline } from '../lib/realtime/polyline'
+import type { TrackProfile } from '../lib/trackProfile'
 import { theme } from '../theme'
 import { screenScale } from './cameraDistance'
 import { CAR_HEIGHT_M, CAR_WIDTH_M, createCarBodyGeometry, createCarHaloGeometry } from './carGeometry'
@@ -53,8 +54,8 @@ export interface TrainCarsLayer {
   carHeightM(): number
   /** Per-frame sizes for the camera distance; call before writeTrain. */
   beginFrame(cameraDistance: number): void
-  /** Lays out slot i's cars at `shown` along `line`: `mix` unfolds the train from the dot, `k` is the slot's fade. */
-  writeTrain(i: number, line: Polyline, shown: number, mix: number, k: number): void
+  /** Lays out slot i's cars at `shown` along `line`, on its `profile`: `mix` unfolds the train from the dot, `k` is the slot's fade. */
+  writeTrain(i: number, line: Polyline, profile: TrackProfile, shown: number, mix: number, k: number): void
   /** Hides slot i's cars (a freed slot). */
   clear(i: number): void
   /** Hides slot i's cars while it is off screen; zeroes them once, not every frame. */
@@ -152,17 +153,17 @@ export function useTrainCars(): TrainCarsLayer {
         frame.crossScale = screenScale(cameraDistance, MIN_WIDTH_PX, CAR_WIDTH_M) / CAR_WIDTH_M
         gapFrame.crossScale = rimFrame.crossScale = frame.crossScale
       },
-      writeTrain(i, line, shown, mix, k) {
+      writeTrain(i, line, profile, shown, mix, k) {
         const b = bodies.current
         const h = halos.current
         if (!b || !h) return
         const out = b.instanceMatrix.array as Float32Array
         const consist = consists[i]!
         const widen = i === selected ? SELECTED_WIDEN : widenFor(i)
-        writeConsist(out, h.instanceMatrix.array as Float32Array, i, line, shown, consist, mix, k, widen, i === selected ? gapFrame : frame, scratch)
+        writeConsist(out, h.instanceMatrix.array as Float32Array, i, line, profile, shown, consist, mix, k, widen, i === selected ? gapFrame : frame, scratch)
         const r = rims.current
         if (i === selected && r) {
-          writeConsist(rimBodies, r.instanceMatrix.array as Float32Array, 0, line, shown, consist, mix, k, widen, rimFrame, scratch)
+          writeConsist(rimBodies, r.instanceMatrix.array as Float32Array, 0, line, profile, shown, consist, mix, k, widen, rimFrame, scratch)
           rimDirty = true
         }
         hidden[i] = 0

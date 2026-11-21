@@ -3,6 +3,8 @@
  * `?interior=a|b|c` picks how the street gives way (default a, the veil); `?interiorY=1|2|3`
  * picks the vertical exaggeration (default 2). Once both are decided, remove together:
  * - this file: replace `interiorLook` with constants for the chosen look and scale
+ * - useNetwork.ts: reads `interiorLook.yScale` for the track profile (the tracks descend to the interior's
+ *   rails); pass the chosen scale constant instead
  * - InteriorVeil.tsx: the unchosen `veil` branch and, unless B wins, the `hull` prop (or the whole
  *   file if C wins)
  * - StationInterior.tsx: the `look.under` render-order switch, the `veil === 'none'` check, and the

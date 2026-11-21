@@ -1,6 +1,7 @@
 import type { ShapeId, ShapesFile, StationsFile, StopId, TripIndexFile } from '../../data/schema'
 import { toGround, type Ground } from '../projection'
 import { trackLine } from '../trackLine'
+import { EMPTY_PROFILE, resampleForProfile, type TrackProfile } from '../trackProfile'
 import { buildPolyline, projectForward, type Polyline } from './polyline'
 
 export interface ShapeGeometry {
@@ -11,11 +12,14 @@ export interface ShapeGeometry {
   stopDistances: readonly number[]
   /** Largest distance from a stop to the track line; a sanity bound, not used in positioning. */
   maxStopOffsetM: number
+  /** The map's vertical profile for this shape (EMPTY_PROFILE when flat): a train at d draws at profileAt(profile, d). */
+  profile: TrackProfile
 }
 
 /**
- * Builds each pattern's line with `trackLine(shape, trackOffsetM)`, the same line the map draws, so
- * dots ride their direction's track (at offset 0 it is still spur-dropped, not the raw shape). Then
+ * Builds each pattern's line with `trackLine(shape, trackOffsetM)` resampled along `profiles` (network.profiles),
+ * the same line and distances the map draws, so dots ride their direction's track, up and down its ramps (at
+ * offset 0 it is still spur-dropped, not the raw shape). Then
  * projects the stops onto it, forward-only so distances never decrease (even on hairpins). Throws if
  * a pattern stop has no station or a pattern has no shape.
  */
@@ -24,6 +28,7 @@ export function buildShapeGeometries(
   index: TripIndexFile,
   stations: StationsFile,
   trackOffsetM: number,
+  profiles: ReadonlyMap<ShapeId, TrackProfile>,
 ): Map<ShapeId, ShapeGeometry> {
   const stopGround = new Map<StopId, Ground>()
   for (const st of stations.stations) {
@@ -36,7 +41,9 @@ export function buildShapeGeometries(
   for (const [shapeId, pattern] of Object.entries(index.patterns)) {
     const shape = shapeById.get(shapeId)
     if (!shape) throw new Error(`pattern ${shapeId} has no shape`)
-    const line = buildPolyline(trackLine(shape, trackOffsetM))
+    const flat = buildPolyline(trackLine(shape, trackOffsetM))
+    const profile = profiles.get(shapeId) ?? EMPTY_PROFILE
+    const line = profile === EMPTY_PROFILE ? flat : buildPolyline(resampleForProfile(flat.points, flat.cumulative, profile).points)
     let cursor = { segment: 0, t: 0 }
     let maxStopOffsetM = 0
     const stopDistances = pattern.stops.map((stop) => {
@@ -47,7 +54,7 @@ export function buildShapeGeometries(
       maxStopOffsetM = Math.max(maxStopOffsetM, hit.offsetM)
       return hit.distance
     })
-    out.set(shapeId, { shapeId, line, stops: pattern.stops, stopDistances, maxStopOffsetM })
+    out.set(shapeId, { shapeId, line, stops: pattern.stops, stopDistances, maxStopOffsetM, profile })
   }
   return out
 }

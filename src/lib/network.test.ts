@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { decodeShapePoints, deltaEncode } from '../data/codec'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
+import type { StationDepthsFile } from '../data/stationSchema'
 import { buildNetwork, pointAlong, type ShapePath } from './network'
 import { toGround } from './projection'
+import { EMPTY_PROFILE, profileAt } from './trackProfile'
 
 const FV = 'v1'
+const NO_DEPTHS: StationDepthsFile = { license: 'ODbL-1.0', attribution: [], stations: [] }
 
 function stationsFile(): StationsFile {
   return {
@@ -38,7 +41,7 @@ function shapesFile(): ShapesFile {
 }
 
 describe('buildNetwork', () => {
-  const net = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0)
+  const net = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, NO_DEPTHS, 2)
 
   it('decodes and projects shape points', () => {
     const shape = shapesFile().shapes[0]!
@@ -78,31 +81,31 @@ describe('buildNetwork', () => {
   })
 
   it('throws on mismatched feed versions', () => {
-    expect(() => buildNetwork(stationsFile(), { ...routesFile(), feedVersion: 'v2' }, shapesFile(), 0)).toThrow(/v2/)
+    expect(() => buildNetwork(stationsFile(), { ...routesFile(), feedVersion: 'v2' }, shapesFile(), 0, NO_DEPTHS, 2)).toThrow(/v2/)
   })
 
   it('throws on a shape with an unknown route', () => {
     const shapes = shapesFile()
     shapes.shapes[0]!.routeId = 'X'
-    expect(() => buildNetwork(stationsFile(), routesFile(), shapes, 0)).toThrow(/unknown route "X"/)
+    expect(() => buildNetwork(stationsFile(), routesFile(), shapes, 0, NO_DEPTHS, 2)).toThrow(/unknown route "X"/)
   })
 
   it('throws on a shape with one point', () => {
     const shapes = shapesFile()
     shapes.shapes[0]!.lat = [4070000]
     shapes.shapes[0]!.lon = [-7400000]
-    expect(() => buildNetwork(stationsFile(), routesFile(), shapes, 0)).toThrow(/1 point/)
+    expect(() => buildNetwork(stationsFile(), routesFile(), shapes, 0, NO_DEPTHS, 2)).toThrow(/1 point/)
   })
 
   it('throws without stations', () => {
-    expect(() => buildNetwork({ feedVersion: FV, stations: [] }, routesFile(), shapesFile(), 0)).toThrow(/no stations/)
+    expect(() => buildNetwork({ feedVersion: FV, stations: [] }, routesFile(), shapesFile(), 0, NO_DEPTHS, 2)).toThrow(/no stations/)
   })
 })
 
 describe('buildNetwork track offset', () => {
   it('moves shape points right of travel and measures length on the offset path', () => {
-    const plain = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0).shapes[0]!
-    const shifted = buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7).shapes[0]!
+    const plain = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, NO_DEPTHS, 2).shapes[0]!
+    const shifted = buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7, NO_DEPTHS, 2).shapes[0]!
     const [a, b] = [plain.points[0]!, plain.points[1]!]
     const len = Math.hypot(b.x - a.x, b.z - a.z)
     // Right normal of tangent (tx, tz) is (-tz, tx).
@@ -110,7 +113,44 @@ describe('buildNetwork track offset', () => {
     expect(shifted.points[0]!.z).toBeCloseTo(a.z + ((b.x - a.x) / len) * 4.7)
     expect(shifted.points).toHaveLength(plain.points.length)
     expect(shifted.cumulative.at(-1)).toBe(shifted.length)
-    expect(buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7).trackOffsetM).toBe(4.7)
+    expect(buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7, NO_DEPTHS, 2).trackOffsetM).toBe(4.7)
+  })
+})
+
+describe('buildNetwork track profile', () => {
+  it('keeps every shape at y = 0 with no station depths', () => {
+    const net = buildNetwork(stationsFile(), routesFile(), shapesFile(), 4.7, NO_DEPTHS, 2)
+    expect(net.profiles.size).toBe(0)
+    for (const s of net.shapes) {
+      expect(s.profile).toBe(EMPTY_PROFILE)
+      expect(s.y).toEqual(s.points.map(() => 0))
+    }
+  })
+
+  it('descends a shape to a station depth it rides, scaled by yScale, and warns about a track nobody rides', () => {
+    // A 100 m platform track laid along the middle of the shape's first segment.
+    const [a, b] = decodeShapePoints(shapesFile().shapes[0]!).map((p) => toGround(p))
+    const anchor = { lat: 40.725, lon: -74.05 }
+    const g = toGround(anchor)
+    const len = Math.hypot(b!.x - a!.x, b!.z - a!.z)
+    const [ux, uz] = [(b!.x - a!.x) / len, (b!.z - a!.z) / len]
+    const t = (g.x - a!.x) * ux + (g.z - a!.z) * uz
+    const end = (s: number): [number, number] => [a!.x + ux * (t + s) - g.x, a!.z + uz * (t + s) - g.z]
+    const ends: [[number, number], [number, number]] = [end(-50), end(50)]
+    const depths: StationDepthsFile = {
+      ...NO_DEPTHS,
+      stations: [{ stationId: '101', anchor, tracks: [{ stopId: '101N', railY: -10.2, ends }, { stopId: '101S', railY: -10.2, ends }] }],
+    }
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const shape = buildNetwork(stationsFile(), routesFile(), shapesFile(), 0, depths, 2).shapes[0]!
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0]).toMatch(/101S/)
+    warn.mockRestore()
+    expect(profileAt(shape.profile, t)).toBeCloseTo(-20.4, 9)
+    expect(shape.y[0]).toBe(0)
+    expect(shape.y.at(-1)).toBe(0)
+    expect(Math.min(...shape.y)).toBeCloseTo(-20.4, 9)
+    shape.y.forEach((y, i) => expect(y).toBe(profileAt(shape.profile, shape.cumulative[i]!)))
   })
 })
 
@@ -121,7 +161,7 @@ function path(points: { x: number; z: number }[]): ShapePath {
     const b = points[i]!
     cumulative.push(cumulative[i - 1]! + Math.hypot(b.x - a.x, b.z - a.z))
   }
-  return { id: 's', routeId: 'r', direction: 'N', primary: true, points, cumulative, length: cumulative.at(-1) ?? 0 }
+  return { id: 's', routeId: 'r', direction: 'N', primary: true, points, cumulative, length: cumulative.at(-1) ?? 0, y: points.map(() => 0), profile: EMPTY_PROFILE }
 }
 
 describe('pointAlong', () => {

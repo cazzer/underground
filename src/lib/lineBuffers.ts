@@ -4,7 +4,7 @@ import type { ShapePath } from './network'
 export type Rgb = readonly [number, number, number]
 
 export interface LineBuffers {
-  /** Six floats per segment: start xyz, end xyz (y = 0). */
+  /** Six floats per segment: start xyz, end xyz (y from the shape's profile, `path.y`). */
   positions: Float32Array
   /** Six floats per segment, matching `positions`. */
   colors: Float32Array
@@ -34,7 +34,7 @@ export function buildLineBuffers(
     for (let i = 1; i < path.points.length; i++) {
       const a = path.points[i - 1]!
       const c = path.points[i]!
-      positions.set([a.x, 0, a.z, c.x, 0, c.z], o)
+      positions.set([a.x, path.y[i - 1]!, a.z, c.x, path.y[i]!, c.z], o)
       colors.set([r, g, b, r, g, b], o)
       o += 6
     }

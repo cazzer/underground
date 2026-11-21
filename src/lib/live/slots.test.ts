@@ -3,6 +3,7 @@ import { buildPolyline, pointAtDistance } from '../realtime/polyline'
 import type { HopPlan } from '../realtime/position'
 import type { LiveTrip } from '../realtime/prepareTrips'
 import type { ShapeGeometry } from '../realtime/shapeGeometry'
+import { EMPTY_PROFILE } from '../trackProfile'
 import { createSlotTable, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, type ReconcileOptions, type SlotTable } from './slots'
 
 const FADE = 0.4
@@ -18,6 +19,7 @@ function shape(shapeId: string, x = 0): ShapeGeometry {
     stops: ['a', 'b', 'c'],
     stopDistances: [0, 1000, 2000],
     maxStopOffsetM: 0,
+    profile: EMPTY_PROFILE,
   }
 }
 const SHAPES: Record<string, ShapeGeometry> = { S1: shape('S1'), S1b: shape('S1b', 10), S2: shape('S2', 500) }

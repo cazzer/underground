@@ -1,8 +1,12 @@
 /** public/data → render model: projected stations, routes, and shape paths. Pure. */
 import type { Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
+import type { StationDepthsFile } from '../data/stationSchema'
 import { boundsCenter } from './framing'
 import { toGround, type Ground } from './projection'
+import { buildPolyline } from './realtime/polyline'
+import { profileRuns } from './trackAnchors'
 import { trackLine } from './trackLine'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleForProfile, type TrackProfile } from './trackProfile'
 
 export interface Station {
   id: StationId
@@ -27,11 +31,18 @@ export interface ShapePath {
   routeId: RouteId
   direction: Direction
   primary: boolean
-  /** `trackLine`: spurs dropped, `trackOffsetM` right of travel, so the directions are parallel tracks. */
+  /**
+   * `trackLine`: spurs dropped, `trackOffsetM` right of travel, so the directions are parallel tracks; then
+   * resampled along the profile's ramps (collinear points, the ground path is unchanged).
+   */
   points: Ground[]
   /** Cumulative distance (meters) at each point; last entry is the total length. */
   cumulative: number[]
   length: number
+  /** Scene height of each point: profileAt(profile, cumulative[i]). */
+  y: number[]
+  /** Shared with the realtime geometry, so trains ride the drawn track up and down. */
+  profile: TrackProfile
 }
 
 export interface Bounds {
@@ -55,16 +66,8 @@ export interface Network {
   center: Ground
   /** How far each shape sits right of travel; realtime geometry reads it here (never from the URL). */
   trackOffsetM: number
-}
-
-function cumulativeLengths(points: readonly Ground[]): number[] {
-  const cumulative = [0]
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1]!
-    const b = points[i]!
-    cumulative.push(cumulative[i - 1]! + Math.hypot(b.x - a.x, b.z - a.z))
-  }
-  return cumulative
+  /** Vertical profile of each shape anchored at a station depth (others are flat at 0); realtime reads it here. */
+  profiles: ReadonlyMap<ShapeId, TrackProfile>
 }
 
 function extend(b: Bounds, p: Ground): void {
@@ -74,12 +77,18 @@ function extend(b: Bounds, p: Ground): void {
   if (p.z > b.maxZ) b.maxZ = p.z
 }
 
-/** `trackOffsetM` moves every shape that far right of its own travel direction (see trackLine.ts). */
+/**
+ * `trackOffsetM` moves every shape that far right of its own travel direction (see trackLine.ts). Each shape
+ * that stops at a station in `depths` descends to that station's rails (y scaled by `yScale`, the interior's
+ * vertical exaggeration); the rest stay at 0. Warns about authored tracks no shape rides.
+ */
 export function buildNetwork(
   stationsFile: StationsFile,
   routesFile: RoutesFile,
   shapesFile: ShapesFile,
   trackOffsetM: number,
+  depths: StationDepthsFile,
+  yScale: number,
 ): Network {
   const { feedVersion } = stationsFile
   for (const f of [routesFile, shapesFile]) {
@@ -101,12 +110,24 @@ export function buildNetwork(
     return { id: s.id, name: s.name, pos, routeIds: s.routes, stops: s.stops }
   })
 
-  const shapes = shapesFile.shapes.map((s): ShapePath => {
+  const lines = shapesFile.shapes.map((s) => {
     if (!routeById.has(s.routeId)) throw new Error(`Shape ${s.id} references unknown route "${s.routeId}"`)
     const points = trackLine(s, trackOffsetM)
     if (points.length < 2) throw new Error(`Shape ${s.id} has ${points.length} point(s); needs at least 2`)
+    return { id: s.id, routeId: s.routeId, direction: s.direction, line: buildPolyline(points) }
+  })
+  const { runs, unmatched } = profileRuns(depths, stations, lines)
+  for (const stopId of unmatched) console.warn(`Track depth: no shape rides the ${stopId} platform track; it stays at street level`)
+
+  const profiles = new Map<ShapeId, TrackProfile>()
+  const shapes = shapesFile.shapes.map((s, i): ShapePath => {
+    const { line } = lines[i]!
+    const built = buildTrackProfile(runs.get(s.id) ?? [], { grade: GRADE, yScale })
+    if (built.dropped.length > 0) console.warn(`Track depth: shape ${s.id} has overlapping platform runs; dropped`, built.dropped)
+    const profile = built.profile
+    if (profile !== EMPTY_PROFILE) profiles.set(s.id, profile)
+    const { points, cumulative, y } = resampleForProfile(line.points, line.cumulative, profile)
     for (const p of points) extend(bounds, p)
-    const cumulative = cumulativeLengths(points)
     return {
       id: s.id,
       routeId: s.routeId,
@@ -115,6 +136,8 @@ export function buildNetwork(
       points,
       cumulative,
       length: cumulative.at(-1)!,
+      y,
+      profile,
     }
   })
 
@@ -128,6 +151,7 @@ export function buildNetwork(
     bounds,
     center: boundsCenter(bounds),
     trackOffsetM,
+    profiles,
   }
 }
 

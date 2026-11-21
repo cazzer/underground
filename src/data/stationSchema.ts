@@ -100,3 +100,28 @@ export interface FareLine {
   path: LocalPoint[]
   sources: InteriorSource[]
 }
+
+/**
+ * public/data/station-depths.json, written by scripts/build-stations.ts from the same interiors: each platform
+ * track's ends and rail height, so the map's tracks can descend to meet the interior. ODbL like the interiors.
+ */
+export interface StationDepthsFile {
+  license: 'ODbL-1.0'
+  /** Union of the interiors' credits, OSM first. */
+  attribution: string[]
+  /** Sorted by stationId. */
+  stations: StationDepth[]
+}
+export interface StationDepth {
+  stationId: StationId
+  anchor: LatLon
+  /** Sorted by stopId. */
+  tracks: TrackDepth[]
+}
+export interface TrackDepth {
+  stopId: StopId
+  /** Real rail height, meters relative to the street (platform level y - RAIL_DROP_M), rounded to 0.01. */
+  railY: number
+  /** First and last point of the interior's track path, station-local meters. */
+  ends: [LocalPoint, LocalPoint]
+}

@@ -1,14 +1,18 @@
 // Structural checks against the committed public/data, so schedule refreshes don't break them.
 import { describe, expect, it } from 'vitest'
+import routesRaw from '../../../public/data/routes.json?raw'
+import depthsRaw from '../../../public/data/station-depths.json?raw'
 import shapesRaw from '../../../public/data/shapes.json?raw'
 import l08Raw from '../../../public/data/stations/L08.json?raw'
 import stationsRaw from '../../../public/data/stations.json?raw'
 import tripIndexRaw from '../../../public/data/trip-index.json?raw'
-import type { ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
-import type { StationInterior } from '../../data/stationSchema'
+import type { RoutesFile, ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
+import type { StationDepthsFile, StationInterior } from '../../data/stationSchema'
 import { createSlotTable, reconcileSlots } from '../live/slots'
+import { buildNetwork } from '../network'
 import { toGround } from '../projection'
 import { TRACK_OFFSET_M } from '../trackOffset'
+import { profileAt } from '../trackProfile'
 import { buildPolyline, pointAtDistance, projectForward } from './polyline'
 import type { LiveTrip } from './prepareTrips'
 import { joinTrip } from './joinTrip'
@@ -20,7 +24,7 @@ const stations = JSON.parse(stationsRaw) as StationsFile
 const index = JSON.parse(tripIndexRaw) as TripIndexFile
 
 describe('real public/data', () => {
-  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M)
+  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, new Map())
 
   it('builds one geometry per pattern', () => {
     expect(geometries.size).toBe(Object.keys(index.patterns).length)
@@ -83,7 +87,7 @@ describe('primary fallback join on real data', () => {
 })
 
 describe('a trip moving between two shapes of the same route', () => {
-  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M)
+  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, new Map())
   const lookup = buildTripLookup(index, shapes)
 
   it('never draws the dot somewhere else: it carries over within 25 m, or shrinks in place on the old shape', () => {
@@ -129,7 +133,7 @@ describe('a trip moving between two shapes of the same route', () => {
 // The interior's tracks are authored from the platform, independently of GTFS: a train stopped at Bedford Av
 // should sit on its own platform track (L08N is the NE one), not between the two.
 describe('Bedford Av (L08): a stopped L train sits on its platform track', () => {
-  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M)
+  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, new Map())
   const l08 = JSON.parse(l08Raw) as StationInterior
   const anchor = toGround(l08.anchor)
   const trackOf = (stopId: string) => {
@@ -157,5 +161,32 @@ describe('Bedford Av (L08): a stopped L train sits on its platform track', () =>
       expect(projectForward(far, p, { segment: 0, t: 0 }).offsetM, `${g.shapeId} from the other track`).toBeGreaterThan(5)
     }
     expect(checked).toBeGreaterThan(0)
+  })
+})
+
+describe('real public/data: trains ride the drawn profile', () => {
+  const network = buildNetwork(stations, JSON.parse(routesRaw) as RoutesFile, shapes, TRACK_OFFSET_M, JSON.parse(depthsRaw) as StationDepthsFile, 2)
+  const geometries = buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, network.profiles)
+
+  it('uses the same resampled line, distances and profile as the map for every pattern', () => {
+    expect(network.profiles.size).toBeGreaterThan(0)
+    for (const path of network.shapes) {
+      const g = geometries.get(path.id)
+      if (!g) continue
+      expect(g.line.points, path.id).toEqual(path.points)
+      expect(g.line.cumulative, path.id).toEqual(path.cumulative)
+      expect(g.profile, path.id).toBe(path.profile)
+    }
+  })
+
+  it('places a train at the L08N stop at the interior rail height', () => {
+    let calls = 0
+    for (const [id, g] of geometries) {
+      const i = g.stops.indexOf('L08N')
+      if (i < 0) continue
+      calls++
+      expect(profileAt(g.profile, g.stopDistances[i]!), id).toBeCloseTo(-20.4, 9)
+    }
+    expect(calls).toBeGreaterThan(0)
   })
 })

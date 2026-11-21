@@ -1,5 +1,6 @@
 import { buildNetwork, type Network } from '../lib/network'
 import type { DataFile, RoutesFile, ShapesFile, StationsFile } from './schema'
+import type { StationDepthsFile } from './stationSchema'
 
 /**
  * Checks the outer shape of a fetched data file: an object with a string `feedVersion` and an
@@ -31,6 +32,15 @@ export function expectDataRecord<T extends DataFile>(raw: unknown, key: string, 
   return raw as T
 }
 
+/** Checks station-depths.json's outer shape: an ODbL file with a `stations` array. Entries are trusted (see above). */
+export function expectStationDepths(raw: unknown, url: string): StationDepthsFile {
+  const file = raw as Partial<StationDepthsFile> | null
+  if (typeof raw !== 'object' || raw === null || file?.license !== 'ODbL-1.0' || !Array.isArray(file.stations)) {
+    throw new Error(`${url}: not a station-depths file`)
+  }
+  return raw as StationDepthsFile
+}
+
 /** Fetches and parses JSON, throwing `<url>: HTTP <status>` or `<url>: invalid JSON (...)`. */
 export async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
   // no-cache revalidates (cheap 304s), so a stale cached file can't mix two builds.
@@ -56,18 +66,25 @@ export interface LoadedNetwork {
 }
 
 /**
- * Fetches stations, routes, and shapes from `<baseUrl>data/` in parallel and builds the network,
- * drawing each shape `trackOffsetM` right of its travel direction.
+ * Fetches stations, routes, shapes, and station depths from `<baseUrl>data/` in parallel and builds the network,
+ * drawing each shape `trackOffsetM` right of its travel direction, down to the station depths scaled by `yScale`.
  */
-export async function loadNetwork(baseUrl: string, trackOffsetM: number, signal: AbortSignal): Promise<LoadedNetwork> {
+export async function loadNetwork(
+  baseUrl: string,
+  trackOffsetM: number,
+  yScale: number,
+  signal: AbortSignal,
+): Promise<LoadedNetwork> {
   async function file<T extends DataFile>(key: string): Promise<T> {
     const url = `${baseUrl}data/${key}.json`
     return expectDataFile<T>(await fetchJson(url, signal), key, url)
   }
-  const [stations, routes, shapes] = await Promise.all([
+  const depthsUrl = `${baseUrl}data/station-depths.json`
+  const [stations, routes, shapes, depths] = await Promise.all([
     file<StationsFile>('stations'),
     file<RoutesFile>('routes'),
     file<ShapesFile>('shapes'),
+    fetchJson(depthsUrl, signal).then((raw) => expectStationDepths(raw, depthsUrl)),
   ])
-  return { network: buildNetwork(stations, routes, shapes, trackOffsetM), files: { stations, shapes } }
+  return { network: buildNetwork(stations, routes, shapes, trackOffsetM, depths, yScale), files: { stations, shapes } }
 }

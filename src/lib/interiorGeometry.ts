@@ -6,6 +6,9 @@ import type { Connector, LocalPoint, StationInterior } from '../data/stationSche
 
 export type Rgb = readonly [number, number, number]
 
+/** Estimated drop from the platform edge to the rail head, meters: where the interior draws its tracks. */
+export const RAIL_DROP_M = 1.1
+
 /** Same shape as lineBuffers.ts's LineBuffers (not imported: that module has extensionless imports). */
 export interface Buffers {
   /** Six floats per segment: start xyz, end xyz, group-local meters. */
