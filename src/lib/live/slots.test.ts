@@ -29,6 +29,7 @@ function trip(key: string, over: { shapeId?: string; arriveAt?: number; fixed?: 
     to: 1,
     arriveAt: over.fixed === undefined ? (over.arriveAt ?? 1100) : null,
     runS: 100,
+    dwellS: 0,
     fixedFraction: over.fixed ?? null,
     minFraction: 0,
     departsInS: null,

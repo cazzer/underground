@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Arrival, VehicleStatus } from '../../data/realtime'
 import { buildPolyline } from './polyline'
-import { hopDistance, planHop, positionAlongShape, type PositionResult } from './position'
+import { dwellFor, DWELL_S, hopDistance, planHop, positionAlongShape, type PositionResult } from './position'
 import type { ShapeGeometry } from './shapeGeometry'
 
 const NOW = 1_795_228_554
@@ -20,6 +20,7 @@ const southbound: ShapeGeometry = {
   stopDistances: [0, 1000, 2000],
   maxStopOffsetM: 0,
 }
+// A 100 s hop includes a 30 s dwell at its origin, so the train moves for the last 70 s.
 const SEGMENTS = { '101N>102N': 100, '102N>103N': 100 }
 
 function at(
@@ -47,7 +48,7 @@ describe('positionAlongShape STOPPED_AT', () => {
     expect(ok(at('STOPPED_AT', '102N', [['103N', NOW + 150]])).distance).toBeCloseTo(1000)
   })
   it('moves on when the status lags behind the next arrival', () => {
-    expect(ok(at('STOPPED_AT', '102N', [['103N', NOW + 40]])).distance).toBeCloseTo(1600)
+    expect(ok(at('STOPPED_AT', '102N', [['103N', NOW + 35]])).distance).toBeCloseTo(1500)
   })
   it('stays at the stop with no arrival for the next stop', () => {
     const r = ok(at('STOPPED_AT', '102N', []))
@@ -61,7 +62,7 @@ describe('positionAlongShape STOPPED_AT', () => {
 
 describe('positionAlongShape in transit', () => {
   it('interpolates toward the next stop', () => {
-    const r = ok(at('IN_TRANSIT_TO', '103N', [['103N', NOW + 25]]))
+    const r = ok(at('IN_TRANSIT_TO', '103N', [['103N', NOW + 17.5]]))
     expect(r.distance).toBeCloseTo(1750)
     expect(r.point.x).toBeCloseTo(0)
     expect(r.point.z).toBeCloseTo(-1750)
@@ -76,11 +77,11 @@ describe('positionAlongShape in transit', () => {
   })
   it('floors INCOMING_AT at 75% of the hop', () => {
     expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 80]])).distance).toBeCloseTo(1750)
-    expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 5]])).distance).toBeCloseTo(1950)
+    expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 7]])).distance).toBeCloseTo(1900)
   })
   it('falls back to a run time from distance when the segment is unknown', () => {
-    // 1000 m at 8 m/s = 125 s; 62.5 s left is halfway.
-    const r = ok(at('IN_TRANSIT_TO', '102N', [['102N', NOW + 62.5]], { segments: {} }))
+    // 1000 m at 8 m/s = 125 s, 30 s of it dwell, so it moves for 95 s; 47.5 s left is halfway.
+    const r = ok(at('IN_TRANSIT_TO', '102N', [['102N', NOW + 47.5]], { segments: {} }))
     expect(r.distance).toBeCloseTo(500)
   })
   it('reports how long until a train still at its origin departs', () => {
@@ -92,7 +93,7 @@ describe('positionAlongShape in transit', () => {
 
 describe('positionAlongShape without a status', () => {
   it('uses the first upcoming arrival as the next stop', () => {
-    const r = ok(at(null, null, [['101N', NOW - 30], ['102N', NOW + 50], ['103N', NOW + 150]]))
+    const r = ok(at(null, null, [['101N', NOW - 30], ['102N', NOW + 35], ['103N', NOW + 150]]))
     expect(r.distance).toBeCloseTo(500)
     expect(r.departsInS).toBeNull()
   })
@@ -105,7 +106,7 @@ describe('positionAlongShape without a status', () => {
     expect(ok(at(null, null, [['102N', NOW - 60], ['103N', NOW - 20]])).distance).toBeCloseTo(2000)
   })
   it('ignores arrivals for stops off the pattern', () => {
-    expect(ok(at(null, null, [['Z99N', NOW + 10], ['103N', NOW + 25]])).distance).toBeCloseTo(1750)
+    expect(ok(at(null, null, [['Z99N', NOW + 10], ['103N', NOW + 17.5]])).distance).toBeCloseTo(1750)
   })
 })
 
@@ -120,7 +121,7 @@ describe('positionAlongShape failures and direction', () => {
   })
   it('heads south on a southbound shape', () => {
     const r = ok(
-      at('IN_TRANSIT_TO', '101S', [['101S', NOW + 50]], {
+      at('IN_TRANSIT_TO', '101S', [['101S', NOW + 35]], {
         geometry: southbound,
         segments: { '102S>101S': 100 },
       }),
@@ -133,16 +134,16 @@ describe('positionAlongShape failures and direction', () => {
 describe('planHop and hopDistance', () => {
   const cases: [string, VehicleStatus | null, string | null, Arrival[], { segments?: Record<string, number> }?][] = [
     ['dwelling', 'STOPPED_AT', '102N', [['103N', NOW + 150]]],
-    ['status lag', 'STOPPED_AT', '102N', [['103N', NOW + 40]]],
+    ['status lag', 'STOPPED_AT', '102N', [['103N', NOW + 35]]],
     ['terminal', 'STOPPED_AT', '103N', []],
-    ['in transit', 'IN_TRANSIT_TO', '103N', [['103N', NOW + 25]]],
+    ['in transit', 'IN_TRANSIT_TO', '103N', [['103N', NOW + 17.5]]],
     ['overdue', 'IN_TRANSIT_TO', '103N', [['103N', NOW - 10]]],
     ['far off', 'IN_TRANSIT_TO', '103N', [['103N', NOW + 500]]],
     ['incoming floor', 'INCOMING_AT', '103N', [['103N', NOW + 80]]],
-    ['incoming late', 'INCOMING_AT', '103N', [['103N', NOW + 5]]],
-    ['unknown segment', 'IN_TRANSIT_TO', '102N', [['102N', NOW + 62.5]], { segments: {} }],
+    ['incoming late', 'INCOMING_AT', '103N', [['103N', NOW + 7]]],
+    ['unknown segment', 'IN_TRANSIT_TO', '102N', [['102N', NOW + 47.5]], { segments: {} }],
     ['at origin', 'IN_TRANSIT_TO', '101N', [['101N', NOW + 90]]],
-    ['no status', null, null, [['101N', NOW - 30], ['102N', NOW + 50], ['103N', NOW + 150]]],
+    ['no status', null, null, [['101N', NOW - 30], ['102N', NOW + 35], ['103N', NOW + 150]]],
     ['all past', null, null, [['102N', NOW - 60], ['103N', NOW - 20]]],
   ]
 
@@ -160,12 +161,25 @@ describe('planHop and hopDistance', () => {
   })
 
   it('advances with time without re-planning', () => {
-    const arrivals: Arrival[] = [['103N', NOW + 50]]
+    const arrivals: Arrival[] = [['103N', NOW + 70]]
     const plan = planHop({ geometry: northbound, status: 'IN_TRANSIT_TO', stopId: '103N', arrivals, segments: SEGMENTS, now: NOW })
     if ('ok' in plan) throw new Error('unexpected failure')
-    expect(hopDistance(plan, northbound, NOW)).toBeCloseTo(1500)
-    expect(hopDistance(plan, northbound, NOW + 25)).toBeCloseTo(1750)
+    expect(hopDistance(plan, northbound, NOW)).toBeCloseTo(1000)
+    expect(hopDistance(plan, northbound, NOW + 35)).toBeCloseTo(1500)
     expect(hopDistance(plan, northbound, NOW + 80)).toBeCloseTo(2000)
+  })
+
+  it('never moves backward as time passes, in any case', () => {
+    for (const [name, status, stopId, arrivals, opts] of cases) {
+      const plan = planHop({ geometry: northbound, status, stopId, arrivals, segments: opts?.segments ?? SEGMENTS, now: NOW })
+      if ('ok' in plan) throw new Error(`unexpected ${plan.reason}`)
+      let prev = -Infinity
+      for (let t = 0; t <= 200; t += 0.5) {
+        const d = hopDistance(plan, northbound, NOW + t)
+        expect(d, `${name} at +${t}`).toBeGreaterThanOrEqual(prev)
+        prev = d
+      }
+    }
   })
 
   it('passes failure reasons through', () => {
@@ -193,6 +207,61 @@ describe('STOPPED_AT with no prediction for the next stop', () => {
       const p = plan(stop, arrivals)
       if ('ok' in p) throw new Error('unexpected failure')
       expect([p.from, p.to, p.fixedFraction]).toEqual([long.stops.indexOf(stop), long.stops.indexOf(stop), 0])
+    }
+  })
+})
+
+describe('dwell at the origin stop', () => {
+  const hop = (arriveAt: number, segments: Record<string, number> = SEGMENTS) => {
+    const plan = planHop({ geometry: northbound, status: 'IN_TRANSIT_TO', stopId: '102N', arrivals: [['102N', arriveAt]], segments, now: NOW })
+    if ('ok' in plan) throw new Error(`unexpected ${plan.reason}`)
+    return plan
+  }
+
+  it('holds at the platform for the dwell, then runs and arrives on time', () => {
+    const plan = hop(NOW + 100)
+    expect(plan.dwellS).toBe(DWELL_S)
+    for (const t of [0, 10, 29.9]) expect(hopDistance(plan, northbound, NOW + t), `+${t}`).toBe(0)
+    expect(hopDistance(plan, northbound, NOW + 65)).toBeCloseTo(500)
+    expect(hopDistance(plan, northbound, NOW + 100)).toBeCloseTo(1000)
+    expect(hopDistance(plan, northbound, NOW + 130)).toBeCloseTo(1000)
+  })
+
+  it('caps the dwell at a share of a short hop and still arrives on time', () => {
+    const plan = hop(NOW + 60, { '101N>102N': 60 })
+    expect(plan.dwellS).toBeCloseTo(21)
+    expect(hopDistance(plan, northbound, NOW + 20.9)).toBe(0)
+    expect(hopDistance(plan, northbound, NOW + 40.5)).toBeCloseTo(500)
+    expect(hopDistance(plan, northbound, NOW + 60)).toBeCloseTo(1000)
+    expect(dwellFor(1000)).toBe(DWELL_S)
+  })
+
+  it('dwells on a fallback run time too', () => {
+    const plan = hop(NOW + 125, {})
+    expect(plan.runS).toBeCloseTo(125)
+    expect(plan.dwellS).toBe(DWELL_S)
+    expect(hopDistance(plan, northbound, NOW + 29)).toBe(0)
+    expect(hopDistance(plan, northbound, NOW + 125)).toBeCloseTo(1000)
+  })
+
+  it('does not move the target across a stop when the next hop is planned 0 to 20 s later', () => {
+    // Hop 1 ends at stop 1 at A; the train then dwells there and leaves for stop 2, due at A + 100.
+    const A = NOW + 50
+    const before = planHop({ geometry: northbound, status: 'IN_TRANSIT_TO', stopId: '102N', arrivals: [['102N', A]], segments: SEGMENTS, now: NOW })
+    if ('ok' in before) throw new Error('unexpected failure')
+    const target = hopDistance(before, northbound, A)
+    expect(target).toBeCloseTo(1000)
+    const statuses: [VehicleStatus | null, string | null][] = [['STOPPED_AT', '102N'], ['IN_TRANSIT_TO', '103N'], ['INCOMING_AT', '103N'], [null, null]]
+    for (const [status, stopId] of statuses) {
+      for (let late = 0; late <= 20; late += 2) {
+        const arrivals: Arrival[] = [['103N', A + 100]]
+        const plan = planHop({ geometry: northbound, status, stopId, arrivals, segments: SEGMENTS, now: A + late })
+        if ('ok' in plan) throw new Error(`unexpected ${plan.reason}`)
+        // INCOMING_AT is floored at 75% of the hop on purpose; it never occurs this early in a real hop.
+        if (status === 'INCOMING_AT') continue
+        const moved = Math.abs(hopDistance(plan, northbound, A + late) - target)
+        expect(moved, `${status} ${late}s late`).toBeLessThanOrEqual(50)
+      }
     }
   })
 })
