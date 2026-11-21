@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useFocus } from '../lib/focus'
 import { network } from '../lib/network'
 import { theme } from '../theme'
@@ -33,9 +34,9 @@ function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
           type="button"
           onClick={onClose}
           aria-label="Close station panel"
-          className="cursor-pointer px-1 text-ink-dim hover:text-ink"
+          className="-m-2 flex min-h-11 min-w-11 cursor-pointer items-center justify-center p-2 text-ink-dim hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
         >
-          x
+          ×
         </button>
       </div>
       <div className="mt-1 flex gap-1.5">
@@ -62,6 +63,16 @@ function ArrivalsPanel({ stationId, onClose }: ArrivalsPanelProps) {
 
 export function Hud() {
   const { focusedId, dismiss } = useFocus()
+
+  useEffect(() => {
+    if (!focusedId) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismiss()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [focusedId, dismiss])
+
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
       <header>

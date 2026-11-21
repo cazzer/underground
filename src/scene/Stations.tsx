@@ -33,7 +33,7 @@ function StationMarker({ station, focused }: StationMarkerProps) {
         onPointerOver={() => (document.body.style.cursor = 'pointer')}
         onPointerOut={() => (document.body.style.cursor = '')}
       >
-        <circleGeometry args={[1, 24]} />
+        <circleGeometry args={[focused ? 1.1 : 1, 24]} />
         <meshBasicMaterial color={theme.stationFill} transparent depthTest={false} depthWrite={false} />
       </mesh>
       <mesh renderOrder={3}>
