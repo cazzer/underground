@@ -1,7 +1,5 @@
 import { Grid } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
-import { useLayoutEffect, useRef } from 'react'
-import { Material, type Mesh } from 'three'
 import { network } from '../lib/network'
 import { theme } from '../theme'
 import { CameraRig } from './CameraRig'
@@ -10,13 +8,6 @@ import { SubwayLines } from './SubwayLines'
 import { Trains } from './Trains'
 
 export function Scene() {
-  const grid = useRef<Mesh>(null)
-  // drei's Grid forwards props to the mesh, not its material. It's transparent, so it renders
-  // with the transparent list; skip depth writes so it never occludes anything drawn after it.
-  useLayoutEffect(() => {
-    if (grid.current?.material instanceof Material) grid.current.material.depthWrite = false
-  }, [])
-
   return (
     <Canvas
       camera={{ fov: 35, near: 10, far: 40_000 }}
@@ -26,7 +17,6 @@ export function Scene() {
     >
       <color attach="background" args={[theme.background]} />
       <Grid
-        ref={grid}
         infiniteGrid
         renderOrder={-1}
         position={[0, -0.5, 0]}
