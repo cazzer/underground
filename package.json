@@ -14,6 +14,7 @@
     "data": "node scripts/build-data.ts",
     "data:stations": "node scripts/build-stations.ts",
     "data:stations:fetch": "node scripts/fetch-station-sources.ts",
+    "data:catalog:fetch": "node scripts/fetch-station-catalog.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts"
   },
   "dependencies": {

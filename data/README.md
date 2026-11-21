@@ -14,6 +14,13 @@ be accurate.
 - `stations/<id>.sources.json`: pinned extracts of the public sources, written only by
   `npm run data:stations:fetch -- --station <id>`. Each section records its query or URL, when it
   was fetched, and the source's own update time or version. The build never touches the network.
+- `stations/catalog/{stations,entrances,equipment,envelopes,osm}.json`: citywide pinned extracts
+  (all 496 stations, 2,120 entrance rows, 759 E&E machines, 475 NYCT station envelopes, and 5,029
+  OSM platform and subway-track ways within 250 to 300 m of a station), written only by
+  `npm run data:catalog:fetch`. Rows share the keys `gtfsStopId`, `stationId` (the E&E station MRN
+  without leading zeros) and `complexId`. Nothing here is read by `npm run data:stations`; it is
+  input for the planned station generator. The DOS Track LRS is not pinned (see
+  `../docs/research/data-sources.md` §5.1).
 
 ## Refreshing
 
@@ -25,12 +32,23 @@ be accurate.
 4. Commit the sources, the authored file, and `public/data/stations/` together. A test fails if the
    committed output is stale.
 
+## Refreshing the catalog
+
+1. `npm run data:catalog:fetch` (needs network; Overpass is often busy, and the script retries 502s
+   and 429s after 30, 60 and 120 s). It writes nothing unless every request succeeds, each row count
+   matches `count(*)`, no file is over 2 MB and the total is under 5 MB.
+2. Review the diff of `stations/catalog/`. The E&E file changes most often (new machines).
+3. Commit. `catalogData.test.ts` checks the files against each other.
+
 ## Licenses
 
 - The `osm` section of `*.sources.json` is © OpenStreetMap contributors, available under the
   ODbL 1.0 (see `../public/data/LICENSE-ODbL.md`).
 - The `entrances` and `equipment` sections are MTA data from data.ny.gov (datasets i9wp-a4ja and
-  94fv-bak7). Attribution: Metropolitan Transportation Authority. Their license terms are not yet
-  verified.
+  94fv-bak7), as are `catalog/stations.json`, `catalog/entrances.json`, `catalog/equipment.json` and
+  `catalog/envelopes.json` (39hk-dx4f, i9wp-a4ja, 94fv-bak7, vkng-7ivg). Attribution: Metropolitan
+  Transportation Authority. No license is set on the datasets, so the OPEN-NY Terms of Use apply;
+  see `../docs/research/data-sources.md` §5.1 (open questions included).
+- `catalog/osm.json` is © OpenStreetMap contributors, available under the ODbL 1.0.
 - The `*.authored.json` files are offered under the ODbL 1.0, because their frame is registered to
   OpenStreetMap geometry.
