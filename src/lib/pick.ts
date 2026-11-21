@@ -65,9 +65,12 @@ export function nearestStation(
   return best
 }
 
-/** The train target for a pick: a touch with no station in reach gets the bigger one. */
-export function trainHitPx(touch: boolean, station: PickHit | null): number {
-  return touch && station === null ? TRAIN_TOUCH_HIT_PX : TRAIN_HIT_PX
+/**
+ * The train target for a pick: a touch with no station in reach gets the bigger one. The open station
+ * (`focusedIndex`) draws no marker, so it doesn't count: a tap on a train at its platform gets the bigger one too.
+ */
+export function trainHitPx(touch: boolean, station: PickHit | null, focusedIndex = -1): number {
+  return touch && (station === null || station.index === focusedIndex) ? TRAIN_TOUCH_HIT_PX : TRAIN_HIT_PX
 }
 
 /**

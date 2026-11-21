@@ -86,7 +86,7 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
       click.x = clientX - view.left
       click.y = clientY - view.top
       const station = nearestStation(positions, toScreen, click, radiusM)
-      const train = trains ? nearestTrain(trains, toScreen, click, trainHitPx(touch, station)) : null
+      const train = trains ? nearestTrain(trains, toScreen, click, trainHitPx(touch, station, focusedIndex.current)) : null
       return choosePick(station, train, focusedIndex.current)
     }
     const trainAt = (key: string) => {

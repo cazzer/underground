@@ -23,8 +23,12 @@ import type { InteriorModel } from './interiorModel'
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
 const TAN_ISO = Math.tan(ISO_POLAR)
-/** Turn (radians, summed while focused) that counts as the visitor's first turn and retires the hint. */
-const TURN_SEEN = 0.1
+/**
+ * Turn (radians, summed while focused) that counts as the visitor's first turn and retires the hint:
+ * about 17°, past what a drifting pinch adds.
+ */
+const TURN_SEEN = 0.3
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
 interface StationOrbitOptions {
   controls: RefObject<MapControlsImpl | null>
@@ -54,11 +58,12 @@ interface OrbitFocus {
 
 /**
  * Station orbit: a full spin while focused (a spring to north-up otherwise), a turn that pivots on the
- * focus point, and a soft pan radius. It also flags the session's first turn for the HUD hint. All frames write the controls imperatively: passing these as props or on* handlers would re-run drei's
+ * focus point, and a soft pan radius. It also flags the session's first turn for the HUD hint. All
+ * frames write the controls imperatively: passing these as props or on* handlers would re-run drei's
  * connect effect and could lock the controls (underground-by0). Nothing here allocates per frame.
  */
 export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, flying, busy }: StationOrbitOptions): void {
-  const input = useRef<AzimuthInput>({ theta: 0, focused: false, distance: 0, dt: 0 })
+  const input = useRef<AzimuthInput>({ theta: 0, focused: false, distance: 0, dt: 0, reducedMotion: false })
   const bounds = useRef<AzimuthBounds>({ min: 0, max: 0 })
   const lastTheta = useRef(0)
   const shift = useRef<ScreenShift>({ right: 0, toward: 0 })
@@ -85,6 +90,7 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     inp.focused = focusPos !== null
     inp.distance = camera.position.distanceTo(c.target)
     inp.dt = delta
+    inp.reducedMotion = reduceMotion.matches
     const b = azimuthBounds(inp, bounds.current)
     // enableRotate stays on: OrbitControls seeds a rotate only when it is on at gesture start, so
     // toggling it mid-gesture applied a stale start (a pinch into a station swung the view). The

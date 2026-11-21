@@ -19,6 +19,11 @@ export const PAN_GIVE = 30
 export const PAN_SPRING = 8
 /** Exponential rate (per second) at which a dropped focus pulls the view back to north-up. */
 export const AZIMUTH_SPRING = 3
+/**
+ * Fastest that spring may turn the view, radians per second (180°/s): after a big turn the exponential
+ * ease alone would whip round at first; this keeps the start steady and leaves the ease for the last ~60°.
+ */
+export const AZIMUTH_SPRING_MAX_SPEED = Math.PI
 
 const SNAP = 1e-4
 const TWO_PI = 2 * Math.PI
@@ -64,22 +69,35 @@ export interface AzimuthInput {
   /** Camera distance to its target. */
   distance: number
   dt: number
+  /** prefers-reduced-motion: a dropped focus snaps to north-up instead of turning back. */
+  reducedMotion: boolean
+}
+
+/**
+ * One frame of the return to north-up from `theta`: the short way round, an exponential ease that never
+ * turns faster than AZIMUTH_SPRING_MAX_SPEED, or straight to 0 under reduced motion.
+ */
+export function springToNorth(theta: number, dt: number, reducedMotion: boolean): number {
+  if (reducedMotion) return 0
+  const w = wrapAngle(theta)
+  const eased = springToward(w, 0, dt, AZIMUTH_SPRING)
+  const maxStep = AZIMUTH_SPRING_MAX_SPEED * dt
+  return Math.abs(w - eased) > maxStep ? w - Math.sign(w) * maxStep : eased
 }
 
 /**
  * The azimuth window for this frame, written into `out` (called every frame, so no allocation).
  * Focused: ±azimuthCap, so ±Infinity (a full spin, which the controls leave unclamped) while close.
- * Otherwise min = max springs from the current azimuth the short way to 0, held within the cap; the
- * controls clamp to it, so the view eases back to north-up, is north-up by the top-down distance,
- * and a rotate gesture can't turn it.
+ * Otherwise min = max follows springToNorth, held within the cap; the controls clamp to it, so the
+ * view turns back to north-up, is north-up by the top-down distance, and a rotate gesture can't turn it.
  */
-export function azimuthBounds({ theta, focused, distance, dt }: AzimuthInput, out: AzimuthBounds): AzimuthBounds {
+export function azimuthBounds({ theta, focused, distance, dt, reducedMotion }: AzimuthInput, out: AzimuthBounds): AzimuthBounds {
   const cap = azimuthCap(distance)
   if (focused) {
     out.min = -cap
     out.max = cap
   } else {
-    const t = Math.max(-cap, Math.min(cap, springToward(wrapAngle(theta), 0, dt, AZIMUTH_SPRING)))
+    const t = Math.max(-cap, Math.min(cap, springToNorth(theta, dt, reducedMotion)))
     out.min = t
     out.max = t
   }

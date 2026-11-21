@@ -67,10 +67,8 @@ export function Stations({ stations }: StationsProps) {
     if (scale === last.scale && focusedIndex === last.focusedIndex) return
     last.scale = scale
     last.focusedIndex = focusedIndex
-    const m = f.instanceMatrix.array as Float32Array
-    writeMarkerMatrices(m, positions, MARKER_Y, scale, -1, 1)
-    // A zero matrix collapses the focused instance, so neither its fill nor its ring draws.
-    if (focusedIndex >= 0) m.fill(0, focusedIndex * 16, focusedIndex * 16 + 16)
+    // Scale 0 collapses the focused instance, so neither its fill nor its ring draws.
+    writeMarkerMatrices(f.instanceMatrix.array as Float32Array, positions, MARKER_Y, scale, focusedIndex, 0)
     r.instanceMatrix.array.set(f.instanceMatrix.array)
     f.instanceMatrix.needsUpdate = true
     r.instanceMatrix.needsUpdate = true

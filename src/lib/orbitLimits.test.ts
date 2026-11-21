@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import type { StationInterior } from '../data/stationSchema'
 import { PerspectiveCamera, Vector3 } from 'three'
 import { EXIT_DISTANCE, EXIT_RADIUS } from './focusMachine'
 import { freeCenterShift, interiorFreeRect } from './interiorCamera'
+import { interiorFocusAnchor } from './interiorFraming'
 import {
+  AZIMUTH_SPRING,
+  AZIMUTH_SPRING_MAX_SPEED,
   azimuthBounds,
   azimuthCap,
   focusPoint,
@@ -15,6 +20,7 @@ import {
   pivotShift,
   rotateScreenOffset,
   softClampToRadius,
+  springToNorth,
   springToward,
   wrapAngle,
   type AzimuthBounds,
@@ -39,6 +45,18 @@ describe('panRadius', () => {
     const offset = Math.hypot(s.right, s.toward + 30 * Math.tan(polar))
     expect(PAN_RADIUS_MAX + PAN_GIVE + offset).toBeLessThan(EXIT_RADIUS)
     expect(PAN_RADIUS_BARE + PAN_GIVE).toBeLessThan(EXIT_RADIUS)
+  })
+})
+
+describe('panRadius on real data', () => {
+  it("covers every Bedford Av slab vertex and entrance from the plan center, below the cap", () => {
+    const interior = JSON.parse(readFileSync('public/data/stations/L08.json', 'utf8')) as StationInterior
+    const a = interiorFocusAnchor({ x: 0, z: 0 }, interior, 2, Math.SQRT2)
+    const r = panRadius(a.reach)
+    expect(r).toBeLessThan(PAN_RADIUS_MAX)
+    const points = [...interior.slabs.flatMap((s) => s.outline), ...interior.entrances.map((e) => [e.x, e.z] as const)]
+    expect(points.length).toBeGreaterThan(10)
+    for (const [x, z] of points) expect(Math.hypot(x - a.center.x, z - a.center.z) + PAN_MARGIN).toBeLessThanOrEqual(r + 1e-9)
   })
 })
 
@@ -92,13 +110,13 @@ describe('azimuthBounds', () => {
 
   it('focused and close: no window at all, so the view spins a full turn', () => {
     for (const theta of [0, 2, Math.PI, -3]) {
-      const b = azimuthBounds({ theta, focused: true, distance: 180, dt: 0.016 }, out())
+      const b = azimuthBounds({ theta, focused: true, distance: 180, dt: 0.016, reducedMotion: false }, out())
       expect(b).toEqual({ min: -Infinity, max: Infinity })
     }
   })
 
   it('focused but top-down: the window is closed', () => {
-    const b = azimuthBounds({ theta: 0, focused: true, distance: 1500, dt: 0.016 }, out())
+    const b = azimuthBounds({ theta: 0, focused: true, distance: 1500, dt: 0.016, reducedMotion: false }, out())
     expect(b.min).toBeCloseTo(0, 12)
     expect(b.max).toBeCloseTo(0, 12)
   })
@@ -107,7 +125,7 @@ describe('azimuthBounds', () => {
     let theta = -Math.PI / 4
     const b = out()
     for (let i = 0; i < 600 && theta !== 0; i++) {
-      azimuthBounds({ theta, focused: false, distance: 400, dt: 1 / 60 }, b)
+      azimuthBounds({ theta, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, b)
       expect(b.min).toBe(b.max)
       theta = b.min
     }
@@ -116,10 +134,10 @@ describe('azimuthBounds', () => {
 
   it('unfocused near ±π: springs the short way, never sweeping through the long way', () => {
     // 3.3 rad past π is -2.98 the short way: the spring must go up through -2.9, not down through 3.
-    const b = azimuthBounds({ theta: 3.3, focused: false, distance: 400, dt: 1 / 60 }, out())
+    const b = azimuthBounds({ theta: 3.3, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, out())
     expect(b.min).toBeLessThan(0)
     expect(b.min).toBeGreaterThan(wrapAngle(3.3))
-    const c = azimuthBounds({ theta: -3.3, focused: false, distance: 400, dt: 1 / 60 }, out())
+    const c = azimuthBounds({ theta: -3.3, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, out())
     expect(c.min).toBeGreaterThan(0)
     expect(c.min).toBeLessThan(wrapAngle(-3.3))
   })
@@ -130,11 +148,38 @@ describe('azimuthBounds', () => {
     // A fast zoom out: 420 m to 1400 m in a third of a second, far quicker than the spring.
     for (let i = 0; i <= 20; i++) {
       const distance = EXIT_DISTANCE + ((1400 - EXIT_DISTANCE) * i) / 20
-      azimuthBounds({ theta, focused: false, distance, dt: 1 / 60 }, b)
+      azimuthBounds({ theta, focused: false, distance, dt: 1 / 60, reducedMotion: false }, b)
       expect(Math.abs(b.min)).toBeLessThanOrEqual(azimuthCap(distance))
       theta = b.min
     }
     expect(theta).toBe(0)
+  })
+})
+
+describe('springToNorth', () => {
+  it('never turns faster than the speed cap after a big turn', () => {
+    const dt = 1 / 60
+    let theta = Math.PI - 0.01
+    for (let i = 0; i < 60; i++) {
+      const next = springToNorth(theta, dt, false)
+      expect(Math.abs(next - theta)).toBeLessThanOrEqual(AZIMUTH_SPRING_MAX_SPEED * dt + 1e-12)
+      theta = next
+    }
+    // A second at the cap brings 179° down to about 0, no further.
+    expect(theta).toBeGreaterThan(0)
+  })
+
+  it('keeps the plain exponential ease for small angles, and lands exactly on 0', () => {
+    expect(springToNorth(0.5, 1 / 60, false)).toBeCloseTo(springToward(0.5, 0, 1 / 60, AZIMUTH_SPRING), 12)
+    let theta = 2
+    for (let i = 0; i < 600 && theta !== 0; i++) theta = springToNorth(theta, 1 / 60, false)
+    expect(theta).toBe(0)
+  })
+
+  it('snaps straight to north-up under reduced motion', () => {
+    expect(springToNorth(2.5, 1 / 60, true)).toBe(0)
+    const b = azimuthBounds({ theta: -3, focused: false, distance: 430, dt: 1 / 60, reducedMotion: true }, { min: 1, max: 1 })
+    expect(b).toEqual({ min: 0, max: 0 })
   })
 })
 

@@ -95,7 +95,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides;
     `machineLook.ts` TEMPORARY `?machines=` escalator/elevator look
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
-  panel: the station name, a focusable heading (`tabIndex -1`), then `InteriorStatus` and the arrival rows, nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
+  panel: the station name, a focusable heading (`tabIndex -1`), then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only), nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
   each pick (its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useStopListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
   notice, then the station, and closing either of the first two returns focus to the station heading or else
@@ -287,7 +287,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   center) + 20 m (100 m of a bare station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`), so
   on a phone a drag can bring every part of the interior to the free area at any angle. Past EXIT_DISTANCE
   |azimuth| is capped, falling from π to 0 at the top-down distance (1400 m), and dropping focus (zoom out,
-  close the panel) springs the view back to north-up the short way round, so the city and top-down views
+  close the panel) springs the view back to north-up the short way round (an exponential ease capped at
+  180°/s; under prefers-reduced-motion it snaps to north-up at once), so the city and top-down views
   are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it
   mid-gesture applies a stale rotate start), and `rotateSpeed` is 0 while unfocused so drift can't replay
   when the bounds open. Markers and dots rescale with distance
@@ -301,8 +302,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55. The focused station (picked or auto-focused by zoom) draws no marker: its
-  panel and interior mark it, and it stays pickable.
+  you-are-here reticle 6.55. The focused station (picked or auto-focused by zoom) draws no marker and no
+  station tie: its panel and interior mark it, and it stays pickable.
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
   (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior) has depthTest false.
@@ -329,7 +330,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),
   projects stations (22 px) and live trains (16 px, dot or car line, read from the slot table) to pixels,
   and a station wins unless a train is 6 px closer or the station is the open one. A station's target grows
-  to its drawn marker at close zoom; a touch with no station in reach gets 22 px for trains; cars are tested
+  to its drawn marker at close zoom; a touch with no station in reach (the open station, whose marker is hidden, doesn't count) gets 22 px
+  for trains; cars are tested
   along their floor and roof lines. No meshes carry r3f pointer handlers.
 - Live train dots and cars are instanced too, with per-slot colors (`routeLineColor` like the lines; car
   instance `slot * MAX_CARS + c`). Their per-frame
