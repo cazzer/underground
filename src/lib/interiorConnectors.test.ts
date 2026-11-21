@@ -99,7 +99,6 @@ describe('elevators', () => {
     const verticals = withRole(strong, 'elevator').map((k) => seg(strong, k)).filter((s) => s[1] !== s[4])
     for (const s of verticals) expect([s[1], s[4]]).toEqual([-16, 0])
   })
-
 })
 
 describe('escalators', () => {
