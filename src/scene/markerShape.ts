@@ -1,4 +1,4 @@
-/** Station marker shape, shared by the instanced markers (Stations.tsx) and the focused ring copy (FocusRing.tsx). */
+/** Station marker shape for the instanced markers (Stations.tsx). */
 export const MARKER_MIN_METERS = 6
 export const MARKER_Y = 0.2
 export const SEGMENTS = 24

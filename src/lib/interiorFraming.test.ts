@@ -60,12 +60,13 @@ describe('interiorBounds', () => {
 })
 
 describe('interiorFocusAnchor', () => {
-  it('centers the plan, gives the scaled mid-depth times tan(polar) toward the camera and half the longer side', () => {
+  it('centers the plan, gives the scaled mid-depth times tan(polar) toward the camera and the farthest point', () => {
     const a = interiorFocusAnchor({ x: 100, z: 200 }, interior, 2, Math.SQRT2)
     expect(a.center.x).toBeCloseTo(100 + 5)
     expect(a.center.z).toBeCloseTo(200 + 8.5)
     expect(a.towardCamera).toBeCloseTo(8 * Math.SQRT2)
-    expect(a.halfExtent).toBe(25)
+    // A corner and the entrance tie at (±25, 11.5) from the center: past the 25 m half of the longer side.
+    expect(a.reach).toBeCloseTo(Math.hypot(25, 11.5))
   })
 })
 

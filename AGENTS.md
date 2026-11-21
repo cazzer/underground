@@ -71,18 +71,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
-  TEMPORARY: `?orbit=a|b|c` (azimuth window ±30/45/60 degrees; default b) until pah.5 decides; the
-  removal list is in `src/scene/orbitLook.ts`
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
-    `useStationOrbit.ts` the focused-station orbit (azimuth window per frame, pan-radius clamp);
-    `orbitLook.ts` TEMPORARY `?orbit=` override
+    `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`); `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
     LineSegments2, `theme.stationTieWidth`, faded out between 350 and 550 m); `LineHighlight.tsx` holds the
-    temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; `FocusRing.tsx` redraws the focused ring above the
-    trains and the veil; `markerShape.ts` the shared marker constants);
+    temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
+    instance is zeroed, so it has no marker; `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, theme.train in mono themes; stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
@@ -98,7 +95,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides;
     `machineLook.ts` TEMPORARY `?machines=` escalator/elevator look
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
-  panel; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
+  panel: the station name, a focusable heading (`tabIndex -1`), then `InteriorStatus` and the arrival rows, nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
   each pick (its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useStopListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
   notice, then the station, and closing either of the first two returns focus to the station heading or else
@@ -108,13 +105,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
   `LocateButton.tsx` the header's location button (shows locating and located); `LocateStatus.tsx` its message (the sentence alone is the always-mounted live region)
   with a "Go to <nearest station>" action and a clear ×
-  `InteriorStatus.tsx` the panel's station-layout line (loading, error with Retry, ready, zoom-in hint)
+  `InteriorStatus.tsx` the panel's station-layout line, one always-mounted live region: loading, error with Retry,
+  and `ReadyLine` for a loaded interior (null for authored ones; the one place a ready-state line goes)
   `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a combobox over a
   listbox of `SearchResult.tsx` rows (name plus route chips, which tell duplicate names apart); choosing a result
   calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). `useKeyboardInset.ts`
   pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
   location message
-  `OrbitHint.tsx` the panel's turn hint (right- or Shift-drag; two fingers on a coarse pointer)
+  `OrbitHint.tsx` the header's muted turn hint under the status lines (right- or Shift-drag; two fingers on a
+  coarse pointer), shown while a station is focused until the first turn of the session (`src/lib/orbitTurned.ts`)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
@@ -140,7 +139,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     labels, padded hull; `interiorReveal.ts` distance to interior opacity. These have `.ts` imports
     because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always 180 m,
     at the current azimuth) in the screen area the header, footer and station panel leave free;
-    `orbitLimits.ts` azimuth window, spring to north-up, soft pan radius, focus-point pivot
+    `orbitLimits.ts` azimuth cap, short-way spring to north-up, soft pan radius, focus-point pivot;
+    `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`)
   - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
     `stationSearch.ts` ranks stations for a query (exact, prefix, typo-tolerant; a number only prefix-matches as the
     last word and never with an explicit ordinal, so "14 st" and "14th" skip 145 St; half-typed long forms and ordinals
@@ -281,14 +281,16 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   HUD uses Tailwind tokens (`bg-panel`, `text-ink`, ...) backed by theme CSS variables.
 - Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`).
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
-  focused: azimuth stays within ±45 degrees (`?orbit=`), and the turn pivots on the focus point (the
-  interior's mid-depth center at the middle of the free area, or the view center for a bare station).
-  The focus point pans within the interior's half-extent + 20 m of its plan center (100 m of a bare
-  station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`). The window closes to 0 toward top-down, and
-  dropping focus (zoom out, close the panel) springs the view back to north-up, so the city and
-  top-down views are always north-up. `enableRotate` stays on; the azimuth window alone stops a turn
-  (toggling it mid-gesture applies a stale rotate start), and `rotateSpeed` is 0 while unfocused so
-  drift can't replay when the window opens. Markers and dots rescale with distance
+  focused: a full spin (azimuth bounds ±Infinity inside EXIT_DISTANCE), and the turn pivots on the focus point
+  (the interior's mid-depth center at the middle of the free area, or the view center for a bare station).
+  The focus point pans within the interior's reach (farthest outline vertex or entrance from its plan
+  center) + 20 m (100 m of a bare station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`), so
+  on a phone a drag can bring every part of the interior to the free area at any angle. Past EXIT_DISTANCE
+  |azimuth| is capped, falling from π to 0 at the top-down distance (1400 m), and dropping focus (zoom out,
+  close the panel) springs the view back to north-up the short way round, so the city and top-down views
+  are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it
+  mid-gesture applies a stale rotate start), and `rotateSpeed` is 0 while unfocused so drift can't replay
+  when the bounds open. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
 - Every `on*` handler passed to `MapControls` (today `onStart`) stays referentially
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
@@ -299,11 +301,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55, focused ring 10
-  (whenever a station is focused, so a train never covers it).
+  you-are-here reticle 6.55. The focused station (picked or auto-focused by zoom) draws no marker: its
+  panel and interior mark it, and it stays pickable.
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
-  (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior, focus ring) has depthTest false.
+  (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior) has depthTest false.
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
@@ -336,8 +338,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   real depths). Two merged `LineSegments2` (fine, then strong strokes) are built from the deepest
   level up, so upper levels paint over lower ones; deeper levels mix toward the background. It fades
   in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
-  layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong); the
-  focused ring stays above it at 10; look C uses -0.6 and -0.3. Mezzanine guides and a
+  layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong);
+  look C uses -0.6 and -0.3. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at 180 m (a partial fit on small screens).
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.

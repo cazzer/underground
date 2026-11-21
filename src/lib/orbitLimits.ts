@@ -1,11 +1,11 @@
-/** Pure limits for the station orbit: azimuth window, spring back to north-up, pan radius, pivot. */
+/** Pure limits for the station orbit: full spin while focused, spring back to north-up, pan radius, pivot. */
 import { EXIT_DISTANCE } from './focusMachine'
 import type { Ground } from './projection'
 import { DEFAULT_TILT } from './tilt'
 
 /** Pan radius around a station with no interior loaded: the station stays near the view center. */
 export const PAN_RADIUS_BARE = 100
-/** Slack past an interior's half-extent, so its far edge can be brought to the middle. */
+/** Slack past an interior's reach, so its farthest point can be brought to the middle with room to spare. */
 export const PAN_MARGIN = 20
 /**
  * Largest pan radius. With PAN_GIVE it leaves room inside EXIT_RADIUS (300) for the view center's
@@ -21,11 +21,12 @@ export const PAN_SPRING = 8
 export const AZIMUTH_SPRING = 3
 
 const SNAP = 1e-4
+const TWO_PI = 2 * Math.PI
 
-/** Pan radius for a focused station: its interior's plan half-extent plus a margin, or the bare radius. */
-export function panRadius(halfExtent: number | null): number {
-  if (halfExtent === null) return PAN_RADIUS_BARE
-  return Math.min(halfExtent + PAN_MARGIN, PAN_RADIUS_MAX)
+/** Pan radius for a focused station: its interior's reach (farthest point from the plan center) plus a margin, or the bare radius. */
+export function panRadius(reach: number | null): number {
+  if (reach === null) return PAN_RADIUS_BARE
+  return Math.min(reach + PAN_MARGIN, PAN_RADIUS_MAX)
 }
 
 /** Exponential ease of `value` toward `goal`; snaps onto the goal once within 1e-4, so it lands exactly. */
@@ -34,15 +35,21 @@ export function springToward(value: number, goal: number, dt: number, rate: numb
   return Math.abs(next - goal) < SNAP ? goal : next
 }
 
+/** `theta` wrapped into (-π, π], so easing it to 0 always takes the shorter way round. */
+export function wrapAngle(theta: number): number {
+  const t = theta - TWO_PI * Math.floor((theta + Math.PI) / TWO_PI)
+  return t === -Math.PI ? Math.PI : t
+}
+
 /**
- * Half-width of the azimuth window at camera `distance`: the full `limit` up to EXIT_DISTANCE (where
- * focus drops), falling linearly to 0 at the tilt's top-down distance, so top-down is never rotated.
+ * Largest |azimuth| allowed at camera `distance`: unlimited up to EXIT_DISTANCE (where focus drops),
+ * then falling linearly from π to 0 at the tilt's top-down distance, so top-down is never rotated.
  */
-export function azimuthLimit(distance: number, limit: number): number {
+export function azimuthCap(distance: number): number {
   const far = DEFAULT_TILT.farDistance
   if (distance >= far) return 0
-  if (distance <= EXIT_DISTANCE) return limit
-  return (limit * (far - distance)) / (far - EXIT_DISTANCE)
+  if (distance <= EXIT_DISTANCE) return Infinity
+  return (Math.PI * (far - distance)) / (far - EXIT_DISTANCE)
 }
 
 export interface AzimuthBounds {
@@ -56,23 +63,23 @@ export interface AzimuthInput {
   focused: boolean
   /** Camera distance to its target. */
   distance: number
-  /** Half-width of the window at full tilt, radians. */
-  limit: number
   dt: number
 }
 
 /**
  * The azimuth window for this frame, written into `out` (called every frame, so no allocation).
- * Focused: ±azimuthLimit. Otherwise min = max springs from the current azimuth to 0, which the
- * controls clamp to, so the view eases back to north-up and a rotate gesture can't turn it.
+ * Focused: ±azimuthCap, so ±Infinity (a full spin, which the controls leave unclamped) while close.
+ * Otherwise min = max springs from the current azimuth the short way to 0, held within the cap; the
+ * controls clamp to it, so the view eases back to north-up, is north-up by the top-down distance,
+ * and a rotate gesture can't turn it.
  */
-export function azimuthBounds({ theta, focused, distance, limit, dt }: AzimuthInput, out: AzimuthBounds): AzimuthBounds {
+export function azimuthBounds({ theta, focused, distance, dt }: AzimuthInput, out: AzimuthBounds): AzimuthBounds {
+  const cap = azimuthCap(distance)
   if (focused) {
-    const l = azimuthLimit(distance, limit)
-    out.min = -l
-    out.max = l
+    out.min = -cap
+    out.max = cap
   } else {
-    const t = springToward(theta, 0, dt, AZIMUTH_SPRING)
+    const t = Math.max(-cap, Math.min(cap, springToward(wrapAngle(theta), 0, dt, AZIMUTH_SPRING)))
     out.min = t
     out.max = t
   }

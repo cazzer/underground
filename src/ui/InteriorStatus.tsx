@@ -1,4 +1,5 @@
 import type { InteriorLoad } from '../data/useStationInterior'
+import type { InteriorModel } from '../scene/interiorModel'
 
 export interface InteriorStatusInfo {
   load: InteriorLoad
@@ -9,6 +10,19 @@ export interface InteriorStatusInfo {
 
 interface InteriorStatusProps {
   info: InteriorStatusInfo
+}
+
+interface ReadyLineProps {
+  model: InteriorModel
+  revealed: boolean
+}
+
+/**
+ * The line for a loaded interior. The card stays just name and arrivals, so an authored interior
+ * shows nothing here (and the live region collapses); a line for generated interiors goes here.
+ */
+function ReadyLine(_props: ReadyLineProps): null {
+  return null
 }
 
 function StatusLine({ info: { load, revealed, onRetry } }: InteriorStatusProps) {
@@ -32,11 +46,7 @@ function StatusLine({ info: { load, revealed, onRetry } }: InteriorStatusProps) 
         </>
       )
     case 'ready':
-      return revealed ? (
-        <p className="whitespace-nowrap text-ink-dim">Below street{load.model.yScale === 1 ? '' : ' · not to scale'}</p>
-      ) : (
-        <p className="text-ink-dim">Zoom in to see the station layout</p>
-      )
+      return <ReadyLine model={load.model} revealed={revealed} />
   }
 }
 

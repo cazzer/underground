@@ -5,8 +5,7 @@ import { useFocus } from '../lib/focus'
 import { writeMarkerMatrices } from '../lib/markerMatrices'
 import type { Station } from '../lib/network'
 import { theme } from '../theme'
-import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
-import { FocusRing } from './FocusRing'
+import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
 import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
@@ -14,7 +13,10 @@ interface StationsProps {
   stations: readonly Station[]
 }
 
-/** All station markers as two instanced meshes (fill, then ring). ScenePicker handles clicks on them, in screen space. */
+/**
+ * All station markers as two instanced meshes (fill, then ring). The focused station's marker is hidden
+ * (its panel and interior mark it); it stays pickable, since ScenePicker picks in screen space.
+ */
 export function Stations({ stations }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
@@ -32,9 +34,8 @@ export function Stations({ stations }: StationsProps) {
     }),
     [],
   )
-  const colors = useMemo(() => ({ stroke: new Color(theme.stationStroke), focus: new Color(theme.stationFocus) }), [])
-  const drawn = useRef({ scale: NaN, focusScale: NaN, focusedIndex: -1 })
-  const coloredIndex = useRef(-1)
+  const stroke = useMemo(() => new Color(theme.stationStroke), [])
+  const drawn = useRef({ scale: NaN, focusedIndex: -1 })
 
   useEffect(
     () => () => {
@@ -51,20 +52,10 @@ export function Stations({ stations }: StationsProps) {
     if (!f || !r) return
     f.instanceMatrix.setUsage(DynamicDrawUsage)
     r.instanceMatrix.setUsage(DynamicDrawUsage)
-    for (let i = 0; i < stations.length; i++) r.setColorAt(i, colors.stroke)
+    for (let i = 0; i < stations.length; i++) r.setColorAt(i, stroke)
     r.instanceColor!.needsUpdate = true
-    coloredIndex.current = -1
     drawn.current.scale = NaN
-  }, [stations, colors])
-
-  useLayoutEffect(() => {
-    const r = ring.current
-    if (!r || coloredIndex.current === focusedIndex) return
-    if (coloredIndex.current >= 0) r.setColorAt(coloredIndex.current, colors.stroke)
-    if (focusedIndex >= 0) r.setColorAt(focusedIndex, colors.focus)
-    r.instanceColor!.needsUpdate = true
-    coloredIndex.current = focusedIndex
-  }, [focusedIndex, colors])
+  }, [stations, stroke])
 
   useFrame((state) => {
     const f = fill.current
@@ -72,13 +63,14 @@ export function Stations({ stations }: StationsProps) {
     if (!f || !r) return
     const d = cameraDistance(state)
     const scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
-    const focusScale = focusScaleFactor(d, scale)
     const last = drawn.current
-    if (scale === last.scale && focusScale === last.focusScale && focusedIndex === last.focusedIndex) return
+    if (scale === last.scale && focusedIndex === last.focusedIndex) return
     last.scale = scale
-    last.focusScale = focusScale
     last.focusedIndex = focusedIndex
-    writeMarkerMatrices(f.instanceMatrix.array as Float32Array, positions, MARKER_Y, scale, focusedIndex, focusScale)
+    const m = f.instanceMatrix.array as Float32Array
+    writeMarkerMatrices(m, positions, MARKER_Y, scale, -1, 1)
+    // A zero matrix collapses the focused instance, so neither its fill nor its ring draws.
+    if (focusedIndex >= 0) m.fill(0, focusedIndex * 16, focusedIndex * 16 + 16)
     r.instanceMatrix.array.set(f.instanceMatrix.array)
     f.instanceMatrix.needsUpdate = true
     r.instanceMatrix.needsUpdate = true
@@ -103,7 +95,6 @@ export function Stations({ stations }: StationsProps) {
         {/* Default white material: the per-instance colors are the ring colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
-      {focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} />}
     </>
   )
 }

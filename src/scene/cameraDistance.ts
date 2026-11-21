@@ -37,16 +37,3 @@ export function markerRadiusPx(distance: number): number {
   const t = Math.log(MARKER_FAR.distance / distance) / Math.log(MARKER_FAR.distance / MARKER_NEAR.distance)
   return MARKER_FAR.px + (MARKER_NEAR.px - MARKER_FAR.px) * t
 }
-
-/** The focused marker grows by up to FOCUS_GROWTH, but the growth stops at FOCUS_MAX_PX on screen. */
-const FOCUS_GROWTH = 1.4
-const FOCUS_MAX_PX = 12
-
-/**
- * Scale multiplier for the focused station's marker, given the camera distance and the base
- * marker scale. Never below 1, so the focused marker is never smaller than its neighbours.
- */
-export function focusScaleFactor(distance: number, baseScale: number): number {
-  const capped = screenScale(distance, FOCUS_MAX_PX, 0) / baseScale
-  return Math.max(1, Math.min(FOCUS_GROWTH, capped))
-}

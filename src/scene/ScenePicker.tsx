@@ -7,7 +7,7 @@ import { nearestTrain, trainScreenPoints, type TrainPickInput, type TrainPickSou
 import type { Station } from '../lib/network'
 import { choosePick, nearestStation, trainHitPx, type ScenePick, type ScreenPoint, type ToScreen } from '../lib/pick'
 import { useTrainSelection } from '../lib/trainSelection'
-import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
+import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
 import { MARKER_MIN_METERS } from './markerShape'
 
 /** Pointer travel (px) above which a press is a pan, not a click. Fingertip taps drift more than a mouse. */
@@ -47,7 +47,7 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
     const v = new Vector3()
     const view = { width: 1, height: 1, left: 0, top: 0 }
     const click: ScreenPoint = { x: 0, y: 0 }
-    const marker = { scale: 0, focusScale: 1 }
+    const marker = { scale: 0 }
     /** One input object, refilled on each pick. */
     let input: TrainPickInput | null = null
     const toScreen: ToScreen = (x, y, z, out) => {
@@ -58,8 +58,9 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
       out.y = ((1 - v.y) / 2) * view.height
       return true
     }
-    // The markers as Stations.tsx draws them, so the whole drawn marker is a target when it outgrows STATION_HIT_PX.
-    const radiusM = (i: number): number => (i === focusedIndex.current ? marker.scale * marker.focusScale : marker.scale)
+    // The markers as Stations.tsx sizes them, so the whole drawn marker is a target when it outgrows STATION_HIT_PX.
+    // The focused one isn't drawn but keeps the same target, so it can still be tapped.
+    const radiusM = (): number => marker.scale
     /** Canvas size (r3f measures it on resize) and this moment's pick input; null trains without a live layer. */
     const begin = (): TrainPickInput | null => {
       const state = get()
@@ -69,7 +70,6 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
       view.top = state.size.top
       const d = cameraDistance(state)
       marker.scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
-      marker.focusScale = focusScaleFactor(d, marker.scale)
       const src = trainPick.current
       if (!src) return null
       input ??= { ...src, mix: 0, localS: 0 }
