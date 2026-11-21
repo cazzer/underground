@@ -65,7 +65,7 @@ describe('loadNetwork', () => {
 
   it('fetches the three files without the browser cache and builds the network', async () => {
     const fetch = stubFetch()
-    const { network, files } = await loadNetwork('/underground/', new AbortController().signal)
+    const { network, files } = await loadNetwork('/underground/', 0, new AbortController().signal)
     expect(files.shapes.shapes).toHaveLength(1)
     expect(network.stations.map((s) => s.id)).toEqual(['101'])
     expect(fetch.mock.calls.map(([url]) => url).sort()).toEqual([
@@ -78,14 +78,14 @@ describe('loadNetwork', () => {
 
   it('names the url and HTTP status on a failed response', async () => {
     stubFetch({ name: 'shapes', respond: () => new Response('nope', { status: 503 }) })
-    await expect(loadNetwork('/underground/', new AbortController().signal)).rejects.toThrow(
+    await expect(loadNetwork('/underground/', 0, new AbortController().signal)).rejects.toThrow(
       '/underground/data/shapes.json: HTTP 503',
     )
   })
 
   it('names the url on invalid JSON', async () => {
     stubFetch({ name: 'routes', respond: () => new Response('{not json', { status: 200 }) })
-    await expect(loadNetwork('/underground/', new AbortController().signal)).rejects.toThrow(
+    await expect(loadNetwork('/underground/', 0, new AbortController().signal)).rejects.toThrow(
       /^\/underground\/data\/routes\.json: invalid JSON/,
     )
   })
@@ -94,6 +94,6 @@ describe('loadNetwork', () => {
     stubFetch()
     const controller = new AbortController()
     controller.abort()
-    await expect(loadNetwork('/underground/', controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(loadNetwork('/underground/', 0, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
   })
 })

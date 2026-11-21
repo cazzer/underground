@@ -3,6 +3,7 @@ import { decodeShapePoints } from '../data/codec'
 import type { Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
 import { boundsCenter } from './framing'
 import { toGround, type Ground } from './projection'
+import { offsetPolyline } from './trackOffset'
 
 export interface Station {
   id: StationId
@@ -27,6 +28,7 @@ export interface ShapePath {
   routeId: RouteId
   direction: Direction
   primary: boolean
+  /** Offset `trackOffsetM` right of travel, so the two directions draw as parallel tracks. */
   points: Ground[]
   /** Cumulative distance (meters) at each point; last entry is the total length. */
   cumulative: number[]
@@ -71,7 +73,13 @@ function extend(b: Bounds, p: Ground): void {
   if (p.z > b.maxZ) b.maxZ = p.z
 }
 
-export function buildNetwork(stationsFile: StationsFile, routesFile: RoutesFile, shapesFile: ShapesFile): Network {
+/** `trackOffsetM` moves every shape that far right of its own travel direction (see trackOffset.ts). */
+export function buildNetwork(
+  stationsFile: StationsFile,
+  routesFile: RoutesFile,
+  shapesFile: ShapesFile,
+  trackOffsetM: number,
+): Network {
   const { feedVersion } = stationsFile
   for (const f of [routesFile, shapesFile]) {
     if (f.feedVersion !== feedVersion) {
@@ -94,8 +102,9 @@ export function buildNetwork(stationsFile: StationsFile, routesFile: RoutesFile,
 
   const shapes = shapesFile.shapes.map((s): ShapePath => {
     if (!routeById.has(s.routeId)) throw new Error(`Shape ${s.id} references unknown route "${s.routeId}"`)
-    const points = decodeShapePoints(s).map((p) => toGround(p))
-    if (points.length < 2) throw new Error(`Shape ${s.id} has ${points.length} point(s); needs at least 2`)
+    const centerline = decodeShapePoints(s).map((p) => toGround(p))
+    if (centerline.length < 2) throw new Error(`Shape ${s.id} has ${centerline.length} point(s); needs at least 2`)
+    const points = offsetPolyline(centerline, trackOffsetM)
     for (const p of points) extend(bounds, p)
     const cumulative = cumulativeLengths(points)
     return {

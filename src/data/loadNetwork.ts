@@ -55,8 +55,11 @@ export interface LoadedNetwork {
   files: NetworkFiles
 }
 
-/** Fetches stations, routes, and shapes from `<baseUrl>data/` in parallel and builds the network. */
-export async function loadNetwork(baseUrl: string, signal: AbortSignal): Promise<LoadedNetwork> {
+/**
+ * Fetches stations, routes, and shapes from `<baseUrl>data/` in parallel and builds the network,
+ * drawing each shape `trackOffsetM` right of its travel direction.
+ */
+export async function loadNetwork(baseUrl: string, trackOffsetM: number, signal: AbortSignal): Promise<LoadedNetwork> {
   async function file<T extends DataFile>(key: string): Promise<T> {
     const url = `${baseUrl}data/${key}.json`
     return expectDataFile<T>(await fetchJson(url, signal), key, url)
@@ -66,5 +69,5 @@ export async function loadNetwork(baseUrl: string, signal: AbortSignal): Promise
     file<RoutesFile>('routes'),
     file<ShapesFile>('shapes'),
   ])
-  return { network: buildNetwork(stations, routes, shapes), files: { stations, shapes } }
+  return { network: buildNetwork(stations, routes, shapes, trackOffsetM), files: { stations, shapes } }
 }

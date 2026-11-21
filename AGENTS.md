@@ -78,6 +78,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
+    `trackOffset.ts` `offsetPolyline` (miter joins, capped at 2× on sharp bends; type-only `.ts`
+    imports because a scripts/ test loads it) plus the TEMPORARY `?tracks=` resolver;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts`, `pickStation.ts`: pure render helpers; `labels.ts`
@@ -180,6 +182,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - All route shapes draw as one merged `LineSegments2` (one draw call, per-vertex colors in linear
   space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then
   route_sort_order. Don't add per-route `<Line>`s.
+- Each shape draws `trackOffsetM` to the right of its own travel direction (`offsetPolyline` in
+  `buildNetwork`), so the two directions are parallel tracks; zoomed out the pair reads as one line.
+  Live dots stay on the centerline until pah.3 moves them onto their track.
+  TEMPORARY: `?tracks=a|b|off` (4.7 m, measured at Bedford Av; 3 m; off = one line; default a); the
+  removal list is in `src/data/trackLook.ts`
 - Station markers are instanced: matrices are rewritten only when the scale or focus changes.
 - Live train dots are instanced too, with per-slot colors (`routeLineColor` like the lines). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
