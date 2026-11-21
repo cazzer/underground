@@ -1,0 +1,10 @@
+{
+  "name": "underground-rt",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  // The Cache API is a no-op on workers.dev, so the edge cache layer only takes effect
+  // on a custom domain/route (tracked in 8x4.5). Until then the per-isolate memo and the
+  // upstream cf.cacheTtl are what limit upstream fetches.
+  "workers_dev": true,
+  "observability": { "enabled": true }
+}
