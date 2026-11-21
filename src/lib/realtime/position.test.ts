@@ -182,11 +182,11 @@ describe('STOPPED_AT with no prediction for the next stop', () => {
   const plan = (stopId: string, arrivals: Arrival[]) =>
     planHop({ geometry: long, status: 'STOPPED_AT', stopId, arrivals, segments: {}, now: NOW })
 
-  it('uses the arrivals when the next stop is skipped', () => {
-    // At B (index 1) but the train's first prediction is E (index 4): it is on the hop D -> E.
+  it('runs from the stop the train is at to the first predicted stop', () => {
+    // At B (index 1) but the train's first prediction is E (index 4): it is on the hop B -> E.
     const p = plan('BN', [['EN', NOW + 40], ['FN', NOW + 100]])
     if ('ok' in p) throw new Error('unexpected failure')
-    expect([p.from, p.to]).toEqual([3, 4])
+    expect([p.from, p.to]).toEqual([1, 4])
   })
   it('still holds at the terminal and when there are no later arrivals', () => {
     for (const [stop, arrivals] of [['FN', [['EN', NOW + 40]]], ['BN', []], ['BN', [['AN', NOW + 40]]]] as [string, Arrival[]][]) {

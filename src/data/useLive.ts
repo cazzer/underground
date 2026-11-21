@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { clockNow } from '../lib/live/clock'
 import { deriveLiveStatus, type LiveStatus } from '../lib/live/liveStatus'
 import type { JoinStage } from '../lib/realtime/joinTrip'
@@ -56,6 +56,9 @@ export function useLive(files: NetworkFiles | null): Live {
     if (!configured) console.info('Live trains off: VITE_RT_URL is not set (copy .env.example to .env.local)')
   }, [configured])
 
+  // Where each trip was placed last poll, so a fallback join that is a tie keeps its shape instead of flapping.
+  const previousShapes = useRef<ReadonlyMap<string, ShapeId>>(new Map())
+
   const { snapshot, offsetS } = feed
   const data = staticLoad.status === 'ready' ? staticLoad.data : null
   const prepared = useMemo(() => {
@@ -63,7 +66,8 @@ export function useLive(files: NetworkFiles | null): Live {
     const started = performance.now()
     try {
       const now = clockNow(offsetS, started)
-      const result = prepareTrips(snapshot, data, now)
+      const result = prepareTrips(snapshot, data, now, previousShapes.current)
+      previousShapes.current = new Map(result.trips.map((t) => [t.key, t.shapeId]))
       return { ok: true as const, ...result, ms: performance.now() - started, now }
     } catch (err) {
       console.error('Failed to place live trips', err)

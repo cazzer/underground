@@ -85,7 +85,8 @@ function chooseHop(input: PositionInput): Hop | PlanFailure {
   const atOrigin = (tN: number): Hop => ({ from: 0, to: 0, arriveAt: null, departsInS: tN - now, fraction: 0 })
 
   // The next stop after `after` with a prediction, from the feed-ordered arrivals; null when there is none.
-  const fromArrivals = (after: number): Hop | null => {
+  // `anchored`: the train is known to be at `after`, so a hop that skips stops starts there.
+  const fromArrivals = (after: number, anchored = false): Hop | null => {
     const onPattern = arrivals.filter((a) => stops.indexOf(a[0]) > after)
     if (onPattern.length === 0) return null
     const upcoming = onPattern.find((a) => a[1] >= now)
@@ -94,7 +95,8 @@ function chooseHop(input: PositionInput): Hop | PlanFailure {
       return { from: Math.max(j - 1, 0), to: j, arriveAt: null, departsInS: null, fraction: 1 }
     }
     const j = stops.indexOf(upcoming[0])
-    return j === 0 ? atOrigin(upcoming[1]) : { from: j - 1, to: j, arriveAt: upcoming[1], departsInS: null }
+    if (j === 0) return atOrigin(upcoming[1])
+    return { from: anchored && j > after + 1 ? after : j - 1, to: j, arriveAt: upcoming[1], departsInS: null }
   }
 
   if (status === 'STOPPED_AT') {
@@ -104,8 +106,8 @@ function chooseHop(input: PositionInput): Hop | PlanFailure {
     const tN = next === undefined ? undefined : arrivalAt(next)
     if (tN !== undefined) return { from: k, to: k + 1, arriveAt: tN, departsInS: null }
     // Hold only at the terminal. With a next stop but no prediction for it (an express on a local pattern,
-    // or a VehiclePosition that lags the train), the arrivals say where the train has got to.
-    return (next !== undefined && fromArrivals(k)) || { from: k, to: k, arriveAt: null, departsInS: null, fraction: 0 }
+    // or a VehiclePosition that lags the train), the arrivals say where the train has got to, and it runs from here.
+    return (next !== undefined && fromArrivals(k, true)) || { from: k, to: k, arriveAt: null, departsInS: null, fraction: 0 }
   }
 
   if (status === 'IN_TRANSIT_TO' || status === 'INCOMING_AT') {

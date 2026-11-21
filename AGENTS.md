@@ -76,12 +76,16 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `clock.ts` the live clock: `now = offsetS + performance.now()/1000`, where `offsetS` is the maximum over
     polls of `generatedAt - receivedPerfMs/1000`. Monotone (a poll served from the Worker's 15 s memo
     can't move it back), never reads the device clock; `SNAPSHOT_MAX_AGE_S` (120) drops old data
-  - `backoff.ts` poll delay (20 s; jittered exponential backoff on failure; Retry-After; "warming" 503s)
+  - `backoff.ts` poll delay (20 s; jittered exponential backoff on failure; Retry-After capped at 5 min; "warming" 503s);
+    `pollOutcome.ts` the pure per-poll decision (state, delay, log; a too-old success is a failure; a schema
+    mismatch sticks until a success) that `useRealtimeFeed` runs
   - `liveStatus.ts` `deriveLiveStatus` for the HUD (off/connecting/live/stale/error; one failed poll with
     a snapshot is not shown, two show a delay while trains stay drawn; technical text never appears)
   - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
     poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, glide to
-    arrive on time, or cross-fade; reduced motion cross-fades); `trainRoute.ts` dot color route
+    arrive on time, or cross-fade; reduced motion cross-fades). On a shape change the dot's ground point is
+    projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
+    (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate

@@ -50,7 +50,13 @@ export type DropReason = (typeof DROP_REASONS)[number]
  * Once per poll: drops ghosts, joins each remaining trip to a shape, and drops what can't be placed.
  * Every drop is counted by reason. The caller then runs hopDistance per frame on each trip's plan.
  */
-export function prepareTrips(snapshot: RealtimeSnapshot, data: StaticRealtimeData, now: number): PreparedTrips {
+export function prepareTrips(
+  snapshot: RealtimeSnapshot,
+  data: StaticRealtimeData,
+  now: number,
+  /** Shape each trip key was placed on last poll; breaks ties in the fallback join so trips don't flap. */
+  previousShapes?: ReadonlyMap<string, ShapeId>,
+): PreparedTrips {
   const dropped = Object.fromEntries(DROP_REASONS.map((r) => [r, 0])) as Record<DropReason, number>
   const trips: LiveTrip[] = []
 
@@ -61,7 +67,7 @@ export function prepareTrips(snapshot: RealtimeSnapshot, data: StaticRealtimeDat
         dropped[ghost]++
         continue
       }
-      const join = joinTrip(trip, data.lookup, now)
+      const join = joinTrip(trip, data.lookup, now, previousShapes?.get(`${feed}:${trip.tripId}`))
       if (!join.matched) {
         dropped[join.reason]++
         continue

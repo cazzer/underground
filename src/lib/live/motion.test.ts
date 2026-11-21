@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decideCorrection, EASE_MAX_M, GLIDE_MAX_MPS, HOLD_BACK_M, type CorrectionInput } from './motion'
 
-const base: CorrectionInput = { errM: 0, remainingM: 1000, timeToArriveS: 60, reshaped: false, reducedMotion: false }
+const base: CorrectionInput = { errM: 0, remainingM: 1000, timeToArriveS: 60, fixedPlan: false, reducedMotion: false }
 const decide = (over: Partial<CorrectionInput>) => decideCorrection({ ...base, ...over })
 
 describe('decideCorrection', () => {
@@ -11,9 +11,18 @@ describe('decideCorrection', () => {
     expect(decide({ errM: -HOLD_BACK_M })).toEqual({ kind: 'none' })
   })
 
-  it('cross-fades a backward error past the hold limit, and any shape change', () => {
+  it('cross-fades a backward error past the hold limit', () => {
     expect(decide({ errM: -HOLD_BACK_M - 1 })).toEqual({ kind: 'crossfade' })
-    expect(decide({ errM: 0, reshaped: true })).toEqual({ kind: 'crossfade' })
+  })
+
+  it('cross-fades a backward error against a plan that is not moving, since waiting would never end', () => {
+    expect(decide({ errM: -EASE_MAX_M, fixedPlan: true })).toEqual({ kind: 'none' })
+    expect(decide({ errM: -EASE_MAX_M - 1, fixedPlan: true })).toEqual({ kind: 'crossfade' })
+    expect(decide({ errM: -900, fixedPlan: false })).toEqual({ kind: 'none' })
+  })
+
+  it('caps a glide at the longest allowed', () => {
+    expect(decide({ errM: 400, remainingM: 1000, timeToArriveS: 600 })).toEqual({ kind: 'glide', durationS: 90 })
   })
 
   it('glides a larger forward error so the train arrives on time', () => {

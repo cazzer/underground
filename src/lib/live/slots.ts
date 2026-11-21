@@ -1,5 +1,7 @@
+import { pointAtDistance, projectForward } from '../realtime/polyline'
 import { hopDistance } from '../realtime/position'
 import type { LiveTrip } from '../realtime/prepareTrips'
+import type { ShapeGeometry } from '../realtime/shapeGeometry'
 import { SMOOTHING, smoothDistance, type SmoothingParams } from '../realtime/smoothing'
 import { POLL_MS } from './backoff'
 import { decideCorrection } from './motion'
@@ -10,6 +12,9 @@ export const TRAIN_CAPACITY = 1024
 export const FADE_S = 0.4
 /** A trip missing from a poll is kept, moving on its old plan, this long before it fades. */
 export const GRACE_S = POLL_MS / 1000
+
+/** A displayed point this close to a trip's new shape carries over to it; farther away, the dot cross-fades. */
+export const CARRY_M = 25
 
 /** Reconcile decides every correction, so the per-frame ease never snaps or holds on its own. */
 const FRAME_SMOOTHING: SmoothingParams = { ...SMOOTHING, snapM: Infinity, holdBackM: Infinity }
@@ -40,6 +45,8 @@ export interface SlotTable {
   /** Cross-fade phase (0 none, SHRINK, GROW) and when it began. */
   phase: Uint8Array
   phaseAt: Float64Array
+  /** The shape `displayed` is measured on. It is the trip's own except while a cross-fade hasn't yet moved the dot to a new shape. */
+  drawGeometry: (ShapeGeometry | null)[]
   /** One past the highest slot ever used; per-frame loops stop here. */
   high: number
 }
@@ -57,6 +64,7 @@ export function createSlotTable(capacity: number): SlotTable {
     glideT: new Float64Array(capacity).fill(NaN),
     phase: new Uint8Array(capacity),
     phaseAt: new Float64Array(capacity),
+    drawGeometry: new Array<ShapeGeometry | null>(capacity).fill(null),
     high: 0,
   }
 }
@@ -76,18 +84,41 @@ export interface ReconcileOptions {
   graceS?: number
 }
 
-/** Chooses how a persisting trip absorbs its new plan (see motion.ts) and records it on the slot. */
-function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, reshaped: boolean, nowS: number, o: ReconcileOptions): void {
-  const shown = t.displayed[slot]!
-  t.glideT[slot] = NaN
-  if (Number.isNaN(shown) || t.phase[slot] !== 0) return
+/**
+ * Chooses how a persisting trip absorbs its new plan (see motion.ts) and records it on the slot. When the
+ * trip moved to another shape, the dot's ground point is projected onto it: close enough carries over
+ * unchanged, otherwise the dot shrinks where it is (on the old shape) and grows on the new one.
+ */
+function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o: ReconcileOptions): void {
+  const fadeS = o.fadeS ?? FADE_S
   const { plan, geometry } = trip
+  t.glideT[slot] = NaN
+  let shown = t.displayed[slot]!
+  if (Number.isNaN(shown)) {
+    t.drawGeometry[slot] = geometry
+    return
+  }
+  if (t.drawGeometry[slot] !== geometry && t.drawGeometry[slot]!.shapeId !== geometry.shapeId) {
+    const at = pointAtDistance(t.drawGeometry[slot]!.line, shown).point
+    const hit = projectForward(geometry.line, at, { segment: 0, t: 0 })
+    if (hit.offsetM > CARRY_M) {
+      if (t.phase[slot] === SHRINK) return // already shrinking on the old shape; the move picks up the latest one
+      // Start (or restart mid-grow) the shrink at the scale the dot has now.
+      t.phaseAt[slot] = t.phase[slot] === GROW ? nowS - (fadeS - Math.min(nowS - t.phaseAt[slot]!, fadeS)) : nowS
+      t.phase[slot] = SHRINK
+      return
+    }
+    shown = hit.distance
+    t.displayed[slot] = shown
+  }
+  t.drawGeometry[slot] = geometry
+  if (t.phase[slot] !== 0) return
   const target = hopDistance(plan, geometry, o.dataNow)
   const c = decideCorrection({
     errM: target - shown,
     remainingM: geometry.stopDistances[plan.to]! - shown,
     timeToArriveS: plan.fixedFraction === null && plan.arriveAt !== null ? plan.arriveAt - o.dataNow : null,
-    reshaped,
+    fixedPlan: plan.fixedFraction !== null,
     reducedMotion: o.reducedMotion,
   })
   if (c.kind === 'crossfade') {
@@ -122,10 +153,9 @@ export function reconcileSlots(
     present.add(trip.key)
     const slot = t.byKey.get(trip.key)
     if (slot !== undefined) {
-      const reshaped = t.trips[slot]!.shapeId !== trip.shapeId
-      if (reshaped) needsColor.push(slot)
+      if (t.trips[slot]!.shapeId !== trip.shapeId) needsColor.push(slot)
       t.trips[slot] = trip
-      absorbPlan(t, slot, trip, reshaped, nowS, o)
+      absorbPlan(t, slot, trip, nowS, o)
       if (isLeaving(t, slot)) {
         // Continue from the scale it has now, so a returning trip doesn't pop.
         t.bornAt[slot] = nowS - (1 - (nowS - t.leavingSince[slot]!) / fadeS) * fadeS
@@ -140,6 +170,7 @@ export function reconcileSlots(
     }
     t.keys[free] = trip.key
     t.trips[free] = trip
+    t.drawGeometry[free] = trip.geometry
     t.byKey.set(trip.key, free)
     t.bornAt[free] = nowS
     t.leavingSince[free] = NaN
@@ -162,6 +193,7 @@ export function freeSlot(t: SlotTable, i: number): void {
   if (key !== null && key !== undefined) t.byKey.delete(key)
   t.keys[i] = null
   t.trips[i] = null
+  t.drawGeometry[i] = null
   t.leavingSince[i] = NaN
   t.displayed[i] = NaN
   t.glideT[i] = NaN
@@ -169,16 +201,17 @@ export function freeSlot(t: SlotTable, i: number): void {
 }
 
 /**
- * The slot's displayed distance for this frame, stored back on the table. `target` is the plan's
+ * The slot's displayed distance for this frame (along `drawGeometry`), stored back on the table. `target` is the plan's
  * distance at `dataNow` (live clock); `localS` is the monotone clock of the fades. No allocation.
  */
 export function stepSlot(t: SlotTable, i: number, target: number, dataNow: number, localS: number, dtS: number, fadeS: number = FADE_S): number {
   if (t.phase[i] === SHRINK && localS - t.phaseAt[i]! >= fadeS) {
-    // Fully shrunk: move unseen, then grow at the new position.
+    // Fully shrunk: move unseen (onto the trip's own shape), then grow at the new position.
     t.phase[i] = GROW
     t.phaseAt[i] = localS
     t.displayed[i] = NaN
     t.glideT[i] = NaN
+    t.drawGeometry[i] = t.trips[i]!.geometry
   } else if (t.phase[i] === GROW && localS - t.phaseAt[i]! >= fadeS) {
     t.phase[i] = 0
   }

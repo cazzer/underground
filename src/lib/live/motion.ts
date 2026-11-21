@@ -2,7 +2,7 @@ import { SMOOTHING } from '../realtime/smoothing'
 
 /**
  * How a dot absorbs a change of plan (a new poll moved where its train should be). Nothing teleports:
- * a small error eases (and a small backward one waits), a larger forward one glides so the train reaches
+ * a small error eases (and a small backward one waits for a moving plan), a larger forward one glides so the train reaches
  * its next stop on time, and anything else cross-fades (shrink here, grow there).
  */
 
@@ -28,8 +28,8 @@ export interface CorrectionInput {
   remainingM: number
   /** Seconds until the planned arrival; null when the plan is fixed or already overdue. */
   timeToArriveS: number | null
-  /** The trip moved to another shape. */
-  reshaped: boolean
+  /** The plan doesn't move (dwelling, or overdue at the next stop), so a delay revision can't wait for it to catch up. */
+  fixedPlan: boolean
   /** The user asked for less motion: every correction cross-fades. */
   reducedMotion: boolean
 }
@@ -38,11 +38,13 @@ const NONE: Correction = { kind: 'none' }
 const CROSSFADE: Correction = { kind: 'crossfade' }
 
 export function decideCorrection(i: CorrectionInput): Correction {
-  if (i.reshaped || i.errM < -HOLD_BACK_M) return CROSSFADE
+  if (i.errM < -HOLD_BACK_M || (i.fixedPlan && i.errM < -EASE_MAX_M)) return CROSSFADE
   if (i.errM <= EASE_MAX_M) return NONE
   if (i.reducedMotion) return CROSSFADE
   if (i.timeToArriveS !== null && i.timeToArriveS >= MIN_GLIDE_S) {
-    return i.remainingM / i.timeToArriveS <= GLIDE_MAX_MPS ? { kind: 'glide', durationS: i.timeToArriveS } : CROSSFADE
+    return i.remainingM / i.timeToArriveS <= GLIDE_MAX_MPS
+      ? { kind: 'glide', durationS: Math.min(i.timeToArriveS, GLIDE_MAX_S) }
+      : CROSSFADE
   }
   const durationS = i.errM / GLIDE_CATCHUP_MPS
   return durationS <= GLIDE_MAX_S ? { kind: 'glide', durationS } : CROSSFADE

@@ -35,6 +35,7 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
   const halo = useRef<InstancedMesh>(null)
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
   const point = useMemo(() => ({ x: 0, z: 0 }), [])
+  const range = useMemo(() => ({ start: 0, count: 0 }), [])
   const geometry = useMemo(
     () => ({
       dot: new CircleGeometry(1, SEGMENTS).rotateX(-Math.PI / 2),
@@ -113,7 +114,7 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
       const trip = table.trips[i]
       if (!trip) continue
       const shown = stepSlot(table, i, hopDistance(trip.plan, trip.geometry, now), now, localS, dt)
-      pointAtDistanceInto(trip.geometry.line, shown, point)
+      pointAtDistanceInto(table.drawGeometry[i]!.line, shown, point)
       const k = slotScale(table, i, localS, FADE_S)
       if (k === 0 && isLeaving(table, i)) {
         writeInstanceMatrix(out, i, 0, 0, 0, 0)
@@ -124,12 +125,12 @@ export function LiveTrains({ trips, offsetS, patterns, network }: LiveTrainsProp
     }
     h.instanceMatrix.array.set(out)
     d.count = h.count = table.high
-    // Upload only the slots in use.
-    for (const m of [d, h]) {
-      m.instanceMatrix.clearUpdateRanges()
-      m.instanceMatrix.addUpdateRange(0, table.high * 16)
-      m.instanceMatrix.needsUpdate = true
-    }
+    // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
+    range.count = table.high * 16
+    d.instanceMatrix.updateRanges.push(range)
+    h.instanceMatrix.updateRanges.push(range)
+    d.instanceMatrix.needsUpdate = true
+    h.instanceMatrix.needsUpdate = true
   })
 
   return (
