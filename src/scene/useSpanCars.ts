@@ -1,17 +1,17 @@
-import { type RefObject, useMemo, useRef } from 'react'
-import { Color, DynamicDrawUsage, type InstancedMesh } from 'three'
+import { type RefObject, useEffect, useMemo, useRef } from 'react'
+import { type BufferGeometry, Color, DynamicDrawUsage, type InstancedMesh, type MeshBasicMaterial } from 'three'
 import { type Consist, MAX_CARS } from '../lib/live/consist'
 import { consistSpanInto, type ConsistSpan } from '../lib/live/consistLayout'
-import { slotScale, type SlotTable } from '../lib/live/slots'
+import { slotScale, TRAIN_CAPACITY, type SlotTable } from '../lib/live/slots'
 import { trainSpanWeight, veilTint, type StationSpans } from '../lib/platformSpan'
 import { theme } from '../theme'
 import { interiorLook } from './interiorLook'
 import type { TrainCarsLayer } from './useTrainCars'
+import { VEIL_TINT_ATTRIBUTE, veilTintMaterial, withTintAttribute } from './veilTint'
 
 /** Trains drawn above the veil at once: a station's platforms hold a few, with room for ones pulling in and out. */
 export const SPAN_TRAINS = 12
 export const SPAN_CARS = SPAN_TRAINS * MAX_CARS
-const STRIDE = MAX_CARS * 16
 /**
  * Look A's screen-wide veil dims every street train, so a lifted car mixes toward it as it leaves the span. Look B's
  * footprint veil covers only the station's outline (its edge is near the platform ends, the span ramps out past
@@ -20,17 +20,25 @@ const STRIDE = MAX_CARS * 16
 const VEIL_TINT = interiorLook.veil === 'screen' ? interiorLook.veilOpacity : 0
 export const SPAN_LIFT = !interiorLook.under
 
+const WHITE = new Color(1, 1, 1)
+
+/** For the `?debug` overlay: the most trains ever left unlifted in one frame because the meshes were full. */
+export const spanCarStats = { peakOverflow: 0 }
+
 export interface SpanCarsLayer {
   bodies: RefObject<InstancedMesh | null>
   halos: RefObject<InstancedMesh | null>
   rims: RefObject<InstancedMesh | null>
+  /** The copies' geometry and materials: bodies and rims carry a per-instance veil tint (veilTint.ts). */
+  geometry: { body: BufferGeometry; halo: BufferGeometry; rim: BufferGeometry }
+  material: { body: MeshBasicMaterial; rim: MeshBasicMaterial }
   /** Before the first frame: dynamic usage, instance colors allocated, nothing drawn. */
   prepare(): void
   /**
-   * After this frame's cars are written: copies the cars of every train near `spans` (the focused station's
-   * platform spans, null for none) into the above-veil meshes, each car tinted toward the veil by how far it is
-   * past the platform, and the selected train's rim with them. `reveal` is the interior's opacity; at 0 nothing
-   * draws. No allocation; never throws.
+   * After this frame's cars are written: copies every car with a span weight above 0 (`spans` is the focused
+   * station's platform spans, null for none) into the above-veil meshes, with the selected train's rim, each mixed
+   * toward the veil by how far it is past the platform. `reveal` is the interior's opacity; at 0 nothing draws.
+   * With more than SPAN_TRAINS candidates, the ones most on the platforms win. No allocation; never throws.
    */
   write(
     table: SlotTable,
@@ -44,36 +52,56 @@ export interface SpanCarsLayer {
   ): void
 }
 
-function copyCars(from: ArrayLike<number>, fromSlot: number, to: Float32Array, toSlot: number): void {
-  const s = fromSlot * STRIDE
-  const d = toSlot * STRIDE
-  for (let j = 0; j < STRIDE; j++) to[d + j] = from[s + j]!
+function copyMatrix(from: ArrayLike<number>, fromIndex: number, to: Float32Array, toIndex: number): void {
+  const s = fromIndex * 16
+  const d = toIndex * 16
+  for (let j = 0; j < 16; j++) to[d + j] = from[s + j]!
 }
 
 /**
  * The above-veil copies of the live trains on a revealed station's platforms: the same car matrices (copied from
  * `cars`, so widening, the selected lift and the rim stay identical) in small meshes drawn after the interior.
+ * Only cars with a weight above 0 are copied, so past the ramp the street cars (and the strokes over them) show as
+ * they are; a copy at a tiny weight renders like its veiled original, so the hand-off doesn't show.
  */
 export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
   const bodies = useRef<InstancedMesh>(null)
   const halos = useRef<InstancedMesh>(null)
   const rims = useRef<InstancedMesh>(null)
-
-  const layer = useMemo((): Omit<SpanCarsLayer, 'bodies' | 'halos' | 'rims'> => {
-    const span: ConsistSpan = { cars: 0, pitch: 0, step: 0, rear: 0 }
-    const weights = new Float64Array(MAX_CARS)
-    const tint = new Color()
-    const background = new Color(theme.background).convertLinearToSRGB()
-    const rimColor = new Color(theme.trainSelectedRim)
-    const white = new Color(1, 1, 1)
-    /** Writes `color` mixed toward the background by `a` (in sRGB, as the veil blends) as instance `index`'s color. */
-    const writeTint = (out: Float32Array, index: number, color: Color, a: number): void => {
-      tint.copy(color)
-      if (a > 0) tint.convertLinearToSRGB().lerp(background, a).convertSRGBToLinear()
-      out[index * 3] = tint.r
-      out[index * 3 + 1] = tint.g
-      out[index * 3 + 2] = tint.b
+  const parts = useMemo(() => {
+    const body = withTintAttribute(cars.geometry.body, SPAN_CARS)
+    const rim = withTintAttribute(cars.geometry.halo, MAX_CARS)
+    return {
+      geometry: { body: body.geometry, halo: cars.geometry.halo, rim: rim.geometry },
+      tint: { body: body.tint, rim: rim.tint },
+      material: {
+        // White: vertex shading times the per-instance route color, as the street cars.
+        body: veilTintMaterial({ vertexColors: true, transparent: true, depthTest: true, depthWrite: true }),
+        rim: veilTintMaterial({ color: theme.trainSelectedRim, transparent: true, depthTest: false, depthWrite: false }),
+      },
     }
+  }, [cars])
+
+  useEffect(
+    () => () => {
+      parts.geometry.body.dispose()
+      parts.geometry.rim.dispose()
+      parts.material.body.dispose()
+      parts.material.rim.dispose()
+    },
+    [parts],
+  )
+
+  const layer = useMemo((): Pick<SpanCarsLayer, 'prepare' | 'write'> => {
+    const span: ConsistSpan = { cars: 0, pitch: 0, step: 0, rear: 0 }
+    /** This frame's candidate slots and each one's highest car weight. */
+    const candidates = new Int32Array(TRAIN_CAPACITY)
+    const peaks = new Float64Array(TRAIN_CAPACITY)
+    const layOut = (table: SlotTable, i: number, mix: number, localS: number, consistOf: (slot: number) => Consist): void => {
+      const g = table.drawGeometry[i]!
+      consistSpanInto(span, g.line.length, table.displayed[i]!, consistOf(i), mix * slotScale(table, i, localS))
+    }
+    const carWeight = (c: number, s: { d0: number; d1: number }): number => trainSpanWeight(span.rear + (c + 0.5) * span.step, s)
     return {
       prepare() {
         for (const m of [bodies.current, halos.current, rims.current]) {
@@ -82,8 +110,11 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
           m.count = 0
         }
         // Instance colors must exist before the first frame, or the shader compiles without them.
-        bodies.current?.setColorAt(0, white)
-        rims.current?.setColorAt(0, white)
+        const b = bodies.current
+        if (b) {
+          b.setColorAt(0, WHITE)
+          b.instanceColor!.setUsage(DynamicDrawUsage)
+        }
       },
       write(table, spans, reveal, mix, localS, selected, colors, consistOf) {
         const b = bodies.current
@@ -92,52 +123,74 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
         const srcB = cars.bodies.current
         const srcH = cars.halos.current
         const srcR = cars.rims.current
-        if (!b || !h || !r || !srcB || !srcH || !srcR || !b.instanceColor || !r.instanceColor) return
+        if (!b || !h || !r || !srcB || !srcH || !srcR || !b.instanceColor) return
         let n = 0
-        let rimOn = false
+        let rimN = 0
         if (SPAN_LIFT && spans && reveal > 0) {
-          const outB = b.instanceMatrix.array as Float32Array
-          const outH = h.instanceMatrix.array as Float32Array
-          const bodyColors = b.instanceColor.array as Float32Array
-          for (let i = 0; i < table.high && n < SPAN_TRAINS; i++) {
+          let found = 0
+          for (let i = 0; i < table.high; i++) {
             const g = table.drawGeometry[i]
-            const color = colors[i]
-            const shown = table.displayed[i]!
-            if (!table.trips[i] || !g || !color || Number.isNaN(shown)) continue
+            if (!table.trips[i] || !g || !colors[i] || Number.isNaN(table.displayed[i]!)) continue
             const s = spans.get(g.shapeId)
             if (!s) continue
-            consistSpanInto(span, g.line.length, shown, consistOf(i), mix * slotScale(table, i, localS))
-            let any = false
-            for (let c = 0; c < MAX_CARS; c++) {
-              weights[c] = c < span.cars ? trainSpanWeight(span.rear + (c + 0.5) * span.step, s) : 0
-              if (weights[c]! > 0) any = true
+            layOut(table, i, mix, localS, consistOf)
+            let peak = 0
+            for (let c = 0; c < span.cars; c++) peak = Math.max(peak, carWeight(c, s))
+            if (peak <= 0) continue
+            // Insertion by peak weight, highest first (a handful of candidates at most).
+            let at = found++
+            while (at > 0 && peaks[at - 1]! < peak) {
+              candidates[at] = candidates[at - 1]!
+              peaks[at] = peaks[at - 1]!
+              at--
             }
-            if (!any) continue
-            copyCars(srcB.instanceMatrix.array, i, outB, n)
-            copyCars(srcH.instanceMatrix.array, i, outH, n)
-            for (let c = 0; c < MAX_CARS; c++) writeTint(bodyColors, n * MAX_CARS + c, color, veilTint(reveal, weights[c]!, VEIL_TINT))
-            if (i === selected) {
-              copyCars(srcR.instanceMatrix.array, 0, r.instanceMatrix.array as Float32Array, 0)
-              const rimColors = r.instanceColor.array as Float32Array
-              for (let c = 0; c < MAX_CARS; c++) writeTint(rimColors, c, rimColor, veilTint(reveal, weights[c]!, VEIL_TINT))
-              rimOn = true
+            candidates[at] = i
+            peaks[at] = peak
+          }
+          if (found > SPAN_TRAINS && found - SPAN_TRAINS > spanCarStats.peakOverflow) {
+            spanCarStats.peakOverflow = found - SPAN_TRAINS
+            console.warn(`Platform trains: ${found - SPAN_TRAINS} over the ${SPAN_TRAINS}-train capacity stay under the veil`)
+          }
+          const outB = b.instanceMatrix.array as Float32Array
+          const outH = h.instanceMatrix.array as Float32Array
+          const outR = r.instanceMatrix.array as Float32Array
+          const bodyColors = b.instanceColor.array as Float32Array
+          for (let t = 0; t < Math.min(found, SPAN_TRAINS); t++) {
+            const i = candidates[t]!
+            const s = spans.get(table.drawGeometry[i]!.shapeId)!
+            const color = colors[i]!
+            layOut(table, i, mix, localS, consistOf)
+            for (let c = 0; c < span.cars; c++) {
+              const w = carWeight(c, s)
+              if (w <= 0) continue
+              const tint = veilTint(reveal, w, VEIL_TINT)
+              copyMatrix(srcB.instanceMatrix.array, i * MAX_CARS + c, outB, n)
+              copyMatrix(srcH.instanceMatrix.array, i * MAX_CARS + c, outH, n)
+              bodyColors[n * 3] = color.r
+              bodyColors[n * 3 + 1] = color.g
+              bodyColors[n * 3 + 2] = color.b
+              parts.tint.body[n] = tint
+              n++
+              if (i !== selected) continue
+              copyMatrix(srcR.instanceMatrix.array, c, outR, rimN)
+              parts.tint.rim[rimN++] = tint
             }
-            n++
           }
         }
-        b.count = h.count = n * MAX_CARS
-        r.count = rimOn ? MAX_CARS : 0
+        b.count = h.count = n
+        r.count = rimN
         if (n === 0) return
-        // A few KB per frame, only while trains are lifted.
+        // A few KB per frame, only while cars are lifted.
         b.instanceMatrix.needsUpdate = true
         h.instanceMatrix.needsUpdate = true
         b.instanceColor.needsUpdate = true
-        if (!rimOn) return
+        parts.geometry.body.getAttribute(VEIL_TINT_ATTRIBUTE).needsUpdate = true
+        if (rimN === 0) return
         r.instanceMatrix.needsUpdate = true
-        r.instanceColor.needsUpdate = true
+        parts.geometry.rim.getAttribute(VEIL_TINT_ATTRIBUTE).needsUpdate = true
       },
     }
-  }, [cars])
+  }, [cars, parts])
 
-  return useMemo(() => ({ bodies, halos, rims, ...layer }), [layer])
+  return useMemo(() => ({ bodies, halos, rims, geometry: parts.geometry, material: parts.material, ...layer }), [parts, layer])
 }

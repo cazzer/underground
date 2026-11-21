@@ -22,6 +22,9 @@ export const MASK_INSET_M = 10
 /**
  * Spans per station and shape from the runs each shape's profile kept (buildTrackProfile's `kept`): the union of
  * a shape's runs at one station, should it ride more than one of its tracks. Runs without a station are skipped.
+ * The union covers any gap between two such runs too, so the mask would erase the map track there and trains would
+ * stay lifted across it. No authored station has that today (a shape rides one track per station); a multi-level
+ * interior where one shape rides two separated tracks would need per-run spans instead.
  */
 export function platformSpans(kept: Iterable<readonly [ShapeId, readonly ProfileRun[]]>): Map<StationId, Map<ShapeId, PlatformSpan>> {
   const out = new Map<StationId, Map<ShapeId, PlatformSpan>>()

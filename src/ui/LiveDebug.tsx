@@ -1,4 +1,5 @@
 import type { LiveDebugInfo } from '../data/useLive'
+import { SPAN_TRAINS, spanCarStats } from '../scene/useSpanCars'
 
 interface LiveDebugProps {
   debug: LiveDebugInfo | null
@@ -43,6 +44,10 @@ export function LiveDebug({ debug, technical }: LiveDebugProps) {
       {technical && <p>error {technical}</p>}
       <p>
         offset {fixed(debug.offsetS, 2)} / prepare {fixed(debug.prepareMs)} ms / failures {debug.failures}
+      </p>
+      {/* Read when a poll re-renders this; the scene updates it per frame. */}
+      <p>
+        platform lift overflow (peak, over {SPAN_TRAINS}) {spanCarStats.peakOverflow}
       </p>
     </aside>
   )

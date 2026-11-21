@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { CircleGeometry, Color, DynamicDrawUsage, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial } from 'three'
+import type { StationId } from '../data/schema'
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix } from '../lib/live/consist'
@@ -40,7 +41,7 @@ interface LiveTrainsProps extends LiveLayer {
   /** Filled while mounted, so a click can be tested against the trains as drawn. */
   trainPick: RefObject<TrainPickSource | null>
   /** The station whose interior is loaded (null for none): its platform trains draw above the veil as it reveals. */
-  interiorStationId: string | null
+  interiorStationId: StationId | null
 }
 
 /**
@@ -258,7 +259,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
         </mesh>
       </group>
       <TrainCars layer={cars} />
-      <SpanCars layer={spanCars} cars={cars} />
+      <SpanCars layer={spanCars} />
     </>
   )
 }

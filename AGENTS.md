@@ -91,7 +91,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
   - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms (12
-    trains; per-car veil tint; the selected rim with them); `PlatformTrackMask.tsx` fades the map track out
+    trains, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
+    in `?debug`); `veilTint.ts` their material, mixing each instance toward the background after shading, as the
+    veil blends, so a copy at weight 0 renders exactly like its veiled street car; `PlatformTrackMask.tsx` fades the map track out
     along those platforms as the interior reveals (its own small LineSegments2, not the merged lines)
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a

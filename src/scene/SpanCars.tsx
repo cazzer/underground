@@ -1,14 +1,10 @@
-import { FrontSide } from 'three'
-import { MAX_CARS } from '../lib/live/consist'
 import { theme } from '../theme'
+import { MAX_CARS } from '../lib/live/consist'
 import { RENDER_ORDER } from './renderOrder'
 import { SPAN_CARS, type SpanCarsLayer } from './useSpanCars'
-import type { TrainCarsLayer } from './useTrainCars'
 
 interface SpanCarsProps {
   layer: SpanCarsLayer
-  /** For the shared car geometry. */
-  cars: TrainCarsLayer
 }
 
 /**
@@ -16,20 +12,34 @@ interface SpanCarsProps {
  * three passes as TrainCars (selected rim, background footprints, bodies). The bodies test depth against the
  * street cars (they share matrices with their originals, so they pass where those drew), which keeps a nearer
  * street car in front. LiveTrains writes them per frame.
+ * The footprints don't test depth, so where a nearer street car that isn't lifted (another route's, outside the
+ * span) overlaps a lifted car on screen, the footprint paints over it and the lifted body fails the depth test
+ * there: a background-colored hole. Bedford Av has one route on two parallel tracks, so it can't happen there; a
+ * multi-route interior with crossing tracks would need the footprints depth-tested too.
  */
-export function SpanCars({ layer, cars }: SpanCarsProps) {
+export function SpanCars({ layer }: SpanCarsProps) {
   return (
     <>
-      <instancedMesh ref={layer.rims} args={[cars.geometry.halo, undefined, MAX_CARS]} frustumCulled={false} renderOrder={RENDER_ORDER.spanCarRim}>
-        {/* White material: the per-instance colors are the rim color, tinted toward the veil. */}
-        <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
-      </instancedMesh>
-      <instancedMesh ref={layer.halos} args={[cars.geometry.halo, undefined, SPAN_CARS]} frustumCulled={false} renderOrder={RENDER_ORDER.spanCarHalo}>
+      <instancedMesh
+        ref={layer.rims}
+        args={[layer.geometry.rim, layer.material.rim, MAX_CARS]}
+        frustumCulled={false}
+        renderOrder={RENDER_ORDER.spanCarRim}
+      />
+      <instancedMesh
+        ref={layer.halos}
+        args={[layer.geometry.halo, undefined, SPAN_CARS]}
+        frustumCulled={false}
+        renderOrder={RENDER_ORDER.spanCarHalo}
+      >
         <meshBasicMaterial color={theme.background} transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
-      <instancedMesh ref={layer.bodies} args={[cars.geometry.body, undefined, SPAN_CARS]} frustumCulled={false} renderOrder={RENDER_ORDER.spanCars}>
-        <meshBasicMaterial vertexColors transparent depthTest depthWrite side={FrontSide} />
-      </instancedMesh>
+      <instancedMesh
+        ref={layer.bodies}
+        args={[layer.geometry.body, layer.material.body, SPAN_CARS]}
+        frustumCulled={false}
+        renderOrder={RENDER_ORDER.spanCars}
+      />
     </>
   )
 }
