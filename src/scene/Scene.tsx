@@ -12,6 +12,7 @@ import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
+import { PlatformTrackMask } from './PlatformTrackMask'
 import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
 import { StationTies } from './StationTies'
@@ -51,11 +52,12 @@ export function Scene({ network, insets, live, onLiveError, interior, panel, onI
       <MapGrid />
       <SubwayLines network={network} />
       <StationTies network={network} />
+      {interior && <PlatformTrackMask network={network} stationId={interior.stationId} />}
       <Stations stations={network.stations} />
       <ScenePicker stations={network.stations} trainPick={trainPick} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
-          <LiveTrains {...live} network={network} trainPick={trainPick} />
+          <LiveTrains {...live} network={network} trainPick={trainPick} interiorStationId={interior?.stationId ?? null} />
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}

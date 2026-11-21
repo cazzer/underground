@@ -14,6 +14,8 @@
  * - renderOrder.ts: `interiorUnderFine` / `interiorUnder` (unless C wins), or `interiorVeil` (if C wins)
  * - scripts/lib/templates/stairs.ts: `DRAWN_Y_SCALE` (generated stair and escalator runs are sized for the drawn
  *   rise) must equal the chosen scale; regenerate with `npm run data:stations`
+ * - useSpanCars.ts: `VEIL_TINT` and `SPAN_LIFT` become constants (if C wins, delete SpanCars, useSpanCars and their
+ *   render orders: the interior draws under the trains)
  * - AGENTS.md: the `?interior=` / `?interiorY=` TEMPORARY note, "padded hull" in the directory map
  *   (unless B wins), and "look C uses -0.6 and -0.3" in the rendering conventions (unless C wins)
  */

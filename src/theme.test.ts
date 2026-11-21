@@ -22,6 +22,30 @@ describe('status tokens', () => {
   })
 })
 
+/** The panel's 'rgba(r, g, b, a)' composited over the background, as '#rrggbb'. */
+function opaquePanel(panel: string, background: string): string {
+  const m = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(panel)
+  if (!m) throw new Error(`panel is not rgba(): ${panel}`)
+  const alpha = Number(m[4])
+  const rgb = [m[1], m[2], m[3]].map(Number)
+  const hex = `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`
+  return mixHex(background, hex, alpha)
+}
+
+describe('access tokens', () => {
+  it('draw the access glyph (ink, dimmed for partial, and the outlined badge) at 3:1 on the panel', async () => {
+    for (const t of Object.values(await themes())) {
+      const panel = opaquePanel(t.panel, t.background)
+      for (const [name, color] of [['ink', t.ink], ['inkDim', t.inkDim], ['accessBadge', t.accessBadge]] as const) {
+        expect(contrastRatio(color, panel), `${t.name} ${name} ${color} on ${panel}`).toBeGreaterThanOrEqual(3)
+      }
+      expect(contrastRatio(t.accessBadgeInk, t.accessBadge), `${t.name} badge glyph`).toBeGreaterThanOrEqual(4.5)
+      // inkDim also sets the small text beside the glyph (the partial note, "partly", the borough line).
+      expect(contrastRatio(t.inkDim, panel), `${t.name} inkDim text on ${panel}`).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+})
+
 /** Straight-line distance between two '#rrggbb' colors in sRGB (0 to about 441). */
 function colorDistance(a: string, b: string): number {
   const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))

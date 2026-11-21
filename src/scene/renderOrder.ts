@@ -10,6 +10,8 @@ export const RENDER_ORDER = {
   // From a station marker down to its sunken platform tracks, under the marker disc.
   stationTie: 1.5,
   lineFocus: 2,
+  // Along a revealed station's platforms the map track gives way to the interior's: over the lines, under the markers.
+  platformTrackMask: 2.5,
   stationFill: 3,
   stationRing: 4,
   trainHalo: 5,
@@ -34,4 +36,9 @@ export const RENDER_ORDER = {
   interiorVeil: 7,
   interiorFine: 8,
   interior: 9,
+  // Trains on a revealed station's platforms, redrawn above the veil and the interior strokes: rim, footprints,
+  // bodies (depth-tested against the street cars they copy). Keep 10 and up free for anything that must top them.
+  spanCarRim: 9.4,
+  spanCarHalo: 9.45,
+  spanCars: 9.5,
 } as const

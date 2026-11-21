@@ -8,7 +8,7 @@ const BAYSIDE = { lat: 40.7685, lon: -73.7771 }
 const BOSTON = { lat: 42.3601, lon: -71.0589 }
 
 function station(id: string, name: string, lat: number, lon: number): Station {
-  return { id, name, pos: toGround({ lat, lon }), routeIds: [], stops: [] }
+  return { id, name, pos: toGround({ lat, lon }), routeIds: [], stops: [], access: { status: 'none' } }
 }
 
 const stations = [

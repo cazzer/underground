@@ -1,12 +1,13 @@
 /** public/data → render model: projected stations, routes, and shape paths. Pure. */
-import type { Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
+import type { AdaStatus, Borough, Direction, RouteId, RoutesFile, ShapeId, ShapesFile, StationId, StationsFile, StopId } from '../data/schema'
 import type { StationDepthsFile } from '../data/stationSchema'
 import { boundsCenter } from './framing'
 import { toGround, type Ground } from './projection'
+import { platformSpans, type PlatformSpan } from './platformSpan'
 import { buildPolyline } from './realtime/polyline'
 import { profileRuns } from './trackAnchors'
 import { trackLine } from './trackLine'
-import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleForProfile, type TrackProfile } from './trackProfile'
+import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleForProfile, type ProfileRun, type TrackProfile } from './trackProfile'
 
 export interface Station {
   id: StationId
@@ -16,6 +17,22 @@ export interface Station {
   routeIds: readonly RouteId[]
   /** Child stop ids (one per platform direction), sorted. */
   stops: readonly StopId[]
+  /** Undefined when an older cached stations.json predates the field. */
+  borough?: Borough
+  access: StationAccessInfo
+}
+
+/** ADA status; `note` is the MTA's direction text for a partly accessible station ("Downtown only"). */
+export interface StationAccessInfo {
+  status: AdaStatus
+  note?: string
+}
+
+/** A file without `ada` (an older cached build) or with an unknown value reads as not accessible: no false badge. */
+export function stationAccess(s: Partial<Pick<StationsFile['stations'][number], 'ada' | 'adaPartial'>>): StationAccessInfo {
+  if (s.ada === 'full') return { status: 'full' }
+  if (s.ada === 'partial') return s.adaPartial?.note ? { status: 'partial', note: s.adaPartial.note } : { status: 'partial' }
+  return { status: 'none' }
 }
 
 export interface Route {
@@ -70,6 +87,8 @@ export interface Network {
   profiles: ReadonlyMap<ShapeId, TrackProfile>
   /** Scene height of the deepest ridden platform track at each station with a depth (rail y x yScale). */
   stationTrackY: ReadonlyMap<StationId, number>
+  /** Per station with a depth, where each shape riding its platform tracks runs along them (the profile's kept runs). */
+  platformSpans: ReadonlyMap<StationId, ReadonlyMap<ShapeId, PlatformSpan>>
 }
 
 function extend(b: Bounds, p: Ground): void {
@@ -109,7 +128,7 @@ export function buildNetwork(
   const stations = stationsFile.stations.map((s): Station => {
     const pos = toGround(s)
     extend(bounds, pos)
-    return { id: s.id, name: s.name, pos, routeIds: s.routes, stops: s.stops }
+    return { id: s.id, name: s.name, pos, routeIds: s.routes, stops: s.stops, borough: s.borough, access: stationAccess(s) }
   })
 
   const lines = shapesFile.shapes.map((s) => {
@@ -123,6 +142,7 @@ export function buildNetwork(
 
   const profiles = new Map<ShapeId, TrackProfile>()
   const stationTrackY = new Map<StationId, number>()
+  const keptRuns: [ShapeId, ProfileRun[]][] = []
   const shapes = shapesFile.shapes.map((s, i): ShapePath => {
     const { line } = lines[i]!
     const built = buildTrackProfile(runs.get(s.id) ?? [], { grade: GRADE, yScale })
@@ -132,6 +152,7 @@ export function buildNetwork(
     }
     const profile = built.profile
     // Only runs the profile kept: a dropped (overlapping) run's station isn't drawn at depth on this shape.
+    if (built.kept.length > 0) keptRuns.push([s.id, built.kept])
     for (const run of built.kept) {
       if (run.stationId === undefined) continue
       const y = run.yReal * yScale
@@ -166,6 +187,7 @@ export function buildNetwork(
     trackOffsetM,
     profiles,
     stationTrackY,
+    platformSpans: platformSpans(keptRuns),
   }
 }
 

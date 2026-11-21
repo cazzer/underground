@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { nextFocus, type FocusState } from './focusMachine'
 import type { Station } from './network'
 
-const station = (id: string, x: number, z: number): Station => ({ id, name: id, pos: { x, z }, routeIds: [], stops: [] })
+const station = (id: string, x: number, z: number): Station => ({ id, name: id, pos: { x, z }, routeIds: [], stops: [], access: { status: 'none' } })
 const A = station('A', 0, 0)
 const B = station('B', 1000, 0)
 const C = station('C', 0, 450)

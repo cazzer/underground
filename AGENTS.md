@@ -80,6 +80,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   with `provenance: 'generated'` count as not listed and `stations/depths-generated.json` is never fetched; with
   it, that file joins the startup fetch batch (its failure only logs) and its depths merge into the track
   profiles. The removal list is in `src/data/generatedLook.ts`
+  TEMPORARY: `?access=a|b|c` (plain glyph, filled badge, text pill; default a) until the epz look card is
+  decided; the `accessBadge`/`accessBadgeInk` tokens serve B; the removal list is in `src/ui/accessLook.ts`
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
@@ -99,12 +101,19 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
+  - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms (12
+    trains, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
+    in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
+    veil blends, so a copy at weight 0 renders exactly like its veiled street car; `PlatformTrackMask.tsx` fades the map track out
+    along those platforms as the interior reveals (its own small LineSegments2, not the merged lines)
   - `StationInterior.tsx` the focused station's interior (two line layers, `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides;
     `machineLook.ts` TEMPORARY `?machines=` escalator/elevator look
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
-  panel: the station name, a focusable heading (`tabIndex -1`), then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only), nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
+  panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
+  plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
+  a dim aria-hidden `PartialAccessNote` line, then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only), nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
   each pick (its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useStopListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
   notice, then the station, and closing either of the first two returns focus to the station heading or else
@@ -117,7 +126,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `InteriorStatus.tsx` the panel's station-layout line, one always-mounted live region: loading, error with Retry,
   and `ReadyLine` for a loaded interior (null for authored ones; the one place a ready-state line goes)
   `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a combobox over a
-  listbox of `SearchResult.tsx` rows (name plus route chips, which tell duplicate names apart); choosing a result
+  listbox of `SearchResult.tsx` rows (name and access icon, the borough on a dim line only for names whose stations span boroughs
+  (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart); choosing a result
   calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). `useKeyboardInset.ts`
   pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
   location message
@@ -133,6 +143,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trackProfile.ts` a shape's vertical profile (knots, `profileAt`, `resampleForProfile`) and
     `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
+    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`) and its
+    weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`); `platformMask.ts` the mask's line buffers;
     `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts`, `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
@@ -332,13 +344,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   positive `useFrame` priority (it takes over rendering).
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
+  platform track mask 2.5,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55. The focused station (picked or auto-focused by zoom) draws no marker and no
+  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies).
+  The focused station (picked or auto-focused by zoom) draws no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
   (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior) has depthTest false.
+  The above-veil platform car bodies (9.5) test and write depth too: they copy their street cars' matrices, so
+  they pass where those drew and a nearer street car stays in front.
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
@@ -375,7 +391,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   interior's mid-height, halfway between its lowest and highest level. It fades
   in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
   layer, live trains included, in one draw call; the interior draws at 8 (fine) and 9 (strong);
-  look C uses -0.6 and -0.3. Mezzanine guides and a
+  look C uses -0.6 and -0.3. Trains on the revealed station's platforms
+  are redrawn above the veil and strokes (`SpanCars.tsx`, 9.4 to 9.5; not in look C): every car within
+  `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
+  toward the background after shading by `veilTint` (veil opacity × reveal × (1 − weight), look A only), so a car
+  leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal
+  (`PlatformTrackMask.tsx`, a background-colored copy of its platform run at 2.5, blending back to the route color
+  over the last 10 m), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at 180 m (a partial fit on small screens).
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.
