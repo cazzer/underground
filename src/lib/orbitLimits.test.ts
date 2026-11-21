@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { PerspectiveCamera, Vector3 } from 'three'
-import { EXIT_DISTANCE, EXIT_RADIUS } from './focusMachine'
+import { EXIT_RADIUS } from './focusMachine'
 import { freeCenterShift, interiorFreeRect } from './interiorCamera'
 import {
   AZIMUTH_SPRING,
   AZIMUTH_SPRING_MAX_SPEED,
   azimuthBounds,
   azimuthCap,
+  FULL_SPIN_TILT,
   focusPoint,
+  PAN_CLAMP_TILT,
   PAN_GIVE,
   PAN_MARGIN,
   PAN_RADIUS_BARE,
@@ -22,7 +24,19 @@ import {
   wrapAngle,
   type AzimuthBounds,
 } from './orbitLimits'
-import { ISO_POLAR, tiltForDistance } from './tilt'
+import { DEFAULT_TILT, depthFactor, ISO_POLAR, tiltForDistance, tiltT } from './tilt'
+
+/** The farthest camera distance at which tiltT reaches `t` (tiltT falls with distance), to 0.01 m. */
+function distanceAtTilt(t: number): number {
+  let near = DEFAULT_TILT.nearDistance
+  let far = DEFAULT_TILT.farDistance
+  while (far - near > 0.01) {
+    const mid = (near + far) / 2
+    if (tiltT(mid) >= t) near = mid
+    else far = mid
+  }
+  return near
+}
 
 describe('panRadius', () => {
   it('is the bare radius without an interior, else the reach plus the margin', () => {
@@ -32,15 +46,22 @@ describe('panRadius', () => {
 
   it('is capped so a full stretch plus the view offset never drops focus', () => {
     expect(panRadius(1000)).toBe(PAN_RADIUS_MAX)
-    // The target sits off the focus point by the free-area shift plus the depth term; both are
-    // largest at EXIT_DISTANCE on a phone with a stacked panel. A 30 m mid-depth (scaled) covers a
-    // deep station like 191 St at yScale 1, and is three times the starter stations'.
+    // The target sits off the focus point by the free-area shift plus the depth term (drawn at the
+    // depth factor, as useStationOrbit sizes it), on a phone with a stacked panel, at every distance the
+    // clamp applies at: out to where the tilt reaches PAN_CLAMP_TILT (about 750 m once the tilt's near
+    // distance is 400 m), where the shift is largest. A 30 m mid-depth (scaled) covers a deep station like
+    // 191 St at yScale 1, and is three times the starter stations'.
     const phone = { width: 390, height: 844 }
     const free = interiorFreeRect(phone, { top: 80, bottom: 70 }, { left: 16, top: 470, right: 374, bottom: 770 })
-    const polar = tiltForDistance(EXIT_DISTANCE)
-    const s = freeCenterShift(phone, free, 35, EXIT_DISTANCE, polar, { right: 0, toward: 0 })
-    const offset = Math.hypot(s.right, s.toward + 30 * Math.tan(polar))
-    expect(PAN_RADIUS_MAX + PAN_GIVE + offset).toBeLessThan(EXIT_RADIUS)
+    const outer = distanceAtTilt(PAN_CLAMP_TILT)
+    expect(outer).toBeCloseTo(Math.sqrt(DEFAULT_TILT.farDistance * DEFAULT_TILT.nearDistance), 1)
+    let worst = 0
+    for (let d = DEFAULT_TILT.nearDistance; d <= outer; d += 5) {
+      const polar = tiltForDistance(d)
+      const s = freeCenterShift(phone, free, 35, d, polar, { right: 0, toward: 0 })
+      worst = Math.max(worst, Math.hypot(s.right, s.toward + 30 * depthFactor(d) * Math.tan(polar)))
+    }
+    expect(PAN_RADIUS_MAX + PAN_GIVE + worst).toBeLessThan(EXIT_RADIUS)
     expect(PAN_RADIUS_BARE + PAN_GIVE).toBeLessThan(EXIT_RADIUS)
   })
 })
@@ -77,16 +98,27 @@ describe('wrapAngle', () => {
 })
 
 describe('azimuthCap', () => {
-  it('is unlimited through EXIT_DISTANCE', () => {
-    expect(azimuthCap(180)).toBe(Infinity)
-    expect(azimuthCap(EXIT_DISTANCE)).toBe(Infinity)
+  it('is unlimited from FULL_SPIN_TILT to full tilt', () => {
+    expect(azimuthCap(1)).toBe(Infinity)
+    expect(azimuthCap(FULL_SPIN_TILT)).toBe(Infinity)
+    expect(azimuthCap(tiltT(DEFAULT_TILT.nearDistance))).toBe(Infinity)
   })
 
-  it('falls linearly from π to zero at the top-down distance and stays there', () => {
-    expect(azimuthCap(EXIT_DISTANCE + 1e-9)).toBeCloseTo(Math.PI, 6)
-    expect(azimuthCap((EXIT_DISTANCE + 1400) / 2)).toBeCloseTo(Math.PI / 2)
-    expect(azimuthCap(1400)).toBe(0)
-    expect(azimuthCap(5000)).toBe(0)
+  it('rises linearly from zero top-down to π just below FULL_SPIN_TILT', () => {
+    expect(azimuthCap(0)).toBe(0)
+    expect(azimuthCap(tiltT(DEFAULT_TILT.farDistance))).toBe(0)
+    expect(azimuthCap(tiltT(5000))).toBe(0)
+    expect(azimuthCap(FULL_SPIN_TILT / 2)).toBeCloseTo(Math.PI / 2, 12)
+    expect(azimuthCap(FULL_SPIN_TILT - 1e-9)).toBeCloseTo(Math.PI, 6)
+  })
+
+  it('never falls as the camera comes in', () => {
+    let prev = -1
+    for (let d = 5000; d >= 100; d -= 10) {
+      const cap = azimuthCap(tiltT(d))
+      expect(cap).toBeGreaterThanOrEqual(prev)
+      prev = cap
+    }
   })
 })
 
@@ -95,22 +127,28 @@ describe('azimuthBounds', () => {
 
   it('focused and close: no window at all, so the view spins a full turn', () => {
     for (const theta of [0, 2, Math.PI, -3]) {
-      const b = azimuthBounds({ theta, focused: true, distance: 180, dt: 0.016, reducedMotion: false }, out())
+      const b = azimuthBounds({ theta, focused: true, tilt: 1, dt: 0.016, reducedMotion: false }, out())
       expect(b).toEqual({ min: -Infinity, max: Infinity })
     }
   })
 
   it('focused but top-down: the window is closed', () => {
-    const b = azimuthBounds({ theta: 0, focused: true, distance: 1500, dt: 0.016, reducedMotion: false }, out())
+    const b = azimuthBounds({ theta: 0, focused: true, tilt: 0, dt: 0.016, reducedMotion: false }, out())
     expect(b.min).toBeCloseTo(0, 12)
     expect(b.max).toBeCloseTo(0, 12)
+  })
+
+  it('focused and partly tilted: the window is ±azimuthCap', () => {
+    const b = azimuthBounds({ theta: 0.2, focused: true, tilt: 0.3, dt: 0.016, reducedMotion: false }, out())
+    expect(b.max).toBeCloseTo((Math.PI * 0.3) / FULL_SPIN_TILT, 12)
+    expect(b.min).toBe(-b.max)
   })
 
   it('unfocused: min = max walks theta to exactly 0', () => {
     let theta = -Math.PI / 4
     const b = out()
     for (let i = 0; i < 600 && theta !== 0; i++) {
-      azimuthBounds({ theta, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, b)
+      azimuthBounds({ theta, focused: false, tilt: 1, dt: 1 / 60, reducedMotion: false }, b)
       expect(b.min).toBe(b.max)
       theta = b.min
     }
@@ -119,10 +157,10 @@ describe('azimuthBounds', () => {
 
   it('unfocused near ±π: springs the short way, never sweeping through the long way', () => {
     // 3.3 rad past π is -2.98 the short way: the spring must go up through -2.9, not down through 3.
-    const b = azimuthBounds({ theta: 3.3, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, out())
+    const b = azimuthBounds({ theta: 3.3, focused: false, tilt: 1, dt: 1 / 60, reducedMotion: false }, out())
     expect(b.min).toBeLessThan(0)
     expect(b.min).toBeGreaterThan(wrapAngle(3.3))
-    const c = azimuthBounds({ theta: -3.3, focused: false, distance: 400, dt: 1 / 60, reducedMotion: false }, out())
+    const c = azimuthBounds({ theta: -3.3, focused: false, tilt: 1, dt: 1 / 60, reducedMotion: false }, out())
     expect(c.min).toBeGreaterThan(0)
     expect(c.min).toBeLessThan(wrapAngle(-3.3))
   })
@@ -130,11 +168,12 @@ describe('azimuthBounds', () => {
   it('unfocused from 180 degrees while zooming out: north-up by the top-down distance whatever the pace', () => {
     let theta = Math.PI
     const b = out()
-    // A fast zoom out: 420 m to 1400 m in a third of a second, far quicker than the spring.
+    // A fast zoom out from full tilt to top-down in a third of a second, far quicker than the spring.
+    const { nearDistance, farDistance } = DEFAULT_TILT
     for (let i = 0; i <= 20; i++) {
-      const distance = EXIT_DISTANCE + ((1400 - EXIT_DISTANCE) * i) / 20
-      azimuthBounds({ theta, focused: false, distance, dt: 1 / 60, reducedMotion: false }, b)
-      expect(Math.abs(b.min)).toBeLessThanOrEqual(azimuthCap(distance))
+      const tilt = tiltT(nearDistance + ((farDistance - nearDistance) * i) / 20)
+      azimuthBounds({ theta, focused: false, tilt, dt: 1 / 60, reducedMotion: false }, b)
+      expect(Math.abs(b.min)).toBeLessThanOrEqual(azimuthCap(tilt))
       theta = b.min
     }
     expect(theta).toBe(0)
@@ -163,26 +202,39 @@ describe('springToNorth', () => {
 
   it('snaps straight to north-up under reduced motion', () => {
     expect(springToNorth(2.5, 1 / 60, true)).toBe(0)
-    const b = azimuthBounds({ theta: -3, focused: false, distance: 430, dt: 1 / 60, reducedMotion: true }, { min: 1, max: 1 })
+    const b = azimuthBounds({ theta: -3, focused: false, tilt: 1, dt: 1 / 60, reducedMotion: true }, { min: 1, max: 1 })
     expect(b).toEqual({ min: 0, max: 0 })
   })
 })
 
 describe('panClampArmed', () => {
   it('a released hold outside R does not jump: it arms only once the view comes inside', () => {
-    let armed = panClampArmed(false, true, true, false)
+    let armed = panClampArmed(false, true, true, 1, false)
     expect(armed).toBe(false)
-    armed = panClampArmed(armed, true, false, false)
+    armed = panClampArmed(armed, true, false, 1, false)
     expect(armed).toBe(false)
-    armed = panClampArmed(armed, true, false, true)
+    armed = panClampArmed(armed, true, false, 1, true)
     expect(armed).toBe(true)
-    armed = panClampArmed(armed, true, false, false)
+    armed = panClampArmed(armed, true, false, 1, false)
     expect(armed).toBe(true)
   })
 
   it('disarms while busy and when the focus center changes', () => {
-    expect(panClampArmed(true, true, true, true)).toBe(false)
-    expect(panClampArmed(true, false, false, false)).toBe(false)
+    expect(panClampArmed(true, true, true, 1, true)).toBe(false)
+    expect(panClampArmed(true, false, false, 1, false)).toBe(false)
+  })
+
+  it('is off below PAN_CLAMP_TILT, so a pan from far out is free', () => {
+    expect(panClampArmed(true, true, false, PAN_CLAMP_TILT - 1e-6, true)).toBe(false)
+    expect(panClampArmed(false, true, false, PAN_CLAMP_TILT, true)).toBe(true)
+  })
+
+  it('zooming in past PAN_CLAMP_TILT outside R does not pull the view in', () => {
+    let armed = panClampArmed(true, true, false, 0.3, false)
+    armed = panClampArmed(armed, true, false, 0.6, false)
+    expect(armed).toBe(false)
+    armed = panClampArmed(armed, true, false, 0.7, true)
+    expect(armed).toBe(true)
   })
 })
 

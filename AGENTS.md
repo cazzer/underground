@@ -191,9 +191,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     labels (`levelHeightText`: authored levels "−4.3 m"; on a generated interior an `ee-rise` depth is signed to one
     decimal, "+" above the street, and any other is "≈ −9 m", signed whole meters), padded hull; `interiorFade.ts` per-level fade share by distance from the street level;
     `interiorReveal.ts` distance to interior opacity. These have `.ts` imports
-    because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always 180 m,
-    at the current azimuth) in the screen area the header, footer and station panel leave free;
-    `orbitLimits.ts` azimuth cap, short-way spring to north-up, soft pan radius, focus-point pivot;
+    because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always `LANDING_DISTANCE`, the tilt's
+    near distance, at the current azimuth) in the screen area the header, footer and station panel leave free;
+    `orbitLimits.ts` azimuth cap by tilt, short-way spring to north-up, soft pan radius, focus-point pivot;
     `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`)
   - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
     `stationSearch.ts` ranks stations for a query (exact, prefix, typo-tolerant; a number only prefix-matches as the
@@ -359,12 +359,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `tiltT` is `depthFactor`, the one parameter for every drawn depth (track profile, car height, ties, interior
   levels, veil, level labels), so depth only shows as the camera tips: 0 top-down, 1 (the authored ×yScale) fully tilted.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
-  focused: a full spin (azimuth bounds ±Infinity inside EXIT_DISTANCE), and the turn pivots on the focus point
+  focused (focus engages inside 1100 m within 140 m of a station and drops past 1400 m or 350 m away,
+  `focusMachine.ts`): |azimuth| is capped by tilt, rising from 0 top-down to π at tiltT 0.67 and a full spin
+  (azimuth bounds ±Infinity) from there, and the turn pivots on the focus point
   (the interior's mid-depth center at the middle of the free area, or the view center for a bare station).
   The focus point pans within the interior's reach (farthest outline vertex or entrance from its plan
   center) + 20 m (100 m of a bare station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`), so
-  on a phone a drag can bring every part of the interior to the free area at any angle. Past EXIT_DISTANCE
-  |azimuth| is capped, falling from π to 0 at the top-down distance (1400 m), and dropping focus (zoom out,
+  on a phone a drag can bring every part of the interior to the free area at any angle. The pan clamp applies
+  only from tiltT 0.5 (further out a pan is free), and arms only once the view is inside the radius. Dropping focus (zoom out,
   close the panel) springs the view back to north-up the short way round (an exponential ease capped at
   180°/s; under prefers-reduced-motion it snaps to north-up at once), so the city and top-down views
   are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it
@@ -448,7 +450,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (the route lines' alpha times 1 − weight × reveal in the band line shader, the weight easing back to 0 over the
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
-  beside the station panel at 180 m (a partial fit on small screens).
+  beside the station panel at the tilt's near distance, in full 3D (a partial fit on small screens); a bare
+  station lands at the same distance.
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.
 
 ## Station interior format

@@ -2,11 +2,11 @@ import type { Station } from './network'
 import type { Ground } from './projection'
 
 /** Zooming inside ENTER_DISTANCE with a station within ENTER_RADIUS of the view center focuses it. */
-export const ENTER_DISTANCE = 260
+export const ENTER_DISTANCE = 1100
 export const ENTER_RADIUS = 140
 /** Focus is dropped once zoomed out past EXIT_DISTANCE or panned EXIT_RADIUS from the focused station. */
-export const EXIT_DISTANCE = 420
-export const EXIT_RADIUS = 300
+export const EXIT_DISTANCE = 1400
+export const EXIT_RADIUS = 350
 
 export interface FocusState {
   focusedId: string | null

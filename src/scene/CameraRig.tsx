@@ -7,7 +7,7 @@ import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { EXIT_DISTANCE, nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightDuration, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, framePoint, type Insets, type Viewport } from '../lib/framing'
-import { frameInterior, interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
+import { frameInterior, interiorFreeRect, LANDING_DISTANCE, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
 import type { InteriorModel } from './interiorModel'
@@ -42,8 +42,8 @@ function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void {
 const MIN_DISTANCE = 40
 /** How far past the fitted city overview the user may zoom out. */
 const MAX_ZOOM_OUT = 1.3
-/** Camera distance after clicking a station: inside the fully-tilted range. */
-const FOCUS_DISTANCE = 170
+/** Camera distance after clicking a bare station: the same full-tilt landing as an interior. */
+const FOCUS_DISTANCE = LANDING_DISTANCE
 
 interface Destination {
   /** Null for a flight to a point (a location fix): no station to hold focus on when interrupted. */

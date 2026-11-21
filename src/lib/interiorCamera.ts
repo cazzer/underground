@@ -1,9 +1,14 @@
 /** Pure camera framing for a station interior beside the HUD. */
 import type { Insets, Viewport } from './framing'
-import { REVEAL_NEAR } from './interiorReveal'
 import { rotateScreenOffset } from './orbitLimits'
 import type { Ground } from './projection'
-import { ISO_POLAR } from './tilt'
+import { DEFAULT_TILT, ISO_POLAR } from './tilt'
+
+/**
+ * Camera distance a station click lands at, with or without an interior: the tilt's near distance, where
+ * the view is exactly isometric and every depth fully drawn.
+ */
+export const LANDING_DISTANCE = DEFAULT_TILT.nearDistance
 
 /** Screen rectangle in CSS px, viewport-relative. */
 export interface ScreenRect {
@@ -64,14 +69,14 @@ export function freeCenterShift(
 }
 
 /**
- * Camera distance and ground target for an interior fly-to. The distance is always REVEAL_NEAR,
+ * Camera distance and ground target for an interior fly-to. The distance is always LANDING_DISTANCE,
  * where the view is exactly isometric and the interior fully revealed: pulling back to fit a small
- * screen would fade it out and drop the focus, so a big interior gets a partial fit instead. The
+ * screen would flatten it, so a big interior gets a partial fit instead. The
  * target only shifts (freeCenterShift plus the depth term, turned by the camera azimuth into ground
  * x/z), so the interior's mid-depth center lands mid-`free`.
  */
 export function frameInterior({ center, towardCamera, azimuth, viewport, free, fovDeg }: InteriorFrameInput): { distance: number; target: Ground } {
-  const distance = REVEAL_NEAR
+  const distance = LANDING_DISTANCE
   const s = freeCenterShift(viewport, free, fovDeg, distance, ISO_POLAR, { right: 0, toward: 0 })
   const shift = rotateScreenOffset(s.right, s.toward + towardCamera, azimuth)
   return { distance, target: { x: center.x + shift.x, z: center.z + shift.z } }

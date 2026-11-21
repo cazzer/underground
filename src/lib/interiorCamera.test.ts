@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { PerspectiveCamera, Vector3 } from 'three'
-import { frameInterior, interiorFreeRect, type InteriorFrameInput } from './interiorCamera'
-import { ENTER_RADIUS, EXIT_DISTANCE } from './focusMachine'
+import { frameInterior, interiorFreeRect, LANDING_DISTANCE, type InteriorFrameInput } from './interiorCamera'
+import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_RADIUS } from './focusMachine'
 import { interiorOpacity } from './interiorReveal'
-import { ISO_POLAR } from './tilt'
+import { DEFAULT_TILT, ISO_POLAR, tiltT } from './tilt'
 
 const viewport = { width: 1440, height: 900 }
 const insets = { top: 70, bottom: 90 }
@@ -48,29 +48,37 @@ describe('frameInterior', () => {
     ['a tiny free rect', { center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 70, right: 40, bottom: 90 } }],
   ]
 
-  it.each(cases)('%s: stays at full reveal and keeps the station focused', (_, input) => {
+  it("lands at the tilt's near distance, inside the focus range", () => {
+    expect(LANDING_DISTANCE).toBe(DEFAULT_TILT.nearDistance)
+    expect(LANDING_DISTANCE).toBeLessThan(ENTER_DISTANCE)
+  })
+
+  it.each(cases)('%s: lands in full 3D at full reveal and keeps the station focused', (name, input) => {
     const { distance, target } = frameInterior(input)
-    expect(distance).toBeLessThanOrEqual(180)
+    expect(distance).toBe(LANDING_DISTANCE)
+    expect(tiltT(distance)).toBe(1)
     expect(interiorOpacity(distance)).toBe(1)
-    expect(distance).toBeLessThan(EXIT_DISTANCE)
-    // The view center stays close enough that the camera-driven focus keeps this station.
-    expect(Math.hypot(target.x - center.x, target.z - center.z)).toBeLessThan(ENTER_RADIUS)
+    // The view center stays close enough that the camera-driven focus keeps this station: within the
+    // enter radius on a real layout (no neighbour can take over), and inside the exit radius even when
+    // the free rect is a sliver.
+    const off = Math.hypot(target.x - center.x, target.z - center.z)
+    expect(off).toBeLessThan(name === 'a tiny free rect' ? EXIT_RADIUS : ENTER_RADIUS)
   })
 
   it('keeps the center when the free rect is the whole viewport', () => {
     const free = { left: 0, top: 0, right: 1440, bottom: 900 }
-    expect(frameInterior({ center, ...north, viewport, free, fovDeg: 35 })).toEqual({ distance: 180, target: center })
+    expect(frameInterior({ center, ...north, viewport, free, fovDeg: 35 })).toEqual({ distance: LANDING_DISTANCE, target: center })
   })
 
   it('shifts the target east when the free rect is left of center, so the interior moves left', () => {
     const { target } = frameInterior({ center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 0, right: 1120, bottom: 900 } })
-    expect(target.x).toBeCloseTo(1000 + 160 * mpp(180, 900))
+    expect(target.x).toBeCloseTo(1000 + 160 * mpp(LANDING_DISTANCE, 900))
     expect(target.z).toBe(2000)
   })
 
   it('shifts the target north when the free band is below center, like frameBounds', () => {
     const { target } = frameInterior({ center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 100, right: 1440, bottom: 900 } })
-    expect(target.z).toBeCloseTo(2000 - (50 * mpp(180, 900)) / Math.cos(ISO_POLAR))
+    expect(target.z).toBeCloseTo(2000 - (50 * mpp(LANDING_DISTANCE, 900)) / Math.cos(ISO_POLAR))
   })
 })
 

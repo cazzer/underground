@@ -17,7 +17,7 @@ import {
 } from '../lib/orbitLimits'
 import { markTurned } from '../lib/orbitTurned'
 import type { Ground } from '../lib/projection'
-import { depthFactor, ISO_POLAR } from '../lib/tilt'
+import { depthFactor, ISO_POLAR, tiltT } from '../lib/tilt'
 import type { InteriorModel } from './interiorModel'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
@@ -57,13 +57,13 @@ interface OrbitFocus {
 }
 
 /**
- * Station orbit: a full spin while focused (a spring to north-up otherwise), a turn that pivots on the
- * focus point, and a soft pan radius. It also flags the session's first turn for the HUD hint. All
+ * Station orbit: a turn window that opens with the tilt to a full spin while focused (a spring to
+ * north-up otherwise), a turn that pivots on the focus point, and a soft pan radius once tilted. It also flags the session's first turn for the HUD hint. All
  * frames write the controls imperatively: passing these as props or on* handlers would re-run drei's
  * connect effect and could lock the controls (underground-by0). Nothing here allocates per frame.
  */
 export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, flying, busy }: StationOrbitOptions): void {
-  const input = useRef<AzimuthInput>({ theta: 0, focused: false, distance: 0, dt: 0, reducedMotion: false })
+  const input = useRef<AzimuthInput>({ theta: 0, focused: false, tilt: 0, dt: 0, reducedMotion: false })
   const bounds = useRef<AzimuthBounds>({ min: 0, max: 0 })
   const lastTheta = useRef(0)
   const shift = useRef<ScreenShift>({ right: 0, toward: 0 })
@@ -88,14 +88,14 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const inp = input.current
     inp.theta = c.getAzimuthalAngle()
     inp.focused = focusPos !== null
-    inp.distance = camera.position.distanceTo(c.target)
+    inp.tilt = tiltT(camera.position.distanceTo(c.target))
     inp.dt = delta
     inp.reducedMotion = reduceMotion.matches
     const b = azimuthBounds(inp, bounds.current)
     // enableRotate stays on: OrbitControls seeds a rotate only when it is on at gesture start, so
     // toggling it mid-gesture applied a stale start (a pinch into a station swung the view). The
-    // window alone holds the angle when unfocused (min = max) and top-down (0); focused and close
-    // it is ±Infinity, which the controls leave unclamped (a full spin).
+    // window alone holds the angle when unfocused (min = max) and top-down (0); focused it opens
+    // with the tilt, to ±Infinity (a full spin, which the controls leave unclamped) from FULL_SPIN_TILT.
     // Safe mid-gesture: OrbitControls updates rotateStart on every move whatever the speed, so no
     // stale start; and at 0 no sphericalDelta accumulates while the window is shut, so a drifting
     // pinch can't replay as a turn once focus opens the window.
@@ -119,9 +119,9 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const isBusy = busy()
     const isFlying = flying()
     const s = shift.current
+    const distance = camera.position.distanceTo(c.target)
     if (f.useFree) {
       const polar = c.getPolarAngle()
-      const distance = camera.position.distanceTo(c.target)
       freeCenterShift(viewport, free, camera.fov, distance, polar, s)
       // The interior's mid-depth is drawn at the depth factor (StationInterior's scale.y), so its pivot shift is too.
       s.toward += (f.towardCamera * depthFactor(distance) * Math.tan(polar)) / TAN_ISO
@@ -141,7 +141,7 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     }
     const p = focusPoint(c.target, s.right, s.toward, theta, point.current)
     const inside = Math.hypot(p.x - f.center.x, p.z - f.center.z) <= f.radius
-    armed.current = panClampArmed(armed.current, armedFor.current === f.center, isBusy, inside)
+    armed.current = panClampArmed(armed.current, armedFor.current === f.center, isBusy, tiltT(distance), inside)
     armedFor.current = f.center
     if (!armed.current) return
     const out = clamped.current
