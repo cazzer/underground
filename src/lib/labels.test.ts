@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import type { StationsFile } from '../data/schema'
-import { accessLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel } from './labels'
+import { accessLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel, updatedLabel } from './labels'
 import { stationAccess } from './network'
 
 describe('routeChipLabel', () => {
@@ -89,5 +89,12 @@ describe('multiBoroughNames', () => {
     const partial = file.stations.filter((s) => s.ada === 'partial')
     expect(partial.length).toBeGreaterThan(0)
     for (const s of partial) expect(accessLabel(stationAccess(s)), s.id).toMatch(/^Partly accessible: \S/)
+  })
+})
+
+describe('updatedLabel', () => {
+  it('formats the update time in New York time', () => {
+    // 2026-11-21 19:41:00 UTC is 2:41 PM in New York (EST).
+    expect(updatedLabel(Date.UTC(2026, 10, 21, 19, 41) / 1000)).toBe('updated 2:41 PM')
   })
 })

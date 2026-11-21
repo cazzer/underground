@@ -1,31 +1,37 @@
+import { updatedLabel } from '../lib/labels'
 import type { LiveStatus as LiveStatusValue, LiveStatusKind } from '../lib/live/liveStatus'
 
 interface LiveStatusProps {
   status: LiveStatusValue
 }
 
-/** A glyph per state, so color is never the only cue. */
-const GLYPH: Record<LiveStatusKind, string> = { live: '●', connecting: '◐', stale: '▲', error: '✕', off: '○' }
-const TONE: Record<LiveStatusKind, string> = {
-  live: 'text-status-live',
-  connecting: 'text-ink-dim',
-  stale: 'text-status-warn',
-  error: 'text-status-error',
-  off: 'text-ink-dim',
+const DOT: Record<LiveStatusKind, string> = {
+  live: 'bg-status-live',
+  connecting: 'bg-ink-dim animate-pulse motion-reduce:animate-none',
+  stale: 'bg-status-warn',
+  error: 'bg-status-error',
+  off: 'border border-ink-dim',
 }
 
 /**
- * Live-trains state for the HUD. Only the label is in the live region, so a screen reader hears
- * state changes and not the delayed-lines detail beside it (that stays readable in the page).
+ * Live-trains state as a small dot at the end of the schedule line: green live, yellow offline or delayed
+ * (with the time of the data still drawn), red failed, hollow when live trains are off. The label stays in
+ * a live region for screen readers and is the dot's tooltip; colour is never the only cue for them.
  */
 export function LiveStatus({ status }: LiveStatusProps) {
+  const title = status.detail ? `${status.label} (${status.detail})` : status.label
+  const updated = status.updatedAt === null ? null : updatedLabel(status.updatedAt)
   return (
-    <p className={`mt-1 text-xs ${TONE[status.kind]}`}>
-      <span role="status" aria-live="polite">
-        <span aria-hidden="true">{GLYPH[status.kind]} </span>
-        {status.label}
+    <span className="inline-flex items-center gap-1.5" title={title}>
+      <span aria-hidden="true" className={`inline-block size-2 shrink-0 rounded-full ${DOT[status.kind]}`} />
+      <span role="status" className="sr-only">
+        {updated ? `${status.label}, ${updated}` : title}
       </span>
-      {status.detail && <span className="text-ink-dim"> ({status.detail})</span>}
-    </p>
+      {updated && (
+        <span aria-hidden="true" className="text-status-warn">
+          {updated}
+        </span>
+      )}
+    </span>
   )
 }

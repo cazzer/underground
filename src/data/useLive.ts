@@ -10,6 +10,7 @@ import { FEED_IDS, RT_URL, type FeedId } from './realtime'
 import type { ShapeId, TripPattern } from './schema'
 import { useRealtimeFeed } from './useRealtimeFeed'
 import { useRealtimeStatic } from './useRealtimeStatic'
+import { useOnline } from './useOnline'
 
 /** What the scene draws: this poll's placed trips, and the clock to evaluate them against. */
 export interface LiveLayer {
@@ -123,6 +124,7 @@ export function useLive(
 
   const staticError = staticLoad.status === 'error' ? staticLoad.message : null
   const fatalError = staticError ?? prepareError ?? layerError
+  const online = useOnline()
   const status = deriveLiveStatus({
     configured,
     fatal: fatalError !== null,
@@ -132,6 +134,7 @@ export function useLive(
     schemaMismatch: feed.schemaMismatch,
     // Re-evaluated whenever a poll lands, so the age check needs no timer of its own.
     nowS: offsetS === null ? 0 : clockNow(offsetS, performance.now()),
+    online,
   })
 
   return { status, layer, debug, arrivals, technical: fatalError ?? feed.lastError, onLayerError }
