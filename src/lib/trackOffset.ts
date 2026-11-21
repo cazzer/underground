@@ -7,16 +7,8 @@ import type { Ground } from './projection.ts'
 /** Sharp bends cap the miter at this multiple of the offset, so hairpins don't spike. */
 export const MITER_LIMIT = 2
 
-/**
- * TEMPORARY `?tracks=` choices (removal list in src/data/trackLook.ts). `a` is the measured
- * half-spacing at Bedford Av (L08 tracks sit 4.70 m either side of the platform axis).
- */
-export const TRACK_OFFSETS = { a: 4.7, b: 3, off: 0 } as const
-
-export function resolveTrackOffset(search: string): number {
-  const name = new URLSearchParams(search).get('tracks')
-  return name === 'b' || name === 'off' ? TRACK_OFFSETS[name] : TRACK_OFFSETS.a
-}
+/** How far each shape's track sits right of its travel direction: the measured half-spacing at Bedford Av (L08 tracks sit 4.70 m either side of the platform axis). */
+export const TRACK_OFFSET_M = 4.7
 
 const EPS = 1e-9
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MITER_LIMIT, offsetPolyline, resolveTrackOffset, TRACK_OFFSETS } from './trackOffset'
+import { MITER_LIMIT, offsetPolyline } from './trackOffset'
 
 const D = 4.7
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z)
@@ -65,14 +65,5 @@ describe('offsetPolyline', () => {
     const rev = offsetPolyline([...pts].reverse(), D).reverse()
     expect(dist(fwd[0]!, rev[0]!)).toBeCloseTo(2 * D)
     expect(dist(fwd[2]!, rev[2]!)).toBeCloseTo(2 * D)
-  })
-})
-
-describe('resolveTrackOffset', () => {
-  it('reads ?tracks= and defaults to a', () => {
-    expect(resolveTrackOffset('')).toBe(TRACK_OFFSETS.a)
-    expect(resolveTrackOffset('?tracks=b')).toBe(TRACK_OFFSETS.b)
-    expect(resolveTrackOffset('?theme=x&tracks=off')).toBe(0)
-    expect(resolveTrackOffset('?tracks=zzz')).toBe(TRACK_OFFSETS.a)
   })
 })
