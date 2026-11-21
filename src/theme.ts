@@ -28,7 +28,7 @@ export interface Theme {
   /**
    * Rim drawn around the selected train (dot and cars), outside a background-colored gap. A hue no route line
    * uses, at least 3:1 on the background; theme.test.ts holds it apart from every route line color. Interior
-   * tokens may share its hue (drafting's escalator is also violet): the street layer is veiled under an interior.
+   * tokens may share its hue: the street layer is veiled under an interior.
    */
   trainSelectedRim: string
   /** Train car shading: linear multipliers of the car color on its sides and ends (the roof is 1). */
@@ -127,109 +127,10 @@ export const THEMES = {
     interiorApproxDash: 3,
     interiorApproxGap: 2,
   },
-  drafting: {
-    name: 'drafting',
-    background: '#f3efe4',
-    gridCell: '#e2dccb',
-    gridSection: '#cfc7b0',
-    routeLineMix: { toward: '#2b2b2b', amount: 0.15 },
-    lineMono: '#2b2b2b',
-    lineWidth: 1.25,
-    stationFill: '#f3efe4',
-    stationStroke: '#2b2b2b',
-    stationFocus: '#a63d2f',
-    stationTieWidth: 1,
-    train: '#2b2b2b',
-    here: '#c71f7a',
-    hereAccuracyOpacity: 0.15,
-    hereLineWidth: 1.5,
-    trainSelectedRim: '#6a00c8',
-    trainCarSideShade: 0.6,
-    trainCarEndShade: 0.8,
-    statusLive: '#2f6b3a',
-    statusWarn: '#8a5a00',
-    statusError: '#a63d2f',
-    ink: '#2b2b2b',
-    inkDim: '#6b6655',
-    panel: 'rgba(243, 239, 228, 0.9)',
-    panelBorder: '#2b2b2b',
-    accessBadge: '#1f4e8c',
-    accessBadgeInk: '#f3efe4',
-    fontSans: '"Iowan Old Style", "Palatino Linotype", Georgia, serif',
-    fontMono: mono,
-    interiorStroke: '#2b2b2b',
-    interiorTrack: '#a63d2f',
-    interiorEntrance: '#a63d2f',
-    interiorFine: '#8a8370',
-    interiorElevator: '#1d6f8f',
-    interiorEscalator: '#7b2cbf',
-    interiorLineWidth: 1.25,
-    interiorFineWidth: 1,
-    interiorDepthFade: 0.5,
-    interiorApproxMix: 0.4,
-    interiorApproxDash: 3,
-    interiorApproxGap: 2,
-  },
-  terminal: {
-    name: 'terminal',
-    background: '#000000',
-    gridCell: '#06210f',
-    gridSection: '#0d4a22',
-    routeLineMix: { toward: '#33ff66', amount: 1 },
-    lineMono: '#33ff66',
-    lineWidth: 1.5,
-    stationFill: '#000000',
-    stationStroke: '#33ff66',
-    stationFocus: '#ffffff',
-    stationTieWidth: 1,
-    train: '#eaffef',
-    here: '#5ce1ff',
-    hereAccuracyOpacity: 0.15,
-    hereLineWidth: 1.5,
-    trainSelectedRim: '#d07800',
-    trainCarSideShade: 0.45,
-    trainCarEndShade: 0.7,
-    statusLive: '#33ff66',
-    statusWarn: '#ffff66',
-    statusError: '#ff5555',
-    ink: '#33ff66',
-    inkDim: '#1f9940',
-    panel: 'rgba(0, 0, 0, 0.85)',
-    panelBorder: '#33ff66',
-    accessBadge: '#33ff66',
-    accessBadgeInk: '#000000',
-    fontSans: mono,
-    fontMono: mono,
-    interiorStroke: '#33ff66',
-    interiorTrack: '#eaffef',
-    interiorEntrance: '#ffffff',
-    interiorFine: '#1f9940',
-    interiorElevator: '#ff66cc',
-    interiorEscalator: '#33ccff',
-    interiorLineWidth: 1.5,
-    interiorFineWidth: 1,
-    interiorDepthFade: 0.5,
-    interiorApproxMix: 0.4,
-    interiorApproxDash: 3,
-    interiorApproxGap: 2,
-  },
 } as const satisfies Record<string, Theme>
 
-export type ThemeName = keyof typeof THEMES
-
-export const DEFAULT_THEME: ThemeName = 'blueprint'
-
-function isThemeName(value: string | null): value is ThemeName {
-  return value !== null && Object.hasOwn(THEMES, value)
-}
-
-/** Resolve a theme from a URL search string such as `?theme=drafting`. Unknown names fall back to the default. */
-export function resolveTheme(search: string): Theme {
-  const requested = new URLSearchParams(search).get('theme')
-  return THEMES[isThemeName(requested) ? requested : DEFAULT_THEME]
-}
-
-export const theme: Theme = resolveTheme(window.location.search)
+/** Blueprint is the only theme (the user's pick). Every token above is its value. */
+export const theme: Theme = THEMES.blueprint
 
 /**
  * TEMPORARY until the lines look is picked (8x4.3 options round); remove with the unchosen

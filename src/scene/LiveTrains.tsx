@@ -79,7 +79,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   )
   const colors = useMemo(
     () => ({
-      // A mono theme (terminal) draws every line one color, so route colors would vanish into the lines: use the train color.
+      // A mono line mix (amount 1) draws every line one color, so route colors would vanish into the lines: use the train color.
       byRoute: new Map(
         theme.routeLineMix.amount >= 1
           ? []

@@ -45,7 +45,7 @@ describe('routeLineColor', () => {
     expect(contrastRatio(c, BLUEPRINT.background)).toBeGreaterThanOrEqual(MIN_LINE_CONTRAST)
   })
 
-  it('darkens drafting N/Q/R/W yellow (#F6BC26) to 3:1 on paper', () => {
+  it('darkens N/Q/R/W yellow (#F6BC26) to 3:1 on a light background', () => {
     const c = routeLineColor('#F6BC26', DRAFTING.mix, DRAFTING.background)
     expect(contrastRatio(c, DRAFTING.background)).toBeGreaterThanOrEqual(MIN_LINE_CONTRAST)
     expect(relativeLuminance(c)).toBeLessThan(relativeLuminance('#F6BC26'))

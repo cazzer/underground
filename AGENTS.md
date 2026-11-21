@@ -63,7 +63,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 
 ## Directory map
 - `src/main.tsx`, `src/App.tsx`, `src/index.css`: entry, root layout, Tailwind + theme CSS vars
-- `src/theme.ts`: all colors, line widths, fonts; presets selected by `?theme=`. Route colors are
+- `src/theme.ts`: all colors, line widths, fonts. Blueprint is the only theme (the user's pick): don't add
+  other presets, and don't make evidence or cards in other themes. Route colors are
   GTFS data drawn through `theme.routeLineMix` (mixed toward a theme color; amount 1 = mono), then
   pushed to at least 3:1 against `theme.background`.
   TEMPORARY: `?lines=a|b|c` picks the lines look until the 8x4.3 options round is decided (default b)

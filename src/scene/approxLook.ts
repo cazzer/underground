@@ -3,8 +3,8 @@
  * `?approx=a|b|c` (default b) changes how a generated interior's strokes draw; authored interiors never change.
  * A dims them toward the background by `interiorApproxMix` (machines exempt). Contrast caveat: on the deepest
  * level that mix stacks with the depth fade (1 - 0.6 × 0.5 = 0.7 toward the background), which puts every
- * non-machine stroke under 3:1 in every theme (interiorStroke 2.5 blueprint, 1.8 drafting, 2.1 terminal; at the
- * authored 0.5 it is 4.6, 2.9, 4.2), so A would need a smaller mix or a test before it ships. B dashes platform and slab outlines and the slabs' street
+ * non-machine stroke under 3:1 (interiorStroke 2.5; at the
+ * authored 0.5 it is 4.6), so A would need a smaller mix or a test before it ships. B dashes platform and slab outlines and the slabs' street
  * guides in world meters (`interiorApproxDash` / `interiorApproxGap`), in the same two layers and draw calls:
  * the materials turn dashed and per-segment `distances` say which segments to cut (tracks stay solid). C draws
  * everything at the fine width in one layer. Once decided, remove together:
