@@ -8,7 +8,14 @@ guaranteed to be accurate.
 
 ## MTA GTFS
 
-Static GTFS schedule data, https://www.mta.info/developers.
+Static GTFS schedule data, https://www.mta.info/developers. Use is subject to the MTA's
+terms and conditions: https://www.mta.info/developers/terms-and-conditions.
+
+These files are derived, not copies of the feed: shapes are simplified (Douglas-Peucker,
+3 m), segment run times are medians over the scheduled trips, and trip origins are
+delta-encoded.
+
+Route colors come from `routes.txt`. MTA's IP status for those colors is UNVERIFIED.
 
 - `stations.json`
 - `routes.json`

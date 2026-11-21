@@ -4,6 +4,7 @@ import {
   decodeShapePoints,
   deltaDecode,
   deltaEncode,
+  parseShapeId,
   parseTripId,
   segmentKey,
   shapeIdOf,
@@ -36,6 +37,20 @@ describe('parseTripId', () => {
     expect(parseTripId('garbage')).toBeNull()
     expect(parseTripId('')).toBeNull()
     expect(parseTripId('12345_1..S03R')).toBeNull()
+  })
+})
+
+describe('parseShapeId', () => {
+  it('splits double- and single-dot ids', () => {
+    expect(parseShapeId('1..S03R')).toEqual({ token: '1', direction: 'S', path: '03R' })
+    expect(parseShapeId('GS.N01R')).toEqual({ token: 'GS', direction: 'N', path: '01R' })
+    expect(parseShapeId('N..S72R')?.token).toBe('N')
+  })
+  it('allows an empty path and returns null for garbage', () => {
+    expect(parseShapeId('L..S')?.path).toBe('')
+    expect(parseShapeId('')).toBeNull()
+    expect(parseShapeId('000600_1..S03R')).toBeNull()
+    expect(parseShapeId('1..X03R')).toBeNull()
   })
 })
 

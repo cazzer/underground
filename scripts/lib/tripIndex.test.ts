@@ -50,6 +50,16 @@ describe('buildTripIndex', () => {
     feed.stopTimes.find((r) => r.tripId === 'Weekday_002600_1..S03R' && r.stopId === 'A02S')!.stopId = 'A03S'
     expect(() => buildTripIndex(feed)).toThrow(/1\.\.S03R/)
   })
+  it('throws when the trip id disagrees with shape_id, naming the trip', () => {
+    const feed = fixtureFeed()
+    feed.trips.find((t) => t.id === 'Weekday_000600_1..S03R')!.shapeId = '1..S04R'
+    expect(() => buildTripIndex(feed)).toThrow(/Weekday_000600_1\.\.S03R.*shape/)
+  })
+  it('throws when the trip id direction disagrees with direction_id, naming the trip', () => {
+    const feed = fixtureFeed()
+    feed.trips.find((t) => t.id === 'Weekday_000600_1..S03R')!.direction = 'N'
+    expect(() => buildTripIndex(feed)).toThrow(/Weekday_000600_1\.\.S03R.*direction/)
+  })
   it('throws on a trip with no stop_times', () => {
     const feed = fixtureFeed()
     feed.stopTimes = feed.stopTimes.filter((r) => r.tripId !== 'Weekday_000100_GS.N01R')

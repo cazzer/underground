@@ -1,4 +1,4 @@
-import { canonicalShapeId, deltaEncode, parseTripId } from '../../src/data/codec.ts'
+import { canonicalShapeId, deltaEncode, parseTripId, shapeIdOf } from '../../src/data/codec.ts'
 import type {
   CalendarException,
   ServiceCalendar,
@@ -33,6 +33,12 @@ export function buildTripIndex(feed: GtfsFeed): { file: Body; skippedNoShape: nu
     const shape = canonicalShapeId(trip.shapeId)
     const parsed = parseTripId(trip.id)
     if (!parsed) throw new Error(`Cannot parse trip id ${trip.id}`)
+    if (shapeIdOf(parsed) !== shape) {
+      throw new Error(`Trip ${trip.id}: id says shape ${shapeIdOf(parsed)} but shape_id is ${trip.shapeId}`)
+    }
+    if (parsed.direction !== trip.direction) {
+      throw new Error(`Trip ${trip.id}: id says direction ${parsed.direction} but direction_id is ${trip.direction}`)
+    }
     const rows = stopsByTrip.get(trip.id)
     if (!rows) throw new Error(`Trip ${trip.id} has no stop_times`)
     const stops = rows.map((r) => r.stopId)

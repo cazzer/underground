@@ -108,6 +108,8 @@ export interface TripIndexFile extends DataFile {
   /** service → shape → origin times of its trips, ascending and unique, delta-encoded.
    *  Origin = the 6-digit trip-id prefix as an integer: hundredths of a minute after
    *  service-day midnight (can exceed 144000). Realtime key = tripKey(origin, route, dir).
-   *  A key without a path code can match two shapes (48 do in fall 2026); take the first. */
+   *  A key without a path code can match several shapes (48 do in fall 2026). Resolve it to
+   *  the shape flagged `primary` for the key's route+direction if it is among the matches,
+   *  otherwise to the lowest shape id. */
   origins: Record<ServiceId, Record<ShapeId, number[]>>
 }

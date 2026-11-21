@@ -33,7 +33,7 @@ async function loadZip(zipPath: string | undefined): Promise<Uint8Array> {
     return readFileSync(zipPath)
   }
   console.log(`Downloading ${FEED_URL}`)
-  const res = await fetch(FEED_URL)
+  const res = await fetch(FEED_URL, { signal: AbortSignal.timeout(120_000) })
   if (!res.ok) throw new Error(`Download failed: HTTP ${res.status} ${res.statusText}`)
   const bytes = new Uint8Array(await res.arrayBuffer())
   console.log(`Downloaded ${bytes.length} bytes, Last-Modified: ${res.headers.get('last-modified') ?? 'unknown'}`)
@@ -84,6 +84,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  console.error(err instanceof Error ? err.message : err)
+  console.error(err)
   process.exitCode = 1
 })

@@ -1,7 +1,7 @@
 /** Shared encode/decode helpers for public/data. Pure. Type-only imports so Node can run this
  *  file directly (type stripping cannot resolve extensionless runtime imports). */
-import type { LatLon } from '../lib/projection'
-import type { Direction, Shape, ShapeId, StopId } from './schema'
+import type { LatLon } from '../lib/projection.ts'
+import type { Direction, Shape, ShapeId, StopId } from './schema.ts'
 
 export const E5 = 1e5
 
@@ -23,11 +23,24 @@ export function parseTripId(raw: string): ParsedTripId | null {
   return { origin: Number(m[1]), route: m[2]!, direction: m[3] as Direction, path: m[4]! }
 }
 
+export interface ParsedShapeId {
+  /** Route token in the id; can differ from the route_id (W runs on "N"). */
+  token: string
+  direction: Direction
+  path: string
+}
+
+/** Splits "1..S03R" or the single-dot "GS.N01R"; null if it is neither. */
+export function parseShapeId(id: string): ParsedShapeId | null {
+  const m = SHAPE_ID.exec(id)
+  return m ? { token: m[1]!, direction: m[2] as Direction, path: m[3]! } : null
+}
+
 /** "GS.N01R" → "GS..N01R". GTFS static uses one dot for GS/FS; realtime uses one for GS, FS and SI. */
 export function canonicalShapeId(raw: string): ShapeId {
-  const m = SHAPE_ID.exec(raw)
-  if (!m) throw new Error(`Unparseable shape id: ${JSON.stringify(raw)}`)
-  return `${m[1]}..${m[2]}${m[3]}`
+  const p = parseShapeId(raw)
+  if (!p) throw new Error(`Unparseable shape id: ${JSON.stringify(raw)}`)
+  return `${p.token}..${p.direction}${p.path}`
 }
 
 export function shapeIdOf(p: ParsedTripId): ShapeId {
