@@ -18,7 +18,7 @@ import {
   springToward,
   type AzimuthBounds,
 } from './orbitLimits'
-import { ISO_POLAR } from './tilt'
+import { ISO_POLAR, tiltForDistance } from './tilt'
 
 const LIMIT = Math.PI / 4
 
@@ -28,9 +28,17 @@ describe('panRadius', () => {
     expect(panRadius(90)).toBe(90 + PAN_MARGIN)
   })
 
-  it('is capped so a full stretch plus a phone-sized view offset stays inside the focus exit radius', () => {
+  it('is capped so a full stretch plus the view offset never drops focus', () => {
     expect(panRadius(1000)).toBe(PAN_RADIUS_MAX)
-    expect(PAN_RADIUS_MAX + PAN_GIVE + 60).toBeLessThan(EXIT_RADIUS)
+    // The target sits off the focus point by the free-area shift plus the depth term; both are
+    // largest at EXIT_DISTANCE on a phone with a stacked panel. A 30 m mid-depth (scaled) covers a
+    // deep station like 191 St at yScale 1, and is three times the starter stations'.
+    const phone = { width: 390, height: 844 }
+    const free = interiorFreeRect(phone, { top: 80, bottom: 70 }, { left: 16, top: 470, right: 374, bottom: 770 })
+    const polar = tiltForDistance(EXIT_DISTANCE)
+    const s = freeCenterShift(phone, free, 35, EXIT_DISTANCE, polar, { right: 0, toward: 0 })
+    const offset = Math.hypot(s.right, s.toward + 30 * Math.tan(polar))
+    expect(PAN_RADIUS_MAX + PAN_GIVE + offset).toBeLessThan(EXIT_RADIUS)
     expect(PAN_RADIUS_BARE + PAN_GIVE).toBeLessThan(EXIT_RADIUS)
   })
 })
@@ -69,11 +77,11 @@ describe('azimuthLimit', () => {
 })
 
 describe('azimuthBounds', () => {
-  const out = (): AzimuthBounds => ({ min: 0, max: 0, rotate: false })
+  const out = (): AzimuthBounds => ({ min: 0, max: 0 })
 
-  it('focused: rotation on, symmetric window', () => {
+  it('focused: a symmetric window', () => {
     const b = azimuthBounds({ theta: 0.3, focused: true, distance: 180, limit: LIMIT, dt: 0.016 }, out())
-    expect(b).toEqual({ min: -LIMIT, max: LIMIT, rotate: true })
+    expect(b).toEqual({ min: -LIMIT, max: LIMIT })
   })
 
   it('focused but top-down: the window is closed', () => {
@@ -82,12 +90,11 @@ describe('azimuthBounds', () => {
     expect(b.max).toBeCloseTo(0, 12)
   })
 
-  it('unfocused: rotation off and min = max walks theta to exactly 0', () => {
+  it('unfocused: min = max walks theta to exactly 0', () => {
     let theta = -LIMIT
     const b = out()
     for (let i = 0; i < 600 && theta !== 0; i++) {
       azimuthBounds({ theta, focused: false, distance: 600, limit: LIMIT, dt: 1 / 60 }, b)
-      expect(b.rotate).toBe(false)
       expect(b.min).toBe(b.max)
       theta = b.min
     }

@@ -8,9 +8,9 @@ export const PAN_RADIUS_BARE = 100
 /** Slack past an interior's half-extent, so its far edge can be brought to the middle. */
 export const PAN_MARGIN = 20
 /**
- * Largest pan radius. With PAN_GIVE it stays 90 m inside EXIT_RADIUS (300), room for the view
- * center's offset from the focus point (free-area shift plus depth, ~55 m on a phone), so panning
- * never drops focus.
+ * Largest pan radius. With PAN_GIVE it leaves room inside EXIT_RADIUS (300) for the view center's
+ * offset from the focus point (free-area shift plus depth; the test sizes it at EXIT_DISTANCE on a
+ * phone), so panning never drops focus.
  */
 export const PAN_RADIUS_MAX = 180
 /** How far past the radius a drag may stretch before a hard stop. */
@@ -48,7 +48,6 @@ export function azimuthLimit(distance: number, limit: number): number {
 export interface AzimuthBounds {
   min: number
   max: number
-  rotate: boolean
 }
 
 export interface AzimuthInput {
@@ -63,21 +62,19 @@ export interface AzimuthInput {
 }
 
 /**
- * Controls settings for this frame, written into `out` (called every frame, so no allocation).
- * Focused: rotation on, window ±azimuthLimit. Otherwise rotation is off and min = max springs from
- * the current azimuth to 0, which the controls clamp to, so the view eases back to north-up.
+ * The azimuth window for this frame, written into `out` (called every frame, so no allocation).
+ * Focused: ±azimuthLimit. Otherwise min = max springs from the current azimuth to 0, which the
+ * controls clamp to, so the view eases back to north-up and a rotate gesture can't turn it.
  */
 export function azimuthBounds({ theta, focused, distance, limit, dt }: AzimuthInput, out: AzimuthBounds): AzimuthBounds {
   if (focused) {
     const l = azimuthLimit(distance, limit)
     out.min = -l
     out.max = l
-    out.rotate = true
   } else {
     const t = springToward(theta, 0, dt, AZIMUTH_SPRING)
     out.min = t
     out.max = t
-    out.rotate = false
   }
   return out
 }

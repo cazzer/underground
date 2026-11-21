@@ -85,7 +85,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
   `InteriorStatus.tsx` the panel's station-layout line (loading, error with Retry, ready, zoom-in hint)
-  `OrbitHint.tsx` the panel's turn hint (right-drag, or two fingers on a coarse pointer)
+  `OrbitHint.tsx` the panel's turn hint (right- or Shift-drag; two fingers on a coarse pointer)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths, bounds);
@@ -200,10 +200,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   The focus point pans within the interior's half-extent + 20 m of its plan center (100 m of a bare
   station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`). The window closes to 0 toward top-down, and
   dropping focus (zoom out, close the panel) springs the view back to north-up, so the city and
-  top-down views are always north-up. `enableRotate` only changes while no control gesture is open
-  (OrbitControls seeds a rotate at gesture start only). Markers and dots rescale with distance
+  top-down views are always north-up. `enableRotate` stays on; the azimuth window alone stops a turn
+  (toggling it mid-gesture applies a stale rotate start). Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
-- Every `on*` handler passed to `MapControls` (today `onStart` and `onEnd`) stays referentially
+- Every `on*` handler passed to `MapControls` (today `onStart`) stays referentially
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
   which can lock them mid-drag. Set control limits imperatively in `useFrame` (priority -2, before
   drei's `update()` at -1; the pivot and pan clamp at -0.5), not as changing props. Never use a

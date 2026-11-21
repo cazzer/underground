@@ -142,9 +142,8 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   }, [interior, panel, size, insets, camera])
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
+  const flying = useCallback(() => flight.current !== null, [])
   const busy = useCallback(() => flight.current !== null || hold.current !== null, [])
-  // A counter, not a flag: a wheel tick inside a drag dispatches its own start and end.
-  const gestures = useRef(0)
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
   useStationOrbit({
     controls,
@@ -153,8 +152,8 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     interior: interior?.stationId === focusedId ? interior : null,
     viewport: size,
     free,
+    flying,
     busy,
-    gestures,
   })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
@@ -205,7 +204,6 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   // document pointerup listener, leaving the controls stuck in a drag (no wheel, no pan) until
   // reload (underground-by0).
   const onStart = useCallback(() => {
-    gestures.current += 1
     const f = flight.current
     const c = controls.current
     if (f && c) {
@@ -218,11 +216,6 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     flight.current = null
   }, [camera])
 
-  // OrbitControls dispatches end on every pointerup (and pointercancel), even one with no start.
-  const onEnd = useCallback(() => {
-    gestures.current = Math.max(0, gestures.current - 1)
-  }, [])
-
   return (
     <MapControls
       ref={controls}
@@ -232,7 +225,6 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       minDistance={MIN_DISTANCE}
       maxDistance={maxDistance}
       onStart={onStart}
-      onEnd={onEnd}
     />
   )
 }

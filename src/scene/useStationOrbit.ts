@@ -33,10 +33,10 @@ interface StationOrbitOptions {
   viewport: Viewport
   /** The screen area the HUD leaves free (interiorFreeRect). */
   free: ScreenRect
-  /** True while a fly-to or an interrupted-flight focus hold owns the camera. */
+  /** True during a fly-to: the flight owns the camera, so a turn doesn't pivot. */
+  flying: () => boolean
+  /** True during a fly-to or an interrupted-flight focus hold: the pan clamp stays off. */
   busy: () => boolean
-  /** Open control gestures (start events minus end events); rotation is only toggled at zero. */
-  gestures: RefObject<number>
 }
 
 /** What the view orbits and pans around: the interior's plan (pivoting on the free area's middle) or the bare station. */
@@ -54,9 +54,9 @@ interface OrbitFocus {
  * frames write the controls imperatively: passing these as props or on* handlers would re-run drei's
  * connect effect and could lock the controls (underground-by0). Nothing here allocates per frame.
  */
-export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, busy, gestures }: StationOrbitOptions): void {
+export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, flying, busy }: StationOrbitOptions): void {
   const input = useRef<AzimuthInput>({ theta: 0, focused: false, distance: 0, limit: orbitLook.limit, dt: 0 })
-  const bounds = useRef<AzimuthBounds>({ min: 0, max: 0, rotate: false })
+  const bounds = useRef<AzimuthBounds>({ min: 0, max: 0 })
   const lastTheta = useRef(0)
   const shift = useRef<ScreenShift>({ right: 0, toward: 0 })
   const move = useRef<Ground>({ x: 0, z: 0 })
@@ -82,10 +82,9 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     inp.distance = camera.position.distanceTo(c.target)
     inp.dt = delta
     const b = azimuthBounds(inp, bounds.current)
-    // OrbitControls seeds a rotate only when rotation is on at gesture start, so flipping it
-    // mid-gesture would apply a stale start point (a pinch into a station swinging the view). With
-    // rotation left on, the min = max window still holds the angle once focus drops.
-    if (gestures.current === 0) c.enableRotate = b.rotate
+    // enableRotate stays on: OrbitControls seeds a rotate only when it is on at gesture start, so
+    // toggling it mid-gesture applied a stale start (a pinch into a station swung the view). The
+    // window alone holds the angle when unfocused (min = max) and top-down (0).
     c.minAzimuthAngle = b.min
     c.maxAzimuthAngle = b.max
   }, -2)
@@ -103,6 +102,7 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
       return
     }
     const isBusy = busy()
+    const isFlying = flying()
     const s = shift.current
     if (f.useFree) {
       const polar = c.getPolarAngle()
@@ -113,7 +113,7 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
       s.toward = 0
     }
     // The controls turned about the target; slide target and camera so the turn pivots on the focus point.
-    if (!isBusy && theta !== theta0) {
+    if (!isFlying && theta !== theta0) {
       const m = pivotShift(s.right, s.toward, theta0, theta, move.current)
       c.target.x += m.x
       c.target.z += m.z
