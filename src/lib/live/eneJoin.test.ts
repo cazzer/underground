@@ -19,7 +19,7 @@ const noData = (over: Partial<EneInput> = {}): EneInput => ({ configured: true, 
 describe('joinStationOutages', () => {
   it('names an outaged elevator with its levels, street end first, and feeds the drawing and routing', () => {
     const j = joinStationOutages(l08, feed([outage('EL358')]), NOW)
-    expect(j.panel).toEqual({ kind: 'out', outages: [{ id: 'EL358', kind: 'elevator', levels: 'Mezzanine to platform', returnAt: NOW + 3600 }] })
+    expect(j.panel).toEqual({ kind: 'out', outages: [{ id: 'EL358', kind: 'elevator', levels: 'Mezzanine to platform', source: 'interior', returnAt: NOW + 3600 }] })
     expect(j.outIds).toEqual(['EL358'])
     expect(j.known).toBe(true)
     expect(closedForRouting(j)).toEqual(new Set(['EL358']))
@@ -40,7 +40,7 @@ describe('joinStationOutages', () => {
         ...Object.entries(travels).map(([id, travel]) => ({ ...base, id, kind: 'escalator' as const, travel })),
       ],
     })
-    const levelsOf = (interior: StationInterior, id: string): string | undefined => {
+    const levelsOf = (interior: StationInterior, id: string): string | null | undefined => {
       const j = joinStationOutages(interior, feed([outage(id)]), NOW)
       return j.panel.kind === 'out' ? j.panel.outages[0]?.levels : undefined
     }

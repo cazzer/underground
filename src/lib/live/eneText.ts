@@ -38,8 +38,10 @@ export interface OutageRow {
   kind: MachineOutage['kind']
   /** "Elevator out of service". */
   title: string
-  /** "Mezzanine to platform": the panel's first detail line. */
-  levels: string
+  /** "Mezzanine to platform": the panel's first detail line; null for an index-only machine whose inventory row has no text. */
+  levels: string | null
+  /** The text is the inventory's, so it can be long: the panel wraps it (clamped) instead of keeping it on one line. */
+  wraps: boolean
   /** The second line's parts, each kept whole: the code, then "back about 6 AM" or "return time passed" (none when the MTA gave no time). */
   meta: string[]
 }
@@ -67,7 +69,7 @@ function outageRow(o: MachineOutage, nowS: number): OutageRow {
     const back = nyReturnLabel(o.returnAt, nowS)
     meta.push(back === null ? 'return time passed' : `back ${back}`)
   }
-  return { id: o.id, kind: o.kind, title: `${KIND_NAME[o.kind]} out of service`, levels: o.levels, meta }
+  return { id: o.id, kind: o.kind, title: `${KIND_NAME[o.kind]} out of service`, levels: o.levels, wraps: o.source === 'catalog', meta }
 }
 
 /** What the station panel shows for a join, as of `nowS`. */
