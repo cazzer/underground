@@ -2,7 +2,7 @@
  *  build-street-index.ts reads the files and writes the shards (streetIndexShards.ts). The contract and the rules
  *  kept are in src/data/searchSchema.ts. A street is one record per (borough, street key) with a site per nearby
  *  station; an intersection is a node two differently named streets share, nodes within INTERSECTION_MERGE_M of each
- *  other (the two carriageways of one crossing) taken as one. The borough is the nearest station's. */
+ *  other (the two carriageways of one crossing) taken as one, sited at the one nearest their mean. The borough is the nearest station's. */
 import type { Borough, Station } from '../../src/data/schema.ts'
 import type { IntersectionEntry, SearchSite, StreetEntry, StreetRank, StreetSearchEntry } from '../../src/data/searchSchema.ts'
 import { toGround, toLatLon, type Ground } from '../../src/lib/projection.ts'
@@ -26,14 +26,19 @@ const SUFFIXES: Readonly<Record<string, string>> = {
 }
 const COMPASS: Readonly<Record<string, string>> = { north: 'N', south: 'S', east: 'E', west: 'W' }
 
-/** The MTA-style short form: "North 7th Street" is "N 7 St", "Avenue U" "Av U". A compass word is only shortened before
- *  a number ("West St", "West End Av" and "East Broadway" keep it); "Lafayette Court" has no short form. */
+/** The MTA-style short form: "North 7th Street" is "N 7 St", "Avenue U" "Av U", "Ocean Avenue North" "Ocean Av N", "Saint
+ *  Marks Place" "St Marks Pl". A leading compass word is only shortened before a number, and a trailing one after a street type
+ *  ("West St", "West End Av" and "East Broadway" keep it); "Lafayette Court" has no short form. */
 export function displayStreetName(name: string): string {
   const words = name.trim().split(/\s+/).map((w) => w.replace(/^(\d+)(?:st|nd|rd|th)$/i, '$1'))
   if (words.length >= 2) {
-    const last = words.length - 1
-    words[last] = SUFFIXES[words[last]!.toLowerCase()] ?? words[last]!
+    const compass = COMPASS[words[words.length - 1]!.toLowerCase()]
+    // A street type then a compass suffix ("Park Avenue South") shortens both; otherwise only a last-word type does.
+    const type = compass !== undefined && words.length >= 3 && SUFFIXES[words[words.length - 2]!.toLowerCase()] !== undefined ? words.length - 2 : words.length - 1
+    if (type === words.length - 2) words[words.length - 1] = compass!
+    words[type] = SUFFIXES[words[type]!.toLowerCase()] ?? words[type]!
     if (words.length === 2 && words[0]!.toLowerCase() === 'avenue' && /^(?:[A-Za-z]|\d+)$/.test(words[1]!)) words[0] = 'Av'
+    if (words[0]!.toLowerCase() === 'saint') words[0] = 'St'
   }
   if (words.length >= 3 && /^\d+$/.test(words[1]!)) words[0] = COMPASS[words[0]!.toLowerCase()] ?? words[0]!
   return words.join(' ')
@@ -219,13 +224,16 @@ export function buildStreetIndex(pin: Pin, stations: readonly Station[]): { entr
     const b = groups.get(`${borough}\t${kb}`)!
     const [first, second] = a.rank !== b.rank ? (a.rank > b.rank ? [a, b] : [b, a]) : byCodeUnit(display.get(a)!, display.get(b)!) <= 0 ? [a, b] : [b, a]
     for (const ns of cluster(ids, (id) => vertices.get(id)!)) {
+      // The member node nearest the mean (the lower id on a tie), so the site is on both streets.
       const mean = { x: ns.reduce((sum, id) => sum + vertices.get(id)!.x, 0) / ns.length, z: ns.reduce((sum, id) => sum + vertices.get(id)!.z, 0) / ns.length }
+      let node = ns[0]!
+      for (const id of ns) if (dist(vertices.get(id)!, mean) < dist(vertices.get(node)!, mean)) node = id
       intersections.push({
         kind: 'intersection',
         names: [display.get(first)!, display.get(second)!],
         borough,
         rank: Math.min(a.rank, b.rank) as StreetRank,
-        site: site(mean, points[nearestStation(mean, points).index]!),
+        site: site(vertices.get(node)!, points[vertices.get(node)!.station]!),
       })
     }
   }

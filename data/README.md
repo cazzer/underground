@@ -155,7 +155,7 @@ with a site per station the street runs nearest to, and one intersection per pai
 (shared nodes within 100 m count once, so a divided street's two carriageways are one crossing). The borough is the nearest
 `stations.json` station's, which can be wrong on a land border (the build counts the street vertices near one). Coverage is
 the pin's: streets within 300 m of a station point. Caps are in `scripts/lib/budget.ts` (36 KB per shard, 660 KB total gzipped),
-outside the startup budget; the build also fails if the startup total moves. A shard over its cap means 128 buckets, not
+outside the startup budget (it writes only under `search/streets/`). A shard over its cap means 128 buckets, not
 dropped content.
 
 ## Access exceptions
@@ -206,7 +206,9 @@ bump `TIMETABLE_FORMAT`) or the cap in one reviewed PR; don't loosen a check to 
   under the OPEN-NY Terms of Use, which each file's `attribution` says. The walk files (`public/data/walk/`) are ODbL derivatives
   of the same pin and carry the OSM credit only: the anchor is the station's `stations.json` point (MTA GTFS), everything else is OSM.
   The street search shards (`public/data/search/streets/`) are ODbL derivatives too and carry the OSM credit only; their borough
-  labels and the station id on each site come from `stations.json` (MTA GTFS), the rest is OSM.
+  labels come from `stations.json`, which takes them from the MTA Subway Stations dataset (39hk-dx4f, OPEN-NY Terms of Use; joined
+  by `scripts/lib/stationAccess.ts`), and the station id on each site from MTA GTFS; the rest is OSM. The shards keep the OSM-only
+  attribution line.
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.

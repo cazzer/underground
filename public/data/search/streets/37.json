@@ -48,7 +48,7 @@
     {"kind":"intersection","names":["E 99 St","Farragut Rd"],"borough":"Bk","rank":1,"site":[40.64769,-73.90235,"L29"]},
     {"kind":"intersection","names":["E 99 St","Foster Av"],"borough":"Bk","rank":1,"site":[40.64932,-73.90417,"L29"]},
     {"kind":"intersection","names":["E 99 St","Glenwood Rd"],"borough":"Bk","rank":1,"site":[40.64618,-73.90069,"L29"]},
-    {"kind":"intersection","names":["East Houston St","Mulberry St"],"borough":"M","rank":1,"site":[40.72496,-73.99492,"637"]},
+    {"kind":"intersection","names":["East Houston St","Mulberry St"],"borough":"M","rank":1,"site":[40.72489,-73.99495,"D21"]},
     {"kind":"intersection","names":["Empire Blvd","Clove Rd"],"borough":"Bk","rank":1,"site":[40.664,-73.94943,"242"]},
     {"kind":"intersection","names":["Empire Blvd","Franklin Av"],"borough":"Bk","rank":2,"site":[40.66331,-73.96063,"D26"]},
     {"kind":"intersection","names":["Empire Blvd","McKeever Pl"],"borough":"Bk","rank":1,"site":[40.66336,-73.95971,"D26"]},
@@ -79,7 +79,7 @@
     {"kind":"intersection","names":["México-Tenochtitlan Av","E 99 St"],"borough":"M","rank":1,"site":[40.78618,-73.94571,"Q05"]},
     {"kind":"intersection","names":["Park Av","E 99 St"],"borough":"M","rank":1,"site":[40.78844,-73.95101,"625"]},
     {"kind":"intersection","names":["Park Av","Luis Munoz Marin Blvd"],"borough":"M","rank":2,"site":[40.79926,-73.9431,"622"]},
-    {"kind":"intersection","names":["Pelham Parkway South","Muliner Av"],"borough":"Bx","rank":1,"site":[40.85679,-73.86192,"505"]},
+    {"kind":"intersection","names":["Pelham Pkwy S","Muliner Av"],"borough":"Bx","rank":1,"site":[40.85679,-73.86192,"505"]},
     {"kind":"intersection","names":["Queens Blvd","99 St"],"borough":"Q","rank":1,"site":[40.72744,-73.8544,"G09"]},
     {"kind":"intersection","names":["Rockaway Beach Blvd","Beach 99 St"],"borough":"Q","rank":1,"site":[40.58423,-73.82035,"H13"]},
     {"kind":"intersection","names":["Rockaway Blvd","99 St"],"borough":"Q","rank":1,"site":[40.68003,-73.83996,"A63"]},
@@ -87,6 +87,6 @@
     {"kind":"intersection","names":["Shore Front Pkwy","Beach 99 St"],"borough":"Q","rank":1,"site":[40.58276,-73.81943,"H13"]},
     {"kind":"intersection","names":["Victory Blvd","Murray Hulbert Av"],"borough":"SI","rank":1,"site":[40.63787,-74.07371,"S30"]},
     {"kind":"intersection","names":["West Broadway","Murray St"],"borough":"M","rank":3,"site":[40.7144,-74.01016,"A36"]},
-    {"kind":"intersection","names":["Westchester Av","Mulford Av"],"borough":"Bx","rank":1,"site":[40.84429,-73.83577,"603"]}
+    {"kind":"intersection","names":["Westchester Av","Mulford Av"],"borough":"Bx","rank":1,"site":[40.84415,-73.83596,"603"]}
   ]
 }

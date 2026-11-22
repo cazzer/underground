@@ -34,7 +34,13 @@ describe('displayStreetName', () => {
     ['Avenue U', 'Av U'],
     ['Avenue 8', 'Av 8'],
     ['5th Avenue', '5 Av'],
-    ['Saint Marks Place', 'Saint Marks Pl'],
+    ['Saint Marks Place', 'St Marks Pl'],
+    ['Bedford Park Boulevard West', 'Bedford Park Blvd W'],
+    ['Ocean Avenue North', 'Ocean Av N'],
+    ['Park Avenue South', 'Park Av S'],
+    ['Broadway North', 'Broadway North'],
+    ['Eastern Parkway Extension', 'Eastern Parkway Extension'],
+    ['Brooklyn Bridge', 'Brooklyn Bridge'],
     ['West Street', 'West St'],
     ['West End Avenue', 'West End Av'],
     ['East Broadway', 'East Broadway'],
@@ -96,7 +102,7 @@ describe('buildStreetIndex', () => {
     expect(crossingsOf(buildStreetIndex(pin, [STATION]).entries)[0]!.names).toEqual(['Berry St', 'Wythe Av'])
   })
 
-  it('merges a second carriageway crossing 20 m away into one intersection at the mean, and keeps one 150 m away apart', () => {
+  it('merges a second carriageway crossing 20 m away into one intersection at the node nearest the mean, and keeps one 150 m away apart', () => {
     const cross = (gap: number) => {
       const nodes: NodeMeters = { 1: [0, -100], 2: [0, 0], 3: [0, 100], 4: [gap, -100], 5: [gap, 0], 6: [gap, 100], 7: [-100, 0], 8: [gap + 100, 0] }
       return pinOf(nodes, [
@@ -108,7 +114,8 @@ describe('buildStreetIndex', () => {
     expect(INTERSECTION_MERGE_M).toBe(100)
     const near = crossingsOf(buildStreetIndex(cross(20), [STATION]).entries)
     expect(near).toHaveLength(1)
-    expect(metersFrom(near[0]!.site, { x: 10, z: 0 })).toBeLessThan(1.5)
+    // The two crossing nodes (0, 0) and (20, 0) are equally near the mean; the lower node id wins.
+    expect(metersFrom(near[0]!.site, { x: 0, z: 0 })).toBeLessThan(1.5)
     expect(crossingsOf(buildStreetIndex(cross(150), [STATION]).entries)).toHaveLength(2)
   })
 

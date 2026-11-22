@@ -7,9 +7,11 @@
  *  `buckets` is STREET_BUCKETS (on a mismatch log once and show no street results); keep only the entries whose
  *  `entryBucketKeys` contains `k`; rank them with the station search's token matching.
  *
- *  Guarantee: a chosen query token of two or more characters that matches a name token exactly or as a prefix (spelled
- *  as published, by its canonical form, or by a long form) finds its entry in that one shard. Not covered: a typo in the
- *  first two characters, and a one-character token, which finds only names with a one-character token. */
+ *  Guarantee: a query token of two or more characters that matches a DISTINCTIVE token of the name (exactly or as a
+ *  prefix, spelled as published, by its canonical form, or by a long form) finds the entry in the one shard of the query's
+ *  key. A query of generic tokens only finds names made only of generic tokens ("West St", "Court St"). Not covered: a typo
+ *  in the first two characters; a one-character token, which finds only names with a one-character token; and prefixes typed
+ *  before the name's first distinctive word ("sou" for South Portland Av, "av" for Av I), which may miss. */
 import { longForms, searchTokens, type SearchToken } from './searchText.ts'
 
 /** Bump when the key or bucket rule changes; a shard of another format is ignored. */

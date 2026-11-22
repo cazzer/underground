@@ -60,7 +60,9 @@ describe('committed street search shards', () => {
     expect(total).toBeLessThanOrEqual(SEARCH_STREETS_TOTAL_GZIP_CAP_BYTES)
   }, 60_000)
 
-  it('carry the envelope and file every entry in the buckets of its keys only', () => {
+  it('carry the envelope and file every entry in exactly the buckets of its keys', () => {
+    const filed = new Map<string, number[]>()
+    const wanted = new Map<string, number[]>()
     for (const name of names) {
       const shard = json(new URL(name, OUT)) as StreetSearchShard
       expect([shard.format, shard.family, shard.buckets, shard.license]).toEqual([1, 'streets', STREET_BUCKETS, 'ODbL-1.0'])
@@ -68,10 +70,14 @@ describe('committed street search shards', () => {
       expect(shard.attribution).toEqual(['© OpenStreetMap contributors'])
       expect(shard.osmTimestamp).toBe(manifest.baseTimestamp)
       for (const e of shard.entries) {
-        const keys = entryBucketKeys(e.kind === 'street' ? [e.name] : e.names)
-        expect(keys.some((k) => bucketOf(k, STREET_BUCKETS) === shard.bucket), `${name}: ${JSON.stringify(e)}`).toBe(true)
+        const id = JSON.stringify(e)
+        filed.set(id, [...(filed.get(id) ?? []), shard.bucket])
+        wanted.set(id, [...new Set(entryBucketKeys(e.kind === 'street' ? [e.name] : e.names).map((k) => bucketOf(k, STREET_BUCKETS)))].sort((a, b) => a - b))
       }
     }
+    expect(filed.size).toBeGreaterThan(10_000)
+    const wrong = [...filed].filter(([id, buckets]) => JSON.stringify(buckets) !== JSON.stringify(wanted.get(id)))
+    expect(wrong.slice(0, 3)).toEqual([])
   }, 60_000)
 
   it('name every intersection street as a street of the same borough, and put every site on a known station inside the city', () => {

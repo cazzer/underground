@@ -10,8 +10,9 @@
  *    "N 7th St" are one street, "N 7 St"). `sites` has, for each station among the street's vertices' nearest stations,
  *    the point on the street nearest that station, sorted by station id.
  *  - Intersection `names` are the two display names, the higher `rank` first then by name (code-unit order), each equal
- *    to a `StreetEntry.name` in the same borough; its `rank` is the lower of the two. Its `site` is the mean of the shared
- *    nodes within 100 m of each other, so two carriageways crossing are one intersection.
+ *    to a `StreetEntry.name` in the same borough; its `rank` is the lower of the two. Its `site` is the shared node
+ *    nearest the mean of those within 100 m of each other (so the site is on both streets), so two carriageways crossing
+ *    are one intersection.
  *  - Uniqueness: streets by (borough, name); intersections by (borough, names, site lat/lon).
  *  - No ids are stored: an entry has the same fields in every bucket it is filed in.
  *  - Entry order: streets, then intersections, each by display text (the name, or the names joined with " & "), then

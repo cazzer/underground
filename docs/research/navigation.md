@@ -146,9 +146,9 @@ lines and should take milliseconds on 4k nodes (not benchmarked).
 
 **Street and intersection index (built, 2q7.13):** `npm run data:search:streets` files 3,222 street records (a street per
 borough, a site per nearby station) and 11,512 intersections from the street pin, within 300 m of a station, into 64 FNV-1a
-hash-bucket shards: 525 KB gzipped in total (3.6 MB raw), 27.5 KB the largest shard, median about 7 KB. A name is filed under the
+hash-bucket shards: 523 KB gzipped in total (3.6 MB raw), 27.5 KB the largest shard, median about 7 KB. A name is filed under the
 first two characters of each distinctive token (not st, av, a compass letter and the like), spelled as published, canonical and as a long form, so
-one fetch finds it at any prefix of that token. The borough is the nearest station's, wrong on a few land-border streets.
+one fetch finds it from any prefix of 2+ characters of that token (a query like "w 4" reads only the "4" bucket). The borough is the nearest station's, wrong on a few land-border streets.
 
 **Address index:** Manhattan (63,245 points, 872 streets) is 264 KB gzipped at 1 m; citywide about 4 MB
 (UNVERIFIED), in hash-bucket shards.
@@ -156,9 +156,12 @@ one fetch finds it at any prefix of that token. The borough is the nearest stati
 **Privacy.**
 - Static shards still reveal a little to GitHub Pages: walk shards are keyed by the station the user
   picked or focused, never by the fix; address shards by hash bucket, not street name. A street shard
-  covers about 5 of the 312 two-character prefixes (the index has 32 one-character keys too), so a request
-  says only which of 64 buckets holds the first distinctive token typed (its one-character then two-character
-  bucket as the user types); the query text never leaves the device. Routing runs on
+  holds about 5 of the 315 keys (283 two-character prefixes and 32 one-character keys; 1 to 10 per bucket), so
+  one request narrows the first distinctive word to those. But a client that fetches the one-character bucket
+  and then the two-character one as the user types sends both, and together they can reveal the first two letters
+  of that word to the Pages log (measured: 247 of the 283 prefixes are pinned exactly, and all 283 when the word
+  starts with a letter). The fetch rule is decided in 2q7.14 (privacy card underground-2q7.14.1). No URL ever holds
+  the text typed, and no query text is sent. Routing runs on
   the fix in memory, so the rule that no request carries the location holds.
 - Any hosted routing API needs the origin, which breaks that rule; it would need the user to change it,
   plus consent on every request. Not recommended.
