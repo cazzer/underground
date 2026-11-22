@@ -17,7 +17,7 @@ import { wrapAngle } from '../lib/orbitLimits'
 import type { Ground } from '../lib/projection'
 import type { InteriorModel } from './interiorModel'
 
-type PointRequest = Extract<FlyRequest, { kind: 'point' }>
+export type PointRequest = Extract<FlyRequest, { kind: 'point' }>
 export type MapControlsImpl = ComponentRef<typeof MapControls>
 
 export interface Destination {
@@ -162,6 +162,21 @@ export function bareStationPoints(stationId: string, streets: StreetLayer | null
 export function pointFlight(req: PointRequest, viewport: Viewport, insets: Insets, fovDeg: number, maxDistance: number): Destination {
   const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, EXIT_DISTANCE, maxDistance)
   return { stationId: null, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false }
+}
+
+/**
+ * Points an in-flight `f` at `dest` from the camera's current pose (`az` its azimuth) at eased progress `e0`, keeping the
+ * flight's timing, so the camera doesn't jump (a mid-flight retarget). `dest`'s `stationId` and `follows` are not copied.
+ */
+export function rebaseFlight(f: Flight, dest: Destination, c: MapControlsImpl, camera: PerspectiveCamera, az: number, e0: number): void {
+  f.from.copy(c.target)
+  f.fromDistance = camera.position.distanceTo(c.target)
+  f.fromAzimuth = az
+  f.e0 = e0
+  f.target = dest.target
+  f.distance = dest.distance
+  f.azimuth = dest.azimuth
+  f.freeBottom = dest.freeBottom
 }
 
 /**

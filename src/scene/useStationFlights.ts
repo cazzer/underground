@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { PerspectiveCamera } from 'three'
 import { interiorCovers, type IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
@@ -17,9 +17,11 @@ import {
   interiorFlight,
   newFlight,
   pointFlight,
+  rebaseFlight,
   stationFlight,
   type Flight,
   type MapControlsImpl,
+  type PointRequest,
 } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
 import type { ReframeLayout } from './useInteriorReframe'
@@ -52,7 +54,8 @@ interface StationFlightsOptions {
 
 /**
  * Starts the flight a fly request asks for (a station or a point), and retargets a station flight mid-way when its
- * interior, a bare station's streets or the panel's measurement arrives. Call it after CameraRig's `latest` layout effect, so a fly request
+ * interior, a bare station's streets or the panel's measurement arrives, and a point flight when the viewport or the HUD
+ * insets change. Call it after CameraRig's `latest` layout effect, so a fly request
  * reads the current layout.
  */
 export function useStationFlights({
@@ -72,6 +75,9 @@ export function useStationFlights({
   index,
   frame,
 }: StationFlightsOptions): void {
+  /** The point flight this hook started and its request, while that flight may still be in `flight` (matched by identity). */
+  const point = useRef<{ flight: Flight; request: PointRequest } | null>(null)
+
   // Layout effect, not a passive one: a frame between the select and a passive effect would see
   // the new focus with no flight and drop it again (the camera is still far out).
   useLayoutEffect(() => {
@@ -85,8 +91,10 @@ export function useStationFlights({
       const l = layout.current
       const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
       flight.current = newFlight(dest, c, camera, prefersReducedMotion())
+      point.current = { flight: flight.current, request: flyRequest }
       return
     }
+    point.current = null
     const station = network.stationById.get(flyRequest.stationId)
     if (!station) throw new Error(`Fly request for unknown station "${flyRequest.stationId}"`)
     hold.current = null
@@ -142,13 +150,22 @@ export function useStationFlights({
       f.turnDecided = true
       awaiting.current = nextAwaiting(awaiting.current, layout.current.tripOpen)
     }
-    f.from.copy(c.target)
-    f.fromDistance = camera.position.distanceTo(c.target)
-    f.fromAzimuth = az
-    f.e0 = e0
-    f.target = dest.target
-    f.distance = dest.distance
-    f.azimuth = dest.azimuth
-    f.freeBottom = dest.freeBottom
+    rebaseFlight(f, dest, c, camera, az, e0)
   }, [interior, panel, size, insets, streets, index, frame, camera, network, controls, flight, awaiting, layout])
+
+  // A point flight (a place, the location button) frames its point in the free rect it set off with; the header can grow
+  // in the same commit (a place's status line) and the viewport can resize mid-flight: reframe it in the new one at the
+  // same pace. Only the flight this hook started: a follow, a reframe or a gesture replaced it (and landing cleared it).
+  useEffect(() => {
+    const p = point.current
+    const f = flight.current
+    const c = controls.current
+    if (!p || !c) return
+    if (f !== p.flight) {
+      point.current = null
+      return
+    }
+    const dest = pointFlight(p.request, size, insets, camera.fov, layout.current.maxDistance)
+    rebaseFlight(f, dest, c, camera, c.getAzimuthalAngle(), flightProgress(f.elapsed, f.duration))
+  }, [size, insets, camera, controls, flight, layout])
 }
