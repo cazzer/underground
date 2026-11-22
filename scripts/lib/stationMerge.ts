@@ -2,7 +2,7 @@
  *  StationInterior contract. Hand-edited input is read through the path-labelled checkers, so a bad
  *  field fails with its JSON path. No IO. */
 import type {
-  Connector, Entrance, FareLine, Level, LocalPoint, Platform, Slab, StationInterior,
+  Connector, DepthSource, Entrance, FareLine, Level, LocalPoint, Platform, Slab, StationInterior,
 } from '../../src/data/stationSchema.ts'
 import { bool, finite, list, oneOf, pair, record, text } from './check.ts'
 import type { Ctx } from './stationCtx.ts'
@@ -13,6 +13,7 @@ import { makeFrame, openRing } from './stationGeometry.ts'
 import type { AuthoredStation, StationSources } from './stationInputs.ts'
 import { checkMembers, trackOwner } from './stationMembers.ts'
 
+const DEPTH_SOURCES = ['ee-rise', 'deep-list', 'osm-level', 'structure-default'] as const satisfies readonly DepthSource[]
 const ROW_TOLERANCE_DEG = 1e-6
 export const MTA_CREDIT = 'Metropolitan Transportation Authority, data.ny.gov'
 const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
@@ -34,6 +35,12 @@ function points(ctx: Ctx, v: unknown, path: string, min: number): LocalPoint[] {
   return out
 }
 
+/** The `approximate` marker is `true` or absent; `false` is a mistake, not a way to say "surveyed". */
+function onlyTrue(v: unknown, path: string): true {
+  if (v !== true) throw new Error(`${path}: expected true or absent, got ${JSON.stringify(v)}`)
+  return true
+}
+
 function buildLevels(authored: AuthoredStation): Level[] {
   const seen = new Set<string>()
   const levels = list(authored.levels, 'levels').map((l, i): Level => {
@@ -43,7 +50,9 @@ function buildLevels(authored: AuthoredStation): Level[] {
     if (seen.has(id)) throw new Error(`${at}.id: duplicate level id ${id}`)
     seen.add(id)
     const kind = oneOf(r.kind, ['street', 'mezzanine', 'platform'], `${at}.kind`)
-    return { id, name: text(r.name, `${at}.name`), kind, y: finite(r.y, `${at}.y`) }
+    const depthSource = r.depthSource === undefined ? undefined : oneOf(r.depthSource, DEPTH_SOURCES, `${at}.depthSource`)
+    if (depthSource !== undefined && kind === 'street') throw new Error(`${at}.depthSource: the street level has no depth source`)
+    return { id, name: text(r.name, `${at}.name`), kind, y: finite(r.y, `${at}.y`), ...(depthSource === undefined ? {} : { depthSource }) }
   })
   const streets = levels.filter((l) => l.kind === 'street')
   if (streets.length !== 1) throw new Error(`levels: expected exactly one street level, got ${streets.length}`)
@@ -82,6 +91,7 @@ function buildSlabs(authored: AuthoredStation, ctx: Ctx): Slab[] {
       name: text(r.name, `${at}.name`),
       outline: openRing(points(ctx, r.outline, `${at}.outline`, 3), `slab ${String(r.id)}`),
       ...(r.paid === undefined ? {} : { paid: bool(r.paid, `${at}.paid`) }),
+      ...(r.approximate === undefined ? {} : { approximate: onlyTrue(r.approximate, `${at}.approximate`) }),
       sources: ['authored'],
     }
   })
@@ -183,6 +193,7 @@ export function buildStationInterior(authored: AuthoredStation, sources: Station
     stationId,
     ...(members ? { memberStationIds: members } : {}),
     name: text(authored.name, 'name'),
+    ...(authored.approximate === undefined ? {} : { approximate: onlyTrue(authored.approximate, 'approximate') }),
     anchor: { lat: authored.frame.anchor.lat, lon: authored.frame.anchor.lon },
     license: 'ODbL-1.0',
     attribution: [

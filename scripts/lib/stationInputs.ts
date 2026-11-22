@@ -11,6 +11,8 @@ export interface AuthoredStation {
   /** A station complex: every member's GTFS station id, sorted, `stationId` first (the file is named after it). */
   memberStationIds?: string[]
   name: string
+  /** The whole layout is approximate (see StationInterior.approximate). */
+  approximate?: true
   /** Free text. Facts not confirmed by a source start with "UNVERIFIED:". Not copied to output. */
   notes: string[]
   frame: { anchor: LatLon; bearingDeg: number }
@@ -26,7 +28,7 @@ export interface AuthoredStation {
   }
   levels: Level[]
   platforms: { id: string; level: LevelId; osmWay: number; tracks: { stopId: string; path: FramePoint[] }[] }[]
-  slabs: { id: string; level: LevelId; name: string; outline: FramePoint[]; paid?: boolean }[]
+  slabs: { id: string; level: LevelId; name: string; outline: FramePoint[]; paid?: boolean; approximate?: true }[]
   /** Must cover every Open Data row exactly once; matched by the row's exact lat/lon (tolerance 1e-6 deg). */
   entrances: { id: string; source: [lat: number, lon: number] }[]
   /** Stairs, ramps and walkways (no source provides them). Escalators/elevators come from E&E. */

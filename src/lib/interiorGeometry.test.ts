@@ -130,6 +130,21 @@ describe('buildInteriorBuffers', () => {
     expect(split.fine.distances.filter((d) => d > 0)).toHaveLength(8)
   })
 
+  it('dashes an approximate slab without dashStructure, and leaves the platform solid', () => {
+    const base = fixture()
+    const approx = { ...base, slabs: base.slabs.map((s) => ({ ...s, approximate: true as const })) }
+    const b = buildInteriorBuffers(approx, opts())
+    expect(b.strong.positions).toEqual(strong.positions)
+    // Only the slab's outline (4) and guides (4 + 4) carry distances; the platform outline stays 0, 0.
+    expect(b.strong.distances.filter((d) => d > 0)).toHaveLength(4)
+    expect(b.fine.distances.filter((d) => d > 0)).toHaveLength(8)
+    for (let k = 0; k < count(b.strong); k++) {
+      if (ROLES[color(b.strong, k)[0]!] !== 'outline') continue
+      // The platform outline is at y -16, the mezzanine slab at -8.
+      expect(b.strong.distances[k * 2 + 1]! > 0).toBe(seg(b.strong, k)[1]! === -8)
+    }
+  })
+
   it('throws naming the element for an unknown level', () => {
     const bad = fixture([{ ...STAIR, upper: { ...STAIR.upper, level: 'roof' } }])
     expect(() => buildInteriorBuffers(bad, opts())).toThrow('Unknown level "roof" in ST1')

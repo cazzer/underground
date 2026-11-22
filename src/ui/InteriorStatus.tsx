@@ -16,7 +16,7 @@ interface ReadyLineProps {
 
 /**
  * The line for a loaded interior. The card stays just name and arrivals, so an authored interior shows nothing
- * here and the live region collapses. A generated one says it is estimated; the line shows whether or not the
+ * here and the live region collapses. A generated one, or an authored one marked approximate, says it is estimated; the line shows whether or not the
  * interior is in view, so the live region announces it once per station, not per zoom. Keyed by station: going
  * from one generated station to another whose interior is cached keeps the same text, and only a new node
  * makes the region speak again.
