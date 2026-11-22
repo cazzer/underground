@@ -112,4 +112,24 @@ describe('buildLineBuffers', () => {
     const { bands } = buildLineBuffers([path('a', 'A', true, [[3, 3], [3, 3]], undefined, [1, 1])], ORDER, colorOf)
     expect([...bands]).toEqual([0, 0, 1, 0, 0, 0, 1, 0])
   })
+
+  describe('with skipCovered', () => {
+    const primary = path('a', 'A', true, [[0, 0], [10, 0], [20, 0]])
+    const variant = { ...path('ax', 'A', false, [[0, 0], [10, 0], [20, 0], [20, 10]]), cover: { primaryId: 'a', segments: Uint8Array.of(1, 1, 0) } }
+
+    it("leaves out a variant's covered segments and maps the rest to their buffer segments", () => {
+      const { positions, segments } = buildLineBuffers([primary, variant], ORDER, colorOf, true)
+      // The variant's one unique segment, then the primary's two.
+      expect(segmentStartsX(positions)).toEqual([20, 0, 10])
+      expect([...segments.get('ax')!]).toEqual([-1, -1, 0])
+      expect([...segments.get('a')!]).toEqual([1, 2])
+    })
+
+    it('draws every segment when the primary is not among the paths, or without skipCovered', () => {
+      expect(buildLineBuffers([variant], ORDER, colorOf, true).positions.length).toBe(3 * 6)
+      const { positions, segments } = buildLineBuffers([primary, variant], ORDER, colorOf)
+      expect(positions.length).toBe(5 * 6)
+      expect([...segments.get('ax')!]).toEqual([0, 1, 2])
+    })
+  })
 })

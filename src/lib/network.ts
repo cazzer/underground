@@ -12,6 +12,7 @@ import { profileRuns } from './trackAnchors'
 import { trackLine } from './trackLine'
 import { lineBreaks } from './trackBreaks'
 import { buildTrackProfile, EMPTY_PROFILE, GRADE, profileAt, resampleAt, type ProfileRun, type TrackProfile } from './trackProfile'
+import type { PrimaryCover } from './variantCover'
 
 export interface Station {
   id: StationId
@@ -68,6 +69,11 @@ export interface ShapePath {
   bandInputs: Float32Array
   /** The shape's bands along its distance (corridors.ts); NO_BANDS when it shares no corridor or before bandShapes. */
   bands: ShapeBands
+  /**
+   * A variant's segments that draw exactly under its primary (variantCover.ts), set by bandShapes: the route lines
+   * leave them out. Absent on primaries, on variants with none, and before the bands arrive.
+   */
+  cover?: PrimaryCover
 }
 
 export interface Bounds {

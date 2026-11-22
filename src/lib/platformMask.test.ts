@@ -39,9 +39,10 @@ describe('writePlatformFade', () => {
   const xs = [0, 100, ...maskBreaks({ d0: 160, d1: 240 }).flatMap((d) => (d === 160 ? [160, 164] : [d])), 300, 400]
   const a = path('a', xs)
   const b = path('b', [0, 400])
+  // b's one segment first, then a's.
   const first = new Map([
-    ['b', 0],
-    ['a', 1],
+    ['b', Int32Array.of(0)],
+    ['a', Int32Array.from(xs.slice(1), (_, i) => 1 + i)],
   ])
   const fade = new Float32Array((1 + xs.length - 1) * FADE_INPUTS).fill(9)
 
@@ -61,6 +62,14 @@ describe('writePlatformFade', () => {
     expect(weightAt(164)).toBeCloseTo(0.352, 6)
     // A segment's start repeats the previous segment's end, so the fade is continuous.
     for (let i = 2; i < xs.length; i++) expect(fade[(1 + i - 1) * FADE_INPUTS]).toBe(fade[(1 + i - 2) * FADE_INPUTS + 1])
+  })
+
+  it('skips segments left out of the buffers', () => {
+    // b drawn second, after a's first segment; a's second segment is left out (-1).
+    const c = path('c', [100, 200, 300])
+    const out = new Float32Array(3 * FADE_INPUTS).fill(9)
+    writePlatformFade(out, [c, b], new Map([['c', Int32Array.of(0, -1)], ['b', Int32Array.of(1)]]), new Map([['c', { d0: 0, d1: 400 }]]))
+    expect([...out]).toEqual([1, 1, 0, 0, 0, 0])
   })
 
   it('clears everything for no station', () => {

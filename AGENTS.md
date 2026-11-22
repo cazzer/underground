@@ -145,7 +145,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths without bands, bounds,
     `trackLines` for the corridor search; `drawnPath` resamples one shape); `networkBands.ts` `bandShapes` redraws
-    the banded shapes (`BandedShapes`), `bandNetwork` runs the search too (tests, the worker fallback);
+    the banded shapes (`BandedShapes`) and sets each variant's `cover`, `bandNetwork` runs the search too (tests, the worker fallback);
+    `variantCover.ts` `coverVariants`: a variant's segments with the same ends, y and band inputs as one of its route
+    and direction's primary's (1 mm, 1e-4), outside the primary's platform spans (its fade would show the variant
+    under it), so the lines skip them (about half of the variant segments; trains keep every shape whole;
+    `variantCover.data.test.ts` checks the skipped ones draw within 0.05 px of the primary at six views);
     `trackLine.ts` a shape's drawn track (decode, project, `dropSpurs` removes out-and-back tips of
     160°+ turns, then offset); `trackOffset.ts` `offsetPolyline` (miter joins, capped at 2× on sharp
     bends) plus the `TRACK_OFFSET_M` constant (4.7 m). Both use explicit `.ts` imports because a scripts/
@@ -182,7 +186,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     ease, the 8 px pan break (16 px on touch), the 100 px jump re-fly, `followDistanceFor`); `followStep.ts` `stepFollow`,
     one follow frame (pan break, the 0.35 s lag `stepLag`, catch-up), tested on its own
   - `lineBuffers.ts` (positions, colors, `bands`: each segment end's band inputs from `vertexBandInputs` (miter
-    vector normal / cosHalf, slot, corridor half-width), and `firstSegment` per shape), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
+    vector normal / cosHalf, slot, corridor half-width), and `segments` per shape: each of its segments' buffer index, -1 when skipped; `skipCovered` leaves out
+    `ShapePath.cover` segments whose primary is drawn too, for opaque layers only, so not `?lines=c`), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
     station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
@@ -460,7 +465,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   zoom for z-offsets to work.
 - All route shapes draw as one merged `LineSegments2` (one draw call, per-vertex colors in linear
   space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then
-  route_sort_order. Don't add per-route `<Line>`s.
+  route_sort_order. A variant's stretches under its primary are left out (`variantCover.ts`): the primary draws
+  the same pixels after them. Don't add per-route `<Line>`s.
 - Routes sharing a corridor draw as side-by-side bands `theme.bandPitchPx` apart on screen at any zoom and tilt.
   Each shape point carries band inputs (`ShapePath.bandInputs`: miter, slot and half-width, from corridors.ts via
   networkBands.ts) and the vertex shader moves it along its miter normal by `bandShift` (`src/lib/bandOffset.ts`);

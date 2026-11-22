@@ -10,8 +10,11 @@ import { routeLineColor, type RouteLineMix } from '../lib/routeColor'
 import { theme } from '../theme'
 import { BAND_END, BAND_START, BandLineMaterial, FADE_ATTRIBUTE } from './bandLineMaterial'
 
-/** Line buffers for `paths`, each colored by its route's GTFS color under `mix`, with their band inputs. */
-export function routeLineBuffers(network: Network, paths: readonly ShapePath[], mix: RouteLineMix): LineBuffers {
+/**
+ * Line buffers for `paths`, each colored by its route's GTFS color under `mix`, with their band inputs. An opaque
+ * layer passes `skipCovered` to leave out variant segments its primaries draw over (buildLineBuffers).
+ */
+export function routeLineBuffers(network: Network, paths: readonly ShapePath[], mix: RouteLineMix, skipCovered: boolean): LineBuffers {
   const order = new Map(network.routes.map((r, i) => [r.id, i]))
   const colors = new Map<RouteId, Rgb>()
   for (const r of network.routes) {
@@ -23,7 +26,7 @@ export function routeLineBuffers(network: Network, paths: readonly ShapePath[], 
     const c = colors.get(id)
     if (!c) throw new Error(`No color for route "${id}"`)
     return c
-  })
+  }, skipCovered)
 }
 
 /** Dash pattern in world meters (a generated interior's outlines). */

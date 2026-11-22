@@ -6,21 +6,26 @@
 import type { ShapeId } from '../data/schema'
 import { corridorBands, type ShapeBands } from './corridors'
 import { drawnPath, type Network, type ShapePath } from './network'
+import { coverVariants } from './variantCover'
 
 export interface BandedShapes {
-  /** network.shapes with their bands, in the same order; a shape that shares no corridor is the same object. */
+  /**
+   * network.shapes with their bands and, on variants, their cover under the primary (variantCover.ts), in the same
+   * order; a shape with neither is the same object.
+   */
   shapes: readonly ShapePath[]
   shapeById: ReadonlyMap<ShapeId, ShapePath>
   /** Bands of each shape that shares a corridor. */
   bands: ReadonlyMap<ShapeId, ShapeBands>
 }
 
-/** network's shapes redrawn with `bands` (corridorBands over network.trackLines). */
+/** network's shapes redrawn with `bands` (corridorBands over network.trackLines), then each variant's cover. */
 export function bandShapes(network: Network, bands: ReadonlyMap<ShapeId, ShapeBands>): BandedShapes {
-  const shapes = network.shapes.map((s, i) => {
+  const banded = network.shapes.map((s, i) => {
     const b = bands.get(s.id)
     return b ? drawnPath(s, network.trackLines[i]!.line, s.profile, b, network.platformSpans) : s
   })
+  const shapes = coverVariants(banded, network.platformSpans)
   return { shapes, shapeById: new Map(shapes.map((s) => [s.id, s])), bands }
 }
 

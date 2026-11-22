@@ -27,22 +27,25 @@ export const FADE_INPUTS = 2
 
 /**
  * Writes the fade weights of `spans` (one station's, or null for none) into `fade`, laid out like the line buffers
- * (segment `firstSegment.get(id) + i - 1` joins points i - 1 and i of shape `id`). Every other segment gets 0.
+ * (`segments.get(id)[i - 1]` is the buffer segment joining points i - 1 and i of shape `id`, -1 when it isn't
+ * drawn). Every other segment gets 0.
  */
 export function writePlatformFade(
   fade: Float32Array,
   paths: readonly ShapePath[],
-  firstSegment: ReadonlyMap<ShapeId, number>,
+  segments: ReadonlyMap<ShapeId, Int32Array>,
   spans: StationSpans | null,
 ): void {
   fade.fill(0)
   if (!spans) return
   for (const path of paths) {
     const span = spans.get(path.id)
-    const first = firstSegment.get(path.id)
-    if (!span || first === undefined) continue
+    const of = segments.get(path.id)
+    if (!span || !of) continue
     for (let i = 1; i < path.points.length; i++) {
-      const o = (first + i - 1) * FADE_INPUTS
+      const seg = of[i - 1]!
+      if (seg < 0) continue
+      const o = seg * FADE_INPUTS
       fade[o] = maskSpanWeight(path.cumulative[i - 1]!, span)
       fade[o + 1] = maskSpanWeight(path.cumulative[i]!, span)
     }

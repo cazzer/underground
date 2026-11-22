@@ -35,7 +35,7 @@ export function LineHighlight({ network, paths, interiorStationId }: LayerProps)
     const station = focusedId ? network.stationById.get(focusedId) : undefined
     if (!station) return null
     const routes = new Set(station.routeIds)
-    return routeLineBuffers(network, paths.filter((s) => routes.has(s.routeId)), theme.routeLineMix)
+    return routeLineBuffers(network, paths.filter((s) => routes.has(s.routeId)), theme.routeLineMix, true)
   }, [network, paths, focusedId])
   const lines = useLineLayer(buffers, RENDER_ORDER.lineFocus)
   usePlatformFade(lines, buffers, paths, network, interiorStationId)
@@ -51,7 +51,8 @@ const FADE_FAR = 8_000
 const FADE_NEAR = 3_000
 
 export function LineFade({ network, paths, interiorStationId }: LayerProps) {
-  const buffers = useMemo(() => routeLineBuffers(network, paths, theme.routeLineMix), [network, paths])
+  // Translucent while it fades in, so every variant segment stays drawn: one under its primary would show through.
+  const buffers = useMemo(() => routeLineBuffers(network, paths, theme.routeLineMix, false), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lineFocus)
   usePlatformFade(lines, buffers, paths, network, interiorStationId)
   useFrame((state) => {

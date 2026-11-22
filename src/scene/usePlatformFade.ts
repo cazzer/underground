@@ -20,10 +20,10 @@ export function usePlatformFade(
   interiorStationId: StationId | null,
 ): void {
   useEffect(() => {
-    if (!lines || !buffers?.firstSegment) return
+    if (!lines || !buffers?.segments) return
     const fade = lines.geometry.getAttribute(FADE_ATTRIBUTE) as InstancedBufferAttribute
     const spans = (interiorStationId !== null && network.platformSpans.get(interiorStationId)) || null
-    writePlatformFade(fade.array as Float32Array, paths, buffers.firstSegment, spans)
+    writePlatformFade(fade.array as Float32Array, paths, buffers.segments, spans)
     fade.needsUpdate = true
   }, [lines, buffers, paths, network, interiorStationId])
 }
