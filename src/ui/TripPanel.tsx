@@ -92,9 +92,8 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, exit
       <div ref={content}>
         {collapsed ? (
           <ExpandBar ref={setHeading} label={bar.spoken} controls={bodyId} onExpand={expand}>
-            <span aria-hidden="true" className="flex min-w-0">
-              <span className="min-w-0 truncate">{bar.head}</span>
-              <span className="min-w-0 shrink-[0.01] truncate whitespace-pre">{bar.tail}</span>
+            <span aria-hidden="true" className="line-clamp-2 min-w-0">
+              {bar.text}
             </span>
           </ExpandBar>
         ) : (

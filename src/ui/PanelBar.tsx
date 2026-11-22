@@ -41,7 +41,7 @@ interface ExpandBarProps {
 
 /**
  * A collapsed panel: its text and an up chevron; pressing it expands the panel. The caller decides how the text
- * shortens (a station name wraps; a trip's From truncates first).
+ * shortens (a station name or a trip's From → To wraps, a trip's to two lines at most).
  */
 export function ExpandBar({ label, controls, onExpand, ref, children }: ExpandBarProps) {
   return (
