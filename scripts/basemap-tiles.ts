@@ -9,20 +9,26 @@
  *  node scripts/basemap-tiles.ts probe-sizes <tiles-dir>
  *      Prints the sizes of the tiles verify-basemap.ts probes as one line of JSON; fails if one is not in the tree.
  *
+ *  node scripts/basemap-tiles.ts pin-state
+ *      Prints `none`, `legacy` (the old nyc.pmtiles pin) or `tiles` for data/basemap/basemap.json, which it validates
+ *      with parseBasemapFile (so a malformed pin fails the deploy instead of being skipped).
+ *
  *  Offline. */
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
+import { parseBasemapFile } from './lib/basemapSpec.ts'
 import { unpackTarGz } from './lib/basemapUnpack.ts'
 import { probeSizes, scanProblems, scanTiles } from './lib/tileTree.ts'
 
 function option(args: string[], name: string): number | undefined {
   const i = args.indexOf(name)
   if (i < 0) return undefined
-  const n = Number(args[i + 1])
-  if (!Number.isInteger(n) || n < 0) throw new Error(`${name} needs a whole number`)
+  const value = args[i + 1]
+  const n = value === undefined || value === '' ? NaN : Number(value)
+  if (!Number.isInteger(n) || n < 0) throw new Error(`${name} needs a whole number, got ${JSON.stringify(value ?? null)}`)
   return n
 }
 
-function require(value: number | undefined, name: string): number {
+function required(value: number | undefined, name: string): number {
   if (value === undefined) throw new Error(`${name} is required`)
   return value
 }
@@ -44,15 +50,20 @@ async function main(): Promise<void> {
   const [first, second] = rest
   if (command === 'check' && first !== undefined) return check(first, rest)
   if (command === 'unpack' && first !== undefined && second !== undefined) {
-    const result = await unpackTarGz(first, second, { files: require(option(rest, '--files'), '--files'), tileBytes: require(option(rest, '--tile-bytes'), '--tile-bytes'), maxZoom: option(rest, '--max-zoom') ?? 15 })
+    const result = await unpackTarGz(first, second, { files: required(option(rest, '--files'), '--files'), tileBytes: required(option(rest, '--tile-bytes'), '--tile-bytes'), maxZoom: option(rest, '--max-zoom') ?? 15 })
     console.log(`Unpacked ${result.files} files, ${result.bytes} tile bytes into ${second}/tiles`)
+    return
+  }
+  if (command === 'pin-state') {
+    const { pin } = parseBasemapFile(JSON.parse(readFileSync(new URL('../data/basemap/basemap.json', import.meta.url), 'utf8')))
+    console.log(pin === null ? 'none' : 'legacy' in pin ? 'legacy' : 'tiles')
     return
   }
   if (command === 'probe-sizes' && first !== undefined) {
     console.log(JSON.stringify(await probeSizes(first)))
     return
   }
-  throw new Error('usage: node scripts/basemap-tiles.ts check <dir> | unpack <tar.gz> <dest> | probe-sizes <dir> (see the file header for options)')
+  throw new Error('usage: node scripts/basemap-tiles.ts check <dir> | unpack <tar.gz> <dest> | probe-sizes <dir> | pin-state (see the file header for options)')
 }
 
 main().catch((err: unknown) => {

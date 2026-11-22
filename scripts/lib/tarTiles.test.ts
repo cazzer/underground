@@ -43,6 +43,7 @@ describe('listTarFiles', () => {
     ['a name prefix', { name: '0.mvt', prefix: 'tiles/0/0' }],
     ['a link name on a regular file', { name: 'tiles/0/0/0.mvt', link: 'elsewhere' }],
     ['a header that is not ustar', { name: 'tiles/0/0/0.mvt', magic: 'none' as const }],
+    ['a GNU-magic header', { name: 'tiles/0/0/0.mvt', magic: 'gnu' as const }],
   ])('rejects %s', (_what, entry) => {
     expect(() => listTarFiles(makeTar([entry]))).toThrow(/tar entry/)
   })

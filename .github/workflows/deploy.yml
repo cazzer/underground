@@ -118,7 +118,7 @@ jobs:
         run: |
           # The default shell has no pipefail, and the node scripts below are piped to tee.
           set -o pipefail
-          state=$(jq -r 'if .pin == null then "none" elif .pin.asset == null then "legacy" else "tiles" end' data/basemap/basemap.json)
+          state=$(node scripts/basemap-tiles.ts pin-state)
           if [ "$state" = none ]; then
             echo "::warning::data/basemap/basemap.json has no pin; deploying without the basemap."
           elif [ "$state" = legacy ]; then

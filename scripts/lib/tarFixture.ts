@@ -8,8 +8,8 @@ export interface FixtureEntry {
   type?: string
   link?: string
   prefix?: string
-  /** Writes `ustar  ` (GNU) when false, and no magic at all when 'none'. */
-  magic?: 'ustar' | 'none'
+  /** `ustar` writes `ustar\0` and version `00` (POSIX, the default); `gnu` writes `ustar  \0` (GNU tar's old format); `none` writes no magic. */
+  magic?: 'ustar' | 'gnu' | 'none'
 }
 
 /** A small MVT: one layer holding `n` filler bytes (its length a protobuf varint). */
@@ -32,8 +32,11 @@ function header(e: FixtureEntry, size: number): Uint8Array {
   put(block, 136, '00000000000\0')
   put(block, 156, e.type ?? '0')
   put(block, 157, e.link ?? '')
-  if (e.magic !== 'none') put(block, 257, 'ustar\0')
-  put(block, 263, '00')
+  if (e.magic === 'gnu') put(block, 257, 'ustar  \0')
+  else if (e.magic !== 'none') {
+    put(block, 257, 'ustar\0')
+    put(block, 263, '00')
+  }
   put(block, 345, e.prefix ?? '')
   put(block, 148, '        ')
   const sum = block.reduce((s, b) => s + b, 0)
@@ -41,13 +44,15 @@ function header(e: FixtureEntry, size: number): Uint8Array {
   return block
 }
 
-export function makeTar(entries: FixtureEntry[], { end = true }: { end?: boolean } = {}): Uint8Array {
+/** `pad` rounds the archive up to a multiple of that many bytes with zeros, as GNU tar does to its 10240-byte record. */
+export function makeTar(entries: FixtureEntry[], { end = true, pad }: { end?: boolean; pad?: number } = {}): Uint8Array {
   const parts: Uint8Array[] = []
   for (const e of entries) {
     const body = e.body ?? new Uint8Array()
     parts.push(header(e, body.length), body, new Uint8Array((512 - (body.length % 512)) % 512))
   }
   if (end) parts.push(new Uint8Array(1024))
+  if (pad !== undefined) parts.push(new Uint8Array((pad - (parts.reduce((n, p) => n + p.length, 0) % pad)) % pad))
   const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0))
   let at = 0
   for (const p of parts) {
@@ -57,6 +62,6 @@ export function makeTar(entries: FixtureEntry[], { end = true }: { end?: boolean
   return out
 }
 
-export function makeTarGz(entries: FixtureEntry[]): Buffer {
-  return gzipSync(makeTar(entries))
+export function makeTarGz(entries: FixtureEntry[], options: { pad?: number } = {}): Buffer {
+  return gzipSync(makeTar(entries, options))
 }

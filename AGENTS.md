@@ -60,9 +60,9 @@ so dev and preview serve under that path.
   `scripts/lib/streetsBuild.ts` (footways only), never per file.
 - `npm run basemap:fetch [-- --out dir]`: downloads the pinned NYC basemap (`data/basemap/basemap.json` `pin`, a GitHub Release
   tarball of uncompressed MVT tiles) and unpacks it to the gitignored `public/basemap/tiles/<z>/<x>/<y>.mvt` (vite serves
-  `/underground/basemap/tiles/...`), sha256-, size- and path-checked, no network once the tree matches; fails while the pin is
+  `/underground/basemap/tiles/...`, and a dev-only middleware in `vite.config.ts` answers 404 for a tile not in the tree), sha256-, size- and path-checked, no network once the tree matches; fails while the pin is
   null or the old `nyc.pmtiles` format. `npm run basemap:gate -- <source|output> <metadata.json>` is the workflow's licensing gate
-  (offline); `npm run basemap:tiles -- check|unpack|probe-sizes ...` checks a tile tree and unpacks a tarball (offline);
+  (offline); `npm run basemap:tiles -- check|unpack|probe-sizes|pin-state ...` checks a tile tree, unpacks a tarball, classifies the pin (offline);
   `npm run basemap:verify -- <tiles-url> '<probe-sizes-json>'` fetches three tiles from the live site (network; the deploy's
   `verify-basemap` job runs it). The basemap is built by hand-dispatching `.github/workflows/basemap.yml` (see Data below), then
   pinned in a normal PR.

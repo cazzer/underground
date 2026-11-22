@@ -4,23 +4,28 @@
  *
  *  Uses the network (the URL given, nothing else). `<probe-sizes-json>` is `node scripts/basemap-tiles.ts probe-sizes
  *  dist/basemap/tiles`: the file size of each probe tile in the deployed tree (scripts/lib/tileProbe.ts: z0, a z15 tile over
- *  Midtown and one over Brooklyn). Each is fetched twice, with `Accept-Encoding: identity` and with the header a browser
- *  sends (`gzip, deflate, br, zstd`; a script can set it, a page's JavaScript cannot), and must answer 200 with a body that,
+ *  Midtown and one over Brooklyn). Each is fetched twice, with `Accept-Encoding: identity` and with a browser's header
+ *  (`gzip, deflate, br`: a browser also offers zstd, which Node cannot decode; a script can set the header, a page's JavaScript
+ *  cannot), and must answer 200 with a body that,
  *  decoded, is a valid MVT of exactly the file's size and (when compressed) the identity bytes. Pages may compress the
  *  tile; the browser decodes that transparently, so a content-encoding is recorded, never a failure. A tile the pack does not
  *  hold is also asked for: its status (the client treats 404 as an empty tile) is recorded, not judged.
- *  A new deploy can take a moment to reach the CDN, so it retries (default 6 times, 20 s apart), each time with a
- *  cache-busting query. Every header, content-type and content-encoding included, goes to the job summary. */
+ *  A new deploy can take a moment to reach the CDN, so it retries (default 6 times, 20 s apart, none starting after 12
+ *  minutes), each time with a cache-busting query. Every header, content-type and content-encoding included, goes to the job summary. */
 import { appendFileSync } from 'node:fs'
 import { MISSING_TILE, PROBE_TILES, tilePath, tileProblems } from './lib/tileProbe.ts'
 import type { ProbeResponse, ProbeTile } from './lib/tileProbe.ts'
 
-const REQUEST_TIMEOUT_MS = 60_000
+/** A request that hangs is cut off at 30 s, and no new attempt starts after 12 minutes, so the worst case (a last attempt of
+ *  seven slow requests) ends well inside the job's 20-minute timeout and the summary is always written. */
+const REQUEST_TIMEOUT_MS = 30_000
+const DEADLINE_MS = 12 * 60_000
 
 type Encoding = 'identity' | 'browser'
 
-/** What a browser sends on an ordinary request. */
-const BROWSER_ENCODINGS = 'gzip, deflate, br, zstd'
+/** What a browser sends on an ordinary request, less zstd: Node's fetch cannot decode a zstd body, so offering it would
+ *  turn a server that answers zstd into a false failure (Pages answers gzip, as measured). */
+const BROWSER_ENCODINGS = 'gzip, deflate, br'
 const SHOWN = ['content-type', 'content-encoding', 'content-length', 'cache-control', 'etag', 'vary', 'age', 'x-cache']
 
 interface Probe {
@@ -108,12 +113,19 @@ async function main(): Promise<void> {
   const attempts = option(args, '--attempts', 6)
   const delayS = option(args, '--delay-s', 20)
 
+  const deadline = Date.now() + DEADLINE_MS
   let probes: Probe[] = []
   for (let attempt = 1; attempt <= attempts; attempt++) {
     probes = await runAll(base, sizes)
     if (probes.every((p) => p.problems.length === 0)) break
     for (const p of probes) for (const problem of p.problems) console.log(`attempt ${attempt}/${attempts}: ${p.tile.label} (${p.encoding}): ${problem}`)
-    if (attempt < attempts) await sleep(delayS * 1000)
+    if (attempt < attempts) {
+      if (Date.now() + delayS * 1000 > deadline) {
+        console.log('The 12-minute deadline is near: no further attempts.')
+        break
+      }
+      await sleep(delayS * 1000)
+    }
   }
   const text = summary(base, [...probes, await absentTile(base)])
   console.log(text)

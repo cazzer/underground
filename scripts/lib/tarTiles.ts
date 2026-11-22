@@ -18,6 +18,8 @@ export interface TarFile {
 const BLOCK = 512
 const NAME = /^tiles\/(0|[1-9]\d?)\/(0|[1-9]\d{0,7})\/(0|[1-9]\d{0,7})\.mvt$/
 export const MAX_TILE_ZOOM = 22
+/** Bytes 257 to 264 of a header: the magic `ustar\0` and the version `00`. */
+const USTAR = [0x75, 0x73, 0x74, 0x61, 0x72, 0x00, 0x30, 0x30]
 
 /** null when `name` is exactly a tile path of a real tile (x and y inside the zoom's grid), else why not. */
 export function tileNameProblem(name: string, maxZoom = MAX_TILE_ZOOM): string | null {
@@ -70,7 +72,7 @@ export function listTarFiles(tar: Uint8Array, maxZoom = MAX_TILE_ZOOM): TarFile[
     const name = cString(field(block, 0, 100))
     const bad = (why: string): Error => new Error(`tar entry ${JSON.stringify(name)}: ${why}`)
     if (octal(field(block, 148, 156), 'the checksum') !== checksum(block)) throw bad('bad header checksum')
-    if (cString(field(block, 257, 262)) !== 'ustar') throw bad('not a ustar header')
+    if (!USTAR.every((b, i) => block[257 + i] === b)) throw bad('not a POSIX ustar header (magic "ustar\\0", version "00"; GNU tar needs --format=ustar)')
     const type = block[156] as number
     if (type !== 0x30 && type !== 0) throw bad(`type ${JSON.stringify(String.fromCharCode(type))} is not a regular file (links, directories, devices and extensions are refused)`)
     if (cString(field(block, 157, 257)) !== '' || cString(field(block, 345, 500)) !== '') throw bad('has a link name or a name prefix')

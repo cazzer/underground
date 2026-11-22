@@ -259,8 +259,8 @@ count and byte total pass), and unpacks to `dist/basemap/tiles/`; the unpacked t
 without `asset` (the first, `nyc.pmtiles` format) is skipped with a warning, as is a null pin. Its `verify-basemap` job
 fetches three tiles from the live site (z0, a z15 tile over Midtown and one over Brooklyn), with and without a browser's
 `Accept-Encoding`, and fails unless each is a 200 with the tile's exact bytes. `npm run basemap:fetch` fetches the same tree
-into the gitignored `public/basemap/tiles/` for dev (offline after the first fetch; vite serves it, but answers a tile that
-is not in the tree with the app's `index.html` and status 200, so a dev client must check the content type).
+into the gitignored `public/basemap/tiles/` for dev (offline after the first fetch; vite serves it, and answers 404 for a tile
+that is not in the tree, as Pages does).
 
 **Layers.** Kept: `earth`, `water`, `landuse`, `roads`. Dropped: `buildings`, `landcover`, `places`, `pois`, `boundaries`
 (`tile-join -l` for each kept layer; note `-x` is *attribute* exclusion, not layer exclusion). The gate fails the workflow if
@@ -311,8 +311,10 @@ table to its job summary and fails above 200 MB.
 3,820 files (1 each at z0 to z8, 2, 6, 16, 56, 195, 728 and 2,808 at z9 to z15), 44,878,229 bytes unpacked (z15 19.9 MB, z14 12.7 MB,
 z13 5.9 MB), larger than the 33 MB `.pmtiles` because that stores each tile gzipped and these are plain. The tarball is
 31,372,949 bytes (`gzip -9n`). Unpacking takes about 0.6 s with `scripts/basemap-tiles.ts unpack` (2.4 s for the deploy's whole
-`ensureTiles`, which also hashes and scans). Pages sends each file gzipped to a client that offers it (measured on `.pmtiles`,
-also `application/octet-stream`; section 6), so a tile costs about what its entry in the `.pmtiles` did. The Pages artifact limit is
+`ensureTiles`, which also hashes and scans). UNVERIFIED until the first tile-pinned deploy (the `verify-basemap` summary records
+it; section 6's TODO): that Pages serves `.mvt` as `application/octet-stream`, that it gzips each tile for a client that offers
+gzip (it did gzip the `.pmtiles`, which was `application/octet-stream`), and so that a tile costs about what its entry in the
+`.pmtiles` did on the wire. The Pages artifact limit is
 1 GB (the deploy fails above 900 MB and prints the artifact's size and file count); the tiles add 45 MB to it. The artifact is
 uploaded as a single tar, so the 3,820 files should not slow `upload-pages-artifact` (the job summary times it).
 
@@ -374,10 +376,13 @@ browser decodes transparently. There is no Range dependency anywhere now (`scrip
 
 - Cache: `cache-control: max-age=600` (an `etag` changes with each deploy), so a tile can be stale for up to 10 minutes after a
   deploy; the CDN varies on `Accept-Encoding`.
+- UNVERIFIED for tiles until the first tile-pinned deploy: the `.mvt` content-type, whether Pages compresses `.mvt` files, and the
+  wire size of a tile (only the `.pmtiles` was measured, above).
 - Each deploy's `verify-basemap` job records the tiles' headers (content-type, content-encoding, cache-control, etag) in its summary:
   TODO fill in from the first deploy with a tile pin. It also asks for a tile the pack lacks (z15, x 0, y 0), recorded not judged:
   Pages should answer `404`, which the client must treat as an empty tile.
-- Vite dev (sirv) serves `public/basemap/tiles/...` uncompressed with an empty content type; `vite preview` compresses only text and
+- Vite dev (sirv) serves `public/basemap/tiles/...` uncompressed with an empty content type, and a small dev-only middleware in
+  `vite.config.ts` answers 404 for a tile not in the tree (without it the SPA fallback returned `index.html` with status 200); `vite preview` compresses only text and
   JSON. Neither is Pages.
 - The build job's `upload-pages-artifact` step is timed in the job summary. Baseline, run 44989770200 (one 33 MB file, a 42 MB
   artifact): the upload step started 05:32:12 and the deploy job started 05:32:24, so upload plus job teardown took under 12 s;

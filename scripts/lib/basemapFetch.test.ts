@@ -123,6 +123,13 @@ describe('unpackTarGz', () => {
     expect(await readdir(join(dir, 'dest/tiles/15/9649'))).toEqual(['12314.mvt'])
   })
 
+  it('unpacks a small archive padded to GNU tar\'s 10240-byte record', async () => {
+    const file = join(dir, 'padded.tar.gz')
+    const tiny = [{ name: 'tiles/0/0/0.mvt', body: tileBody(3) }]
+    await writeFile(file, makeTarGz(tiny, { pad: 10240 }))
+    expect(await unpackTarGz(file, join(dir, 'padded'), { files: 1, tileBytes: 5, maxZoom: 15 })).toEqual({ files: 1, bytes: 5 })
+  })
+
   it('writes nothing when any entry is hostile, even a late one', async () => {
     const hostile = [...entries, { name: '/tmp/underground-escape.mvt', body: tileBody() }]
     await expect(unpack(hostile, { files: 3, tileBytes: 713 })).rejects.toThrow(/tar entry/)
@@ -135,7 +142,7 @@ describe('unpackTarGz', () => {
     await expect(unpack(entries, { tileBytes: 700 })).rejects.toThrow(/at most|total 708/)
     await expect(unpack([{ name: 'tiles/0/0/0.mvt', body: Uint8Array.from([0x1f, 0x8b, 8]) }], { files: 1, tileBytes: 3 })).rejects.toThrow(/not an MVT/)
     const file = join(dir, 'bomb.tar.gz')
-    await writeFile(file, makeTarGz([{ name: 'tiles/0/0/0.mvt', body: tileBody(100) }, { name: 'tiles/1/0/0.mvt', body: tileBody(100) }]))
+    await writeFile(file, makeTarGz([0, 1, 2].map((i) => ({ name: `tiles/2/${i}/0.mvt`, body: tileBody(10000) }))))
     await expect(unpackTarGz(file, join(dir, 'dest2'), { files: 1, tileBytes: 10, maxZoom: 15 })).rejects.toThrow(/at most/)
     await expect(readdir(join(dir, 'dest2'))).rejects.toThrow(/ENOENT/)
   })

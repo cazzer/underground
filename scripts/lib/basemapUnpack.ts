@@ -16,12 +16,15 @@ export interface UnpackExpect {
   maxZoom: number
 }
 
-/** Header and padding take at most 1023 bytes a file, and the archive ends in two blocks. */
+/** Header and padding take at most 1023 bytes a file, and the archive ends in two blocks. GNU tar also pads the archive to a
+ *  multiple of its 10240-byte record, so the limit is rounded up to one and given one more. */
 const TAR_OVERHEAD_PER_FILE = 1024
 const TAR_END = 1024
+const TAR_RECORD = 10240
 
 export async function unpackTarGz(tarGz: string, destRoot: string, expect: UnpackExpect): Promise<{ files: number; bytes: number }> {
-  const maxOutputLength = expect.tileBytes + expect.files * TAR_OVERHEAD_PER_FILE + TAR_END
+  const raw = expect.tileBytes + expect.files * TAR_OVERHEAD_PER_FILE + TAR_END
+  const maxOutputLength = Math.ceil(raw / TAR_RECORD) * TAR_RECORD + TAR_RECORD
   let tar: Uint8Array
   try {
     tar = gunzipSync(await readFile(tarGz), { maxOutputLength })

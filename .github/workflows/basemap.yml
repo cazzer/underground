@@ -184,21 +184,24 @@ jobs:
           maxzoom=$(jq -r '.spec.maxzoom' data/basemap/basemap.json)
           node scripts/basemap-tiles.ts check stage/tiles --max-zoom "$maxzoom" | tee tiles-report.txt
           node scripts/basemap-tiles.ts probe-sizes stage/tiles
-          tile_bytes=$(sed -n 's/^.* tile files, \([0-9]*\) bytes$/\1/p' tiles-report.txt | head -n1)
-          if [ "$tile_bytes" -gt "$BASEMAP_MAX_BYTES" ]; then
-            echo "::error::the tiles are $tile_bytes bytes, over the $BASEMAP_MAX_BYTES cap"
-            exit 1
-          fi
 
       # Deterministic, so the same tiles give the same sha256: sorted names, files only (no directory entries), mtime 0,
       # owner 0, fixed modes, ustar (what the deploy's reader accepts), gzip without a name or time. The round trip uses
       # the deploy's extractor (scripts/basemap-tiles.ts unpack), so a tarball it would refuse fails here.
       - name: Pack the tiles
         id: pack
+        env:
+          # From `basemap-tiles.ts check`, which wrote them to this step's outputs.
+          files: ${{ steps.tiles.outputs.files }}
+          tile_bytes: ${{ steps.tiles.outputs.tile_bytes }}
         run: |
+          [[ "$files" =~ ^[0-9]+$ && "$tile_bytes" =~ ^[0-9]+$ ]] || { echo "::error::the tile check reported no counts (files '$files', bytes '$tile_bytes')"; exit 1; }
+          if [ "$tile_bytes" -gt "$BASEMAP_MAX_BYTES" ]; then
+            echo "::error::the tiles are $tile_bytes bytes, over the $BASEMAP_MAX_BYTES cap"
+            exit 1
+          fi
           (cd stage && find tiles -type f | LC_ALL=C sort) > "$PWD/files.txt"
-          files=$(wc -l < files.txt | tr -d ' ')
-          tile_bytes=$(sed -n 's/^.* tile files, \([0-9]*\) bytes$/\1/p' tiles-report.txt | head -n1)
+          test "$(wc -l < files.txt | tr -d ' ')" = "$files"
           tar --format=ustar --numeric-owner --owner=0 --group=0 --mtime=@0 --mode='u=rw,go=r' -C stage -T "$PWD/files.txt" -cf - | gzip -9n > nyc-tiles.tar.gz
           bytes=$(stat -c %s nyc-tiles.tar.gz)
           if [ "$bytes" -gt "$BASEMAP_MAX_BYTES" ]; then
