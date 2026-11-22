@@ -35,7 +35,9 @@ function buildEnd(
     return { end: { x: entrance.x, z: entrance.z, level: ctx.street.id }, viaEntrance: entrance }
   }
   const [x, z] = ctx.frame.fromUV(pair(e.at, `${at}.at`))
-  const level = levelOf(ctx, e.level, `${at}.level`).id
+  const levelInfo = levelOf(ctx, e.level, `${at}.level`)
+  const level = levelInfo.id
+  if (e.area !== undefined && levelInfo.kind === 'street') throw new Error(`${at}.area: an end on the street level has no area`)
   const end: Endpoint = { x, z, level }
   if (e.area !== undefined) end.area = areaOf(areas, e.area, level, `${at}.area`)
   return { end, viaEntrance: undefined }

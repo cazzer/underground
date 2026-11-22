@@ -80,7 +80,6 @@ describe('walkways and areas', () => {
     ['an entrance end', (f: Fixture) => { walkway(f).upper = { entrance: 'ent-u' } }, /no entrance end/],
     ['no area', (f: Fixture) => { delete walkway(f).upper.area }, /names the area at each end/],
     ['the same area at both ends', (f: Fixture) => { walkway(f).upper = { level: 'mezz', at: [-20, 5], area: 'mezz-t' } }, /two different areas/],
-    ['the street level', (f: Fixture) => { walkway(f).lower = { level: 'street', at: [-20, 9], area: 'mezz-t' } }, /is on level mezz, not street/],
   ])('rejects a walkway with %s', (_name, mutate, message) => {
     expect(() => build(mutate)).toThrow(message)
   })
@@ -100,6 +99,7 @@ describe('walkways and areas', () => {
     ['an unknown area', (f: Fixture) => { walkway(f).lower.area = 'nope' }, /unknown platform or slab "nope"/],
     ['an area on another level', (f: Fixture) => { walkway(f).lower.area = 'island-t' }, /island-t is on level platform, not mezz/],
     ['an end more than 0.5 m outside its area', (f: Fixture) => { walkway(f).lower = { level: 'mezz', at: [-20, 11], area: 'mezz-t' } }, /outside its area mezz-t/],
+    ['an area on an `at` end at the street level', (f: Fixture) => { walkway(f).lower = { level: 'street', at: [-20, 9], area: 'mezz-t' } }, /an end on the street level has no area/],
     ['an area on an entrance end', (f: Fixture) => { (connector(f, 'st-street-t').upper as Record<string, unknown>).area = 'mezz-t' }, /entrance end is on the street and has no area/],
     ['a paid that is not a boolean', (f: Fixture) => { (f.authored.slabs[0] as { paid: unknown }).paid = 'yes' }, /slabs\[0\]\.paid/],
   ])('rejects %s', (_name, mutate, message) => {

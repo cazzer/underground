@@ -20,6 +20,7 @@ import { buildStationDepths } from './stationDepths.ts'
 import { NOT_INTERIOR_FILES } from './stationIndex.ts'
 import type { AuthoredStation, StationSources } from './stationInputs.ts'
 import { buildStationInterior } from './stationMerge.ts'
+import { membersOf } from './stationMembers.ts'
 import { markGenerated } from './stationProvenance.ts'
 
 const OUT = new URL('../../public/data/stations/', import.meta.url)
@@ -31,6 +32,8 @@ const json = (url: URL): unknown => JSON.parse(text(url))
 const index = json(new URL('index.json', OUT)) as StationIndex
 const generatedIds = Object.entries(index.stations).filter(([, e]) => e.provenance === 'generated').map(([id]) => id).sort()
 const authoredIds = readdirSync(IN).filter((f) => f.endsWith('.authored.json')).map((f) => f.replace('.authored.json', ''))
+/** Every station a hand-authored interior covers (a complex's members too): a generated one never stands for these. */
+const authoredCovered = new Set(authoredIds.flatMap((id) => membersOf(json(new URL(`${id}.json`, OUT)) as StationInterior)))
 const files = readdirSync(OUT).filter((f) => f.endsWith('.json') && !NOT_INTERIOR_FILES.has(f))
 /** At least this many: the plan expected about 255 of the 268 candidates (fall 2026 catalog: 264). */
 const GENERATED_FLOOR = 250
@@ -42,7 +45,7 @@ describe('generated station interiors', () => {
     for (const id of generatedIds) {
       const interior = json(new URL(`${id}.json`, OUT)) as StationInterior
       expect(interior.generated?.confidence, id).toBeGreaterThanOrEqual(INTERIOR_MIN_CONFIDENCE)
-      expect(authoredIds, id).not.toContain(id)
+      expect(authoredCovered.has(id), id).toBe(false)
     }
   })
 
@@ -55,7 +58,7 @@ describe('generated station interiors', () => {
   it('is fresh: regenerating from the catalog reproduces every generated file byte for byte', () => {
     const catalog = generatorCatalog(Object.fromEntries(CATALOG_FILES.map((f) => [f, json(new URL(`catalog/${f}`, IN))])) as Record<CatalogFileName, unknown>)
     const lines = generatorLines(json(new URL('shapes.json', DATA)), json(new URL('stations.json', DATA)))
-    const fresh = generateStations(catalog, lines).stations.filter((g) => !authoredIds.includes(g.authored.stationId))
+    const fresh = generateStations(catalog, lines).stations.filter((g) => !authoredCovered.has(g.authored.stationId))
     expect(fresh.map((g) => g.authored.stationId).sort()).toEqual(generatedIds)
     expect(files.length).toBe(generatedIds.length + authoredIds.length)
     for (const g of fresh) {

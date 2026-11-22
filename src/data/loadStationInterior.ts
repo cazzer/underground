@@ -1,6 +1,7 @@
 import { fetchJson } from './loadNetwork'
 import type { StationInterior } from './stationSchema'
 
+const MEMBER_ID = /^[A-Za-z0-9]+$/
 const ARRAY_KEYS = ['platforms', 'slabs', 'connectors', 'entrances', 'fareLines'] as const
 
 /**
@@ -16,7 +17,11 @@ export function expectStationInterior(raw: unknown, id: string, url: string): St
   const members = r.memberStationIds
   if (
     members !== undefined &&
-    (!Array.isArray(members) || members.length < 2 || members.some((m) => typeof m !== 'string') || members[0] !== id)
+    (!Array.isArray(members) ||
+      members.length < 2 ||
+      members.some((m) => typeof m !== 'string' || !MEMBER_ID.test(m)) ||
+      new Set(members).size !== members.length ||
+      members[0] !== id)
   ) {
     throw fail()
   }

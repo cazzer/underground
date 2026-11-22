@@ -23,8 +23,7 @@ function stationDepths(interior: StationInterior): StationDepth[] {
       const first = t.path[0]
       const last = t.path.at(-1)
       if (!first || !last || t.path.length < 2) throw new Error(`${interior.stationId}: track ${t.stopId} needs 2+ points`)
-      // The merge guarantees every stop belongs to a member; a lone station owns its tracks whatever they are named.
-      const owner = trackOwner(t.stopId, members) ?? (members.length === 1 ? members[0] : undefined)
+      const owner = trackOwner(t.stopId, members)
       if (owner === undefined) throw new Error(`${interior.stationId}: track ${t.stopId} is not a stop of ${members.join(', ')}`)
       byMember.get(owner)!.push({ stopId: t.stopId, railY: round2(y - RAIL_DROP_M), ends: [first, last] })
     }

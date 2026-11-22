@@ -66,8 +66,9 @@ add these keys, all optional and all written to the output only when authored:
   any member; `public/data/station-depths.json` gets one entry per member, and `index.json` maps each other member to the
   file (`{ provenance, file }`). A generated interior for any member is dropped ("hand-authored wins").
 - `fetch.entrancesGtfsStopId` and `fetch.equipmentStationMrn` become arrays, one value per member. `data:stations:fetch` then
-  asks with one `$where ... in(...)` filter and drops exact duplicate entrance rows and identical repeated equipment codes
-  (two equipment rows that disagree fail the fetch). Values are letters and digits only.
+  asks with one `$where` filter (`in(...)` for equipment; a `like` per member for entrances, whose `gtfs_stop_id` can list
+  several stops, "A12; D13", and the rows are then kept by exact stop), and drops exact duplicate entrance rows and
+  identical repeated equipment codes (two equipment rows that disagree fail the fetch). Values are letters and digits only.
 - `slabs[].paid`: `true` inside fare control; leave it out when not stated.
 - A connector end's `area`: the id of the platform or slab it stands on (an `at` end only, on that end's level). The
   containment check then tests that area alone, within 0.5 m. Optional on stairs and ramps; never inferred.

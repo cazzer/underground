@@ -13,6 +13,7 @@ export interface SettledLoad {
   load: InteriorLoad
 }
 
+const reportedUncovered = new Set<string>()
 const NONE: InteriorLoad = { status: 'none' }
 const LOADING: InteriorLoad = { status: 'loading' }
 
@@ -85,7 +86,15 @@ export function deriveInteriorLoad(
   if (!id) return NONE
   const model = peek(id)
   if (model) {
-    if (!interiorCovers(model, stationId)) return { status: 'error', message: `stations/${id}.json does not cover ${stationId}` }
+    if (!interiorCovers(model, stationId)) {
+      const message = `stations/${id}.json does not cover ${stationId}`
+      // Rendered every frame the station is focused; one log per pair is enough to show a deploy skew.
+      if (!reportedUncovered.has(message)) {
+        reportedUncovered.add(message)
+        console.error(`${message}: the station index and the interior file disagree (a stale or mixed deploy?)`)
+      }
+      return { status: 'error', message }
+    }
     return { status: 'ready', model }
   }
   if (settled?.id !== id) return LOADING

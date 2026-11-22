@@ -61,6 +61,11 @@ function main(): void {
   const catalog = generatorCatalog(Object.fromEntries(CATALOG_FILES.map((f) => [f, readJson(new URL(f, CATALOG_DIR))])) as Record<(typeof CATALOG_FILES)[number], unknown>)
   const shapesFile = readJson<ShapesFile>(new URL('shapes.json', DATA_DIR))
   const stationsFile = readJson<StationsFile>(new URL('stations.json', DATA_DIR))
+  const knownStations = new Set(stationsFile.stations.map((s) => s.id))
+  for (const interior of authoredInteriors) {
+    const unknown = membersOf(interior).filter((m) => !knownStations.has(m))
+    if (unknown.length > 0) throw new Error(`stations/${interior.stationId}: member station(s) ${unknown.join(', ')} are not in public/data/stations.json`)
+  }
   const lines = generatorLines(shapesFile, stationsFile)
   const result = generateStations(catalog, lines)
   for (const line of result.log) console.log(`generate: ${line}`)
