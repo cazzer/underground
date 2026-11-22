@@ -213,6 +213,7 @@
     {"x":-288,"z":-1179,"type":"Stair","entry":true,"exit":true,"stopIds":["R27"],"street":"Broadway","wayId":757359118,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-270,"z":1241,"type":"Escalator","entry":true,"exit":true,"stopIds":["142"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null},
     {"x":-267,"z":-1007,"type":"Stair","entry":true,"exit":true,"stopIds":["R27"],"street":"Whitehall Street","wayId":46160406,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-10,"z":1406,"type":"Elevator","entry":true,"exit":true,"stopIds":["142"],"street":"Whitehall Street","wayId":1332885134,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":6,"z":-1143,"type":"Stair","entry":true,"exit":true,"stopIds":["R27"],"street":"Stone Street","wayId":5670920,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":24,"z":1572,"type":"Stair/Escalator","entry":true,"exit":true,"stopIds":["R27"],"street":"Whitehall Street","wayId":32934351,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":290,"z":1078,"type":"Stair","entry":true,"exit":true,"stopIds":["R27"],"street":"Whitehall Street","wayId":1332885134,"cross":null,"crossWayId":null,"side":"east","plaza":null},

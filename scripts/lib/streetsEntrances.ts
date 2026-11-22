@@ -149,26 +149,30 @@ function nearMissGapM(p: [number, number], wayId: number, ways: readonly JoinWay
 
 /** The station's entrances on the file's decimeter grid, joined to their streets, sorted by x, z, then type.
  *  `station` is its stations.json row; `allRows` its catalog rows (`entrancesByStation`): those that list it, and the
- *  complex's other rows, of which elevators and those past SHARED_MAX_M are dropped (logged once per station). */
+ *  complex's other rows, of which those past SHARED_MAX_M are dropped, and elevators too unless `lead` (logged once per
+ *  station). `lead` is a complex's lead member, the only one the map focuses: its file stands for the whole merged
+ *  station, so another member's elevators serve the station the user opened and stay. */
 export function buildEntrances(
   station: { id: StationId; name: string } & LatLon,
   allRows: readonly EntranceInput[],
   file: FileStreets,
+  lead = false,
 ): { entrances: StreetEntrance[]; log: BuildLog[] } {
   const ways = toJoinWays(file)
   const log: BuildLog[] = []
   const who = `${station.id} ${station.name}`
   // A row shared from another member of the complex (it does not list this station) is dropped when it is an elevator
-  // (one that does not list a member does not serve its trains, and an elevator ranks first on the map and in the list)
-  // or when it lies near or past the street radius: the streets there are cut off or gone, so it would be a mark
+  // (one that does not list a member does not serve its trains, and an elevator ranks first on the map and in the list;
+  // a lead keeps them, its file being the merged station's) or when it lies near or past the street radius: the streets there are cut off or gone, so it would be a mark
   // without a label. The rows that list the station always stay.
   const far = (row: EntranceInput): boolean => {
     const g = toGround({ lat: row.lat, lon: row.lon }, station)
     return Math.hypot(Math.round(g.x * 10), Math.round(g.z * 10)) / 10 > SHARED_MAX_M
   }
   const shared = (row: EntranceInput): boolean => !row.gtfsStopIds.includes(station.id)
-  const elevators = allRows.filter((row) => shared(row) && row.type === ELEVATOR).length
-  const rows = allRows.filter((row) => !shared(row) || (row.type !== ELEVATOR && !far(row)))
+  const dropsElevator = (row: EntranceInput): boolean => !lead && row.type === ELEVATOR
+  const elevators = allRows.filter((row) => shared(row) && dropsElevator(row)).length
+  const rows = allRows.filter((row) => !shared(row) || (!dropsElevator(row) && !far(row)))
   if (rows.length < allRows.length) {
     const beyond = allRows.length - rows.length - elevators
     log.push({
