@@ -110,8 +110,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
   Street tokens `streetStroke` (faint by color, not alpha) and `streetWidth` draw the focused station's streets.
-  Default (auto): under the route lines at 0.35 at full color, but above the veil at 7.5, dimmed with it to rest at
-  1.8-2:1 (`src/lib/streetVeil.ts`), while the focused station's interior is loaded under look A.
+  Default (auto): under the route lines at 0.35 at full color, but above the veil at 7.5, drawn at a fainter stroke
+  (1.9:1, `veiledStreetHex` in `src/lib/streetVeil.ts`), while the focused station's interior is loaded under look A.
   TEMPORARY: `?streets=under|over` forces one order until the ost.7 card is decided; the removal list is in
   `src/scene/streetsLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
@@ -163,9 +163,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
   - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
-    with the reveal and goes with the focus); keyed by station. Its draw order is auto: above the veil (7.5), its
-    `material.color` scaled toward the background by `veilWeight` (`streetColorScale`, into the material's own
-    Color), while the station's interior is loaded under look A; else 0.35 at full color; `streetsLook.ts` TEMPORARY
+    with the reveal and goes with the focus); keyed by station. Its draw order is auto: above the veil (7.5), built from
+    `StreetLayer.veiledBuffers` (the 1.9:1 stroke, fading to the background like the others; material color stays
+    white), while the station's interior is loaded under look A; else 0.35 at full color; `streetsLook.ts` TEMPORARY
     override. It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
     street-file entrance the interior doesn't draw itself (`src/lib/entranceMarks.ts`: no interior entrance within
     1.5 m on the scene ground with the same type; none while an interior is still loading;

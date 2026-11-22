@@ -6,11 +6,10 @@ import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
-import { interiorOpacity, veilWeight } from '../lib/interiorReveal'
+import { interiorOpacity } from '../lib/interiorReveal'
 import type { LabelBlockers } from '../lib/labelBlockers'
 import type { Rgb } from '../lib/lineBuffers'
 import { streetLabelOpacity } from '../lib/streetLabelReveal'
-import { streetColorScale, veiledStreetHex } from '../lib/streetVeil'
 import { depthFactor } from '../lib/tilt'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
@@ -22,13 +21,8 @@ import { useLineLayer } from './useLineLayer'
 import { useStreetLabels } from './useStreetLabels'
 
 // Color(hex) converts sRGB to linear, which is what vertex colors must be.
-const linear = (hex: string): Rgb => {
-  const c = new Color(hex)
-  return [c.r, c.g, c.b]
-}
-const MARK_RGB = linear(theme.interiorEntrance)
-const STREET_RGB = linear(theme.streetStroke)
-const VEILED_RGB = linear(veiledStreetHex(theme.streetStroke, theme.background))
+const MARK_COLOR = new Color(theme.interiorEntrance)
+const MARK_RGB: Rgb = [MARK_COLOR.r, MARK_COLOR.g, MARK_COLOR.b]
 
 interface StationStreetsProps {
   /** The focused station's interior, once loaded: its entrances get no second mark. */
@@ -58,23 +52,22 @@ interface StreetLinesProps extends StationStreetsProps {
 }
 
 /**
- * Whether the streets draw above the interior veil: with the station's interior loaded under look A (the screen
- * veil), so they rest faint behind the interior instead of vanishing under the veil; `?streets=` forces either.
+ * How the streets draw: above the interior veil at the veiled stroke (about 1.9:1, streetVeil.ts) with the station's
+ * interior loaded under look A (the screen veil), so they rest faint behind the interior instead of vanishing under
+ * it; otherwise under the route lines at full color. `?streets=` forces either order, at full color.
  */
-function overVeil(interior: InteriorModel | null): boolean {
-  if (streetsLook !== 'auto') return streetsLook === 'over'
-  return interior !== null && interiorLook.veil === 'screen'
+function streetMode(interior: InteriorModel | null): 'under' | 'over' | 'veiled' {
+  if (streetsLook !== 'auto') return streetsLook
+  return interior !== null && interiorLook.veil === 'screen' ? 'veiled' : 'under'
 }
 
 /**
  * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
- * doesn't draw, fading in with the interior reveal; then the street and entrance labels. Above the veil the streets
- * dim toward the background as the veil rises (streetVeil.ts).
+ * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
  */
 function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers }: StreetLinesProps) {
   const group = useRef<Group>(null)
   const shown = useRef(-1)
-  const shownVeil = useRef(-1)
   const labelShown = useRef(0)
   const insetsRef = useRef(insets)
   const panelRef = useRef(panel)
@@ -83,18 +76,21 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     insetsRef.current = insets
     panelRef.current = panel
   }, [insets, panel])
-  const over = overVeil(interior)
-  const lines = useLineLayer(layer.buffers, over ? RENDER_ORDER.streetsOver : RENDER_ORDER.streets, theme.streetWidth)
+  const mode = streetMode(interior)
+  const lines = useLineLayer(
+    mode === 'veiled' ? layer.veiledBuffers : layer.buffers,
+    mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,
+    theme.streetWidth,
+  )
   const markBuffers = useMemo(() => {
     if (interiorPending) return null
     const at = interior && { origin: interior.origin, entrances: interior.entrances }
     return entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, at), ENTRANCE_SIZE_M, MARK_RGB)
   }, [layer, interior, interiorPending])
   const marks = useLineLayer(markBuffers, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
-  // A rebuilt layer (the draw order changes when the interior lands) starts at full opacity and color: catch it up.
+  // A rebuilt layer (the mode changes when the interior lands) starts at full opacity: catch it up.
   useLayoutEffect(() => {
     shown.current = -1
-    shownVeil.current = -1
   }, [lines])
 
   useFrame((state) => {
@@ -102,15 +98,8 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     if (!g) return
     const distance = cameraDistance(state)
     const o = interiorOpacity(distance)
-    const depth = depthFactor(distance)
-    labelShown.current = streetLabelOpacity(o, depth)
+    labelShown.current = streetLabelOpacity(o, depthFactor(distance))
     if (marks && marks.material.opacity !== o) marks.material.opacity = o
-    // Only the auto rule dims: a forced `over` keeps full color, as before the auto rule.
-    const veil = over && streetsLook === 'auto' ? veilWeight(o, depth) : 0
-    if (lines && veil !== shownVeil.current) {
-      streetColorScale(lines.material.color, STREET_RGB, VEILED_RGB, veil)
-      shownVeil.current = veil
-    }
     if (o === shown.current) return
     shown.current = o
     if (lines) lines.material.opacity = o

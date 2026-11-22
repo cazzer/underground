@@ -6,6 +6,7 @@ import { toGround, type Ground } from '../lib/projection'
 import { streetBuffers } from '../lib/streetBuffers'
 import { entranceLabel } from '../lib/streetName'
 import { streetLabelSources, type StreetLabelSource } from '../lib/streetRuns'
+import { veiledStreetHex } from '../lib/streetVeil'
 import { theme } from '../theme'
 import { createInteriorCache } from './interiorCache'
 import { loadStationStreets } from './loadStationStreets'
@@ -26,6 +27,8 @@ export interface StreetLayer {
   stationId: string
   anchor: Ground
   buffers: LineBuffers
+  /** The same streets at the veiled stroke (`veiledStreetHex`, about 1.9:1), drawn above the interior veil. */
+  veiledBuffers: LineBuffers
   file: StationStreets
   streets: StreetLabelSource[]
   entrances: EntranceLabelSource[]
@@ -45,6 +48,7 @@ function buildLayer(id: string, file: StationStreets): StreetLayer {
     stationId: id,
     anchor: toGround(file.anchor),
     buffers: streetBuffers(file, STREET_RGB, BACKGROUND_RGB),
+    veiledBuffers: streetBuffers(file, VEILED_RGB, BACKGROUND_RGB),
     file,
     streets: streetLabelSources(file),
     entrances: entranceLabels(file),
@@ -56,6 +60,8 @@ const STREET_COLOR = new Color(theme.streetStroke)
 const STREET_RGB: Rgb = [STREET_COLOR.r, STREET_COLOR.g, STREET_COLOR.b]
 const BACKGROUND = new Color(theme.background)
 const BACKGROUND_RGB: Rgb = [BACKGROUND.r, BACKGROUND.g, BACKGROUND.b]
+const VEILED = new Color(veiledStreetHex(theme.streetStroke, theme.background))
+const VEILED_RGB: Rgb = [VEILED.r, VEILED.g, VEILED.b]
 
 /**
  * One fetch per station per page load. The buffers are built inside the promise, so a data error rejects (and is
