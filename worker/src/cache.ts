@@ -1,4 +1,6 @@
-export const TTL_MS = 15_000
+/** Memo and edge lifetimes per route: /rt and /ene. */
+export const RT_TTL_MS = 15_000
+export const ENE_TTL_MS = 120_000
 /** A refresh older than this is presumed dead (upstream fetches time out at 5 s). */
 export const REFRESH_GRACE_MS = 6_000
 

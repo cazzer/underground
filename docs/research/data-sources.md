@@ -82,7 +82,7 @@ Files that matter:
 | NY Open Data: Subway Stations [`39hk-dx4f`](https://data.ny.gov/Transportation/MTA-Subway-Stations/39hk-dx4f/about_data) | `gtfs_stop_id`, `complex_id`, `structure` (Subway/Elevated/Open Cut/…), ADA per direction | No layout |
 | Subway Entrances and Exits 2024 [`i9wp-a4ja`](https://data.ny.gov/Transportation/MTA-Subway-Entrances-and-Exits-2024/i9wp-a4ja/about_data) | Entrance lat/lon, type (Stair, Elevator, Escalator, …), entry/exit, `gtfs_stop_id` | Static; no link to mezzanine or platform |
 | E&E Asset Inventory `94fv-bak7` (updated daily) | Lat/lon per machine, `escalator_rise` (messy units), mezzanine/platform/street access flags | Messy units; MRN station codes |
-| MTA E&E feeds: `nyct%2Fnyct_ene_equipments.json`, `nyct%2Fnyct_ene.json` (outages), `…_upcoming.json` | 707 machines with `elevatorsgtfsstopid`. The `serving` text gives topology, e.g. Bedford EL359 "…to mezzanine", EL358 "mezzanine to platform". Live outages. | Free text; no stairs |
+| MTA E&E feeds: `nyct%2Fnyct_ene_equipments.json`, `nyct%2Fnyct_ene.json` (outages), `…_upcoming.json` | 707 machines with `elevatorsgtfsstopid`. The `serving` text gives topology, e.g. Bedford EL359 "…to mezzanine", EL358 "mezzanine to platform". Live outages. | Free text; no stairs. The outage feed needs no API key (checked 2026-11-22), but its content-type is the literal `${header.s3FileType}` (never check it), and `isupcomingoutage` is unreliable (started outages flagged `Y`, overdue ones `N`) |
 | OSM (Overpass) | `railway=platform` closed polygons with `level`; `railway=subway` tracks; entrances; some `highway=steps` | No mezzanine/corridor areas; steps mostly lack levels |
 | MTA diagrams | None found on mta.info | — |
 | Community | [Project Subway NYC](https://www.projectsubwaynyc.com/blog) isometric drawings, which are a visual reference only and assumed all rights reserved | No open interior dataset |
@@ -304,7 +304,7 @@ table unless run with `-pg`, which the workflow does.
 1. fetches the 8 feeds in parallel and decodes them with protobufjs and the NYCT proto;
 2. emits compact JSON per trip: route, direction, `train_id`, next `stop_id`, status, timestamp, and the next N arrivals;
 3. caches that JSON at the edge for 15 s;
-4. optionally merges E&E outages every 5 minutes.
+4. serves trimmed E&E outages at `/ene` (120 s cache).
 
 GitHub Actions cron runs at most every 5 minutes, so it can't provide realtime. Cloudflare limits and pricing in 2026 are UNVERIFIED.
 
