@@ -89,7 +89,9 @@ export function joinStationOutages(interior: StationInterior | null, ene: EneInp
   if (!ene.configured) return NONE
   const known = eneFresh(ene.snapshot, nowS) && !ene.schemaMismatch
   const machines = interior ? interior.connectors.filter(isMachine) : []
-  if (machines.length === 0) return known ? { ...NONE, status: { known, isOut: () => false } } : NONE
+  // Nothing to know without machines (an interior still loading counts): `known` stays false, so the panel's
+  // announcer doesn't take this for a view of fresh data and speak the machines when the interior arrives.
+  if (machines.length === 0) return NONE
   if (!known) {
     // No snapshot yet and fewer than two failures is still connecting, which shows nothing.
     if (ene.snapshot === null && ene.failures < 2 && !ene.schemaMismatch) return NONE

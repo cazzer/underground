@@ -88,6 +88,9 @@ describe('joinStationOutages', () => {
     const bare: StationInterior = { ...l08, connectors: l08.connectors.filter((c) => c.kind !== 'elevator' && c.kind !== 'escalator') }
     expect(joinStationOutages(bare, noData({ failures: 5 }), NOW).panel).toEqual({ kind: 'none' })
     expect(joinStationOutages(bare, feed([outage('EL358')]), NOW).outIds).toEqual([])
+    // Not known either: an interior that is still loading must not read as a view of fresh data.
+    expect(joinStationOutages(null, feed([outage('EL358')]), NOW).status.known).toBe(false)
+    expect(joinStationOutages(bare, feed([]), NOW).status.known).toBe(false)
   })
 })
 
