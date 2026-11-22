@@ -81,7 +81,7 @@ export interface GeocodeResponse {
   incomplete: boolean                                   // a source this answer wanted failed or was skipped; never cached
 }
 
-export type GeocodeErrorCode = 'bad-query' | 'bad-focus' | 'forbidden' | 'busy' | 'upstream' | 'internal'
+export type GeocodeErrorCode = 'bad-query' | 'bad-focus' | 'forbidden' | 'rate-limited' | 'busy' | 'upstream' | 'internal'
 
 /** Shown by the client beside any result of that source (2q7.16). */
 export const GEOCODE_ATTRIBUTION: Record<GeocodeSource, string> = {

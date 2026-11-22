@@ -1,3 +1,4 @@
+import { CLIENT_PERIOD_S, clientAllowed, createClientLimitWarned, type ClientLimitWarned } from './clientLimit'
 import { GEOCODE_SOURCE_BACKOFF_MS, GEOCODE_TTL_MS, type Memo } from './cache'
 import { corsHeaders, isAllowedOrigin } from './cors'
 import { readEdge, writeEdge, type EdgeCache } from './edgeCache'
@@ -19,6 +20,7 @@ export interface GeocodeState {
   upstream: TokenBucket
   photon: TokenBucket
   failedUntil: Record<GeocodeSource, number | null>
+  clientLimitWarned: ClientLimitWarned
 }
 
 export function createGeocodeState(now: number): GeocodeState {
@@ -27,6 +29,7 @@ export function createGeocodeState(now: number): GeocodeState {
     upstream: createBucket(...UPSTREAM_BUCKET, now),
     photon: createBucket(...PHOTON_BUCKET, now),
     failedUntil: { geosearch: null, photon: null },
+    clientLimitWarned: createClientLimitWarned(),
   }
 }
 
@@ -34,6 +37,8 @@ export interface GeocodeDeps {
   fetchGeoSearch(q: GeocodeQuery): Promise<SourceOutcome>
   fetchPhoton(q: GeocodeQuery): Promise<SourceOutcome>
   state: GeocodeState
+  /** The Workers Rate Limiting binding (`env.GEOCODE_CLIENT_LIMIT`); absent means no per-client limit (`clientAllowed`). */
+  clientLimit?: RateLimit
 }
 
 type Ctx = { waitUntil(p: Promise<unknown>): void }
@@ -153,13 +158,20 @@ async function serveMiss(m: Miss): Promise<Response> {
 }
 
 /**
- * GET /geocode: a per-isolate LRU, then the edge cache, then the sources (see `gather`). Never throws. No log
+ * GET /geocode: the Origin check, the per-client limit (429), a per-isolate LRU, then the edge cache, then the sources (see `gather`). Never throws. No log
  * line, error or header ever carries the query or the focus.
  */
 export async function serveGeocode(request: Request, ctx: Ctx, origin: string | null, edge: EdgeCache, deps: GeocodeDeps): Promise<Response> {
   try {
     // A foreign site (or no site at all) stays off the Photon budget.
     if (!isAllowedOrigin(origin)) return failure(403, 'forbidden', origin)
+    // Before parsing and both caches, so a client can't probe what is cached (or what parses) at any rate.
+    if (!(await clientAllowed(deps.clientLimit, request, deps.state.clientLimitWarned))) {
+      return failure(429, 'rate-limited', origin, {
+        'retry-after': String(CLIENT_PERIOD_S),
+        'access-control-expose-headers': 'retry-after',
+      })
+    }
     const parsed = parseGeocodeRequest(new URL(request.url))
     if (!parsed.ok) return failure(400, parsed.error, origin)
     const { query } = parsed
