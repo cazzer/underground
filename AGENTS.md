@@ -440,7 +440,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     wants its other members' points before the marks, nearest the lead first, and every member is an anchor: the target
     within 100 m of the lead or a member (its focused distance is the nearest member's, so under ENTER_RADIUS 140 focus
     stays), `centerRadius` 100 m plus the farthest member's distance. `complexFrame.data.test.ts`: Times Sq under the
-    open phone panel frames 3 of its 4 other members and 16 of 17 marks (was 1 and 9), Canal St 3 of 3 and 14 of 15 (1, 7),
+    open phone panel frames 3 of its 4 other members and 17 of 18 marks (was 1 and 9), Canal St 3 of 3 and 14 of 15 (1, 7),
     Fulton St 2 of 3 and 14 of 28 (1, 7); never less for any complex at 390x844 or 1440x900; a lone station lands exactly as before) over
     `convexRegion.ts` (half-plane clipping, nearest point); `interiorReframe.ts` when a landed station flight reframes onto its interior, and how long; `follow.ts` the train follow's math (`followTargetInto`:
     the ground target that puts a world point on a screen point, exact under perspective at any height; the catch-up

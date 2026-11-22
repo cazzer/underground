@@ -56,9 +56,9 @@ function landings(lead: string, name: ViewName) {
 
 describe('a bare complex lands on its members as well as its lead', () => {
   it('Times Sq-42 St (725 with 127, 902, A27, R16; 266 m to Port Authority)', () => {
-    expect(landings('725', 'phoneOpen')).toMatchObject({ before: [1, 1, 9], after: [1, 3, 16] })
-    expect(landings('725', 'phoneBar')).toMatchObject({ before: [1, 2, 16], after: [1, 3, 16] })
-    expect(landings('725', 'desktop')).toMatchObject({ before: [1, 4, 17], after: [1, 4, 17] })
+    expect(landings('725', 'phoneOpen')).toMatchObject({ before: [1, 1, 9], after: [1, 3, 17] })
+    expect(landings('725', 'phoneBar')).toMatchObject({ before: [1, 2, 17], after: [1, 3, 17] })
+    expect(landings('725', 'desktop')).toMatchObject({ before: [1, 4, 18], after: [1, 4, 18] })
   })
 
   it('Canal St (639, 156 m) and Fulton St (A38, 155 m) under the open phone panel', () => {
