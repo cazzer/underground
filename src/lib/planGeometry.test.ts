@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalPoint } from '../data/stationSchema'
-import { distanceToRing, nearestOnPolyline, segmentT, slicePolyline } from './planGeometry'
+import { distanceToRing, nearestOnPolyline, slicePolyline } from './planGeometry'
 
 // A concave L: a 10 x 10 square with its top-right 5 x 5 corner cut away.
 const L: LocalPoint[] = [
@@ -23,15 +23,6 @@ describe('distanceToRing', () => {
       expect(distanceToRing([7, 7], ring)).toBeCloseTo(2, 12)
     })
   }
-})
-
-describe('segmentT', () => {
-  it('clamps to the segment, and is 0 for a zero-length one', () => {
-    expect(segmentT([-5, 1], [0, 0], [10, 0])).toBe(0)
-    expect(segmentT([15, 1], [0, 0], [10, 0])).toBe(1)
-    expect(segmentT([4, 1], [0, 0], [10, 0])).toBeCloseTo(0.4, 12)
-    expect(segmentT([4, 1], [3, 3], [3, 3])).toBe(0)
-  })
 })
 
 describe('nearestOnPolyline', () => {

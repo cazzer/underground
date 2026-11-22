@@ -162,7 +162,12 @@ export function routesToStreet(interior: StationInterior, stopId: StopId, opts: 
   for (const c of interior.connectors) {
     if (opts.closed?.has(c.id) || (opts.stepFree === true && !STEP_FREE_KINDS.has(c.kind))) continue
     const [lo, up] = [c.lower, c.upper].map((e) => addNode([e.x, e.z], areaOf(interior, areas, e))) as [number, number]
-    const rise = Math.abs((levelY.get(c.upper.level) ?? 0) - (levelY.get(c.lower.level) ?? 0))
+    const [yLower, yUpper] = [c.lower.level, c.upper.level].map((id) => {
+      const y = levelY.get(id)
+      if (y === undefined) throw new Error(`Connector "${c.id}" of ${interior.stationId} is on unknown level "${id}"`)
+      return y
+    }) as [number, number]
+    const rise = Math.abs(yUpper - yLower)
     const s = connectorSeconds(c, rise)
     if (c.travel !== 'down') link(lo, up, s, c.id)
     if (c.travel !== 'up') link(up, lo, s, c.id)
@@ -194,7 +199,9 @@ export function routesToStreet(interior: StationInterior, stopId: StopId, opts: 
   }
   for (const [id, node] of streetEnd) if (!listed.has(id)) exits.push({ entranceId: null, point: nodes[node]!.point, type: null, node })
 
-  // Multi-source Dijkstra from the platform's connector ends, each starting at its walk from the track.
+  // Multi-source Dijkstra from the platform's connector ends, each starting at its walk from the track. The walk
+  // along the platform to the car is not costed (the rider is assumed to board the car nearest the exit), so on a long
+  // platform the in-station time understates.
   const d = new Float64Array(nodes.length).fill(Infinity)
   const prev = new Int32Array(nodes.length).fill(-1)
   const prevConnector: (string | null)[] = new Array<string | null>(nodes.length).fill(null)

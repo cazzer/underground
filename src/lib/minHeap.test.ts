@@ -23,8 +23,7 @@ describe('MinHeap', () => {
     const popped: number[] = []
     for (let i = 0; i < 1000; i++) {
       const item = heap.pop()
-      expect(keys[item]).toBe(heap.lastKey)
-      popped.push(heap.lastKey)
+      popped.push(keys[item]!)
     }
     expect(popped).toEqual([...keys].sort((a, b) => a - b))
     expect(heap.size).toBe(0)
@@ -32,12 +31,10 @@ describe('MinHeap', () => {
 
   it('keeps duplicate items as separate entries', () => {
     const heap = new MinHeap()
-    heap.push(3, 5)
-    heap.push(3, 2)
-    heap.push(1, 9)
-    expect([heap.pop(), heap.lastKey]).toEqual([3, 2])
-    expect([heap.pop(), heap.lastKey]).toEqual([3, 5])
-    expect([heap.pop(), heap.lastKey]).toEqual([1, 9])
+    heap.push(7, 5)
+    heap.push(8, 2)
+    heap.push(7, 1)
+    expect([heap.pop(), heap.pop(), heap.pop(), heap.pop()]).toEqual([7, 8, 7, -1])
   })
 
   it('pops -1 when empty', () => {

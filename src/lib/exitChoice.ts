@@ -46,6 +46,7 @@ export interface ExitChoice extends Omit<InStationRoute, 'seconds'> {
   stepFree: boolean
   /** The street and side of the exit, from the street file's entrance at the same place; null when none matches. */
   street: StreetJoin | null
+  /** Seconds from the track to the street. The walk along the platform to the car is not costed (the rider is assumed to board the car nearest the exit), so on a long platform this understates. */
   inStationS: number
   walk: ExitWalk
   totalS: number
@@ -152,6 +153,10 @@ function estimateOutside(routes: InStationRoute[], exitScene: Ground[], destinat
 export function chooseExit(input: ExitChoiceInput): ExitResult {
   const { interior, stopId, destination, walk } = input
   const stepFree = input.stepFree === true
+  const stationId = stationOf(interior, stopId)
+  if (walk !== null && walk.stationId !== stationId) {
+    throw new Error(`The walk graph is for station ${walk.stationId}, but stop ${stopId} is at ${stationId}`)
+  }
   const routes = routesToStreet(interior, stopId, { stepFree, closed: input.closed })
   if (routes === null) return { kind: 'none', reason: 'no-track' }
   if (routes.length === 0) return { kind: 'none', reason: 'no-exit' }
@@ -164,7 +169,7 @@ export function chooseExit(input: ExitChoiceInput): ExitResult {
   return {
     ...route,
     kind: 'exit',
-    stationId: stationOf(interior, stopId),
+    stationId,
     stopId,
     probable: interior.generated !== undefined,
     stepFree,

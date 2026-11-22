@@ -86,6 +86,11 @@ describe('chooseExit on a synthetic station', () => {
     expect(choice.walk.seconds).toBeCloseTo(choice.walk.meters * WALK_DETOUR / W, 9)
   })
 
+  it('refuses a walk graph from another station', () => {
+    const other = { ...street, stationId: 'X99' }
+    expect(() => chooseExit({ ...base, walk: other, destination: scene(0, 20) })).toThrow('walk graph is for station X99, but stop X01N is at X01')
+  })
+
   it('says why there is no exit', () => {
     expect(chooseExit({ ...base, stopId: 'X01S', destination: scene(0, 20) })).toEqual({ kind: 'none', reason: 'no-track' })
     expect(chooseExit({ ...base, stepFree: true, destination: scene(0, 20) })).toEqual({ kind: 'none', reason: 'no-exit' })

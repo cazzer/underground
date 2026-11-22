@@ -2,7 +2,7 @@
 import type { LocalPoint } from '../data/stationSchema'
 
 /** Parameter 0..1 of the point on segment a-b nearest p; 0 for a zero-length segment. */
-export function segmentT(p: LocalPoint, a: LocalPoint, b: LocalPoint): number {
+function segmentT(p: LocalPoint, a: LocalPoint, b: LocalPoint): number {
   const dx = b[0] - a[0]
   const dz = b[1] - a[1]
   const len2 = dx * dx + dz * dz

@@ -5,7 +5,8 @@
  *  Rules the builder keeps, so the client can rely on them:
  *  - The anchor is the station's stations.json point, the same origin as the street file's. A node's x/z here equal
  *    the street file's x/z for the same OSM node id at the same station (the same projection, rounded the same way),
- *    so an entrance joined in the street file (by 1.5 m of ground position plus type) can be snapped to a node here.
+ *    so an entrance joined in the street file (by 1.5 m of ground position plus type) lies in the same frame. An entrance
+ *    rarely sits on a node (p50 1.4 m from the nearest edge), so the router snaps it to the nearest edge point, not a node.
  *  - Walkable ways are the pin's named roads and walking ways (`ROAD_CLASSES`, `WALK_CLASSES`) minus `foot=no|private|
  *    use_sidepath` and `access=no|private` without a `foot=yes|designated|permissive`. The graph is undirected: the
  *    vehicle `oneway` is ignored (`oneway:foot` is not pinned). Roads are walkable, kind `road`; the router prices them.

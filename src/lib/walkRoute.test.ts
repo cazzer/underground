@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { decodeStationWalk } from '../data/loadStationWalk'
-import type { StationWalk, WalkGraph } from '../data/walkSchema'
+import { WALK_KINDS, type StationWalk, type WalkGraph } from '../data/walkSchema'
 import { gridGraph, walkGraph } from './walkFixture'
 import { routeWalk, snapToWalk, walkQuery, WALK_SPEED_MPS, type WalkOptions, type WalkQuery, type WalkSnap } from './walkRoute'
 
@@ -179,6 +179,23 @@ describe('routeWalk on the real L08 shard', () => {
       expect(path.seconds).toBeCloseTo(reference(q, a, b), 9)
       expect(path.points[0]).toEqual(a.point)
       expect(path.points[path.points.length - 1]).toEqual(b.point)
+      expect(path.meters).toBeGreaterThanOrEqual(Math.hypot(b.point.x - a.point.x, b.point.z - a.point.z) - 1e-9)
+    }
+  }, 60_000)
+
+  it('rebuilds a path whose length matches its time when every edge costs 1 (no roads)', () => {
+    const flat: WalkGraph = { ...graph, edgeKind: graph.edgeKind.map((k) => (k === WALK_KINDS.indexOf('road') ? 0 : k)) as unknown as Uint8Array }
+    const q = walkQuery(flat)
+    let seed = 99
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0
+      return (seed / 2 ** 32 - 0.5) * 300
+    }
+    for (let i = 0; i < 20; i++) {
+      const a = snapAt(q, rand(), rand())
+      const b = snapAt(q, rand(), rand())
+      const path = routeWalk(q, [{ snap: a, startS: 10 }], b)!
+      expect(path.meters).toBeCloseTo((path.seconds - 10) * WALK_SPEED_MPS, 6)
     }
   }, 60_000)
 })

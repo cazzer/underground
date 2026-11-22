@@ -6,8 +6,6 @@ export class MinHeap {
   private items: Int32Array
   private keys: Float64Array
   private count = 0
-  /** The key of the item the last `pop` returned. */
-  lastKey = Infinity
 
   constructor(capacity = 64) {
     this.items = new Int32Array(capacity)
@@ -32,11 +30,10 @@ export class MinHeap {
     this.keys[i] = key
   }
 
-  /** The item with the least key (its key in `lastKey`), or -1 when empty. */
+  /** The item with the least key, or -1 when empty. */
   pop(): number {
     if (this.count === 0) return -1
     const top = this.items[0]!
-    this.lastKey = this.keys[0]!
     this.count--
     if (this.count > 0) {
       const item = this.items[this.count]!
