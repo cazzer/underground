@@ -20,14 +20,20 @@ export interface Buffers {
   /** Six floats per segment, matching `positions`. */
   colors: Float32Array
   /**
-   * TEMPORARY (approxLook.ts, look B). Two floats per segment: the dash distance at its start and end, meters. A
-   * dashed segment runs 0 to its length, so every edge starts on a dash and none falls wholly into a gap; a solid
-   * one is 0, 0, so a dashed material never cuts it. Read only when the layer's material is dashed.
+   * Two floats per segment: the dash distance at its start and end, meters. A dashed segment runs 0 to its length,
+   * so every edge starts on a dash and none falls wholly into a gap; a solid one is 0, 0, so a dashed material never
+   * cuts it. Read only when the layer's material is dashed.
    */
   distances: Float32Array
 }
 
-export class SegmentWriter {
+/** Where connector strokes are written: a SegmentWriter, or a SplitAtY over two of them. */
+export interface SegmentSink {
+  segment(a: Vec3, b: Vec3, ca: Rgb, cb?: Rgb, dashed?: boolean): void
+  loop(points: readonly LocalPoint[], y: number, c: Rgb, dashed?: boolean): void
+}
+
+export class SegmentWriter implements SegmentSink {
   readonly positions: number[] = []
   readonly colors: number[] = []
   readonly distances: number[] = []
@@ -61,6 +67,40 @@ export class SegmentWriter {
       colors: new Float32Array(this.colors),
       distances: new Float32Array(this.distances),
     }
+  }
+}
+
+/**
+ * Writes the part of each segment at or below `y` to `below` and the rest to `above`, cutting a segment that crosses
+ * it there (colors interpolated). Only solid connector strokes go through it today; a dashed caller's two parts would
+ * each restart on a dash (the phase isn't carried across the cut).
+ */
+export class SplitAtY implements SegmentSink {
+  private readonly below: SegmentWriter
+  private readonly above: SegmentWriter
+  private readonly y: number
+
+  constructor(below: SegmentWriter, above: SegmentWriter, y: number) {
+    this.below = below
+    this.above = above
+    this.y = y
+  }
+
+  segment(a: Vec3, b: Vec3, ca: Rgb, cb: Rgb = ca, dashed = false): void {
+    const { y } = this
+    if (a[1] <= y && b[1] <= y) return this.below.segment(a, b, ca, cb, dashed)
+    if (a[1] >= y && b[1] >= y) return this.above.segment(a, b, ca, cb, dashed)
+    const t = (y - a[1]) / (b[1] - a[1])
+    const m: Vec3 = [lerp(a[0], b[0], t), y, lerp(a[2], b[2], t)]
+    const cm = lerpRgb(ca, cb, t)
+    const [lo, hi] = a[1] < y ? [this.below, this.above] : [this.above, this.below]
+    lo.segment(a, m, ca, cm, dashed)
+    hi.segment(m, b, cm, cb, dashed)
+  }
+
+  loop(points: readonly LocalPoint[], y: number, c: Rgb, dashed = false): void {
+    const sink = y <= this.y ? this.below : this.above
+    sink.loop(points, y, c, dashed)
   }
 }
 
