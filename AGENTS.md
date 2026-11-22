@@ -429,11 +429,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   400), never started over another flight. Then at -0.75 `stepFollow` moves target and camera by one step so its dot
   sits mid-free-area (`followTargetInto`, exact under perspective) through a critically damped 0.35 s lag that tracks
   the train's velocity too: steady travel and stops settle exact, a departure or a catch-up glide is rounded off (a few
-  px at most). Wheel zoom (zoom-to-cursor is off while following) and turns keep it there, and a turn pivots on it
+  px at most). It never passes the train along its last direction of travel (no overshoot at a stop), reads at most
+  `FOLLOW_MAX_GOAL_MPS` (a glide's peak plus a train's top speed; a faster frame-to-frame move is eased as position
+  error), and after a flight starts at the speed the train was seen moving during it. Wheel zoom (zoom-to-cursor is off while following) and turns keep it there, and a turn pivots on it
   (the orbit's pivot and pan clamp stand down; turning is armed as if focused, and counts as the first turn).
   Discontinuities (a flight cut short, a panel resize, a cut in the anchor) become a catch-up offset easing out at 5/s
   (snapped under reduced motion); a cut over 100 px on screen re-flies at the current zoom. A pan of 8 px in one
-  gesture (16 px on touch, so a pinch's staggered release doesn't count) ends the follow; the train stays selected and
+  gesture (16 px on touch, so a pinch's staggered release doesn't count; the pointer type is read on the element the
+  controls listen on) ends the follow; the train stays selected and
   keeps the azimuth (a selected train holds it like a focused station; clearing it with no station focused springs
   back to north-up). Esc, ×, a station pick or search choice (they clear the train), the panel's Stop and the
   location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.

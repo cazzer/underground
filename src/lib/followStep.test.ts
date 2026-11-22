@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { createFollowView, FOLLOW_BREAK_PX, FOLLOW_JUMP_PX, followTargetInto, writeFollowView, type FollowView } from './follow'
-import { createFollowState, FOLLOW_LAG_S, stepFollow, stepLag, type FollowState, type FollowStepInput } from './followStep'
+import { createFollowView, FOLLOW_BREAK_PX, FOLLOW_JUMP_PX, followTargetInto, metersPerPx, writeFollowView, type FollowView } from './follow'
+import {
+  cappedVelocity,
+  createFollowLag,
+  createFollowState,
+  FOLLOW_LAG_S,
+  FOLLOW_MAX_GOAL_MPS,
+  observeTrain,
+  stepFollow,
+  stepLag,
+  type FollowState,
+  type FollowStepInput,
+} from './followStep'
 import type { Ground } from './projection'
 import { ISO_POLAR } from './tilt'
 
@@ -33,7 +44,7 @@ function run(s: FollowState, target: Ground, frames: number, train: (n: number) 
 
 describe('stepLag', () => {
   it('tracks steady motion with no trailing offset, and holds a stop exactly', () => {
-    const l = { x: 0, z: 0, vx: 0, vz: 0, gx: 0, gz: 0 }
+    const l = createFollowLag()
     for (let n = 1; n <= 120; n++) stepLag(l, 15 * n * DT, 0, DT, false)
     expect(Math.abs(l.x - 15 * 120 * DT)).toBeLessThan(0.3 * MPP)
     for (let n = 1; n <= 60; n++) stepLag(l, 30, 0, DT, false)
@@ -41,7 +52,7 @@ describe('stepLag', () => {
   })
 
   it('rounds off a departure: a few px behind at most, settled within a second', () => {
-    const l = { x: 0, z: 0, vx: 0, vz: 0, gx: 0, gz: 0 }
+    const l = createFollowLag()
     let worst = 0
     for (let n = 1; n <= 60; n++) {
       stepLag(l, 15 * n * DT, 0, DT, false)
@@ -52,8 +63,41 @@ describe('stepLag', () => {
     expect(Math.abs(l.x - 15) / MPP).toBeLessThan(1)
   })
 
+  it('meets a train that stops dead instead of overshooting it', () => {
+    // 15 m/s for 3 s, then stopped: no more than 0.5 px past the stop on a phone at 400 m.
+    const px = metersPerPx(400, 35, 844)
+    const l = createFollowLag()
+    const stopAt = 15 * 180 * DT
+    let ahead = -Infinity
+    for (let n = 1; n <= 300; n++) {
+      const goal = Math.min(15 * n * DT, stopAt)
+      stepLag(l, 0, -goal, DT, false)
+      if (n > 180) ahead = Math.max(ahead, (stopAt - -l.z) * -1)
+    }
+    expect(ahead / px).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(-l.z - stopAt) / px).toBeLessThan(0.5)
+    expect(Math.hypot(l.vx, l.vz)).toBeLessThan(0.5)
+  })
+
+  it('caps the goal velocity: a 7 m jump in one frame is eased, not flung', () => {
+    expect(Math.hypot(...Object.values(cappedVelocity(0, 0, 7, 0, DT, { x: 0, z: 0 })))).toBeCloseTo(FOLLOW_MAX_GOAL_MPS)
+    expect(cappedVelocity(0, 0, 0.2, 0, DT, { x: 0, z: 0 }).x).toBeCloseTo(12)
+    const l = createFollowLag()
+    let maxV = 0
+    let maxX = 0
+    stepLag(l, 7, 0, DT, false)
+    for (let n = 0; n < 120; n++) {
+      maxV = Math.max(maxV, Math.hypot(l.vx, l.vz))
+      maxX = Math.max(maxX, l.x)
+      stepLag(l, 7, 0, DT, false)
+    }
+    expect(maxV).toBeLessThan(FOLLOW_MAX_GOAL_MPS)
+    expect(maxX).toBeLessThanOrEqual(7 + 1e-9)
+    expect(Math.abs(l.x - 7)).toBeLessThan(0.05)
+  })
+
   it('is stable at a long frame and snaps under reduced motion', () => {
-    const l = { x: 0, z: 0, vx: 0, vz: 0, gx: 0, gz: 0 }
+    const l = createFollowLag()
     stepLag(l, 100, 0, 2, false)
     expect(Math.abs(l.x - 100)).toBeLessThan(100)
     stepLag(l, 120, 0, DT, true)
@@ -142,6 +186,29 @@ describe('stepFollow', () => {
       followTargetInto({ ...train, y: 0 }, v, want)
       expect(Math.hypot(target.x - want.x, target.z - want.z)).toBeLessThan(1e-6)
     }
+  })
+
+  it('starts at the train\'s own speed after a rebase (a landing flight), with no hitch', () => {
+    const s = createFollowState()
+    // Flight frames: the hook observes the train while the flight owns the camera.
+    for (let n = 0; n < 10; n++) observeTrain(s, { x: 0, z: -15 * n * DT }, DT, false)
+    expect(s.trainV.z).toBeCloseTo(-15)
+    // The flight landed on the train: the target is where it puts the train mid-free.
+    const target = { x: 0, z: -15 * 10 * DT }
+    let worst = 0
+    for (let n = 0; n < 60; n++) {
+      run(s, target, 1, () => ({ x: 0, z: -15 * (10 + n) * DT }))
+      worst = Math.max(worst, Math.abs(target.z + 15 * (10 + n) * DT))
+    }
+    expect(worst / MPP).toBeLessThan(0.1)
+    const fresh = createFollowState()
+    const t2 = { x: 0, z: 0 }
+    let worstUnseeded = 0
+    for (let n = 0; n < 60; n++) {
+      run(fresh, t2, 1, () => ({ x: 0, z: -15 * n * DT }))
+      if (n > 1) worstUnseeded = Math.max(worstUnseeded, Math.abs(t2.z + 15 * n * DT))
+    }
+    expect(worstUnseeded).toBeGreaterThan(0.3)
   })
 
   it('holds without a train, then eases onto it', () => {

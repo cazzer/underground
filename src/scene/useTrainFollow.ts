@@ -2,12 +2,15 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { createFollowView, followDistanceFor, followTargetInto, metersPerPx, writeFollowView } from '../lib/follow'
-import { createFollowState, stepFollow, type FollowStepInput } from '../lib/followStep'
+import { flightProgress } from '../lib/flight'
+import { createFollowState, observeTrain, stepFollow, type FollowStepInput } from '../lib/followStep'
 import type { Viewport } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
+import { consistFor } from '../lib/live/consist'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Ground } from '../lib/projection'
 import { tiltForDistance } from '../lib/tilt'
+import { useTrainSelection } from '../lib/trainSelection'
 import type { Destination, Flight, MapControlsImpl } from './cameraFlight'
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -23,13 +26,6 @@ interface TrainFollowOptions {
   /** The screen area the HUD leaves free; the train is kept in its middle. */
   free: ScreenRect
   viewport: Viewport
-  following: boolean
-  /** Changes on every explicit train pick: each one flies to the train again. */
-  selections: number
-  /** The selected train's length (meters): the follow flight pulls back until it fits the free width. */
-  trainM: number
-  /** Ends the follow (a pan); the train stays selected. */
-  unfollow: () => void
 }
 
 /** CameraRig's side of the follow; all three stay referentially stable (underground-by0). */
@@ -40,6 +36,8 @@ export interface TrainFollow {
   active: () => boolean
   /** From the controls' start event: a new gesture's pan is counted from here. */
   onGestureStart: () => void
+  /** A train is selected: the orbit holds its azimuth as for a focused station, so ending a follow doesn't spin the map. */
+  holdAzimuth: () => boolean
 }
 
 /**
@@ -57,16 +55,23 @@ export function useTrainFollow({
   anchor,
   free,
   viewport,
-  following,
-  selections,
-  trainM,
-  unfollow,
 }: TrainFollowOptions): TrainFollow {
+  // Every explicit pick (`selections`) flies to the train again; the selected train's consist sets how far it pulls
+  // back; a pan calls `unfollow` (the train stays selected).
+  const { following, selections, unfollow, selectedKey, selectedSummary } = useTrainSelection()
+  const selected = selectedKey !== null
+  const consist = consistFor(selectedSummary?.routeId ?? null)
+  const trainM = consist.cars * consist.pitchM
   const latest = useRef({ free, viewport, startFlight, unfollow, trainM })
   useLayoutEffect(() => {
     latest.current = { free, viewport, startFlight, unfollow, trainM }
   }, [free, viewport, startFlight, unfollow, trainM])
   const on = useRef(following)
+  const isSelected = useRef(selected)
+  useLayoutEffect(() => {
+    isSelected.current = selected
+  }, [selected])
+  const holdAzimuth = useCallback(() => isSelected.current, [])
   /** A follow flight to start once the anchor is valid and no other flight is under way. */
   const pending = useRef(false)
   const state = useMemo(createFollowState, [])
@@ -86,16 +91,18 @@ export function useTrainFollow({
     reducedMotion: false,
   })
 
-  // The last gesture's pointer type: a touch gets the larger pan break.
+  // The last gesture's pointer type: a touch gets the larger pan break. On the element the controls listen on (drei's
+  // choice), so a gesture that starts on an Html label counts too.
   const gl = useThree((s) => s.gl)
+  const connected = useThree((s) => s.events.connected as HTMLElement | undefined)
   useEffect(() => {
-    const el = gl.domElement
+    const el = connected ?? gl.domElement
     const onDown = (e: PointerEvent) => {
       input.current.touch = e.pointerType === 'touch'
     }
     el.addEventListener('pointerdown', onDown, { capture: true })
     return () => el.removeEventListener('pointerdown', onDown, { capture: true })
-  }, [gl])
+  }, [gl, connected])
 
   useLayoutEffect(() => {
     on.current = following
@@ -123,8 +130,16 @@ export function useTrainFollow({
     if (!on.current || !anchor.valid) return
     const f = flight.current
     if (f?.follows) {
-      // A re-select during the flight just retargets it.
-      pending.current = false
+      if (pending.current) {
+        // A re-select during the flight: rebase it from here onto the new train's fit distance, keeping its timing.
+        pending.current = false
+        const l = latest.current
+        f.e0 = flightProgress(f.elapsed, f.duration)
+        f.from.copy(c.target)
+        f.fromDistance = camera.position.distanceTo(c.target)
+        f.fromAzimuth = c.getAzimuthalAngle()
+        f.distance = followDistanceFor(l.trainM, l.viewport, l.free, camera.fov)
+      }
       const g = aimFor(c, f.distance, tiltForDistance(f.distance))
       f.target.set(g.x, 0, g.z)
     } else if (pending.current && !f) {
@@ -152,9 +167,11 @@ export function useTrainFollow({
     const c = controls.current
     if (!c || !on.current) return
     if (flight.current) {
-      // The flight owns the camera; the frame after it ends measures from where it left the target.
+      // The flight owns the camera; the frame after it ends measures from where it left the target, and starts the lag
+      // at the speed the train is seen moving now.
       state.rebase = true
       state.baselined = false
+      observeTrain(state, anchor.valid ? anchor : null, dt, anchor.cut)
       return
     }
     const l = latest.current
@@ -189,5 +206,5 @@ export function useTrainFollow({
     }
   }, -0.75)
 
-  return { beforeFlight, active, onGestureStart }
+  return { beforeFlight, active, onGestureStart, holdAzimuth }
 }
