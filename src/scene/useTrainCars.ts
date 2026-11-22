@@ -8,6 +8,7 @@ import type { BandView } from '../lib/bandOffset'
 import type { DrawnTrack, TrackPoint } from '../lib/live/trackPoint'
 import { theme } from '../theme'
 import { screenScale } from './cameraDistance'
+import { RENDER_ORDER } from './renderOrder'
 import { CAR_FLOOR_M, CAR_HEIGHT_M, CAR_WIDTH_M, createCarBodyGeometry, createCarHaloGeometry } from './carGeometry'
 
 export const CAR_CAPACITY = TRAIN_CAPACITY * MAX_CARS
@@ -40,6 +41,11 @@ export interface TrainCarsLayer {
   halos: RefObject<InstancedMesh | null>
   /** The selected train's rim footprints, MAX_CARS instances drawn under the car halos. */
   rims: RefObject<InstancedMesh | null>
+  /**
+   * The selected train's background footprints again, MAX_CARS instances, drawn with its rim above the other trains'
+   * dots while those are still drawn (see commit).
+   */
+  gaps: RefObject<InstancedMesh | null>
   geometry: { body: BufferGeometry; halo: BufferGeometry }
   /** Before the first frame: dynamic usage, cleared matrices, nothing drawn. */
   prepare(): void
@@ -62,8 +68,12 @@ export interface TrainCarsLayer {
   clear(i: number): void
   /** Hides slot i's cars while it is off screen; zeroes them once, not every frame. */
   hide(i: number): void
-  /** Draws slots [0, high) and uploads the ones written since the last upload, or draws none when inactive. */
-  commit(high: number, active: boolean): void
+  /**
+   * Draws slots [0, high) and uploads the ones written since the last upload, or draws none when inactive. With
+   * `overDots` (the other trains are still dots, carMix below 1) the selected train's rim and gap draw above those
+   * dots; otherwise at the car layers' own orders, under the other cars' footprints.
+   */
+  commit(high: number, active: boolean, overDots: boolean): void
 }
 
 /** Car instances for the live trains: per-slot consists and colors, written per frame without allocating. */
@@ -71,6 +81,7 @@ export function useTrainCars(): TrainCarsLayer {
   const bodies = useRef<InstancedMesh>(null)
   const halos = useRef<InstancedMesh>(null)
   const rims = useRef<InstancedMesh>(null)
+  const gaps = useRef<InstancedMesh>(null)
   const geometry = useMemo(
     () => ({
       body: createCarBodyGeometry(theme.trainCarSideShade, theme.trainCarEndShade),
@@ -87,7 +98,7 @@ export function useTrainCars(): TrainCarsLayer {
     [geometry],
   )
 
-  const layer = useMemo((): Omit<TrainCarsLayer, 'bodies' | 'halos' | 'rims' | 'geometry'> => {
+  const layer = useMemo((): Omit<TrainCarsLayer, 'bodies' | 'halos' | 'rims' | 'gaps' | 'geometry'> => {
     const consists = new Array<Consist>(TRAIN_CAPACITY).fill(DEFAULT_CONSIST)
     const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: CAR_WIDTH_M, crossScale: 1, y: CAR_FLOOR_M, extrude: 1 }
     const gapFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM, y: CAR_FLOOR_M + SELECTED_LIFT_M }
@@ -98,8 +109,10 @@ export function useTrainCars(): TrainCarsLayer {
     let rimDirty = false
     const zeroRim = (): void => {
       const r = rims.current
-      if (!r) return
+      const g = gaps.current
+      if (!r || !g) return
       clearCars(rimBodies, r.instanceMatrix.array as Float32Array, 0)
+      ;(g.instanceMatrix.array as Float32Array).fill(0)
       rimDirty = true
     }
     const scratch = createConsistScratch()
@@ -122,7 +135,7 @@ export function useTrainCars(): TrainCarsLayer {
         // Everything zeroed, and every slot uploaded with the first ranges (the GPU copy may be stale).
         hidden.fill(1)
         dirty.fill(1)
-        for (const m of [bodies.current, halos.current, rims.current]) {
+        for (const m of [bodies.current, halos.current, rims.current, gaps.current]) {
           if (!m) continue
           m.instanceMatrix.setUsage(DynamicDrawUsage)
           ;(m.instanceMatrix.array as Float32Array).fill(0)
@@ -165,8 +178,13 @@ export function useTrainCars(): TrainCarsLayer {
         const widen = i === selected ? SELECTED_WIDEN : widenFor(i)
         writeConsist(out, h.instanceMatrix.array as Float32Array, i, track, view, shown, consist, mix, k, widen, i === selected ? gapFrame : frame, scratch, shift)
         const r = rims.current
-        if (i === selected && r) {
+        const g = gaps.current
+        if (i === selected && r && g) {
           writeConsist(rimBodies, r.instanceMatrix.array as Float32Array, 0, track, view, shown, consist, mix, k, widen, rimFrame, scratch, shift)
+          // The gap footprints just written to the shared halos, copied for the pass over the dots.
+          const from = h.instanceMatrix.array as Float32Array
+          const to = g.instanceMatrix.array as Float32Array
+          for (let j = 0, o = i * STRIDE; j < STRIDE; j++) to[j] = from[o + j]!
           rimDirty = true
         }
         hidden[i] = 0
@@ -176,15 +194,19 @@ export function useTrainCars(): TrainCarsLayer {
       hide(i) {
         if (hidden[i] === 0) zero(i)
       },
-      commit(high, active) {
+      commit(high, active, overDots) {
         const b = bodies.current
         const h = halos.current
         const r = rims.current
-        if (!b || !h || !r) return
+        const g = gaps.current
+        if (!b || !h || !r || !g) return
         b.count = h.count = active ? high * MAX_CARS : 0
         r.count = active && selected >= 0 ? MAX_CARS : 0
+        // Over the dots the gap has its own pass (the shared halos sit under the dots); else the shared halos are it.
+        g.count = active && selected >= 0 && overDots ? MAX_CARS : 0
+        r.renderOrder = overDots ? RENDER_ORDER.selectedCarRim : RENDER_ORDER.carRim
         if (!active) return
-        if (rimDirty) r.instanceMatrix.needsUpdate = true
+        if (rimDirty) r.instanceMatrix.needsUpdate = g.instanceMatrix.needsUpdate = true
         rimDirty = false
         // Only changed slots go up. needsUpdate without ranges would upload the whole buffer, so skip it then.
         if (pushDirtyRanges(dirty, high, STRIDE, BRIDGE_SLOTS, pools.bodies, b.instanceMatrix.updateRanges) === 0) return
@@ -199,5 +221,5 @@ export function useTrainCars(): TrainCarsLayer {
     }
   }, [])
 
-  return useMemo(() => ({ bodies, halos, rims, geometry, ...layer }), [geometry, layer])
+  return useMemo(() => ({ bodies, halos, rims, gaps, geometry, ...layer }), [geometry, layer])
 }

@@ -26,14 +26,20 @@ export function createSelectedMix(): SelectedMix {
 /**
  * Selects `slot` (-1 for none). The old selection folds back from where it is, unless `keepPrev` is false
  * (its slot now holds another trip, which must not inherit the cars). Reselecting the slot still folding back
- * picks up from its blend.
+ * picks up from its blend. With nothing selected, a train still folding back keeps folding while another unfolds.
  */
 export function selectSlot(s: SelectedMix, slot: number, keepPrev: boolean): void {
   if (slot === s.slot) return
-  const blend = slot >= 0 && slot === s.prevSlot ? s.prevBlend : 0
-  const keep = keepPrev && s.slot >= 0 && s.blend > 0
-  s.prevSlot = keep ? s.slot : -1
-  s.prevBlend = keep ? s.blend : 0
+  const resume = slot >= 0 && slot === s.prevSlot
+  const blend = resume ? s.prevBlend : 0
+  if (s.slot >= 0) {
+    const keep = keepPrev && s.blend > 0
+    s.prevSlot = keep ? s.slot : -1
+    s.prevBlend = keep ? s.blend : 0
+  } else if (resume) {
+    s.prevSlot = -1
+    s.prevBlend = 0
+  }
   s.slot = slot
   s.blend = blend
 }
