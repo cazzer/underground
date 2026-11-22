@@ -1,10 +1,11 @@
-import { pointAtDistance, projectForward } from '../realtime/polyline'
+import { createBandView, type BandView } from '../bandOffset'
 import { hopDistance } from '../realtime/position'
 import type { LiveTrip } from '../realtime/prepareTrips'
 import type { ShapeGeometry } from '../realtime/shapeGeometry'
 import { SMOOTHING, smoothDistance, type SmoothingParams } from '../realtime/smoothing'
 import { POLL_MS } from './backoff'
 import { decideCorrection } from './motion'
+import { carryOnto, clearCarry, createCarryTable, type CarryTable } from './shapeCarry'
 
 /** About 340 trips are live at once; this leaves headroom, and overflow is counted, never silent. */
 export const TRAIN_CAPACITY = 1024
@@ -12,9 +13,6 @@ export const TRAIN_CAPACITY = 1024
 export const FADE_S = 0.4
 /** A trip missing from a poll is kept, moving on its old plan, this long before it fades. */
 export const GRACE_S = POLL_MS / 1000
-
-/** A displayed point this close to a trip's new shape carries over to it; farther away, the dot cross-fades. */
-export const CARRY_M = 25
 
 /** Reconcile decides every correction, so the per-frame ease never snaps or holds on its own. */
 const FRAME_SMOOTHING: SmoothingParams = { ...SMOOTHING, snapM: Infinity, holdBackM: Infinity }
@@ -47,6 +45,8 @@ export interface SlotTable {
   phaseAt: Float64Array
   /** The shape `displayed` is measured on. It is the trip's own except while a cross-fade hasn't yet moved the dot to a new shape. */
   drawGeometry: (ShapeGeometry | null)[]
+  /** The world offset a shape change left between the old drawn point and the new one, easing out (shapeCarry.ts). */
+  carry: CarryTable
   /** One past the highest slot ever used; per-frame loops stop here. */
   high: number
 }
@@ -65,6 +65,7 @@ export function createSlotTable(capacity: number): SlotTable {
     phase: new Uint8Array(capacity),
     phaseAt: new Float64Array(capacity),
     drawGeometry: new Array<ShapeGeometry | null>(capacity).fill(null),
+    carry: createCarryTable(capacity),
     high: 0,
   }
 }
@@ -82,12 +83,18 @@ export interface ReconcileOptions {
   reducedMotion: boolean
   fadeS?: number
   graceS?: number
+  /** The last frame's band view, so a shape change carries the drawn point over. Without one, the lines unbanded. */
+  view?: BandView
 }
+
+/** No view written: bandShift moves nothing, so tracks draw on their ground lines. */
+const UNBANDED: BandView = createBandView()
 
 /**
  * Chooses how a persisting trip absorbs its new plan (see motion.ts) and records it on the slot. When the
- * trip moved to another shape, the dot's ground point is projected onto it: close enough carries over
- * unchanged, otherwise the dot shrinks where it is (on the old shape) and grows on the new one.
+ * trip moved to another shape, the dot's drawn point is projected onto the new shape's drawn line: close enough
+ * carries over (shapeCarry.ts eases out the gap, so nothing jumps on screen), otherwise the dot shrinks where it
+ * is (on the old shape) and grows on the new one.
  */
 function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o: ReconcileOptions): void {
   const fadeS = o.fadeS ?? FADE_S
@@ -101,16 +108,15 @@ function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o:
     return
   }
   if (t.drawGeometry[slot] !== geometry && t.drawGeometry[slot]!.shapeId !== geometry.shapeId) {
-    const at = pointAtDistance(t.drawGeometry[slot]!.line, shown).point
-    const hit = projectForward(geometry.line, at, { segment: 0, t: 0 })
-    if (hit.offsetM > CARRY_M) {
+    const carried = carryOnto(t.carry, slot, t.drawGeometry[slot]!, shown, geometry, o.view ?? UNBANDED, nowS, o.reducedMotion)
+    if (Number.isNaN(carried)) {
       if (t.phase[slot] === SHRINK) return // already shrinking on the old shape; the move picks up the latest one
       // Start (or restart mid-grow) the shrink at the scale the dot has now.
       t.phaseAt[slot] = t.phase[slot] === GROW ? nowS - (fadeS - Math.min(nowS - t.phaseAt[slot]!, fadeS)) : nowS
       t.phase[slot] = SHRINK
       return
     }
-    shown = hit.distance
+    shown = carried
     t.displayed[slot] = shown
   }
   t.drawGeometry[slot] = geometry
@@ -183,6 +189,7 @@ export function reconcileSlots(
     t.displayed[free] = NaN
     t.glideT[free] = NaN
     t.phase[free] = 0
+    clearCarry(t.carry, free)
     t.high = Math.max(t.high, free + 1)
     needsColor.push(free)
   }
@@ -204,6 +211,7 @@ export function freeSlot(t: SlotTable, i: number): void {
   t.displayed[i] = NaN
   t.glideT[i] = NaN
   t.phase[i] = 0
+  clearCarry(t.carry, i)
 }
 
 /**
@@ -218,6 +226,7 @@ export function stepSlot(t: SlotTable, i: number, target: number, dataNow: numbe
     t.displayed[i] = NaN
     t.glideT[i] = NaN
     t.drawGeometry[i] = t.trips[i]!.geometry
+    clearCarry(t.carry, i)
   } else if (t.phase[i] === GROW && localS - t.phaseAt[i]! >= fadeS) {
     t.phase[i] = 0
   }
