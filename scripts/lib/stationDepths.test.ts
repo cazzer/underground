@@ -23,7 +23,12 @@ describe('buildStationDepths', () => {
   })
 
   it('merges credits across stations with OSM first, and sorts stations by id', () => {
-    const other: StationInterior = { ...l08, stationId: 'A01', attribution: ['Someone else', '© OpenStreetMap contributors'] }
+    const other: StationInterior = {
+      ...l08,
+      stationId: 'A01',
+      attribution: ['Someone else', '© OpenStreetMap contributors'],
+      platforms: l08.platforms.map((p) => ({ ...p, tracks: p.tracks.map((t) => ({ ...t, stopId: t.stopId.replace('L08', 'A01') })) })),
+    }
     const out = buildStationDepths([l08, other])
     expect(out.stations.map((s) => s.stationId)).toEqual(['A01', 'L08'])
     expect(out.attribution).toEqual(['© OpenStreetMap contributors', 'Someone else', 'Metropolitan Transportation Authority, data.ny.gov'])

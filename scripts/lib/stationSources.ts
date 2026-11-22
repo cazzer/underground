@@ -107,3 +107,53 @@ export function parseServing(serving: string): Serving {
   if (parts.length > 2) throw new Error(`serving text has more than one " to " (multi-landing machines are unsupported): ${JSON.stringify(serving)}`)
   return { from: sideKind(parts[0]!), to: sideKind(parts[1]!), bothDirections: /both directions/i.test(serving) }
 }
+
+const SODA_VALUE = /^[A-Za-z0-9]+$/
+
+/**
+ * The SODA filter for one field: a single value is the plain equality parameter (so a single-station URL stays what
+ * it was), several are one `$where`: `in(...)`, or with `contains` one `like '%v%'` per value for a field that can list
+ * several ids ("A12; D13"; the like over-matches, so keep the rows with `rowsOfStops` after). Values go into a SoQL
+ * string, so each is checked first.
+ */
+export function sodaFilter(field: string, values: string | readonly string[], match: 'equals' | 'contains' = 'equals'): Record<string, string> {
+  const all = [values].flat()
+  if (all.length === 0) throw new Error(`${field}: no values to filter on`)
+  for (const v of all) {
+    if (!SODA_VALUE.test(v)) throw new Error(`${field}: ${JSON.stringify(v)} is not a plain id (letters and digits only)`)
+  }
+  if (all.length === 1) return { [field]: all[0]! }
+  if (match === 'contains') return { $where: all.map((v) => `${field} like '%${v}%'`).join(' OR ') }
+  return { $where: `${field} in(${all.map((v) => `'${v}'`).join(',')})` }
+}
+
+/** The raw i9wp-a4ja rows whose `gtfs_stop_id` (one id, or several split by ";") names one of `values`. */
+export function rowsOfStops(rows: unknown, values: string | readonly string[]): unknown[] {
+  const wanted = new Set([values].flat())
+  return list(rows, 'entrances').filter((r, i) => {
+    const at = `entrances[${i}].gtfs_stop_id`
+    return text(record(r, `entrances[${i}]`).gtfs_stop_id, at).split(/\s*;\s*/).some((id) => wanted.has(id))
+  })
+}
+
+/** A point shared by two members' stops appears once per member in the dataset; drop the exact duplicates. */
+export function dedupeEntrances(rows: readonly EntranceRow[]): EntranceRow[] {
+  const seen = new Set<string>()
+  return rows.filter((r) => {
+    const key = JSON.stringify([r.type, r.entry, r.exit, r.lat, r.lon])
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/** One row per equipment code: an identical repeat is dropped, two rows that disagree throw. */
+export function dedupeEquipment(rows: readonly EquipmentRow[]): EquipmentRow[] {
+  const byCode = new Map<string, EquipmentRow>()
+  for (const r of rows) {
+    const prior = byCode.get(r.code)
+    if (prior === undefined) byCode.set(r.code, r)
+    else if (JSON.stringify(prior) !== JSON.stringify(r)) throw new Error(`equipment ${r.code}: two rows disagree (${JSON.stringify(prior)} and ${JSON.stringify(r)})`)
+  }
+  return [...byCode.values()]
+}

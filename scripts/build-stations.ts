@@ -17,6 +17,7 @@ import { CATALOG_FILES, generatorCatalog, generatorLines } from './lib/generator
 import { buildStationDepths } from './lib/stationDepths.ts'
 import { buildStationIndex, INDEX_FILE, NOT_INTERIOR_FILES } from './lib/stationIndex.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
+import { membersOf } from './lib/stationMembers.ts'
 import { markGenerated } from './lib/stationProvenance.ts'
 import { toStableJson } from './lib/stableJson.ts'
 
@@ -60,13 +61,18 @@ function main(): void {
   const catalog = generatorCatalog(Object.fromEntries(CATALOG_FILES.map((f) => [f, readJson(new URL(f, CATALOG_DIR))])) as Record<(typeof CATALOG_FILES)[number], unknown>)
   const shapesFile = readJson<ShapesFile>(new URL('shapes.json', DATA_DIR))
   const stationsFile = readJson<StationsFile>(new URL('stations.json', DATA_DIR))
+  const knownStations = new Set(stationsFile.stations.map((s) => s.id))
+  for (const interior of authoredInteriors) {
+    const unknown = membersOf(interior).filter((m) => !knownStations.has(m))
+    if (unknown.length > 0) throw new Error(`stations/${interior.stationId}: member station(s) ${unknown.join(', ')} are not in public/data/stations.json`)
+  }
   const lines = generatorLines(shapesFile, stationsFile)
   const result = generateStations(catalog, lines)
   for (const line of result.log) console.log(`generate: ${line}`)
   console.log(`generate: ${result.stations.length} stations generated, ${result.skipped.length} skipped`)
   for (const s of result.skipped) console.log(`generate: skipped ${s.stationId}: ${s.reason}`)
   const generated = result.stations
-  const authoredIds = new Set(ids)
+  const authoredIds = new Set(authoredInteriors.flatMap(membersOf))
   const skipped = generated.filter((g) => authoredIds.has(g.authored.stationId)).map((g) => g.authored.stationId)
   if (skipped.length > 0) console.log(`generated stations skipped (hand-authored wins): ${skipped.join(', ')}`)
   const generatedInteriors = generated

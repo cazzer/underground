@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { buildInteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
-import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
+import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, NO_SIBLINGS, siblingIdsOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
 import { loadStationIndex } from './loadStationIndex'
 import { loadStationInterior } from './loadStationInterior'
 
@@ -23,7 +23,6 @@ const INDEX_KEY = 'index'
 const indexCache = createInteriorCache(() => loadStationIndex(BASE_URL))
 
 const INDEX_LOADING: IndexLoad = { status: 'loading' }
-
 function initialIndexLoad(): IndexLoad {
   const index = indexCache.peek(INDEX_KEY)
   return index ? { status: 'ready', index } : INDEX_LOADING
@@ -34,7 +33,9 @@ function initialIndexLoad(): IndexLoad {
  * mount (no waiting for a first focus); while it loads or after it fails, no station shows an interior panel.
  * `retry` retries a failed interior. `streetMarker`: whether the scene draws the focused station's own marker.
  */
-export function useStationInterior(stationId: string | null): { load: InteriorLoad; retry: () => void; streetMarker: boolean } {
+export function useStationInterior(
+  stationId: string | null,
+): { load: InteriorLoad; retry: () => void; streetMarker: boolean; siblings: readonly string[] } {
   const [indexLoad, setIndexLoad] = useState<IndexLoad>(initialIndexLoad)
   const [settled, setSettled] = useState<SettledLoad | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -92,6 +93,11 @@ export function useStationInterior(stationId: string | null): { load: InteriorLo
   }, [])
 
   const load = deriveInteriorLoad(stationId, indexLoad, cache.peek, settled)
+  const streetMarker = focusedMarkerShown(stationId, indexLoad, load)
+  // The focused station's complex siblings, whose markers and ties the scene hides with its own. None while the
+  // station keeps its street marker (no interior, or a failed load): there is nothing to stand in for them.
+  const indexed = useMemo(() => siblingIdsOf(stationId, indexLoad), [stationId, indexLoad])
+  const siblings = streetMarker ? NO_SIBLINGS : indexed
   // Whether the focused station keeps its street marker and tie (the no-interior fallback; see focusedMarkerShown).
-  return { load, retry, streetMarker: focusedMarkerShown(stationId, indexLoad, load) }
+  return { load, retry, streetMarker, siblings }
 }

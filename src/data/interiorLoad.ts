@@ -13,6 +13,7 @@ export interface SettledLoad {
   load: InteriorLoad
 }
 
+const reportedUncovered = new Set<string>()
 const NONE: InteriorLoad = { status: 'none' }
 const LOADING: InteriorLoad = { status: 'loading' }
 
@@ -35,10 +36,35 @@ export function focusedMarkerShown(stationId: string | null, index: IndexLoad, l
   return load.status === 'none' || load.status === 'error'
 }
 
-/** The station's id when the index is ready and lists it; otherwise null. */
+/** Every station an interior covers: its complex's members, else its own station alone. */
+export function interiorStationIds(interior: { stationId: string; memberStationIds?: readonly string[] }): readonly string[] {
+  return interior.memberStationIds ?? [interior.stationId]
+}
+
+/** Whether the interior covers the station (any member of a complex). False for no interior or no station. */
+export function interiorCovers(interior: { stationId: string; memberStationIds?: readonly string[] } | null, id: string | null): boolean {
+  if (!interior || id === null) return false
+  return interior.memberStationIds ? interior.memberStationIds.includes(id) : interior.stationId === id
+}
+
+/** The file id of the station's interior (a complex member maps to its complex's file) when the index is ready and lists it; otherwise null. */
 export function interiorIdOf(stationId: string | null, index: IndexLoad): string | null {
   if (!stationId || index.status !== 'ready') return null
-  return Object.hasOwn(index.index.stations, stationId) ? stationId : null
+  if (!Object.hasOwn(index.index.stations, stationId)) return null
+  return index.index.stations[stationId]!.file ?? stationId
+}
+
+/** Shared, so an unchanged "no siblings" keeps its identity. */
+export const NO_SIBLINGS: readonly string[] = Object.freeze([])
+
+/** The other stations that share the focused station's interior file (its complex siblings); empty when none or the index isn't ready. */
+export function siblingIdsOf(stationId: string | null, index: IndexLoad): readonly string[] {
+  const file = interiorIdOf(stationId, index)
+  if (file === null || index.status !== 'ready') return NO_SIBLINGS
+  const siblings = Object.entries(index.index.stations)
+    .filter(([id, entry]) => id !== stationId && (entry.file ?? id) === file)
+    .map(([id]) => id)
+  return siblings.length > 0 ? siblings : NO_SIBLINGS
 }
 
 /**
@@ -46,7 +72,8 @@ export function interiorIdOf(stationId: string | null, index: IndexLoad): string
  * failed, there is nothing to say about the station (almost no station has an interior, so a panel
  * would be wrong for nearly all of them); a station the index doesn't list has none either. Then a
  * cached model wins, so a revisit is ready on its first render, and a settled attempt for another
- * station means this one is loading.
+ * station means this one is loading. A model that doesn't cover the station (the index and the file
+ * disagree) is an error, not a panel for the wrong station.
  */
 export function deriveInteriorLoad(
   stationId: string | null,
@@ -58,7 +85,18 @@ export function deriveInteriorLoad(
   const id = interiorIdOf(stationId, index)
   if (!id) return NONE
   const model = peek(id)
-  if (model) return { status: 'ready', model }
+  if (model) {
+    if (!interiorCovers(model, stationId)) {
+      const message = `stations/${id}.json does not cover ${stationId}`
+      // Rendered every frame the station is focused; one log per pair is enough to show a deploy skew.
+      if (!reportedUncovered.has(message)) {
+        reportedUncovered.add(message)
+        console.error(`${message}: the station index and the interior file disagree (a stale or mixed deploy?)`)
+      }
+      return { status: 'error', message }
+    }
+    return { status: 'ready', model }
+  }
   if (settled?.id !== id) return LOADING
   return settled.load
 }

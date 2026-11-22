@@ -25,15 +25,25 @@ const OPTIONS = {
 }
 
 describe('station index', () => {
-  it('lists exactly the stations with a public/data/stations file', () => {
+  it('lists exactly the stations with a public/data/stations file, plus complex members that point at one', () => {
     // Compared sorted: JS puts integer-like keys first when it writes the object.
-    expect(Object.keys(index.stations).sort()).toEqual(ids)
+    const own = Object.entries(index.stations).filter(([, e]) => e.file === undefined).map(([id]) => id)
+    expect(own.sort()).toEqual(ids)
   })
 
   it.each(ids)('%s: the entry matches the interior file', (id) => {
     const interior = read(id)
     expect(interior.stationId).toBe(id)
     expect(index.stations[id]?.provenance).toBe(interior.generated ? 'generated' : 'authored')
+  })
+
+  it('maps each alias to a listed interior file that covers it', () => {
+    for (const [id, entry] of Object.entries(index.stations)) {
+      if (entry.file === undefined) continue
+      expect(index.stations[entry.file]?.file, `${id} -> ${entry.file}`).toBeUndefined()
+      expect(ids, `${id} -> ${entry.file}`).toContain(entry.file)
+      expect(read(entry.file).memberStationIds, `${id} -> ${entry.file}`).toContain(id)
+    }
   })
 
   it('is fresh: rebuilding from the committed files reproduces index.json byte for byte', () => {

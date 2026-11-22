@@ -13,6 +13,8 @@ import { interiorLook } from './interiorLook'
 /** A station interior, ready to draw: group origin, merged line buffers, labels, camera target. */
 export interface InteriorModel {
   stationId: string
+  /** A station complex: every station this interior covers (stationId first). Absent = stationId alone. */
+  memberStationIds?: readonly string[]
   /** Scene position of the interior's local origin (its anchor). */
   origin: Ground
   strong: Buffers
@@ -117,6 +119,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
       : null
   return {
     stationId: interior.stationId,
+    ...(interior.memberStationIds ? { memberStationIds: interior.memberStationIds } : {}),
     origin,
     strong: built.strong,
     fine: hull && !cutInOver ? withCutLine(built.fine, hull, colorOf('fare', 0)) : built.fine,

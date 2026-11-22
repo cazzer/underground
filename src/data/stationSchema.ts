@@ -21,7 +21,7 @@ export type Archetype =
   | 'unknown'
 export type DepthSource = 'ee-rise' | 'deep-list' | 'osm-level' | 'structure-default'
 export type LevelKind = 'street' | 'mezzanine' | 'platform'
-export type ConnectorKind = 'stair' | 'escalator' | 'elevator' | 'ramp'
+export type ConnectorKind = 'stair' | 'escalator' | 'elevator' | 'ramp' | 'walkway'
 
 export interface GeneratedInfo {
   archetype: Exclude<Archetype, 'unknown'>
@@ -30,7 +30,13 @@ export interface GeneratedInfo {
 }
 
 export interface StationInterior {
+  /** The station this file is named after; for a complex, its first (lowest-sorted) member. */
   stationId: StationId
+  /**
+   * A station complex: every station this file covers, sorted, length >= 2, `stationId` first. Absent = covers
+   * `stationId` alone. The file is stations/<stationId>.json; index.json maps every other member to it.
+   */
+  memberStationIds?: StationId[]
   name: string
   /** Local origin. Render in a group at toGround(anchor); children use local x/z as-is. */
   anchor: LatLon
@@ -82,6 +88,8 @@ export interface Slab {
   level: LevelId
   name: string
   outline: LocalPoint[]
+  /** True = inside fare control. Absent = not stated. */
+  paid?: boolean
   sources: InteriorSource[]
 }
 
@@ -89,13 +97,16 @@ export interface Endpoint {
   x: number
   z: number
   level: LevelId
+  /** Id of the platform or slab this end stands on. Authored only, never on a street end. */
+  area?: string
 }
 export interface Connector {
   /** Elevators/escalators use the MTA equipment code ("EL358"), the join key for live outages. */
   id: string
   kind: ConnectorKind
   /**
-   * y(lower.level) < y(upper.level). Elevators, and escalators from the E&E inventory, have identical x/z
+   * y(lower.level) < y(upper.level), except a walkway: both ends on one non-street level, a plan run of at least
+   * 1 m, each end on a named `area`, the two areas different. Elevators, and escalators from the E&E inventory, have identical x/z
    * at both ends (the renderer gives such an escalator a 30 degree run).
    */
   lower: Endpoint
@@ -129,9 +140,11 @@ export interface FareLine {
   sources: InteriorSource[]
 }
 
-/** public/data/stations/index.json: every station that has an interior file. Fetched after the startup files (not render-blocking), so it has its own size cap rather than the startup budget. */
+/** public/data/stations/index.json: every station that has an interior, a complex's members included. Fetched after the startup files (not render-blocking), so it has its own size cap rather than the startup budget. */
 export interface StationIndexEntry {
   provenance: InteriorProvenance
+  /** A complex member's interior is stations/<file>.json (the complex's first member); absent = stations/<id>.json. */
+  file?: StationId
 }
 export interface StationIndex {
   /** Written in id order, except that JS lists integer-like ids first; don't rely on key order. */
@@ -146,7 +159,8 @@ export type PackedTrack = [y: number, x: number, z: number, h: number]
  * public/data/station-depths.json, written by scripts/build-stations.ts from every interior (authored and generated):
  * per station the rail height and where its platform tracks run along the drawn track lines, so the map's tracks can
  * descend to meet the interior. Columnar to fit the startup budget; src/data/depthsCodec.ts decodes it to a
- * `StationDepthsFile` against the same build's stations.json and drawn lines. ODbL like the interiors.
+ * `StationDepthsFile` against the same build's stations.json and drawn lines. ODbL like the interiors. A complex file
+ * contributes one entry per member (each track goes to the member that owns its stop).
  *
  * Column values (whole meters unless noted) are measured along the drawn line of the stop's direction nearest the
  * station's stations.json point P, from P's projection d onto it: the N track runs d + a ± h, the S track d - a + da ±
