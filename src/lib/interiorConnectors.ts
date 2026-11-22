@@ -21,8 +21,6 @@ export interface ConnectorContext {
   axis: LocalPoint
   /** Plan center of the interior: elevator doors face it, zero-run escalators descend toward it. */
   center: LocalPoint
-  /** Whether the interior's structural strokes are dashed (an estimated layout): a walkway's sides are, like its slabs' outlines. */
-  dash: boolean
   /** Whether the elevator or escalator with this id is out of service: drawn in the `outage` role, with an X. */
   outOfService: (connectorId: string) => boolean
   /** Where a zero-run escalator's run sits (`spreadBanks`); undefined for every other connector. */

@@ -91,7 +91,7 @@ add these keys, all optional and all written to the output only when authored:
 - A connector end's `area`: the id of the platform or slab it stands on (an `at` end only, on that end's level). The
   containment check then tests that area alone, within 0.5 m. Optional on stairs and ramps; never inferred.
 - `kind: "walkway"` connectors join two areas on one non-street level: both ends `at` with an `area`, the two areas
-  different, a plan run of at least 1 m. The lower-below-upper rule does not apply. (Drawing them is not built yet.)
+  different, a plan run of at least 1 m. The lower-below-upper rule does not apply. They draw as two flat sides, dashed when both ends are approximate slabs or the interior is generated.
 
 ## Generated stations
 

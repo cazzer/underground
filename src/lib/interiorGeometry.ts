@@ -140,7 +140,6 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
     yScale,
     stepRise: opts.stepRise,
     colorOf,
-    dash,
     outOfService: opts.outOfService ?? (() => false),
     axis: stationAxis(interior),
     center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
