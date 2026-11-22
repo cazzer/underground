@@ -4,8 +4,10 @@ import { Color, type Group } from 'three'
 import { interiorCovers, interiorStationIds } from '../data/interiorLoad'
 import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
 import type { StreetMask } from '../lib/basemap/streetMask'
+import { clipLineBuffers } from '../lib/clipLineBuffers'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
+import { exitEntranceIndex, type ExitLabel } from '../lib/exitView'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { interiorOpacity } from '../lib/interiorReveal'
@@ -14,6 +16,8 @@ import type { Rgb } from '../lib/lineBuffers'
 import { DESKTOP_LABEL_RADIUS_M, streetLabelOpacity } from '../lib/streetLabelReveal'
 import type { Network } from '../lib/network'
 import { routeBundles } from '../lib/routeBundles'
+import { buildRouteClip, CLIP_TRACK_REACH_M } from '../lib/routeClip'
+import { localTracks } from '../lib/routeTracks'
 import type { Ground } from '../lib/projection'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
@@ -44,6 +48,8 @@ interface StationStreetsProps {
   network: Network
   /** Set while a layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
   mask: StreetMask
+  /** The trip's exit entrance (useTripExit): its label in this layer is placed first and tinted; null for none. */
+  exitLabel: ExitLabel | null
 }
 
 /**
@@ -90,11 +96,11 @@ function streetMode(interior: InteriorModel | null): 'under' | 'over' | 'veiled'
  * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
  * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
  */
-function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask }: StreetLinesProps) {
+function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask, exitLabel }: StreetLinesProps) {
   const group = useRef<Group>(null)
   const shown = useRef(-1)
   const labelShown = useRef(0)
-  const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1, markerRadiusM: 0, ringRadiusM: 0 })
+  const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1, markerRadiusM: 0, ringRadiusM: 0, priorityEntrance: -1 })
   // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring.
   const stations = useMemo(() => nearbyStations(network, layer, interior), [network, layer, interior])
   // Which street candidates a subway line runs along, so their labels step clear of its bundle.
@@ -107,9 +113,23 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     insetsRef.current = insets
     panelRef.current = panel
   }, [insets, panel])
+  // The street pieces that run under a route line are left out, so none reads as one more track in its bundle. Not
+  // at a station with an interior (loaded or loading): there the tracks sink under it, clear of the streets.
+  // While the station index is still loading, every station counts as pending (focusedMarkerShown), so a station
+  // with none draws its streets whole for that moment and the pieces under its lines pop out once the index lands.
+  // The index is fetched on mount, so only a focus in the page's first moments (a #station link) can show it.
+  const clipped = !interior && !interiorPending
+  const clip = useMemo(
+    () => (clipped ? buildRouteClip(localTracks(network.shapes, layer.anchor, layer.file.radiusM + CLIP_TRACK_REACH_M)) : null),
+    [clipped, network, layer],
+  )
   const mode = streetMode(interior)
+  const buffers = useMemo(() => {
+    const base = mode === 'veiled' ? layer.veiledBuffers : layer.buffers
+    return clip ? clipLineBuffers(base, clip) : base
+  }, [mode, layer, clip])
   const lines = useLineLayer(
-    mode === 'veiled' ? layer.veiledBuffers : layer.buffers,
+    buffers,
     mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,
     theme.streetWidth,
   )
@@ -118,6 +138,8 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     const at = interior && { origin: interior.origin, entrances: interior.entrances }
     return entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, at), ENTRANCE_SIZE_M, MARK_RGB)
   }, [layer, interior, interiorPending])
+  // The trip exit's entrance in this layer's file (any member of a complex shows its own), placed first.
+  const priorityEntrance = useMemo(() => (exitLabel ? exitEntranceIndex(exitLabel, layer.file) : -1), [exitLabel, layer])
   const marks = useLineLayer(markBuffers, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
   useLayoutEffect(() => {
     mask.present = true
@@ -144,6 +166,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     ctx.interior = interior
     ctx.focusRing = interior || interiorPending ? null : focused
     ctx.depthScale = depthScaleY(depth)
+    ctx.priorityEntrance = priorityEntrance
     // As Stations.tsx and FocusRing.tsx size them at this distance.
     ctx.markerRadiusM = screenScale(distance, markerRadiusPx(distance), MARKER_MIN_METERS)
     ctx.ringRadiusM = ctx.markerRadiusM * focusScaleFactor(distance, ctx.markerRadiusM)

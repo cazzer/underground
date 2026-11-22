@@ -3,8 +3,8 @@
  * `.ts` import paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
  */
 import type { Connector, LocalPoint, StationInterior } from '../data/stationSchema.ts'
-import { CAR_FLOOR_M, CAR_HEIGHT_M } from './carDims.ts'
 import { spreadBanks } from './escalatorBanks.ts'
+import { bandCutYs, strokeBandOf } from './interiorDecks.ts'
 import { stationAxis } from './interiorAxis.ts'
 import { interiorBounds } from './interiorFraming.ts'
 import {
@@ -15,9 +15,10 @@ import {
   drawWalkway,
   type ConnectorContext,
 } from './interiorConnectors.ts'
-import { SegmentWriter, SplitAtY, type Buffers, type InteriorRole, type Rgb } from './interiorSegments.ts'
+import { SegmentWriter, SplitAtY, type Buffers, type InteriorRole, type Rgb, type SegmentSink } from './interiorSegments.ts'
 
 export type { Buffers, InteriorRole, Rgb } from './interiorSegments.ts'
+export { trainRoofY } from './interiorDecks.ts'
 
 /** Estimated drop from the platform edge to the rail head, meters: where the interior draws its tracks. */
 export const RAIL_DROP_M = 1.1
@@ -44,13 +45,13 @@ export interface InteriorBufferOptions {
    */
   dashStructure?: boolean
   /**
-   * Index into `interior.levels` of the level the lifted platform trains ride (`trainLevelIndex`). Levels above it
-   * (lower indices) go to the `over` layers, drawn after the trains; this level and the ones below stay in the base
-   * layers. A stair, escalator or elevator shaft from this level or below up to a level above it is cut at the trains'
-   * roof (`trainRoofY`): the part below stays in the base layers, so a car in front of a stair foot hides it, and the
-   * rest goes over. Undefined puts everything in the base layers.
+   * The platform decks (`interiorDecks`: level indices, deepest first). Each level draws in its stroke band
+   * (`strokeBandOf`): band j is deck j and the levels between it and the deck below, drawn under deck j's lifted
+   * trains and over deck j - 1's. A stair, escalator or elevator shaft from one band up to a later one is cut at each
+   * lower deck's train roof (`bandCutYs`): the part under a roof stays with that deck's band, so a car in front of a
+   * stair foot hides it, and the rest goes up a band. Default none: everything in band 0.
    */
-  splitLevel?: number
+  decks?: readonly number[]
   /**
    * Machines (elevators, escalators) that are out of service, by connector id: drawn in the `outage` role with an
    * X. Default none.
@@ -61,57 +62,52 @@ export interface InteriorBufferOptions {
   colorOf: (role: InteriorRole, levelIndex: number) => Rgb
 }
 
-/** The base strong and fine layers, and the `over` pair drawn above the lifted platform trains. */
+/** One stroke band's two layers. */
+export interface BandBuffers {
+  strong: Buffers
+  fine: Buffers
+}
+
+/**
+ * The stroke bands: band 0 (`strong`, `fine`), the bands between decks (`mid`, bands 1 to decks - 1; empty with one
+ * deck or none) and the top band (`overStrong`, `overFine`: the levels above the shallowest deck; empty with no deck).
+ */
 export interface InteriorLayers {
   strong: Buffers
   fine: Buffers
+  mid: BandBuffers[]
   overStrong: Buffers
   overFine: Buffers
 }
 
-/**
- * Drawn y (group-local, before the depth factor) of a lifted train's roof on the platform at `level`: its rail
- * (`yScale` exaggerated like the interior) plus the car's floor and body height (real meters: cars aren't
- * exaggerated). At full tilt and crossScale 1, as at the interior's zoom, for an unselected car: the selected one
- * (widened, lifted 0.2 m) rises about 0.5 m above it, so a stair foot can touch its roof by a pixel or two. A stair foot
- * on the camera side of a car is hidden by it too: strokes have no depth test, so the cut is by height alone.
- */
-export function trainRoofY(level: { y: number }, railDrop: number, yScale: number): number {
-  return (level.y - railDrop) * yScale + CAR_FLOOR_M + CAR_HEIGHT_M
-}
+/** What `connectorContext` reads: the buffer options that shape connectors. */
+export type ConnectorContextOptions = Pick<InteriorBufferOptions, 'yScale' | 'stepRise' | 'colorOf' | 'outOfService'>
 
 /**
- * Index of the level the lifted platform trains ride (levels run highest first, so the first such index is the
- * shallowest). Undefined when no platform has a track. The split level and everything below it stay in the base
- * layers (8/9), levels above it draw over (9.6/9.7), and lifted train copies draw at 9.4 to 9.52. With platform
- * tracks on more than one level (a two-deck station) it is the SHALLOWEST deck: both decks' strokes stay in the base
- * layers, each deck's trains draw above both decks' strokes, and mezzanines and levels above still draw over all
- * trains. A stopgap: the upper deck should be in front of the deeper deck's trains (2q7.28). Logs once per station.
+ * Everything the connector writers read but their sinks: level heights, the street level, the station axis and plan
+ * center, and each zero-run escalator's bank anchor. Also throws for an interior with nothing to draw (interiorBounds),
+ * so it becomes an error load.
  */
-export function trainLevelIndex(interior: StationInterior): number | undefined {
-  let shallowest: number | undefined
-  let decks = 0
-  interior.levels.forEach((level, i) => {
-    if (interior.platforms.some((p) => p.level === level.id && p.tracks.length > 0)) {
-      shallowest ??= i
-      decks++
-    }
-  })
-  if (decks > 1) warnTwoDecks(interior.stationId)
-  return shallowest
-}
-
-const warnedDecks = new Set<string>()
-function warnTwoDecks(id: string): void {
-  if (warnedDecks.has(id)) return
-  warnedDecks.add(id)
-  console.warn(`Interior ${id} has platform tracks on more than one level; trains draw above both decks' strokes, so the upper deck is not in front of the deeper deck's trains (2q7.28)`)
+export function connectorContext(interior: StationInterior, opts: ConnectorContextOptions): Omit<ConnectorContext, 'strong' | 'fine'> {
+  const bounds = interiorBounds(interior)
+  const anchors = spreadBanks(interior.connectors, interior.entrances)
+  return {
+    realY: (i) => interior.levels[i]!.y,
+    streetIndex: interior.levels.findIndex((l) => l.kind === 'street'),
+    yScale: opts.yScale,
+    stepRise: opts.stepRise,
+    colorOf: opts.colorOf,
+    outOfService: opts.outOfService ?? (() => false),
+    axis: stationAxis(interior),
+    center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
+    anchorOf: (id) => anchors.get(id),
+  }
 }
 
 /**
  * Merged layers for one station interior, emitted from the deepest level up to the street.
  * Interior layers draw with depthTest off, so buffer order is the overlap rule: upper levels
- * paint over lower ones. With `splitLevel`, the levels above it go to the `over` pair instead (see the option).
+ * paint over lower ones, within each stroke band (see `decks`).
  */
 export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBufferOptions): InteriorLayers {
   const { yScale, colorOf } = opts
@@ -121,44 +117,29 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
     if (i === undefined) throw new Error(`Unknown level "${levelId}" in ${elementId}`)
     return i
   }
-  const realY = (i: number) => interior.levels[i]!.y
-  const streetIndex = interior.levels.findIndex((l) => l.kind === 'street')
-  const base = { strong: new SegmentWriter(), fine: new SegmentWriter() }
-  const split = opts.splitLevel
-  const over = split === undefined ? base : { strong: new SegmentWriter(), fine: new SegmentWriter() }
-  // A level above the split draws over the trains.
-  const isOver = (i: number) => split !== undefined && i < split
+  const decks = opts.decks ?? []
+  const bands = Array.from({ length: decks.length + 1 }, () => ({ strong: new SegmentWriter(), fine: new SegmentWriter() }))
+  const bandOf = (i: number) => strokeBandOf(i, decks)
   const dash = opts.dashStructure === true
   // A walkway's sides dash like the slabs it joins: on an estimated layout, or when both its ends are approximate slabs.
   const approximateSlabs = new Set(interior.slabs.filter((s) => s.approximate === true).map((s) => s.id))
   const walkwayDash = (c: Connector) => dash || [c.lower.area, c.upper.area].every((a) => a !== undefined && approximateSlabs.has(a))
 
-  // Also throws for an interior with nothing to draw, so it becomes an error load.
-  const bounds = interiorBounds(interior)
-  const anchors = spreadBanks(interior.connectors, interior.entrances)
-  const shared: Omit<ConnectorContext, 'strong' | 'fine'> = {
-    realY,
-    streetIndex,
-    yScale,
-    stepRise: opts.stepRise,
-    colorOf,
-    outOfService: opts.outOfService ?? (() => false),
-    axis: stationAxis(interior),
-    center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
-    anchorOf: (id) => anchors.get(id),
-  }
-  const baseCtx: ConnectorContext = { ...shared, ...base }
-  const overCtx: ConnectorContext = { ...shared, ...over }
-  // Rising from the split level or below to above it: cut at the trains' roof.
-  const roofY = split === undefined ? 0 : trainRoofY(interior.levels[split]!, opts.railDrop, yScale)
-  const cutCtx: ConnectorContext = {
-    ...shared,
-    strong: new SplitAtY(base.strong, over.strong, roofY),
-    fine: new SplitAtY(base.fine, over.fine, roofY),
-  }
-  const connectorCtx = (lower: number, upper: number) => {
-    if (!isOver(upper)) return baseCtx
-    return isOver(lower) ? overCtx : cutCtx
+  const shared = connectorContext(interior, { yScale, stepRise: opts.stepRise, colorOf, outOfService: opts.outOfService })
+  const { streetIndex } = shared
+  const cuts = bandCutYs(interior, decks, opts.railDrop, yScale)
+  /** Band `from`'s writer, cutting at each deck roof up to band `to`: a SplitAtY chain, nested a band at a time. */
+  const chain = (role: 'strong' | 'fine', from: number, to: number): SegmentSink =>
+    from >= to ? bands[to]![role] : new SplitAtY(bands[from]![role], chain(role, from + 1, to), cuts[from]!)
+  const contexts = new Map<number, ConnectorContext>()
+  /** Strokes from the lower level's band up to the upper's (one band: that band's writers). */
+  const connectorCtx = (lower: number, upper: number): ConnectorContext => {
+    const from = bandOf(lower)
+    const to = bandOf(upper)
+    const key = from * bands.length + to
+    let ctx = contexts.get(key)
+    if (!ctx) contexts.set(key, (ctx = { ...shared, strong: chain('strong', from, to), fine: chain('fine', from, to) }))
+    return ctx
   }
 
   for (let li = interior.levels.length - 1; li >= 0; li--) {
@@ -166,7 +147,7 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
     const y = level.y * yScale
     const platforms = interior.platforms.filter((p) => indexOf(p.level, p.id) === li)
     const slabs = interior.slabs.filter((s) => indexOf(s.level, s.id) === li)
-    const { strong, fine } = isOver(li) ? over : base
+    const { strong, fine } = bands[bandOf(li)]!
 
     for (const p of platforms) {
       strong.loop(p.outline, y, colorOf('outline', li), dash)
@@ -182,10 +163,10 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
       const upper = indexOf(c.upper.level, c.id)
       if (c.kind === 'elevator') {
         // The shaft spans every level in between; it stops only at its two ends, each written in
-        // that level's pass so the levels above still paint over it. A shaft through the split is cut at the trains'
-        // roof like a stair or escalator from the platform up.
+        // that level's pass (and band) so the levels above still paint over it. A shaft through a deck is cut at its
+        // trains' roof like a stair or escalator from the platform up.
         if (lower === li) drawElevatorShaft(connectorCtx(lower, upper), c, lower, upper)
-        if (lower === li || upper === li) drawElevatorStop(isOver(li) ? overCtx : baseCtx, c, li)
+        if (lower === li || upper === li) drawElevatorStop(connectorCtx(li, li), c, li)
       } else if (lower === li) {
         const ctx = connectorCtx(lower, upper)
         if (c.kind === 'escalator') drawEscalator(ctx, c, lower, upper)
@@ -218,10 +199,12 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
     }
   }
 
-  const built = { strong: base.strong.build(), fine: base.fine.build() }
-  if (over === base) {
+  const built = bands.map((b) => ({ strong: b.strong.build(), fine: b.fine.build() }))
+  const base = built[0]!
+  if (built.length === 1) {
     const empty = new SegmentWriter().build()
-    return { ...built, overStrong: empty, overFine: empty }
+    return { ...base, mid: [], overStrong: empty, overFine: empty }
   }
-  return { ...built, overStrong: over.strong.build(), overFine: over.fine.build() }
+  const top = built.at(-1)!
+  return { ...base, mid: built.slice(1, -1), overStrong: top.strong, overFine: top.fine }
 }

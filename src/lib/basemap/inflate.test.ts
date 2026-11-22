@@ -14,7 +14,7 @@ describe('inflateIfGzip', () => {
     const out = await inflateIfGzip(gz)
     expect([...out]).toEqual([...raw])
     expect(isMvtBytes(out)).toBe(true)
-    expect(decodeTile(out, 15, 9647, 12320, ['roads']).path).toHaveLength(6)
+    expect(decodeTile(out, 15, 9647, 12320, ['roads'], null).path).toHaveLength(6)
   })
 
   it('passes raw MVT and empty bodies through as they are', async () => {
@@ -25,8 +25,8 @@ describe('inflateIfGzip', () => {
 
   it('hands the worker the same tile decoded whether it is stored plain or gzipped, as tiles are during the switch', async () => {
     const gz = gzipSync(raw, { level: 9, mtime: 0 })
-    const plain = decodeTile(await inflateIfGzip(raw), 15, 9647, 12320, ['roads'])
-    const fromGzip = decodeTile(await inflateIfGzip(gz), 15, 9647, 12320, ['roads'])
+    const plain = decodeTile(await inflateIfGzip(raw), 15, 9647, 12320, ['roads'], null)
+    const fromGzip = decodeTile(await inflateIfGzip(gz), 15, 9647, 12320, ['roads'], null)
     expect(fromGzip).toEqual(plain)
     expect(fromGzip.path).toHaveLength(6)
   })

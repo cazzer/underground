@@ -33,6 +33,8 @@ export interface EntranceText {
   headHouse: number
   /** How many entrances this label stands for: itself and the same-text ones within MERGE_M it absorbed. */
   count: number
+  /** The file entrance indexes it stands for: its own `index`, then each merged twin's (`count` of them). */
+  members: number[]
 }
 
 interface NamedLine {
@@ -170,6 +172,7 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
     const twin = out.find((u) => u.text === text && Math.hypot(u.x - d.p[0], u.z - d.p[1]) <= MERGE_M)
     if (twin) {
       twin.count++
+      twin.members.push(d.index)
       continue
     }
     out.push({
@@ -185,6 +188,7 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
       keys: d.keys,
       headHouse: 0,
       count: 1,
+      members: [d.index],
     })
   }
   for (const t of out) t.unique = out.filter((u) => u.text === t.text).length === 1

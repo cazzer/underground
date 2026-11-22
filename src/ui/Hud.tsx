@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { ExitLineView } from '../lib/exitView'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
@@ -45,9 +46,11 @@ interface HudProps {
   locate: LocateControls
   /** Shown under the location message when a `#station=` link named no station. */
   linkNotice: { show: boolean; onDismiss: () => void }
+  /** The trip panel's exit lines, by the trip id of a journey's last ride. */
+  tripExits: ReadonlyMap<string, ExitLineView> | null
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
@@ -248,6 +251,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             onClose={closeTrip}
             headingRef={tripHeading}
             covered={trainOpen || noticeOpen}
+            exits={tripExits}
             ref={trainOpen || noticeOpen ? null : panel}
           />
         )}

@@ -58,16 +58,68 @@ export const RENDER_ORDER = {
   streetEntrance: 7.6,
   interiorFine: 8,
   interior: 9,
-  // Trains on a revealed station's platforms, redrawn above the veil and those strokes: footprints, bodies
-  // (depth-tested against the street cars they copy), then the selected outline's rim and gap shells, as on the street.
+  // Trains on a revealed station's platforms (its deepest deck's, spanCarOrders), redrawn above the veil and those
+  // strokes: footprints, bodies (depth-tested against the street cars they copy), then the selected outline's rim and
+  // gap shells, as on the street.
   spanCarHalo: 9.45,
   spanCars: 9.5,
   spanCarRim: 9.51,
   spanCarGap: 9.52,
-  // The interior's levels above that platform (mezzanines, their stairs, escalators and shafts, the street), fine
+  // The interior's levels above its shallowest deck (mezzanines, their stairs, escalators and shafts, the street), fine
   // then strong, over the lifted trains: they stand in front of them.
   interiorOverFine: 9.6,
   interiorOver: 9.7,
   // The focus ring of a focused station with no interior, redrawn over the trains.
   focusRing: 10,
 } as const
+
+/** A stroke band's layers (interiorDecks.ts): fine, strong, and the exit path drawn over them (2q7.12). */
+export interface StrokeOrders {
+  fine: number
+  strong: number
+  exitPath: number
+}
+
+/** A deck's lifted trains, in SpanCars' passes: footprints, bodies, the selected outline's rim and gap shells. */
+export interface SpanCarOrders {
+  halo: number
+  body: number
+  rim: number
+  gap: number
+}
+
+/** Band 0 and the top band (the levels above the shallowest deck). The exit path (ExitPath.tsx) draws over each band's
+ *  strokes and under the next deck's lifted trains: 9.3 under deck 0's, 9.8 over the top band. */
+const BASE_BAND: StrokeOrders = { fine: RENDER_ORDER.interiorFine, strong: RENDER_ORDER.interior, exitPath: 9.3 }
+const TOP_BAND: StrokeOrders = { fine: RENDER_ORDER.interiorOverFine, strong: RENDER_ORDER.interiorOver, exitPath: 9.8 }
+/** Bands between decks at a multi-deck interior (Union Sq): band 1, then band 2. */
+const MID_BANDS: readonly StrokeOrders[] = [
+  { fine: 9.53, strong: 9.54, exitPath: 9.545 },
+  { fine: 9.57, strong: 9.575, exitPath: 9.578 },
+]
+/** Deck 0 (the deepest, and a single-deck station's only one), then decks 1 and 2, each right after its band. */
+const DECK_TRAINS: readonly SpanCarOrders[] = [
+  { halo: RENDER_ORDER.spanCarHalo, body: RENDER_ORDER.spanCars, rim: RENDER_ORDER.spanCarRim, gap: RENDER_ORDER.spanCarGap },
+  { halo: 9.55, body: 9.555, rim: 9.56, gap: 9.565 },
+  { halo: 9.58, body: 9.585, rim: 9.59, gap: 9.595 },
+]
+
+/**
+ * Render orders of stroke band `band` of `bandCount` (decks + 1): band 0 at 8/9, the top band at 9.6/9.7, and the
+ * bands between decks in between, each just after the lifted trains of the deck below it. One band (no decks) is
+ * band 0 alone. Throws past MAX_DECKS (interiorDecks never gives more).
+ */
+export function strokeOrders(band: number, bandCount: number): StrokeOrders {
+  if (band === 0) return BASE_BAND
+  if (band === bandCount - 1) return TOP_BAND
+  const mid = MID_BANDS[band - 1]
+  if (!mid || band > bandCount - 1) throw new Error(`No render order for stroke band ${band} of ${bandCount}`)
+  return mid
+}
+
+/** Render orders of deck `deck`'s lifted trains (0 is the deepest). Throws past MAX_DECKS. */
+export function spanCarOrders(deck: number): SpanCarOrders {
+  const orders = DECK_TRAINS[deck]
+  if (!orders) throw new Error(`No render order for platform deck ${deck}`)
+  return orders
+}

@@ -103,9 +103,21 @@ interface Incline {
   color: (role: InteriorRole, t: number) => Rgb
 }
 
-function incline(ctx: ConnectorContext, c: Connector, li: number, ui: number): Incline {
+/** What `planEnds` reads from a connector context. */
+export type PlanContext = Pick<ConnectorContext, 'realY' | 'streetIndex' | 'axis' | 'center' | 'anchorOf'>
+
+/**
+ * Plan ends of a connector from level `li` (lower) to `ui` (upper) exactly as drawn: an elevator's shaft point at
+ * both ends, an incline's `inclineEnds` (a zero-run escalator laid by its bank anchor). A path over it lands on its band.
+ */
+export function planEnds(ctx: PlanContext, c: Connector, li: number, ui: number): { lower: LocalPoint; upper: LocalPoint } {
+  if (c.kind === 'elevator') return { lower: [c.lower.x, c.lower.z], upper: [c.lower.x, c.lower.z] }
   const rise = ctx.realY(ui) - ctx.realY(li)
-  const { lower, upper } = inclineEnds(c, rise, ctx.axis, ctx.center, ctx.anchorOf(c.id), li === ctx.streetIndex ? 'lower' : 'upper')
+  return inclineEnds(c, rise, ctx.axis, ctx.center, ctx.anchorOf(c.id), li === ctx.streetIndex ? 'lower' : 'upper')
+}
+
+function incline(ctx: ConnectorContext, c: Connector, li: number, ui: number): Incline {
+  const { lower, upper } = planEnds(ctx, c, li, ui)
   const dx = upper[0] - lower[0]
   const dz = upper[1] - lower[1]
   const run = Math.hypot(dx, dz)

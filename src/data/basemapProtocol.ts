@@ -3,10 +3,11 @@
  * carries a sequence number its reply echoes, so a reply to a load since cancelled or repeated is told apart.
  */
 import type { ClassBuffers } from '../lib/basemap/decodeTile'
+import type { PackedTracks } from '../lib/routeTracks'
 
 export type BasemapRequest =
-  /** Sent once, first: the spec's kept layers, the only ones decoded. */
-  | { type: 'init'; layers: string[] }
+  /** Sent once, first: the spec's kept layers, the only ones decoded, and the drawn tracks the roads are cut under. */
+  | { type: 'init'; layers: string[]; tracks: PackedTracks }
   | { type: 'load'; key: number; seq: number; url: string; z: number; x: number; y: number }
   /** Aborts the fetch; a cancelled tile is never decoded or answered. */
   | { type: 'cancel'; key: number }

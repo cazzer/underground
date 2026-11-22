@@ -4,7 +4,7 @@ import { decodeStationWalk } from '../data/loadStationWalk'
 import type { Connector, StationIndex, StationInterior } from '../data/stationSchema'
 import type { StationStreets, StreetEntrance } from '../data/streetSchema'
 import type { StationWalk } from '../data/walkSchema'
-import { chooseExit, streetJoinOf, walkMinutes, WALK_DETOUR, type ExitChoice } from './exitChoice'
+import { chooseExit, quickestExit, streetEntranceIndex, streetJoinOf, walkMinutes, WALK_DETOUR, type ExitChoice, type ExitWalk } from './exitChoice'
 import { fixture } from './interiorFixture'
 import { toGround } from './projection'
 import { FIXTURE_ANCHOR, walkGraph } from './walkFixture'
@@ -38,9 +38,12 @@ function twoExits(over: Partial<StationInterior> = {}): StationInterior {
 /** One long sidewalk along z = 20, from x -300 to 300. */
 const street = walkGraph([[-300, 20], [300, 20]], [{ nodes: [0, 1] }])
 
-function exitOf(result: ReturnType<typeof chooseExit>): ExitChoice {
+/** A chosen exit, with its walk outside (chooseExit always prices one). */
+function exitOf(result: ReturnType<typeof chooseExit>): ExitChoice & { walk: ExitWalk } {
   if (result.kind !== 'exit') throw new Error(`no exit: ${result.reason}`)
-  return result
+  const { walk } = result
+  if (walk === null) throw new Error('chooseExit gave no walk')
+  return { ...result, walk }
 }
 
 describe('chooseExit on a synthetic station', () => {
@@ -111,10 +114,44 @@ describe('streetJoinOf', () => {
     })
     expect(streetJoinOf(scene(10, 10), 'Stair', streets)?.street).toBe('Bedford Avenue')
   })
+  it('gives the matched entrance index', () => {
+    expect(streetEntranceIndex(scene(9, 10), 'Stair', streets)).toBe(0)
+    expect(streetEntranceIndex(scene(11, 10), 'Stair', streets)).toBeNull()
+  })
   it('does not match another type, 2 m away, or an unlisted exit', () => {
     expect(streetJoinOf(scene(9, 10), 'Elevator', streets)).toBeNull()
     expect(streetJoinOf(scene(11, 10), 'Stair', streets)).toBeNull()
     expect(streetJoinOf(scene(9, 10), null, streets)).toBeNull()
+  })
+})
+
+describe('quickestExit', () => {
+  const interior = twoExits()
+
+  it('takes the exit with the least time inside, with no walk or destination', () => {
+    const r = quickestExit({ interior, stopId: 'X01N' })
+    if (r.kind !== 'exit') throw new Error(r.reason)
+    expect(r.exit.entranceId).toBe('E1')
+    expect(r.connectorIds).toEqual(['PS1', 'ST1'])
+    expect(r.walk).toBeNull()
+    expect(r.destination).toBeNull()
+    expect(r.totalS).toBe(r.inStationS)
+    expect(r.probable).toBe(false)
+  })
+
+  it('marks a generated or approximate interior probable and avoids a closed way out', () => {
+    const generated = twoExits({ generated: { archetype: 'cut-cover-mezzanine', confidence: 0.9 } })
+    const g = quickestExit({ interior: generated, stopId: 'X01N' })
+    expect(g.kind === 'exit' && g.probable).toBe(true)
+    const approximate = quickestExit({ interior: twoExits({ approximate: true }), stopId: 'X01N' })
+    expect(approximate.kind === 'exit' && approximate.probable).toBe(true)
+    const r = quickestExit({ interior, stopId: 'X01N', closed: new Set(['ST1']) })
+    expect(r.kind === 'exit' && r.exit.entranceId).toBe('E3')
+  })
+
+  it('says why there is no exit', () => {
+    expect(quickestExit({ interior, stopId: 'X01S' })).toEqual({ kind: 'none', reason: 'no-track' })
+    expect(quickestExit({ interior, stopId: 'X01N', closed: new Set(['PS1']) })).toEqual({ kind: 'none', reason: 'no-exit' })
   })
 })
 

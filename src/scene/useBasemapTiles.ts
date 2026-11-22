@@ -21,6 +21,7 @@ import type { BasemapTiles } from '../data/basemapTypes'
 import { CAP_Z, capStep, newCap, type CapEvent, type CapState } from '../lib/basemap/locationCap'
 import { newPose } from '../lib/basemap/reselect'
 import { useFocus, type FlyRequest } from '../lib/focus'
+import type { PackedTracks } from '../lib/routeTracks'
 import type { MapControlsImpl } from './cameraFlight'
 
 /** The idle callback's deadline: tiles start loading by then even if the main thread never idles. */
@@ -36,8 +37,8 @@ function stepCap(cap: CapState, store: BasemapTiles, e: CapEvent): void {
   else if (lifted) store.capZoom(null)
 }
 
-export function useBasemapTiles(config: BasemapConfig): BasemapTiles {
-  const store = useMemo(() => createBasemapTiles(config), [config])
+export function useBasemapTiles(config: BasemapConfig, tracks: PackedTracks): BasemapTiles {
+  const store = useMemo(() => createBasemapTiles(config, tracks), [config, tracks])
   // The element MapControls listens on (drei: `domElement || events.connected || gl.domElement`).
   const el = useThree((s) => (s.events.connected as HTMLElement | undefined) || s.gl.domElement)
   const { flyRequest } = useFocus()

@@ -3,7 +3,7 @@
  * side, 0 everywhere else. The map lines and the live trains both read it, so trains ride the drawn track. Pure.
  * Type-only `.ts` import because scripts/lib/trackDepth.test.ts loads this file in Node.
  */
-import type { StationId } from '../data/schema.ts'
+import type { StationId, StopId } from '../data/schema.ts'
 import type { Ground } from './projection.ts'
 import { rampBreaks, RAMP_MAX_ERROR_M } from './rampSampling.ts'
 
@@ -25,6 +25,8 @@ export interface ProfileRun {
   yReal: number
   /** The station whose platform track this is, when it comes from one (trackAnchors.ts). */
   stationId?: StationId
+  /** That platform track's stop id (its deck, at a multi-deck interior). */
+  stopId?: StopId
 }
 
 export interface ProfileOptions {

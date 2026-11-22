@@ -6,8 +6,9 @@ import { addBox, ENTRANCE_SLOTS, groundHalfPx, onScreen, toScreen, type LabelPla
 /** Gap between an entrance mark's edge and a label beside it, px; and above or below it. */
 const SIDE_GAP_PX = 6
 const END_GAP_PX = 3
-/** Rank tiers, far above any screen distance: an elevator first, then a label no other entrance shares, then the
- *  best of each head house before any head house's second. */
+/** Rank tiers, far above any screen distance: the trip's exit (`view.priorityEntrance`), an elevator, then a label no
+ *  other entrance shares, then the best of each head house before any head house's second. */
+const EXIT_TIER = 8e9
 const ELEVATOR_TIER = 4e9
 const UNIQUE_TIER = 2e9
 const HOUSE_TIER = 1e9
@@ -71,7 +72,7 @@ export function entranceBoxes(
 }
 
 /**
- * Orders the entrances (order positions 0 to E - 1): elevators first, then labels no other entrance shares; within
+ * Orders the entrances (order positions 0 to E - 1): the trip's exit first, then elevators, then labels no other entrance shares; within
  * those, the best of each head house before any second, then nearest the free area's middle on screen, last
  * placement's winners STICKY_PX nearer. Entrances off screen have no candidates, so their rank doesn't matter.
  * Insertion sort over a few items; no allocation.
@@ -83,7 +84,7 @@ export function rankEntrances(p: LabelPlacement, view: PlacementView): void {
   for (let i = 0; i < n; i++) {
     const e = p.entrances[i]!
     const near = p.cand.size[i]! > 0 ? Math.hypot(p.markX[i]! - view.focusX, p.markY[i]! - view.focusY) : 1e8
-    p.score[i] = (e.elevator ? 0 : ELEVATOR_TIER) + (e.unique ? 0 : UNIQUE_TIER) + near - (p.lastSrc[i]! >= 0 ? STICKY_PX : 0)
+    p.score[i] = (e.members.includes(view.priorityEntrance) ? 0 : EXIT_TIER) + (e.elevator ? 0 : ELEVATOR_TIER) + (e.unique ? 0 : UNIQUE_TIER) + near - (p.lastSrc[i]! >= 0 ? STICKY_PX : 0)
     if (p.score[i]! < p.houseBest[e.headHouse]!) p.houseBest[e.headHouse] = p.score[i]!
     order[i] = i
   }

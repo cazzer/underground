@@ -15,9 +15,10 @@
  * - scripts/lib/templates/stairs.ts: `DRAWN_Y_SCALE` (generated stair and escalator runs are sized for the drawn
  *   rise) must equal the chosen scale; regenerate with `npm run data:stations`
  * - useSpanCars.ts: `VEIL_TINT` and `SPAN_LIFT` become constants (if C wins, delete SpanCars, useSpanCars and their
- *   render orders: the interior draws under the trains; also the `over` layers, `splitLevel`,
- *   `trainLevelIndex`, `trainRoofY` and `SplitAtY`)
- * - interiorModel.ts: the `interiorLook.under` check on `splitLevel`
+ *   render orders: the interior draws under the trains; also the `mid` and `over` layers, the `decks` option,
+ *   interiorDecks.ts, `deckSpans`, `strokeOrders` / `spanCarOrders`, the extra SpanCars layers in LiveTrains and
+ *   `SplitAtY`)
+ * - interiorModel.ts: the `interiorLook.under` check in `decksOf`
  * - AGENTS.md: the `?interior=` / `?interiorY=` TEMPORARY note, "padded hull" in the directory map
  *   (unless B wins), and "look C uses -0.6 and -0.3" in the rendering conventions (unless C wins)
  */

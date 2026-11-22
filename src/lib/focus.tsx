@@ -66,6 +66,8 @@ export interface UndergroundDevHooks {
   trainKeys?: () => string[]
   /** Viewport px of a live train's dot and, with cars unfolded, its rear and front ends; null if not drawn. */
   trainAt?: (key: string) => { x: number; y: number; rear: { x: number; y: number } | null; front: { x: number; y: number } | null } | null
+  /** TEMPORARY until 2q7.14: aim the trip's drawn exit at scene point (x, z), or clear it with null (useTripExit). */
+  exitTo?: (x: number | null, z?: number) => void
   /** The basemap tile store's counters (useBasemapTiles). */
   basemap?: () => BasemapStats
   /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */

@@ -130,6 +130,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1 px, so width marks only the subway) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
   TEMPORARY: `?basemap=off` draws no basemap and loads no tiles until ost.9.3's look is signed off; the removal list is
   in `src/scene/basemapLook.ts`
+  Exit tokens `exitPath` (pink, 3:1, held apart from the interior, focus, location and route colors, also under simulated
+  red-green color blindness; theme.test.ts), `exitPathWidth` (3 px), `exitPathDash` / `exitPathGap` (world m) draw the trip's
+  way out. TEMPORARY: `?exitPath=a|b` (centerline only, or restroked connectors and entrance too; default b) and
+  `?exitColor=pink|rim|focus` until the 2q7.12 cards are decided; the removal list is in `src/scene/exitPathLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -170,18 +174,36 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     tilt or turn; the tubes are open so no end face crosses a joint, and two 2-instance cap meshes (`writeEndCaps`) close the train's two ends);
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
-    `cameraDistance.ts` helpers; `renderOrder.ts`
-  - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms (12
-    trains, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
+    `cameraDistance.ts` helpers; `renderOrder.ts` (also `strokeOrders` and `spanCarOrders`, the per-band and per-deck orders)
+  - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms, one layer
+    per platform deck (LiveTrains keeps three, splitting the spans with `deckSpans`; 12
+    trains each, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
     veil blends, so a copy at weight 0 renders exactly like its veiled street car. Along those platforms the map
     track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
-  - `StationInterior.tsx` the focused station's interior (two line layers on each side of the lifted-train split; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, level
+  - `StationInterior.tsx` the focused station's interior (two line layers per stroke band, up to four bands; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, level
     labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
-    drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
+    drawable model (theme colors, labels, camera target; `STEP_RISE_M`); `interiorLook.ts` TEMPORARY look overrides;
+    `StationInterior` renders its `children` inside the interior group
+  - `ExitPath.tsx` the trip's way out at its To station, a child of `StationInterior` (only while that interior is the
+    focused one, in an `ErrorBoundary`): `exitPathBuffers` in one LineMaterial layer per stroke band (`model.decks`), at
+    `strokeOrders(band, count).exitPath`: over that band's strokes, under the next deck's lifted trains (9.3 band 0, 9.8
+    the top band, 9.545 / 9.578 Union Sq's mid bands), `theme.exitPathWidth`, dashed (`exitPathDash`/`exitPathGap`)
+    when the layout is estimated or the walk outside is; opacity `interiorOpacity`; `exitPathLook.ts` TEMPORARY look flags.
+    It hands its start (`ExitPathLayers.keepOut`) to the level labels, which drop just below it on screen
+    (`src/lib/labelKeepOut.ts`). The exit's entrance (`TripExit.mapLabel`: ground x/z and raw type) goes to
+    `StationStreets` as `exitLabel`, which finds it in the street file it shows (`exitEntranceIndex`, within 1.5 m, same
+    type; any complex member's file); the label with it among its `EntranceText.members` (its own index plus each same-text
+    twin merged into it) is the exit label: `rankEntrances` (entranceLabelBoxes.ts) ranks it above every other entrance
+    (an 8e9 tier over the elevators' 4e9), `exemptExitFromMarks` (streetLabelPlacement.ts) lets it cover other entrances'
+    marks (only those; panel, header, footer, station markers, focus ring and level labels still block), and
+    `useStreetLabels` tints it `exitPathLook.color` (the path's)
   - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
-    with the reveal and goes with the focus); keyed by station. Its draw order is auto: above the veil (7.5), built from
+    with the reveal and goes with the focus); keyed by station. Street pieces running under a route line are left out
+    (the route clip, see `src/lib/routeClip.ts` below, over `localTracks`: the runs within the file's radius + its reach),
+    so no 1 px centerline reads as one more track in a bundle; the labels still name the street. Not while the station
+    has an interior (loaded or loading): its tracks sink under it, so the streets above stay whole. Its draw order is auto: above the veil (7.5), built from
     `StreetLayer.veiledBuffers` (the 1.9:1 stroke, fading to the background like the others; material color stays
     white), while the station's interior is loaded under look A; else 0.35 at full color; `streetsLook.ts` TEMPORARY
     override. It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
@@ -288,7 +310,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trackProfile.ts` a shape's vertical profile (knots, `profileAt`, `resampleForProfile`) and
     `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
-    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`; `memberSpans` unions a complex's members per shape, the `interiorSpans` that SubwayLines, LineHighlight, usePlatformFade and LiveTrains take instead of a station id) and its
+    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`; `memberSpans` unions a complex's members per shape, the `interiorSpans` that SubwayLines, LineHighlight and usePlatformFade take instead of a station; `deckSpans` splits them by `PlatformSpan.stopId` per deck for LiveTrains id) and its
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
     adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
     `lineBreaks`, every extra vertex a drawn line needs (ramps via `rampSampling.ts`, band tapers every 30 m but only once the slot
@@ -338,7 +360,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     sit side by side across the axis in id order (an authored one off its entrance stays put; one listed
     by two entrances throws);
     `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;
-    `interiorSegments.ts` the shared segment writer; `interiorFixture.ts` the tests' mini interior;
+    `interiorSegments.ts` the shared segment writer (`SplitAtY` nests, one cut per deck roof); `interiorDecks.ts` the platform
+    decks (`interiorDecks`, deepest first, at most `MAX_DECKS` 3), `strokeBandOf`, `bandCutYs`, `trainRoofY`, `trackDecks`;
+    `interiorFixture.ts` the tests' mini interior;
     `interiorFraming.ts` bounds, focus anchor (plan center, toward-camera shift, half-extent), level
     labels (`levelHeightText`: authored levels "−4.3 m"; on a generated interior an `ee-rise` depth is signed to one
     decimal, "+" above the street, and any other is "≈ −9 m", signed whole meters), padded hull; `interiorFade.ts` per-level fade share by distance from the street level;
@@ -361,8 +385,18 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     walkway) and same-area walks, to each exit: an `exit: true` entrance, or the street end of a connector no entrance lists,
     `entranceId` null); `exitChoice.ts` (`chooseExit`: the exit minimizing in-station plus outside time, the outside walk
     over the shard when the destination is within its radius, else a straight-line estimate at `WALK_DETOUR` 1.3;
-    `probable` for a generated interior; `street` joins the street-file entrance within 1.5 m of the same type;
-    `walkMinutes`); `walkFixture.ts` the tests' synthetic walk graphs
+    `probable` for a generated or `approximate` interior; `street` joins the street-file entrance within 1.5 m of the same type;
+    `walkMinutes`; `quickestExit`: no destination, the least in-station time, `walk` and `destination` null;
+    `streetEntranceIndex`); `interiorPath.ts` (`exitPathBuffers`: an `ExitChoice` as group-local buffers: from platform
+    height over the track point below the first connector, each connector's centerline between its drawn ends
+    (`planEnds` in interiorConnectors.ts, shared with the drawing; `connectorContext` in interiorGeometry.ts), the street
+    walk to the exit, then the walk outside (solid over the graph, one dashed line when estimated), a board marker (the
+    track at rail height, `BOARD_HALF_M` 9 either side), and with restroke each connector redrawn and the exit's entrance
+    square 1 m larger; `interiorPathStrokes.ts` its writers: one per stroke band (`strokeBandOf`), a connector crossing
+    bands cut at each deck roof it spans (`bandCutYs`, nested SplitAtY like the interior's), the restroke; one dash phase
+    runs along the path, across bands); `exitView.ts` (`finalRideStops`, `exitLineView`: the panel's
+    "Quickest way out: Bedford Av & N 7 St" plus a dim note (label tail, "probably", walk, a machine's unknown status),
+    and the spoken sentence via `streetSpoken`); `walkFixture.ts` the tests' synthetic walk graphs
   - `searchBucket.ts` which hash bucket a street or intersection entry is filed in and which one a query reads
     (`entryBucketKeys`, `queryBucketKey`, FNV-1a over the first two characters of the first distinctive token; `.ts` imports,
     scripts share it); `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
@@ -507,7 +541,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   dropped, an LRU (24 MB / 128), what to draw meanwhile (`drawn`, `version`), the location zoom cap (`capZoom`), one
   log line per failure reason per session; no worker or a crashed one turns the basemap off (logged).
   `basemapWorker.ts` fetches, inflates a gzip body (`lib/basemap/inflate.ts`) and decodes (`basemapProtocol.ts` the
-  messages); `basemapConfig.ts` `BASEMAP` (the build-time `__BASEMAP__`: bbox, maxzoom, layers, the tile pin's
+  messages; `init` carries the layers and the drawn tracks, `packTracks(network.shapes)` from Basemap (167 distinct paths,
+  about 290 KB), cloned not transferred, from which the worker builds its road clip once (8-18 ms in node, about 3 MB
+  kept); a throw there fails the worker, so the basemap goes off, logged); `basemapConfig.ts` `BASEMAP` (the build-time `__BASEMAP__`: bbox, maxzoom, layers, the tile pin's
   release as version; null for a legacy or absent pin; under `vite serve`, `VITE_BASEMAP_DEV=1` in `.env.local` loads
   the local `public/basemap/tiles` with version "dev") and `tileUrl` (`basemap/tiles/{z}/{x}/{y}.mvt?v=<release>`).
   `src/scene/useBasemapTiles.ts` runs it (starts after the first frame and an idle callback; feeds the location cap,
@@ -522,8 +558,20 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`classOf`: highway, major, minor, path, water, park; tunnels, sidewalks and crossings (a path's `kind_detail`), rail,
   ferry, earth and points dropped), `areaFilter.ts` (`keepRing`: park and water rings under 1 ha only in z14+ tiles,
   about 7 km in; under 5 ha only in z13+, about 14 km in; a ring reaching the tile edge always stays),
-  `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip),
+  `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip;
+  road classes (`isRoadClass`) in z13+ tiles are cut by the worker's route clip; z12 and coarser, water and parks never),
   `mvtFixture.ts` (tests' MVT writer). `projection.ts` exports `groundX`/`groundZ` for per-vertex use
+- `src/lib/routeClip.ts`: the route clip both street layers share (pure; ost.10), so no street centerline reads as one
+  more track inside a bundle. `buildRouteClip` grids the tracks (corridorHash, 100 m cells, streets sampled every 50 m,
+  reach hypot(clip, pad) + 25 m); `keptPieces` cuts a street piece within `ROUTE_CLIP_M` (5 m; routeBundles' 12 m
+  `ROUTE_NEAR_M` is for labels only) and 15° of a track, projected inside the track segment ± 3 m, drops a stretch under
+  2 m left by a cut, and allocates nothing per call. 5 m is the narrowest that still cuts every
+  centerline between two direction tracks (4.7 m off each) and leaves most of a dual carriageway beside a bundle
+  (Broadway at 96 St; `docs/evidence/ost.10/diff-*`). `src/lib/routeTracks.ts`: `distinctTracks` (one per ground path),
+  `packTracks`/`unpackTracks` (finite-checked) for the basemap worker, `localTracks` for one station.
+  `src/lib/clipLineBuffers.ts` cuts a plain layer's buffers, positions and colors interpolated at the cuts. The clip reads
+  ground paths only, not depth, so the station layer skips it at a station with an interior (the basemap's roads,
+  masked there, stay cut)
 - `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,
   one request at a time, a hidden tab aborts and stops, backoff via `lib/live/enePoll.ts`; `eneFetch.ts` validates one body
   (`realtimeFetch.ts`'s timeout, errors and `parseRetryAfter` are reused). Pure joins in `lib/live/`: `eneJoin.ts`
@@ -563,7 +611,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   repeated sentence is spoken again. `TripPanel.tsx` (`aside` "Trip"; heading takes focus on mount; `useScrollHint.ts` a "more below" fade
   while the capped panel scrolls) with `TripEnds.tsx` (From/To rows take focus, then open their own `StationSearch`; a shortcut that fills an
   end returns focus to that row; "Nearest to you" never offers a From equal to To) and `TripJourneys.tsx` (disclosures, first open; a
-  station name calls `select`, the only camera move). The header button's aria-expanded is true only while the panel is in front; pressing
+  station name calls `select`, the only camera move; a journey ending on a train ends with `TripExitLine.tsx`, its way out: the
+  visible text and note aria-hidden, one sr-only sentence, never a live region). The header button's aria-expanded is true only while the panel is in front; pressing
   it when a train or notice covers the panel (or the panel is closed) closes that cover first. × and Esc move focus only from inside the
   panel. The trip panel stays mounted (hidden, inert) under a train panel or notice, so its journeys, scroll and focus survive and a
   notice's auto-dismiss never moves focus; only an explicit open, the button, or a deliberate train/notice close focuses its heading.
@@ -780,6 +829,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   you-are-here reticle 6.55, street-file entrance marks 7.6 (above the veil at 7, under the interior strokes),
   above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
+  at a multi-deck interior the band between decks 9.53 (fine) and 9.54 (strong) and the next deck's cars 9.55 to
+  9.565 (a third deck: 9.57 to 9.595; `strokeOrders`, `spanCarOrders`),
+  the trip's exit path over each stroke band, under the next deck's cars (`strokeOrders(...).exitPath`: 9.3 band 0,
+  9.545 and 9.578 the mid bands, 9.8 the top band),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom), and the other members of its complex once the interior that covers them is loaded, draw no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
@@ -788,7 +841,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior) has depthTest false.
   The above-veil platform car bodies (9.5) test and write depth too: they copy their street cars' matrices, so
   they pass where those drew and a nearer street car stays in front. The selected outline shells (street and platform)
-  test depth but never write it.
+  test depth but never write it, and so do the platform car footprints of every deck above the deepest (9.55, 9.58).
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
@@ -838,7 +891,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   instance `slot * MAX_CARS + c`). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
 - The station interior is a group at `toGround(anchor)` with depths drawn ×2 × the depth factor (the group's
-  `scale.y`; x/z true and never rescaled, since dashes are object-space; labels give real depths). Merged `LineSegments2` (fine, then strong strokes, a pair on each side of the split below) are built from the deepest
+  `scale.y`; x/z true and never rescaled, since dashes are object-space; labels give real depths). Merged `LineSegments2` (fine, then strong strokes, a pair per stroke band below) are built from the deepest
   level up, so upper levels paint over lower ones; levels farther from the street (in level count; deeper, or
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
@@ -846,14 +899,22 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   layer, live trains included, in one draw call, at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
   level labels show by `labelOpacity` (gated between depth 0.35 and 0.65); the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
-  are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.4 to 9.5; not in look C),
-  and the levels above it draw over those trains at 9.6 (fine) and 9.7 (strong): `buildInteriorBuffers` splits at
-  `splitLevel` (`trainLevelIndex`, the deepest level with a platform track). That level and below stay at 8/9; a
-  level above it goes over; a stair, escalator or elevator shaft from it (or below) up to a level above it is cut
-  at the trains' roof (`trainRoofY`: rail ×yScale plus the car's floor and body height from `src/lib/carDims.ts`,
-  not exaggerated; `SplitAtY` in `interiorSegments.ts`), so a car in front of a stair foot hides it and the
-  stair above the roof draws over the car (an elevator's stop stays with its level). The cut is by height alone, so a
-  foot behind a car is hidden too. One platform level is assumed: with platform tracks on more than one level (Union Sq, 635) `trainLevelIndex` takes the shallowest deck, so each deck's trains draw above both decks' strokes and under the levels above (a stopgap: the upper deck should be in front of the deeper deck's trains, 2q7.28). At most four interior line layers; look C doesn't split. Every car within
+  are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.45 to 9.52; not in look C),
+  and the levels above it draw over those trains. A deck is a level with a platform track (`interiorDecks`, deepest
+  first); level i draws in stroke band `strokeBandOf(i, decks)`, the number of decks deeper than it, so band j is deck
+  j and the levels between it and the deck below, and deck j's lifted trains draw right after band j: band 0 at 8/9,
+  the top band (above the shallowest deck) at 9.6 (fine) and 9.7 (strong), the bands between decks in between
+  (`buildInteriorBuffers`' `decks`, the model's `mid` layers). A stair, escalator or elevator shaft rising from one
+  band to a later one is cut at each lower deck's train roof (`bandCutYs`, `trainRoofY`: rail ×yScale plus the car's
+  floor and body height from `src/lib/carDims.ts`, not exaggerated; nested `SplitAtY` in `interiorSegments.ts`), so a
+  car in front of a stair foot hides it and the stair above the roof draws over the car (an elevator's stop stays with
+  its level's band). The cut is by height alone, so a foot behind a car is hidden too. The lifted trains split by deck
+  the same way: each span carries its track's `stopId` (`ProfileRun.stopId`), the model's `trackDecks` maps it to its
+  deck and `deckSpans` (Scene) gives each deck's SpanCars layer its own spans; above deck 0 the footprints test depth,
+  so where decks cross on screen a farther deck's footprint never covers a nearer lifted car. At Union Sq (635) the L
+  draws over the Canarsie deck and under the Lexington and Broadway deck, whose trains draw under the mezzanine; every
+  other shipped interior has one deck and draws exactly as before. At most eight interior line layers (two per band);
+  look C doesn't split. Every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
   toward the background after shading by `veilTint` (veil opacity × veilWeight × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal
@@ -974,6 +1035,14 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Walk shards are fetched only on a user action.** `data/walk/<id>.json` reveals its station id to the static host, so
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
   of a fix); no request carries the fix or the destination, and routing runs on the device.
+- **Trip exit.** Once a plan for the trip panel's ends is ready, `src/data/useTripExit.ts` loads the To station's interior
+  (`useInteriorModel`, the focused interior's cache) and street files (the interior file id's and, for a complex, the
+  alighting member's; `useStationStreetsLoad` tells loading from missing, and the line waits for both). Both trip ends are
+  chosen by the user (a swap counts: the new To was chosen as From), so this fetch reveals nothing they did not pick. It
+  finds each journey's quickest way out (`quickestExit`, avoiding machines out of service; with no fresh outage data none
+  are closed, and the line says the status is unknown only when the station panel would: never while still connecting). The map draws the first journey's (ending on a train) at the To station while the trip panel
+  is open, even under a train panel; only once that station is focused. It fetches no walk graph: only the DEV
+  `__underground.exitTo(x, z | null)` seam aims it at a point (and loads that station's walk graph) until 2q7.14.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
   `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it. Basemap tiles
   follow the camera, never the fix. After a location fly-to, tiles load no finer than z12 (several km a tile) until

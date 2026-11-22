@@ -4,6 +4,7 @@ import { CAP_Z, capStep, newCap } from '../lib/basemap/locationCap'
 import type { ViewPose } from '../lib/basemap/reselect'
 import { keyZ } from '../lib/basemap/tileMath'
 import { groundX, groundZ } from '../lib/projection'
+import { packTracks } from '../lib/routeTracks'
 import type { BasemapConfig } from './basemapConfig'
 import type { BasemapReply, BasemapRequest } from './basemapProtocol'
 import { createBasemapTiles, MAX_IN_FLIGHT, RETRY_MS } from './basemapTiles'
@@ -11,6 +12,7 @@ import type { BasemapWorkerLike } from './basemapTypes'
 
 const CONFIG: BasemapConfig = { bbox: [-74.2591, 40.4774, -73.7004, 40.9176], maxzoom: 15, layers: ['water', 'landuse', 'roads'], version: 'test' }
 type Load = Extract<BasemapRequest, { type: 'load' }>
+const TRACKS = packTracks([{ points: [{ x: 0, z: 0 }, { x: 100, z: 0 }] }])
 
 class FakeWorker implements BasemapWorkerLike {
   sent: BasemapRequest[] = []
@@ -48,7 +50,7 @@ function view(lon: number, lat: number, distance: number): { pose: ViewPose; cam
 
 function setup() {
   const fake = new FakeWorker()
-  const store = createBasemapTiles(CONFIG, { createWorker: () => fake })
+  const store = createBasemapTiles(CONFIG, TRACKS, { createWorker: () => fake })
   store.start()
   /** Updates with the view and again 200 ms later, so a changed view is reselected. */
   const show = (v: ReturnType<typeof view>, t: number) => {
@@ -62,13 +64,13 @@ const CITY_HALL = view(-74.006, 40.7128, 2000)
 const BRONX = view(-73.88, 40.85, 2000)
 
 describe('createBasemapTiles with a fake worker', () => {
-  it('asks for nothing before start and inits the worker with the layers', () => {
+  it('asks for nothing before start and inits the worker with the layers and the tracks', () => {
     const fake = new FakeWorker()
-    const store = createBasemapTiles(CONFIG, { createWorker: () => fake })
+    const store = createBasemapTiles(CONFIG, TRACKS, { createWorker: () => fake })
     store.update(CITY_HALL.pose, CITY_HALL.camera, 0)
     expect(fake.sent).toEqual([])
     store.start()
-    expect(fake.sent).toEqual([{ type: 'init', layers: CONFIG.layers }])
+    expect(fake.sent).toEqual([{ type: 'init', layers: CONFIG.layers, tracks: TRACKS }])
   })
 
   it('keeps at most MAX_IN_FLIGHT loads out, nearest first, and sends the next on each reply', () => {

@@ -1,10 +1,13 @@
 /**
  * Web worker: fetches basemap tiles (same origin, one AbortController each), inflates a gzipped body (inflate.ts)
  * and decodes them into per-class segment buffers (decodeTile.ts), so no tile is ever decoded on the main thread.
- * basemapTiles.ts drives it.
+ * The roads are cut under the route lines by a clip built once from the init message's tracks (routeClip.ts); a
+ * build that throws fails the worker, so the store turns the basemap off (logged). basemapTiles.ts drives it.
  */
 import { decodeTile, isMvtBytes } from '../lib/basemap/decodeTile'
 import { inflateIfGzip } from '../lib/basemap/inflate'
+import { buildRouteClip, type RouteClip } from '../lib/routeClip'
+import { unpackTracks } from '../lib/routeTracks'
 import type { BasemapReply, BasemapRequest } from './basemapProtocol'
 
 /** The worker global, typed for the two members this uses (the project's lib is DOM, not WebWorker). */
@@ -14,6 +17,7 @@ const scope = self as unknown as {
 }
 
 let layers: string[] = []
+let clip: RouteClip | null = null
 const inflight = new Map<number, AbortController>()
 
 type Load = Extract<BasemapRequest, { type: 'load' }>
@@ -42,7 +46,7 @@ async function load({ key, seq, url, z, x, y }: Load, controller: AbortControlle
   }
   const t0 = performance.now()
   try {
-    const classes = decodeTile(body, z, x, y, layers)
+    const classes = decodeTile(body, z, x, y, layers, clip)
     return { type: 'tile', key, seq, classes, decodeMs: performance.now() - t0, bodyBytes: body.byteLength }
   } catch (err) {
     return { type: 'empty', key, seq, reason: 'not-mvt', detail: err instanceof Error ? err.message : String(err) }
@@ -53,6 +57,11 @@ scope.onmessage = (e) => {
   const msg = e.data
   if (msg.type === 'init') {
     layers = msg.layers
+    try {
+      clip = buildRouteClip(unpackTracks(msg.tracks))
+    } catch (err) {
+      throw new Error(`basemap route clip: ${err instanceof Error ? err.message : String(err)}`)
+    }
     return
   }
   if (msg.type === 'cancel') {

@@ -10,8 +10,10 @@ import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { createLabelBlockers } from '../lib/labelBlockers'
+import type { ExitChoice } from '../lib/exitChoice'
+import type { ExitLabel } from '../lib/exitView'
 import type { Network } from '../lib/network'
-import { memberSpans } from '../lib/platformSpan'
+import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
@@ -32,6 +34,8 @@ import { YouAreHere } from './YouAreHere'
 
 /** TEMPORARY `?basemap=off` (basemapLook.ts) draws no basemap and loads no tiles. */
 const basemapConfig = basemapLook === 'off' ? null : BASEMAP
+
+const NO_DECKS: ReadonlyMap<string, number> = new Map()
 
 interface SceneProps {
   network: Network
@@ -56,9 +60,13 @@ interface SceneProps {
   panel: ScreenRect | null
   /** The user's location, once found inside the covered area; null draws no marker. */
   here: { ground: Ground; accuracyM: number } | null
+  /** The trip's way out at its To station; drawn only while that station's interior is the focused one. */
+  exitPath: { interiorId: string; choice: ExitChoice } | null
+  /** The trip's exit label, which the street labels place first. */
+  exitLabel: ExitLabel | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, exitPath, exitLabel }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -70,6 +78,11 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const interiorSpans = useMemo(
     () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),
     [interior, network],
+  )
+  /** The same spans split by the deck each track rides, so each deck's trains draw between its strokes and the next band's. */
+  const spansByDeck = useMemo(
+    () => deckSpans(interiorSpans, interior?.trackDecks ?? NO_DECKS, interior?.decks.length ?? 0),
+    [interiorSpans, interior],
   )
   // The index says who shares the file; the model says who it draws. Their markers and ties go with the focused one's.
   const hiddenSiblings = useMemo(() => hiddenSiblingIds(siblings, interior), [siblings, interior])
@@ -93,7 +106,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
-          <LiveTrains {...live} network={network} trainPick={trainPick} interiorSpans={interiorSpans} view={bandView} anchor={anchor} />
+          <LiveTrains {...live} network={network} trainPick={trainPick} deckSpans={spansByDeck} view={bandView} anchor={anchor} />
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
@@ -105,13 +118,23 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         labelBlockers={labelBlockers}
         network={network}
         mask={streetMask}
+        exitLabel={exitPath ? exitLabel : null}
       />
-      {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} labelBlockers={labelBlockers} />}
+      {interior && (
+        <StationInterior
+          key={interior.stationId}
+          model={interior}
+          network={network}
+          outOfService={outOfService}
+          labelBlockers={labelBlockers}
+          exit={exitPath?.interiorId === interior.stationId ? exitPath.choice : null}
+        />
+      )}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
-          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} />
+          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} />
         </ErrorBoundary>
       )}
     </Canvas>
