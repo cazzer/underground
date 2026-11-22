@@ -20,6 +20,7 @@ import type { Network } from '../lib/network'
 import { wrapAngle } from '../lib/orbitLimits'
 import { bareStationPoints, flushMotion, interiorFlight, newFlight, stationFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
+import { landingLook } from './landingLook'
 
 /** What the reframe frames with, read when it starts (CameraRig's `latest`). */
 export interface ReframeLayout {
@@ -109,7 +110,7 @@ export function useInteriorReframe({
     } else {
       if (!l.interior) return
       // Only the interior's first framing decides a landing turn; the priority frame keeps the view's azimuth.
-      dest = interiorFlight(a.stationId, l.interior, l.size, l.insets, l.panel, camera.fov, az, eased && a.kind === 'interior', l.frame)
+      dest = interiorFlight(a.stationId, l.interior, l.size, l.insets, l.panel, camera.fov, az, eased && a.kind === 'interior', l.frame, landingLook === 'half')
     }
     // A reframe may pull back as well as pan: the bigger of the two sets its pace.
     const move = Math.max(c.target.distanceTo(dest.target), Math.abs(dest.distance - camera.position.distanceTo(c.target)))

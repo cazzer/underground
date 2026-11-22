@@ -137,6 +137,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1 px, so width marks only the subway) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
   TEMPORARY: `?basemap=off` draws no basemap and loads no tiles until ost.9.3's look is signed off; the removal list is
   in `src/scene/basemapLook.ts`
+  TEMPORARY: `?landturn=half` lets a landing on an interior with a priority frame (trip path, machines out of service) turn half
+  way round when the far side shows more of it (`priorityTurn` in `lib/pathFrame.ts`; south up at Pelham Pkwy on a phone) until the
+  2q7.25 landing-turn card is decided (default off: the usual landing turn); the removal list is in `src/scene/landingLook.ts`
   Exit tokens `exitPath` (pink, 3:1, held apart from the interior, focus, location and route colors, also under simulated
   red-green color blindness; theme.test.ts), `exitPathWidth` (3 px), `exitPathDash` / `exitPathGap` (world m) draw the trip's
   way out. TEMPORARY: `?exitPath=a|b` (centerline only, or restroked connectors and entrance too; default b) and
@@ -147,7 +150,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `interiorFlight` takes the focused station id, which for a complex member is not the file's `stationId`, so the focus hold follows the member; `follows` marks a flight to the selected
-    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; `interiorFlight` frames the interior's priority frame when there is one, `priorityLanding`, and may land half a turn round, `priorityTurn`), `newFlight`, `flushMotion` and the landing turn;
+    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; `interiorFlight` frames the interior's priority frame when there is one, `priorityLanding`, and under TEMPORARY `?landturn=half` may land half a turn round, `priorityTurn`), `newFlight`, `flushMotion` and the landing turn;
     `useStationFlights.ts` the fly-request effect and the mid-flight retarget (interior, bare streets, the trip's path frame, panel size);
     `useEntranceProbe.ts` dev-only `__underground.entrancesAt()` (entrance marks and station in viewport px, free rect);
     `usePathProbe.ts` dev-only `__underground.stationPathAt()` (the priority frame's path marker ends and centerline, and its out-of-service machines' ends, in viewport px, free rect);
@@ -966,11 +969,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   panel open the trip's path there, its way out or a change of trains, then the machines out of service, `outageFrame.ts`; wanted in that
   order: path marker ends at rail height, the centerline, the machines' ends, the outline per level, an
   exit's walk) lands as usual when that already shows the whole path and every machine, else on `freeFrame`'s frame of it (400 to 600 m, the
-  target within 100 m of a member) when that shows more of the path, or as much of it and more machines (`priorityLanding`); deciding
-  its landing turn it also tries half a turn round and takes that when it shows more by the same rule (`priorityTurn`). Above a phone's panel the target sits 130 m or
+  target within 100 m of a member) when that shows more of the path, or as much of it and more machines (`priorityLanding`); under the
+  TEMPORARY `?landturn=half` (`landingLook.ts`), deciding its landing turn it also tries half a turn round and takes that when it shows
+  more by the same rule (`priorityTurn`). Above a phone's panel the target sits 130 m or
   more toward the camera from what the free area shows, so at Union Sq the Lexington and Canarsie paths, and the station-house
-  machines at Pelham Pkwy (211), can't be framed within 100 m looking north: they land turned half a turn round, where the far side
-  fits (`pathFrame.data.test.ts`, `outageFrame.data.test.ts`; a phone panel with the outage list expanded leaves too little free area
+  machines at Pelham Pkwy (211), can't be framed within 100 m looking north and land as usual, part of them under the panel
+  (with `?landturn=half` they land half a turn round, where the far side fits; `pathFrame.data.test.ts`, `outageFrame.data.test.ts`; a phone panel with the outage list expanded leaves too little free area
   for any frame); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior). Both
   retarget mid-flight when the interior, a bare station's streets (or the index, for a deep link) or the panel's final size arrives. An interior arriving after 90% of the
   flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,

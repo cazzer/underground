@@ -157,6 +157,9 @@ export function priorityLanding(frame: PriorityFrame, view: FrameView, plain: La
  * half a turn from it, the one that shows more of the path, or as much of it and more of the machines; `azimuth` on a
  * tie. Half a turn keeps the platforms where the landing turn put them on screen, end for end, and puts what lies past
  * the interior's middle on the far side, where the free area above a phone's panel can reach it within TARGET_RADIUS_M.
+ * Only under the TEMPORARY `?landturn=half` (scene/landingLook.ts). The flight's turn is clamped each frame to the orbit's
+ * window for the previous frame's tilt (a full spin only from tiltT 0.67), so at a few frames per second the last
+ * frame can jump from a low tilt to the landing and the half turn lands unturned; the reframe after landing never turns.
  */
 export function priorityTurn(frame: PriorityFrame, view: FrameView, plainOf: (view: FrameView) => Landing): { azimuth: number; landing: Landing } {
   const tiers = priorityTiers(frame)

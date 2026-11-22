@@ -107,17 +107,23 @@ describe('the way out above a phone trip panel', () => {
     }
 
     // The Lexington and Canarsie platforms' ways out, and changes to or from the L: above a phone panel the target
-    // would have to sit over 200 m from every member's point (TARGET_RADIUS_M is 100), so at the usual landing turn
-    // part of the path stays under the panel. Half a turn more puts it on the far side, where it all fits (priorityTurn).
-    const turned: [string, string?][] = [['635N'], ['635S'], ['L03N'], ['L03S'], ['L03N', '635S'], ['635N', 'L03N'], ['L03S', 'R20N']]
-    for (const [stopId, toStop] of turned) {
-      it(`lands with the whole path from ${stopId}${toStop ? ` to ${toStop}` : ''} at Union Sq on ${name}, turned half way round`, () => {
+    // would have to sit over 200 m from every member's point (TARGET_RADIUS_M is 100), so these land as usual and part
+    // of the path stays under the panel.
+    const partial: [string, string?][] = [['635N'], ['635S'], ['L03N'], ['L03S'], ['L03N', '635S'], ['635N', 'L03N'], ['L03S', 'R20N']]
+    for (const [stopId, toStop] of partial) {
+      it(`lands as usual for the path from ${stopId}${toStop ? ` to ${toStop}` : ''} at Union Sq on ${name}`, () => {
         const { frame, interior, plain } = pathAt('635', stopId, toStop)
         const view = { azimuth: landingAzimuth(stationAxis(interior), 0, free), viewport, free, fovDeg: FOV }
         const usual = plain(view)
-        const path = frame.wanted.slice(0, frame.pathCount)
         expect(priorityLanding(frame, view, usual)).toBe(usual)
-        expect(framedCount(view, usual, path)).toBeLessThan(path.length)
+        expect(framedCount(view, usual, frame.wanted.slice(0, frame.pathCount))).toBeLessThan(frame.pathCount)
+      })
+
+      // TEMPORARY ?landturn=half (landingLook.ts): half a turn more puts the path on the far side, where it all fits.
+      it(`with ?landturn=half lands with the whole path from ${stopId}${toStop ? ` to ${toStop}` : ''} at Union Sq on ${name}, turned half way round`, () => {
+        const { frame, interior, plain } = pathAt('635', stopId, toStop)
+        const view = { azimuth: landingAzimuth(stationAxis(interior), 0, free), viewport, free, fovDeg: FOV }
+        const path = frame.wanted.slice(0, frame.pathCount)
         const { azimuth, landing } = priorityTurn(frame, view, plain)
         expect(Math.abs(Math.abs(azimuth - view.azimuth) - Math.PI)).toBeLessThan(1e-9)
         const turnedPlain = plain({ ...view, azimuth })

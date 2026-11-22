@@ -95,8 +95,8 @@ export function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void
  * focused station, which for a complex member is not the model's own (file) id: the flight's focus hold follows it.
  * With a priority frame at this interior (`frame`: the trip's path there, the machines out of service) it frames that
  * instead, as much of it as fits from the landing distance out, the target near one of the interior's stations, unless
- * the usual interior framing shows as much of it (priorityLanding); with `turn` the landing may also turn half way
- * round when that shows more of it (priorityTurn).
+ * the usual interior framing shows as much of it (priorityLanding); with `turn` and `halfTurn` (TEMPORARY
+ * `?landturn=half`, landingLook.ts) the landing may also turn half way round when that shows more of it (priorityTurn).
  */
 export function interiorFlight(
   stationId: string,
@@ -108,13 +108,14 @@ export function interiorFlight(
   azimuth: number,
   turn: boolean,
   frame: PriorityFrame | null = null,
+  halfTurn = false,
 ): Destination {
   const free = interiorFreeRect(viewport, insets, panel)
   const land = turn ? landingAzimuth(model.axis, azimuth, free) : azimuth
   const view = { azimuth: land, viewport, free, fovDeg }
   const plainOf = (v: typeof view) => frameInterior({ ...model.focusAnchor, ...v })
   const applies = frame?.interiorId === model.stationId
-  const chosen = applies && turn ? priorityTurn(frame, view, plainOf) : { azimuth: land, landing: applies ? priorityLanding(frame, view, plainOf(view)) : plainOf(view) }
+  const chosen = applies && turn && halfTurn ? priorityTurn(frame, view, plainOf) : { azimuth: land, landing: applies ? priorityLanding(frame, view, plainOf(view)) : plainOf(view) }
   const { distance, target } = chosen.landing
   return {
     stationId,
