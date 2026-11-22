@@ -405,7 +405,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   into flat true-length footprints; the tilt runs from 1450 m (top-down) to 400 m (isometric, `nearDistance`), with a
   short ease-in to about 1340 m and a long ease-out (two parabolas joined with equal slope at `easeIn` 0.06 of the
   log-distance span), so it shows from about 1250 m (9°; 25° at 1000 m, 38° at 800 m); 1250 to 1000 m the interior
-  fades in as a flat plan (depth 0.17 to 0.46, a level gap of at most 5 px on a phone); 1000 to 400 m the levels
+  fades in as a flat plan (depth 0.17 to 0.46, a level gap of about 5 px on a phone at most); 1000 to 400 m the levels
   separate and the veil and labels come in; at 400 m everything is full 3D.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
   focused or a train is followed (focus engages inside 1250 m within 140 m of a station once the view has held still for 400 ms

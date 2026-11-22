@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ENTER_DISTANCE } from './focusMachine'
+import { ENTER_DISTANCE, EXIT_DISTANCE } from './focusMachine'
 import { DEFAULT_TILT, depthFactor, tiltForDistance } from './tilt'
 import { interiorOpacity, labelOpacity, LABELS_FROM_DEPTH, LABELS_FULL_DEPTH, REVEAL_FAR, REVEAL_NEAR, veilWeight } from './interiorReveal'
 
@@ -58,6 +58,8 @@ describe('stage invariants', () => {
 
   it('the plan fades in from where the tilt first shows and is fully in while its levels are still a few px apart', () => {
     expect(REVEAL_FAR).toBe(ENTER_DISTANCE)
+    // Focus drops where the view is already top-down (the location fly-to floor relies on it).
+    expect(EXIT_DISTANCE).toBe(DEFAULT_TILT.farDistance)
     expect(levelGapPx(REVEAL_FAR)).toBeLessThan(1)
     expect(interiorOpacity(REVEAL_NEAR)).toBe(1)
     expect(levelGapPx(REVEAL_NEAR)).toBeLessThan(6)
