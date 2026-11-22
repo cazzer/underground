@@ -27,7 +27,8 @@ be accurate.
   carry no station key. `catalog/stations.json` is also read by `npm run data` (borough and ADA status
   for `public/data/stations.json`) together with `stations/access-exceptions.json`; after a catalog refresh, run `npm run data:access` (offline). `npm run data:stations` reads
   `stations.json`, `entrances.json`, `equipment.json`, `osm-platforms.json` and `osm-tracks.json` (with the
-  committed `public/data/shapes.json` and `stations.json`) to generate interiors; `envelopes.json` is not used. The DOS Track LRS is not pinned (see `../docs/research/data-sources.md` §5.1).
+  committed `public/data/shapes.json` and `stations.json`) to generate interiors; `envelopes.json` is not used. Those same `stations.json` and `equipment.json` also build
+  `public/data/stations/equipment.json` (the lazily loaded machine index the station panel names outages from at stations whose interior lacks the machine). The DOS Track LRS is not pinned (see `../docs/research/data-sources.md` §5.1).
   **E&E coordinates are unreliable:** the dataset's own overview says they are the station center
   when a machine's exact location is not known, and some are plainly wrong (25 machines are over 500 m
   from their station; EL100 is at Jay St, 15 km from 149 St-Hostos). Place machines from their `serving` text, not from `lat`/`lon`.

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useBands } from './data/useBands'
 import { useEne } from './data/useEne'
+import { useEquipmentIndex } from './data/useEquipmentIndex'
 import { ENE_URL } from './data/realtime'
 import { useLive } from './data/useLive'
 import { useNetwork } from './data/useNetwork'
@@ -10,6 +11,7 @@ import { useStationInterior } from './data/useStationInterior'
 import { useTripExit } from './data/useTripExit'
 import { FocusProvider, useFocus } from './lib/focus'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
+import { joinPanelOutages, stationEquipment } from './lib/live/eneIndexJoin'
 import { outagePanelView } from './lib/live/eneText'
 import { noStepFreeNow } from './lib/live/stepFreeLoss'
 import { markedPlacement } from './lib/locate'
@@ -50,7 +52,11 @@ function MapView({ network, bands, live }: MapViewProps) {
   // Elevators and escalators out of service at the loaded interior; `closedForRouting(outages)` is the step-free routing's input.
   const ene = useEne(ENE_URL)
   const nowS = eneNowS(live.arrivals?.offsetS ?? null, performance.now(), Date.now())
-  const outages = joinStationOutages(model?.interior ?? null, ene, nowS)
+  const interiorOutages = joinStationOutages(model?.interior ?? null, ene, nowS)
+  // The panel also names machines only the equipment index lists (loaded on the first focus); drawing and routing stay the interior's.
+  const equipment = useEquipmentIndex(focusedId, ene.configured)
+  const interiorSettled = interior.index.status !== 'loading' && interior.load.status !== 'loading'
+  const outages = joinPanelOutages(interiorOutages, model?.interior ?? null, interiorSettled, stationEquipment(equipment, focusedId), ene, nowS)
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
   const tripExit = useTripExit({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS })
