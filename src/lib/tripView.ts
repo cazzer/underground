@@ -225,3 +225,19 @@ export function shouldAnnounceTrip(plan: TripPlanState, lastAnnouncedId: string 
   const id = tripAnnounceId(plan)
   return id !== null && id !== lastAnnouncedId && plan.status !== 'idle' && plan.status !== 'loading' && plan.trigger !== 'tick'
 }
+
+/** Names for the views from the map's station and route tables. */
+export function tripNamesOf(network: {
+  stationById: ReadonlyMap<string, { name: string }>
+  routeById: ReadonlyMap<string, { shortName: string }>
+}): TripNames {
+  return {
+    station: (id) => network.stationById.get(id)?.name ?? id,
+    route: (id) => network.routeById.get(id)?.shortName ?? id,
+  }
+}
+
+/** The journeys of a ready plan as views; none otherwise. */
+export function planViews(plan: TripPlanState, nowS: number, names: TripNames): JourneyView[] {
+  return plan.status === 'ready' ? plan.journeys.map((j) => journeyView(j, nowS, names)) : []
+}

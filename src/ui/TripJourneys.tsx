@@ -27,7 +27,8 @@ function StationLink({ stationId, name, onStation }: StationLinkProps) {
     <button
       type="button"
       onClick={() => onStation(stationId)}
-      className="cursor-pointer py-1 text-left underline hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
+      aria-description="Show on map"
+      className="-my-3 inline-flex min-h-11 cursor-pointer items-center text-left underline hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
     >
       {name}
     </button>
@@ -88,16 +89,21 @@ function Journey({ network, view, open, onToggle, onStation }: JourneyProps) {
         aria-controls={legsId}
         className="flex min-h-11 w-full cursor-pointer flex-col items-start gap-1 py-2 text-left hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <span aria-hidden="true" className="text-base">
-          {view.departClock} → {view.arriveClock} · {view.minutes} min · {view.transfersText.toLowerCase()}
+        <span aria-hidden="true" className="flex flex-wrap gap-x-2 text-base">
+          <span className="whitespace-nowrap">
+            {view.departClock} → {view.arriveClock}
+          </span>
+          <span className="whitespace-nowrap">· {view.minutes} min</span>
+          <span className="whitespace-nowrap">· {view.transfersText.toLowerCase()}</span>
         </span>
         <span aria-hidden="true" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-dim">
           {view.routes.map((id, i) => {
             const route = network.routeById.get(id)
             return route ? <RouteChip key={i} route={route} as="span" className="min-w-7 text-center" /> : <span key={i}>{id}</span>
           })}
-          <span>{view.sourceText}</span>
-          <span>{view.departAway === 'Now' ? 'leaves now' : `leaves in ${view.departAway}`}</span>
+          <span className="whitespace-nowrap">
+            {view.departAway === 'Now' ? 'Leaves now' : `Leaves in ${view.departAway}`} · {view.sourceText}
+          </span>
         </span>
         <span className="sr-only">{view.spoken}</span>
       </button>

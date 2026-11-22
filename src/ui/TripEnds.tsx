@@ -1,3 +1,4 @@
+import { useRef, type Ref } from 'react'
 import type { TripEnd } from '../lib/trip'
 import type { TripEnds as Ends } from '../lib/tripView'
 import type { Network } from '../lib/network'
@@ -7,7 +8,7 @@ interface TripEndsProps {
   ends: Ends
   /** The station under the camera, offered as an end while it is neither. */
   focusedId: string | null
-  /** The station nearest a marked fix, offered as From while it is not. In memory only. */
+  /** The station nearest a marked fix, offered as From while it is neither end. In memory only. */
   nearestId: string | null
   /** Opens that end's search. The row has already taken focus, so the dialog hands it back there. */
   onPick: (end: TripEnd) => void
@@ -22,11 +23,13 @@ interface EndRowProps {
   label: string
   name: string | null
   onPress: (button: HTMLButtonElement) => void
+  ref: Ref<HTMLButtonElement>
 }
 
-function EndRow({ label, name, onPress }: EndRowProps) {
+function EndRow({ label, name, onPress, ref }: EndRowProps) {
   return (
     <button
+      ref={ref}
       type="button"
       onClick={(e) => onPress(e.currentTarget)}
       aria-haspopup="dialog"
@@ -52,22 +55,29 @@ function EndRow({ label, name, onPress }: EndRowProps) {
 /**
  * From and To as two rows that open a station search, a swap, and the one or two shortcuts that fill an end:
  * the station nearest a marked fix, and the station on the map. A row takes focus before its dialog opens (iOS
- * doesn't focus a tapped button, and the dialog hands focus back to what had it).
+ * doesn't focus a tapped button, and the dialog hands focus back to what had it). A shortcut disappears when it
+ * is used, so focus moves to the row it filled, one frame later (after the row's new name has rendered).
  */
 export function TripEnds({ network, ends, focusedId, nearestId, onPick, onSet, onSwap }: TripEndsProps) {
+  const rows = { from: useRef<HTMLButtonElement>(null), to: useRef<HTMLButtonElement>(null) }
   const nameOf = (id: string | null) => (id ? (network.stationById.get(id)?.name ?? null) : null)
   const press = (end: TripEnd) => (button: HTMLButtonElement) => {
     button.focus({ preventScroll: true })
     onPick(end)
   }
-  const nearest = nearestId !== null && nearestId !== ends.from ? nameOf(nearestId) : null
+  const set = (end: TripEnd, stationId: string) => {
+    onSet(end, stationId)
+    requestAnimationFrame(() => rows[end].current?.focus({ preventScroll: true }))
+  }
+  // Never offers a From that is the To, nor one already chosen.
+  const nearest = nearestId !== null && nearestId !== ends.from && nearestId !== ends.to ? nameOf(nearestId) : null
   const onMap = focusedId !== null && focusedId !== ends.from && focusedId !== ends.to ? nameOf(focusedId) : null
   return (
     <div className="mt-2">
       <div className="flex items-center gap-1">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <EndRow label="From" name={nameOf(ends.from)} onPress={press('from')} />
-          <EndRow label="To" name={nameOf(ends.to)} onPress={press('to')} />
+          <EndRow ref={rows.from} label="From" name={nameOf(ends.from)} onPress={press('from')} />
+          <EndRow ref={rows.to} label="To" name={nameOf(ends.to)} onPress={press('to')} />
         </div>
         <button
           type="button"
@@ -81,20 +91,22 @@ export function TripEnds({ network, ends, focusedId, nearestId, onPick, onSet, o
         </button>
       </div>
       {nearest !== null && nearestId !== null && (
-        <button type="button" onClick={() => onSet('from', nearestId)} className={`${LINK} -ml-2`}>
+        <button type="button" onClick={() => set('from', nearestId)} className={`${LINK} -ml-2`}>
           Nearest to you: {nearest}
         </button>
       )}
       {onMap !== null && focusedId !== null && (
-        <p className="flex flex-wrap items-center text-sm">
-          <span className="text-ink-dim">On the map: {onMap}</span>
-          <button type="button" onClick={() => onSet('from', focusedId)} className={LINK}>
-            Use as From
-          </button>
-          <button type="button" onClick={() => onSet('to', focusedId)} className={LINK}>
-            Use as To
-          </button>
-        </p>
+        <div className="mt-1 text-sm">
+          <p className="text-ink-dim">On the map: {onMap}</p>
+          <p className="-ml-2 flex flex-wrap">
+            <button type="button" onClick={() => set('from', focusedId)} className={LINK}>
+              Use as From
+            </button>
+            <button type="button" onClick={() => set('to', focusedId)} className={LINK}>
+              Use as To
+            </button>
+          </p>
+        </div>
       )}
     </div>
   )

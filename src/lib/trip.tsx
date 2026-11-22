@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useTripPlan } from '../data/useTripPlan'
 import type { StationsFile } from '../data/schema'
 import type { ArrivalsSource } from './live/arrivals'
+import { useTrainSelection } from './trainSelection'
 import type { TripEnds, TripPlanState } from './tripView'
 
 export type TripEnd = keyof TripEnds
@@ -38,7 +39,9 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   useEffect(() => {
     sourceRef.current = arrivals
   }, [arrivals])
-  const { plan, showLoading, retry } = useTripPlan(stations, ends, open, sourceRef)
+  // A train panel or the gone notice in front of the trip panel: it stops refreshing until they go.
+  const { selectedSummary, notice } = useTrainSelection()
+  const { plan, showLoading, retry } = useTripPlan(stations, ends, open, selectedSummary !== null || notice !== null, sourceRef)
 
   const setOpen = useCallback((next: boolean, defaults?: TripEnds) => {
     setOpenState(next)

@@ -22,6 +22,7 @@ import { OrbitHint } from './OrbitHint'
 import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
+import { TripAnnouncer } from './TripAnnouncer'
 import { TripButton } from './TripButton'
 import { TripPanel } from './TripPanel'
 import { useTripPanel } from './useTripPanel'
@@ -60,7 +61,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const stationHeading = useRef<HTMLHeadingElement>(null)
   const tripHeading = useRef<HTMLHeadingElement>(null)
   const tripButton = useRef<HTMLButtonElement>(null)
-  const { tripOpen, toggleTrip, closeTrip } = useTripPanel({ locate, stationHeading, tripButton })
+  const { tripOpen, tripShown, toggleTrip, closeTrip } = useTripPanel({ locate, panel, stationHeading, tripButton })
   // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
   // heading, else the station panel's, else the Search button; the auto-dismissed notice leaves focus alone. It waits one
   // frame so a station panel that auto-focus mounts as the train closes is found and wins; it is read once,
@@ -156,7 +157,8 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     // While search is open, Esc belongs to it: one press must not also dismiss a panel.
     if ((!focusedId && !trainOpen && !noticeOpen && !tripOpen) || searchOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      // A modal dialog (a trip search, even with focus on the body) owns Esc: its own close is the press.
+      if (e.key !== 'Escape' || document.querySelector('dialog:modal')) return
       if (trainOpen) closeTrain()
       else if (noticeOpen) closeNotice()
       else if (tripOpen) closeTrip()
@@ -183,6 +185,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             {notice ?? ''}
           </p>
           <FocusAnnouncer network={network} covered={trainOpen || noticeOpen || tripOpen} panel={panel} />
+          <TripAnnouncer network={network} arrivals={arrivals} covered={trainOpen || noticeOpen} />
           <LinkNotice
             show={linkNotice.show}
             onDismiss={linkNotice.onDismiss}
@@ -194,7 +197,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
         </div>
         <div className="flex shrink-0 gap-2">
           <SearchButton ref={searchButton} onOpen={openSearch} />
-          <TripButton ref={tripButton} open={tripOpen} onToggle={toggleTrip} />
+          <TripButton ref={tripButton} open={tripShown} onToggle={toggleTrip} />
           <LocateButton
             ref={locateButton}
             onLocate={locate.locate}

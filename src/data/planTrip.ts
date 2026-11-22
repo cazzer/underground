@@ -1,6 +1,7 @@
 import type { StationId, StationsFile } from './schema'
 import { serviceCalendar, timetableFile, transfersFile } from './loadTimetable'
-import { planOn, type RouterTimetable, type TripJourney } from '../lib/route/plan'
+import { complexMembers } from '../lib/route/ends'
+import { planOn,type RouterTimetable, type TripJourney } from '../lib/route/plan'
 import { serviceWindow, windowKey } from '../lib/route/serviceDay'
 import { buildRouterTimetable, sourcesFor } from '../lib/route/timetable'
 import type { RouteOptions } from '../lib/route/types'
@@ -65,4 +66,17 @@ export async function planTrip(
   const journeys = planOn(rt, from, to, atS, opts)
   measureSince('trip:route', start)
   return journeys
+}
+
+/**
+ * Journeys between two stations the visitor chose, each standing for its complex (same-named stations linked by
+ * transfers), so a trip never begins or ends with a walk to a station of the same name. Two ends in one complex
+ * have no trip between them.
+ */
+export async function planTripBetween(stations: StationsFile, from: StationId, to: StationId, atS: number, opts?: RouteOptions): Promise<TripJourney[]> {
+  const { transfers } = await transfersFile()
+  const fromSet = complexMembers(stations.stations, from, transfers)
+  const toSet = complexMembers(stations.stations, to, transfers)
+  if (fromSet.some((id) => toSet.includes(id))) return []
+  return planTrip(stations, fromSet, toSet, atS, opts)
 }
