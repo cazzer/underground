@@ -13,15 +13,20 @@ const CODE_PATTERN = /^[A-Z]{2}[A-Z0-9]{1,10}$/
 const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 /**
- * The inventory's description as one line of panel text: whitespace collapsed, control and bidi/format characters
- * dropped, first letter capitalised. Never truncated (the panel clamps it). Null for none.
+ * The inventory's description as one line of panel text: format, bidi and surrogate characters (and U+FEFF) removed
+ * outright, whitespace collapsed, other control characters dropped, one trailing "." trimmed (the panel's other
+ * lines have none), first letter capitalised. Never truncated (the panel clamps it). Null for none.
  */
 export function cleanServing(text: string | null): string | null {
   if (text === null) return null
   const clean = text
-    .replace(/[\p{Cc}\p{Cf}]/gu, (c) => (/\s/.test(c) ? ' ' : ''))
+    .replace(/[\p{Cf}\p{Cs}\uFEFF]/gu, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\p{Cc}/gu, '')
     .replace(/\s+/g, ' ')
     .trim()
+    .replace(/\.$/, '')
+    .trimEnd()
   return clean === '' ? null : clean.charAt(0).toUpperCase() + clean.slice(1)
 }
 
@@ -58,7 +63,11 @@ export function buildEquipmentIndex(
   const listed = new Map<string, string[]>()
   const nonRevenue: string[] = []
   const noStation: string[] = []
+  const seen = new Set<string>()
   for (const row of equipment) {
+    // Every row, before any filter: a repeated code is a corrupt pin whatever else is wrong with the rows.
+    if (seen.has(row.code)) throw new Error(`equipment ${row.code} appears twice`)
+    seen.add(row.code)
     if (!row.revenue) {
       nonRevenue.push(row.code)
       continue
@@ -69,7 +78,6 @@ export function buildEquipmentIndex(
     }
     const complexId = complexOf.get(row.stationId)
     if (complexId === undefined) throw new Error(`equipment ${row.code}: station ${row.stationId} is not in the station catalog`)
-    if (machines.has(row.code)) throw new Error(`equipment ${row.code} appears twice`)
     if (!CODE_PATTERN.test(row.code)) {
       log.push(`equipment ${row.code}: code the Worker's feed reader rejects, skipped`)
       continue

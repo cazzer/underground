@@ -8,11 +8,12 @@ import { planEnds } from './interiorConnectors'
 import { interiorDecks, strokeBandOf } from './interiorDecks'
 import type { Buffers } from './interiorSegments'
 import { connectorContext, RAIL_DROP_M } from './interiorGeometry'
+import { NOT_INTERIOR_FILES } from '../../scripts/lib/stationIndex.ts'
 import { BOARD_HALF_M, exitPathBuffers, exitPathCenterline } from './interiorPath'
 
 const DIR = 'public/data/stations'
 const interiors = readdirSync(DIR)
-  .filter((f) => f.endsWith('.json') && f !== 'index.json' && f !== 'equipment.json')
+  .filter((f) => f.endsWith('.json') && !NOT_INTERIOR_FILES.has(f))
   .map((f) => JSON.parse(readFileSync(`${DIR}/${f}`, 'utf8')) as StationInterior)
 
 const Y = 2

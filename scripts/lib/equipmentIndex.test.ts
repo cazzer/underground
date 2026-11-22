@@ -50,13 +50,25 @@ const build = (equipment: CatalogEquipment[], known: ReadonlySet<string> = KNOWN
 describe('cleanServing', () => {
   it('collapses whitespace, drops control and bidi characters, capitalises the first letter', () => {
     expect(cleanServing('  street\n to   mezzanine\t ')).toBe('Street to mezzanine')
-    expect(cleanServing('Street‮ to​ mezzanine\u0007')).toBe('Street to mezzanine')
+    expect(cleanServing('Street\u202E to\u200B mezzanine\u0007')).toBe('Street to mezzanine')
+  })
+
+  it('removes U+FEFF and lone surrogates outright, not as a space', () => {
+    expect(cleanServing('Street\uFEFFto mezzanine')).toBe('Streetto mezzanine')
+    expect(cleanServing('Street\uD800 to mezzanine')).toBe('Street to mezzanine')
+  })
+
+  it('trims one trailing period so catalog rows punctuate like the panel\'s other lines', () => {
+    expect(cleanServing('Street to platform.')).toBe('Street to platform')
+    expect(cleanServing('street to platform. ')).toBe('Street to platform')
+    expect(cleanServing('Street. Platform.')).toBe('Street. Platform')
+    expect(cleanServing('.')).toBeNull()
   })
 
   it('is null for none, empty or only invisible characters, and never truncates', () => {
     expect(cleanServing(null)).toBeNull()
     expect(cleanServing('   ')).toBeNull()
-    expect(cleanServing('​\u0007')).toBeNull()
+    expect(cleanServing('\u200B\u0007')).toBeNull()
     expect(cleanServing('a'.repeat(500))).toHaveLength(500)
   })
 })
@@ -106,6 +118,9 @@ describe('buildEquipmentIndex', () => {
 
   it('throws for a repeated code and for a station the catalog lacks', () => {
     expect(() => build([machine('EL1', '1'), machine('EL1', '3')])).toThrow(/EL1 appears twice/)
+    // Even when the rows would be filtered out anyway.
+    expect(() => build([machine('EL1', '1', { revenue: false }), machine('EL1', null)])).toThrow(/EL1 appears twice/)
+    expect(() => build([machine('el1', '1'), machine('el1', '1')])).toThrow(/el1 appears twice/)
     expect(() => build([machine('EL1', '99')])).toThrow(/station 99 is not in the station catalog/)
   })
 

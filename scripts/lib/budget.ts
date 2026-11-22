@@ -11,7 +11,7 @@ export const GZIP_BUDGET_BYTES = 60_000
 /** stations/index.json loads after startup (not render-blocking), so it has its own cap outside the budget above. */
 export const INDEX_GZIP_CAP_BYTES = 8_000
 /** stations/equipment.json loads on the first station focus, outside the budget above, with its own cap: the measured
- *  12,966 B (node zlib level 9, fall 2026) plus about a quarter. */
+ *  12,896 B (node zlib level 9, fall 2026) plus about a quarter. */
 export const EQUIPMENT_GZIP_CAP_BYTES = 16_000
 
 /** public/data/streets/<id>.json loads on focus, outside the budget above; each file has this cap... */

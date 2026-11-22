@@ -69,7 +69,7 @@ function OutageList({ body, noStepFree, onFocusLost }: OutageListProps) {
             <span className="min-w-0">
               <span className="block text-ink">{row.title}</span>
               {row.levels !== null && (
-                <span className={row.wraps ? 'block line-clamp-3 text-ink-dim' : 'block whitespace-nowrap text-ink-dim'}>{row.levels}</span>
+                <span className={row.wraps ? 'line-clamp-3 text-ink-dim' : 'block whitespace-nowrap text-ink-dim'}>{row.levels}</span>
               )}
               <span className="block text-ink-dim">
                 {row.meta.map((part, i) => (

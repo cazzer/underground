@@ -4,6 +4,7 @@ import type { StationInterior as Interior } from '../data/stationSchema'
 import { bandCutYs, interiorDecks, MAX_DECKS, strokeBandOf, trackDecks, trainRoofY } from './interiorDecks'
 import { buildInteriorBuffers } from './interiorGeometry'
 import { fixture, opts } from './interiorFixture'
+import { NOT_INTERIOR_FILES } from '../../scripts/lib/stationIndex.ts'
 
 const read = (f: string) => JSON.parse(readFileSync(new URL(`../../public/data/stations/${f}`, import.meta.url), 'utf8')) as Interior
 
@@ -87,7 +88,7 @@ describe('shipped interiors', () => {
     const dir = new URL('../../public/data/stations/', import.meta.url)
     let checked = 0
     for (const f of readdirSync(dir)) {
-      if (f === 'index.json' || f === 'equipment.json' || !f.endsWith('.json')) continue
+      if (NOT_INTERIOR_FILES.has(f) || !f.endsWith('.json')) continue
       const shipped = read(f)
       const decks = interiorDecks(shipped)
       checked++
