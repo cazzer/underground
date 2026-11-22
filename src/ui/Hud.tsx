@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
@@ -10,64 +10,18 @@ import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
 import { useTrainSelection } from '../lib/trainSelection'
 import type { LocateControls } from '../data/useLocate'
-import { PartialAccessNote, StationName } from './AccessIcon'
-import { ArrivalsList } from './ArrivalsList'
+import { ArrivalsPanel } from './ArrivalsPanel'
 import { Attribution } from './Attribution'
 import { FocusAnnouncer } from './FocusAnnouncer'
 import { LiveStatus } from './LiveStatus'
-import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
+import type { InteriorStatusInfo } from './InteriorStatus'
 import { LinkNotice } from './LinkNotice'
 import { LocateButton } from './LocateButton'
 import { LocateStatus } from './LocateStatus'
 import { OrbitHint } from './OrbitHint'
-import { OutageStatus } from './OutageStatus'
 import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
-
-interface ArrivalsPanelProps {
-  network: Network
-  stationId: string
-  live: LiveStatusValue
-  arrivals: ArrivalsSource | null
-  onClose: () => void
-  interior: InteriorStatusInfo
-  /** Elevators and escalators out of service at the focused station. */
-  outages: OutagePanelView
-  ref: Ref<HTMLElement>
-  /** Takes focus when a panel that covered this one closes, or after the visitor picks this station from search. */
-  headingRef: RefObject<HTMLHeadingElement | null>
-}
-
-function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, outages, ref, headingRef }: ArrivalsPanelProps) {
-  const station = network.stationById.get(stationId)
-  if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
-  return (
-    <aside
-      ref={ref}
-      aria-label={`Arrivals at ${station.name}`}
-      className="pointer-events-auto max-h-full min-h-0 w-72 max-w-full overflow-auto border border-edge bg-panel p-4 text-ink backdrop-blur-sm sm:shrink-0"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <h2 ref={headingRef} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
-          <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} />
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close station panel"
-          className="-m-2 flex min-h-11 min-w-11 cursor-pointer items-center justify-center p-2 text-ink-dim hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
-        >
-          ×
-        </button>
-      </div>
-      <PartialAccessNote access={station.access} />
-      <InteriorStatus info={interior} />
-      <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
-      <ArrivalsList network={network} station={station} source={arrivals} status={live} />
-    </aside>
-  )
-}
 
 interface HudProps {
   network: Network
