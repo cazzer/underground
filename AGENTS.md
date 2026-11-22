@@ -260,6 +260,18 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`); `turnMeter.ts` the
     hint's max net turn (signed, wrapped steps); `reducedMotion.ts` `prefersReducedMotion()`, one live query shared by
     the camera, live and line code
+  - Exit choice (pure; 2q7.11): `minHeap.ts` (`MinHeap`, typed-array binary heap, no decrease-key); `planGeometry.ts`
+    (`distanceToRing`, a client copy of the scripts one, `nearestOnPolyline`, `slicePolyline`); `walkRoute.ts`
+    (`walkQuery` per-edge seconds at `WALK_SPEED_MPS` with roads x1.3 and, step-free, no steps, plus the largest connected
+    component; `snapToWalk` the nearest point on an edge of it; `routeWalk` multi-source A* with a virtual target, so exits
+    snap to edge points, not nodes); `interiorGraph.ts` (`endpointArea`: authored `Endpoint.area`, else the outline within
+    0.5 m; `routesToStreet`: Dijkstra from a stop's platform over connectors (stair/escalator 0.5 m/s of slope, elevator 45 s
+    plus 1 m/s, ramp and walkway at walking pace, escalators one way when `travel` says so; step-free keeps elevator, ramp,
+    walkway) and same-area walks, to each exit: an `exit: true` entrance, or the street end of a connector no entrance lists,
+    `entranceId` null); `exitChoice.ts` (`chooseExit`: the exit minimizing in-station plus outside time, the outside walk
+    over the shard when the destination is within its radius, else a straight-line estimate at `WALK_DETOUR` 1.3;
+    `probable` for a generated interior; `street` joins the street-file entrance within 1.5 m of the same type;
+    `walkMinutes`); `walkFixture.ts` the tests' synthetic walk graphs
   - `searchBucket.ts` which hash bucket a street or intersection entry is filed in and which one a query reads
     (`entryBucketKeys`, `queryBucketKey`, FNV-1a over the first two characters of the first distinctive token; `.ts` imports,
     scripts share it); `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
@@ -435,7 +447,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `basemap-tiles.ts` and `verify-basemap.ts`. The tiles are never in git
 - `public/data/walk/<stationId>.json`: one walk graph per station (`StationWalk`, `src/data/walkSchema.ts`), built by
   `scripts/build-walk.ts` (IO only) from the pin through `scripts/lib/walkGraph.ts` (pure; reuses `clipSpan`/`simplifySpans`/`waysNear`).
-  Not loaded by the client yet (2q7.11).
+  Loaded by `src/data/loadStationWalk.ts` (`decodeStationWalk`: meters, CSR adjacency, per-edge checks, to `WalkGraph`) and
+  `useStationWalk.ts` (cached per station). The request names a station, so fetch a shard only for a station the user picked,
+  focused or chose as a trip endpoint, never the one nearest a location fix without a user action.
 - `public/data/search/streets/<bucket>.json`: 64 street and intersection search shards (`StreetSearchShard`,
   `src/data/searchSchema.ts`), built by `scripts/build-street-index.ts` (IO only) through `scripts/lib/streetIndex.ts` (pure:
   `buildStreetIndex`, `displayStreetName`; reads the pin with `loadPin`, `isStreet` and `streetKey`) and `streetIndexShards.ts`
@@ -771,6 +785,9 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **The client never fetches MTA servers directly.** The MTA terms require serving
   through a non-MTA host, even though the feeds send ACAO `*`. Realtime goes through
   the `worker/` proxy, which returns decoded JSON with a 15 s edge cache (outages at `/ene`: 120 s).
+- **Walk shards are fetched only on a user action.** `data/walk/<id>.json` reveals its station id to the static host, so
+  `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
+  of a fix); no request carries the fix or the destination, and routing runs on the device.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
   `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are

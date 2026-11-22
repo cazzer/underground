@@ -1,11 +1,12 @@
 /** Contract for public/data/walk/<stationId>.json: the walkable graph around one station. Built by
- *  scripts/build-walk.ts (2q7.10) from the pinned OSM street extract; read by the walk router (2q7.11). Change both
+ *  scripts/build-walk.ts (2q7.10) from the pinned OSM street extract; decoded by src/data/loadStationWalk.ts into `WalkGraph` and read by the walk router (2q7.11). Change both
  *  sides together. Type-only imports with .ts paths so Node can run the scripts that load this file.
  *
  *  Rules the builder keeps, so the client can rely on them:
  *  - The anchor is the station's stations.json point, the same origin as the street file's. A node's x/z here equal
  *    the street file's x/z for the same OSM node id at the same station (the same projection, rounded the same way),
- *    so an entrance joined in the street file (by 1.5 m of ground position plus type) can be snapped to a node here.
+ *    so an entrance joined in the street file (by 1.5 m of ground position plus type) lies in the same frame. An entrance
+ *    rarely sits on a node (p50 1.4 m from the nearest edge), so the router snaps it to the nearest edge point, not a node.
  *  - Walkable ways are the pin's named roads and walking ways (`ROAD_CLASSES`, `WALK_CLASSES`) minus `foot=no|private|
  *    use_sidepath` and `access=no|private` without a `foot=yes|designated|permissive`. The graph is undirected: the
  *    vehicle `oneway` is ignored (`oneway:foot` is not pinned). Roads are walkable, kind `road`; the router prices them.
@@ -21,7 +22,7 @@
  *    its ends. `steps` is the step-free flag: a router that avoids stairs avoids kind `steps`.
  *  - Ways that cross without a shared node (a bridge over a road, a tunnel) have no junction there. Nothing marks
  *    levels. */
-import type { LatLon } from '../lib/projection.ts'
+import type { Ground, LatLon } from '../lib/projection.ts'
 import type { StationId } from './schema.ts'
 
 /** Edge kinds, indexed by `edgeKind`. Append only; a reorder is a format bump. */
@@ -54,4 +55,29 @@ export interface StationWalk {
   edgeLength: number[]
   /** Node indexes along the edge, at least 2 entries. */
   edgeNodes: number[][]
+}
+
+/** A walk file decoded for routing (src/data/loadStationWalk.ts `decodeStationWalk`): meters, decoded ids, adjacency. */
+export interface WalkGraph {
+  stationId: StationId
+  /** Scene ground of the file's anchor; x/z below are meters from it. */
+  anchor: Ground
+  radiusM: number
+  /** Decoded OSM node ids. */
+  nodeId: readonly number[]
+  /** Meters east and south of the anchor, per node. */
+  x: Float64Array
+  z: Float64Array
+  /** Decoded OSM way ids, per edge. */
+  edgeWay: readonly number[]
+  /** Index into WALK_KINDS, per edge. */
+  edgeKind: Uint8Array
+  /** Meters along the decoded polyline (within 0.05 m of the file's dm-rounded edgeLength), per edge. */
+  edgeLength: Float64Array
+  /** Node indexes along each edge, first to last. */
+  edgeNodes: readonly Int32Array[]
+  /** CSR over nodes: the edges whose first or last node is n are `adjEdge[adjStart[n]..adjStart[n + 1])`; ring
+   *  edges (first === last) are left out. */
+  adjStart: Int32Array
+  adjEdge: Int32Array
 }
