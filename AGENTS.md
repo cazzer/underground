@@ -346,7 +346,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   checks its outer shape; a 404 is null with one warning (cached for the session), other failures reject (evicted,
   retried on the next focus). `useStationStreets.ts` loads the focused station's file on focus only (never at
   startup) into a cached `StreetLayer`: `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways
-  (`src/lib/streetClass.ts`), decimeters to meters. `fetchJson` throws `HttpError` (with `status`) on a non-OK response
+  (`src/lib/streetClass.ts`), decimeters to meters, mixing to the background over the last 70 m of `radiusM` (`edgeFade`;
+  segments are split at the ramp's ends). `fetchJson` throws `HttpError` (with `status`) on a non-OK response
 - `src/data/schema.ts`: types of the six `public/data/*.json` files (`Station` carries `borough`, `ada`,
   and `adaPartial` on the 8 partial stations, from 39hk-dx4f via `scripts/lib/stationAccess.ts`); `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these

@@ -19,6 +19,8 @@ export interface StreetLayer {
 // Color(hex) converts sRGB to linear, which is what vertex colors must be.
 const STREET_COLOR = new Color(theme.streetStroke)
 const STREET_RGB: Rgb = [STREET_COLOR.r, STREET_COLOR.g, STREET_COLOR.b]
+const BACKGROUND = new Color(theme.background)
+const BACKGROUND_RGB: Rgb = [BACKGROUND.r, BACKGROUND.g, BACKGROUND.b]
 
 /**
  * One fetch per station per page load. The buffers are built inside the promise, so a data error rejects (and is
@@ -27,7 +29,7 @@ const STREET_RGB: Rgb = [STREET_COLOR.r, STREET_COLOR.g, STREET_COLOR.b]
 const cache = createInteriorCache((id) =>
   loadStationStreets(BASE_URL, id).then(
     (file): StreetLayer | null =>
-      file && { stationId: id, anchor: toGround(file.anchor), buffers: streetBuffers(file, STREET_RGB) },
+      file && { stationId: id, anchor: toGround(file.anchor), buffers: streetBuffers(file, STREET_RGB, BACKGROUND_RGB) },
   ),
 )
 
