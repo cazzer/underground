@@ -29,7 +29,10 @@ export { ENE_SCHEMA_VERSION } from '../../worker/src/schema'
  */
 export function eneUrlFrom(rtUrl: string): string | null {
   try {
-    const url = new URL('ene', rtUrl)
+    // A trailing slash on the /rt URL (`/rt/`) would make the sibling `/rt/ene`.
+    const base = new URL(rtUrl)
+    base.pathname = base.pathname.replace(/\/+$/, '')
+    const url = new URL('ene', base)
     if (url.hostname === 'mta.info' || url.hostname.endsWith('.mta.info')) {
       console.error(`VITE_RT_URL points at an MTA host (${url.hostname}); outages are off: the client only uses the Worker`)
       return null

@@ -2,6 +2,11 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { OutagePanelBody, OutagePanelView } from '../lib/live/eneText'
 import { outageAnnouncement, outageSeen, type OutageSeen } from '../lib/live/outageAnnounce'
 
+/** The first line of the block when an outage takes away an accessible station's only step-free way out. */
+export const NO_STEP_FREE_TEXT = 'No step-free access now'
+/** How long the announcement text stays in its live region after it is spoken. */
+const ANNOUNCEMENT_MS = 6000
+
 interface ToggleProps {
   expanded: boolean
   hidden: number
@@ -41,11 +46,13 @@ function Toggle({ expanded, hidden, controls, onToggle, onFocusLost }: TogglePro
 
 interface OutageListProps {
   body: OutagePanelBody
+  /** Show "No step-free access now" before the rows. */
+  noStepFree: boolean
   onFocusLost: () => void
 }
 
 /** The rows as plain panel text (no live region: opening a panel must not speak them over the station's name). */
-function OutageList({ body, onFocusLost }: OutageListProps) {
+function OutageList({ body, noStepFree, onFocusLost }: OutageListProps) {
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
   if (body.kind === 'none') return null
@@ -54,13 +61,22 @@ function OutageList({ body, onFocusLost }: OutageListProps) {
   const rows = expanded ? body.rows : body.rows.slice(0, body.shown)
   return (
     <div className="mt-2 text-xs">
-      <ul id={listId} className="space-y-1.5">
+      {noStepFree && <p className="mb-1.5 text-ink">{NO_STEP_FREE_TEXT}</p>}
+      <ul id={listId} aria-label="Out of service" className="space-y-1.5">
         {rows.map((row) => (
           <li key={row.id} className="flex items-start gap-2">
             <span aria-hidden="true" className="mt-0.5 size-2 shrink-0 bg-status-error" />
             <span className="min-w-0">
               <span className="block text-ink">{row.title}</span>
-              <span className="block text-ink-dim">{row.detail}</span>
+              <span className="block whitespace-nowrap text-ink-dim">{row.levels}</span>
+              <span className="block text-ink-dim">
+                {row.meta.map((part, i) => (
+                  <span key={part}>
+                    {i > 0 && ' · '}
+                    <span className="whitespace-nowrap">{part}</span>
+                  </span>
+                ))}
+              </span>
             </span>
           </li>
         ))}
@@ -86,6 +102,12 @@ function useOutageAnnouncement(stationId: string, view: OutagePanelView): string
     setSaid({ stationId, text: outageAnnouncement(prev.current, next) })
     prev.current = next
   }, [stationId, key])
+  // Spoken once, then cleared, so the region isn't left holding a stale sentence for a screen-reader cursor to find.
+  useEffect(() => {
+    if (said.text === '') return
+    const timer = window.setTimeout(() => setSaid((s) => (s === said ? { ...s, text: '' } : s)), ANNOUNCEMENT_MS)
+    return () => window.clearTimeout(timer)
+  }, [said])
   return said.stationId === stationId ? said.text : ''
 }
 
@@ -108,7 +130,7 @@ export function OutageStatus({ view, stationId, onFocusLost }: OutageStatusProps
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
-      <OutageList key={stationId} body={view.body} onFocusLost={onFocusLost} />
+      <OutageList key={stationId} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
     </>
   )
 }

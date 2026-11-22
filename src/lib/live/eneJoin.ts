@@ -9,13 +9,6 @@ import { clockNow } from './clock'
  */
 export const ENE_MAX_AGE_S = 480
 
-/** Live machine status for one interior. `known` is false with no fresh data: every machine then reads as in service. */
-export interface MachineStatus {
-  known: boolean
-  isOut(connectorId: string): boolean
-}
-
-export const NO_MACHINE_STATUS: MachineStatus = { known: false, isOut: () => false }
 
 export interface MachineOutage {
   /** The equipment code, the connector's id. */
@@ -36,9 +29,21 @@ export type StationOutages =
 
 export interface OutageJoin {
   panel: StationOutages
-  status: MachineStatus
   /** Ids of the machines out of service, sorted: the interior's drawing input. */
   outIds: readonly string[]
+  /** Fresh data says which of this interior's machines are out (or that none are). False otherwise, whatever the panel shows. */
+  known: boolean
+  /** What step-free routing may rely on (`closedForRouting`). */
+  closed: ReadonlySet<string> | null
+}
+
+/**
+ * The connector ids a route must avoid (`chooseExit`'s and `routesToStreet`'s `closed`), or null when machine status is
+ * unknown (stale, missing or mismatched data): callers must then say step-free status is unknown, never treat every
+ * machine as working. An interior with no machines has nothing to close: an empty set.
+ */
+export function closedForRouting(join: OutageJoin): ReadonlySet<string> | null {
+  return join.closed
 }
 
 /** The part of useEne's feed the join reads (this module doesn't import src/data/useEne). */
@@ -76,22 +81,25 @@ function levelsText(interior: StationInterior, c: Connector): string {
   return `${near.level.name} to ${far.level.name.toLowerCase()}`
 }
 
-const NONE: OutageJoin = { panel: { kind: 'none' }, status: NO_MACHINE_STATUS, outIds: [] }
+const NONE: OutageJoin = { panel: { kind: 'none' }, outIds: [], known: false, closed: null }
+/** No machines, so no outage can matter to a route; still not `known` (nothing was learned about any machine). */
+const NO_MACHINES: OutageJoin = { ...NONE, closed: new Set() }
 
 /**
  * Joins the outage feed to the focused interior's machines (elevators and escalators; the equipment code is the
  * connector id). With fresh data, the listed machines are out: `panel` names them (elevators first, then by id),
- * `outIds` feeds the drawing and `status` the step-free routing. Without fresh data (older than ENE_MAX_AGE_S, two
+ * `outIds` feeds the drawing and `closedForRouting` the step-free routing. Without fresh data (older than ENE_MAX_AGE_S, two
  * failed polls with nothing yet, or a version mismatch) an interior that has machines is `unknown` and nothing reads
  * as out. A machine whose return time has passed stays out: the MTA hasn't said it is back.
  */
 export function joinStationOutages(interior: StationInterior | null, ene: EneInput, nowS: number): OutageJoin {
+  const machines = interior ? interior.connectors.filter(isMachine) : []
+  if (interior && machines.length === 0) return NO_MACHINES
   if (!ene.configured) return NONE
   const known = eneFresh(ene.snapshot, nowS) && !ene.schemaMismatch
-  const machines = interior ? interior.connectors.filter(isMachine) : []
-  // Nothing to know without machines (an interior still loading counts): `known` stays false, so the panel's
-  // announcer doesn't take this for a view of fresh data and speak the machines when the interior arrives.
-  if (machines.length === 0) return NONE
+  // No interior yet: `known` stays false, so the panel's announcer doesn't take this for a view of fresh data and
+  // speak the machines when the interior arrives.
+  if (interior === null) return NONE
   if (!known) {
     // No snapshot yet and fewer than two failures is still connecting, which shows nothing.
     if (ene.snapshot === null && ene.failures < 2 && !ene.schemaMismatch) return NONE
@@ -106,7 +114,8 @@ export function joinStationOutages(interior: StationInterior | null, ene: EneInp
   const ids = new Set(outIds)
   return {
     panel: out.length > 0 ? { kind: 'out', outages: out } : { kind: 'none' },
-    status: { known, isOut: (id) => ids.has(id) },
     outIds,
+    known,
+    closed: ids,
   }
 }

@@ -46,6 +46,8 @@ function AccessIcon({ access, context }: AccessIconProps) {
 
 interface StationNameProps extends AccessIconProps {
   name: string
+  /** An outage leaves the station with no step-free way out right now: the hidden text says so after the label. */
+  noStepFreeNow?: boolean
 }
 
 /**
@@ -53,7 +55,7 @@ interface StationNameProps extends AccessIconProps {
  * alone. Screen readers get ", <accessLabel>." as hidden text instead of the icon, so a heading or option name
  * is real text with fixed punctuation. A search row also shows a partly accessible station's note after the icon.
  */
-export function StationName({ name, access, context }: StationNameProps) {
+export function StationName({ name, access, context, noStepFreeNow = false }: StationNameProps) {
   const label = accessLabel(access)
   if (label === null) return name
   const cut = name.lastIndexOf(' ') + 1
@@ -63,7 +65,7 @@ export function StationName({ name, access, context }: StationNameProps) {
       <span className="whitespace-nowrap">
         {name.slice(cut)}
         <AccessIcon access={access} context={context} />
-        <span className="sr-only">, {label}.</span>
+        <span className="sr-only">, {label}{noStepFreeNow ? "; no step-free access now" : ""}.</span>
       </span>
       {context === 'row' && access.note && (
         <span aria-hidden="true" className="text-xs text-ink-dim">

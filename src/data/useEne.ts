@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ENE_MAX_AGE_S } from '../lib/live/eneJoin'
 import { applyEnePoll, ENE_POLL_MS, INITIAL_ENE_STATE, type EnePollState } from '../lib/live/enePoll'
 import { devEneCodes, devEneSnapshot } from './eneDevFixture'
 import { fetchEne, type EneFetchResult } from './eneFetch'
@@ -19,6 +20,12 @@ export interface EneFeed {
 
 /** Dev only: `?ene=EL358,EL359` fakes a snapshot with those machines out, with or without a Worker. */
 const DEV_CODES = import.meta.env.DEV ? devEneCodes(window.location.search) : null
+
+/**
+ * The republish that flips a snapshot to stale comes this long after `generatedAt + ENE_MAX_AGE_S` by the device clock:
+ * the join measures age on the /rt live clock, which can run a poll's worth (about 15 s) behind it.
+ */
+const EXPIRY_SLACK_S = 20
 
 const index = (snapshot: EneSnapshot | null): EneFeed['byCode'] => snapshot && new Map(snapshot.outages.map((o) => [o.code, o]))
 
@@ -49,6 +56,7 @@ export function useEne(url: string | null): EneFeed {
     let lastDoneMs = -Infinity
     let byCode = index(state.snapshot)
     let byCodeOf: EneSnapshot | null = state.snapshot
+    let expiry: number | undefined
 
     const publish = () => {
       if (state.snapshot !== byCodeOf) {
@@ -56,6 +64,11 @@ export function useEne(url: string | null): EneFeed {
         byCode = index(byCodeOf)
       }
       setFeed({ configured: true, snapshot: state.snapshot, byCode, failures: state.failures, schemaMismatch: state.schemaMismatch })
+      // The panel reads the age at render time, and nothing else may render when the data goes stale: republish then.
+      window.clearTimeout(expiry)
+      if (state.snapshot === null) return
+      const inMs = (state.snapshot.generatedAt + ENE_MAX_AGE_S + EXPIRY_SLACK_S - Date.now() / 1000) * 1000
+      if (inMs > 0) expiry = window.setTimeout(publish, inMs)
     }
     const schedule = (ms: number) => {
       window.clearTimeout(timer)
@@ -92,6 +105,7 @@ export function useEne(url: string | null): EneFeed {
       if (document.hidden) {
         controller?.abort()
         window.clearTimeout(timer)
+        window.clearTimeout(expiry)
       } else {
         resume()
       }
@@ -103,6 +117,7 @@ export function useEne(url: string | null): EneFeed {
       document.removeEventListener('visibilitychange', onVisibility)
       controller?.abort()
       window.clearTimeout(timer)
+      window.clearTimeout(expiry)
     }
   }, [url])
 

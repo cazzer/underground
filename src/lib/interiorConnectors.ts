@@ -57,7 +57,9 @@ const CHEVRON_SPACING_M = 4.5
 const CHEVRON_DEPTH_M = 1.5
 const CHEVRON_MAX_DEPTH = 0.4
 const CHEVRON_SIDE = 1
-/** An out-of-service escalator's cross: at most this fraction of the run either side of mid-run. */
+/** An out-of-service escalator's cross: a square this many meters on a side (at least; as wide as the band when wider), so it reads at the landing zoom. */
+const OUTAGE_CROSS_M = 3
+/** At most this fraction of the run either side of mid-run. */
 const OUTAGE_CROSS_MAX_HALF = 0.4
 /** Elevator door gap and cab inset, as fractions of the shaft width. */
 const DOOR_GAP = 0.45
@@ -160,12 +162,17 @@ function chevron(ctx: ConnectorContext, g: Incline, apex: number, depth: number)
   ctx.strong.segment(g.at(back, CHEVRON_SIDE), tip, cBack, cTip)
 }
 
-/** An out-of-service escalator's mark: two strong strokes corner to corner of a square across the band at mid-run. */
+/**
+ * An out-of-service escalator's mark: two strong strokes corner to corner of a fixed-size square (OUTAGE_CROSS_M,
+ * or the band's width if wider) centered on the band at mid-run.
+ */
 function outageCross(ctx: ConnectorContext, c: Connector, g: Incline): void {
-  const half = Math.min(c.width / 2 / g.run, OUTAGE_CROSS_MAX_HALF)
+  const size = Math.max(OUTAGE_CROSS_M, c.width)
+  const half = Math.min(size / 2 / g.run, OUTAGE_CROSS_MAX_HALF)
+  const side = size / c.width
   const color = g.color('outage', 0.5)
-  ctx.strong.segment(g.at(0.5 - half, -1), g.at(0.5 + half, 1), color)
-  ctx.strong.segment(g.at(0.5 - half, 1), g.at(0.5 + half, -1), color)
+  ctx.strong.segment(g.at(0.5 - half, -side), g.at(0.5 + half, side), color)
+  ctx.strong.segment(g.at(0.5 - half, side), g.at(0.5 + half, -side), color)
 }
 
 /**
@@ -247,9 +254,8 @@ export function drawElevatorStop(ctx: ConnectorContext, c: Connector, levelIndex
     ctx.strong.segment(point(0), point(edge), color)
     ctx.strong.segment(point(1 - edge), point(1), color)
   }
-  const cab = shaftCorners(c, ctx.axis, CAB_INSET * c.width)
-  ctx.fine.loop(cab, y, color)
-  // Out of service: the cab is crossed out.
+  ctx.fine.loop(shaftCorners(c, ctx.axis, CAB_INSET * c.width), y, color)
+  // Out of service: the whole shaft square is crossed out, in strong strokes, so it reads from far out.
   if (!ctx.outOfService(c.id)) return
-  for (const [a, b] of [[0, 2], [1, 3]] as const) ctx.fine.segment([cab[a]![0], y, cab[a]![1]], [cab[b]![0], y, cab[b]![1]], color)
+  for (const [a, b] of [[0, 2], [1, 3]] as const) ctx.strong.segment([corners[a]![0], y, corners[a]![1]], [corners[b]![0], y, corners[b]![1]], color)
 }

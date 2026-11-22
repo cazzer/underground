@@ -42,11 +42,11 @@ describe('nyReturnLabel', () => {
   })
 })
 
-const join = (panel: OutageJoin['panel'], known = true): OutageJoin => ({ panel, status: { known, isOut: () => false }, outIds: [] })
+const join = (panel: OutageJoin['panel'], known = true): OutageJoin => ({ panel, outIds: [], known, closed: known ? new Set() : null })
 
 describe('outagePanelView', () => {
   it('is empty for none', () => {
-    expect(outagePanelView(join({ kind: 'none' }), NOON)).toEqual({ known: true, body: { kind: 'none' } })
+    expect(outagePanelView(join({ kind: 'none' }), NOON)).toEqual({ known: true, noStepFree: false, body: { kind: 'none' } })
   })
 
   it('writes the rows: title, then levels, code and return time', () => {
@@ -65,11 +65,18 @@ describe('outagePanelView', () => {
       kind: 'out',
       shown: 2,
       rows: [
-        { id: 'EL358', kind: 'elevator', title: 'Elevator out of service', detail: 'Mezzanine to platform · EL358 · back about 6 PM' },
-        { id: 'ES2', kind: 'escalator', title: 'Escalator out of service', detail: 'Street to mezzanine · ES2 · return time passed' },
-        { id: 'ES3', kind: 'escalator', title: 'Escalator out of service', detail: 'Street to mezzanine · ES3' },
+        { id: 'EL358', kind: 'elevator', title: 'Elevator out of service', levels: 'Mezzanine to platform', meta: ['EL358', 'back about 6 PM'] },
+        { id: 'ES2', kind: 'escalator', title: 'Escalator out of service', levels: 'Street to mezzanine', meta: ['ES2', 'return time passed'] },
+        { id: 'ES3', kind: 'escalator', title: 'Escalator out of service', levels: 'Street to mezzanine', meta: ['ES3'] },
       ],
     })
+  })
+
+  it('carries noStepFree only with outages', () => {
+    const out = join({ kind: 'out', outages: [{ id: 'EL1', kind: 'elevator', levels: 'Street to platform', returnAt: null }] })
+    expect(outagePanelView(out, NOON, true).noStepFree).toBe(true)
+    expect(outagePanelView(out, NOON).noStepFree).toBe(false)
+    expect(outagePanelView(join({ kind: 'none' }), NOON, true).noStepFree).toBe(false)
   })
 
   it('writes the unknown line per kind mix, and is not known', () => {
@@ -78,6 +85,7 @@ describe('outagePanelView', () => {
     expect(unknownText('both')).toBe('Elevator and escalator status unavailable')
     expect(outagePanelView(join({ kind: 'unknown', kinds: 'both' }, false), NOON)).toEqual({
       known: false,
+      noStepFree: false,
       body: { kind: 'unknown', text: 'Elevator and escalator status unavailable' },
     })
   })

@@ -22,14 +22,15 @@ describe('an out-of-service elevator', () => {
   const normal = buildInteriorBuffers(interior, opts())
   const outaged = buildInteriorBuffers(interior, opts(out('EL1')))
 
-  it('draws its shaft and stops in the outage role and crosses out each cab', () => {
+  it('draws its shaft and stops in the outage role and crosses out each stop\'s whole shaft square in strong strokes', () => {
     expect(roleCount(outaged.strong, 'elevator')).toBe(0)
     expect(roleCount(outaged.fine, 'elevator')).toBe(0)
-    expect(roleCount(outaged.strong, 'outage')).toBe(roleCount(normal.strong, 'elevator'))
-    // Two stops, each with the cab's four edges and its two diagonals.
-    expect(roleCount(outaged.fine, 'outage')).toBe(2 * (4 + 2))
-    expect(count(outaged.fine)).toBe(count(normal.fine) + 4)
-    expect(count(outaged.strong)).toBe(count(normal.strong))
+    // Two stops, each with two strong diagonals corner to corner of the shaft square.
+    expect(roleCount(outaged.strong, 'outage')).toBe(roleCount(normal.strong, 'elevator') + 2 * 2)
+    expect(count(outaged.strong)).toBe(count(normal.strong) + 4)
+    // The cab's four edges at each stop stay fine.
+    expect(roleCount(outaged.fine, 'outage')).toBe(2 * 4)
+    expect(count(outaged.fine)).toBe(count(normal.fine))
   })
 
   it('leaves every other segment as it was', () => {
@@ -72,9 +73,9 @@ describe('an out-of-service escalator', () => {
     )
     const cross = k.slice(-2).map((i) => Array.from(outaged.strong.positions.subarray(i * 6, i * 6 + 6)))
     for (const s of cross) {
-      // Half a width along the run, a full width across it, around mid-run (x = 7).
-      expect(Math.abs(s[3]! - s[0]!)).toBeCloseTo(2)
-      expect(Math.abs(s[5]! - s[2]!)).toBeCloseTo(2)
+      // A fixed 3 m square (wider than the 2 m band) centered on mid-run (x = 7).
+      expect(Math.abs(s[3]! - s[0]!)).toBeCloseTo(3)
+      expect(Math.abs(s[5]! - s[2]!)).toBeCloseTo(3)
       expect((s[0]! + s[3]!) / 2).toBeCloseTo(7)
     }
   })
@@ -95,8 +96,16 @@ describe('an out-of-service machine through the split', () => {
   })
 
   it('keeps each elevator stop with its level: the platform stop under the trains, the mezzanine stop over', () => {
-    // The platform stop's cab (4 edges + 2 diagonals) stays in the base fine layer, the mezzanine's goes over.
-    expect(roleCount(split.fine, 'outage')).toBeGreaterThanOrEqual(6)
-    expect(roleCount(split.overFine, 'outage')).toBeGreaterThanOrEqual(6)
+    const only = buildInteriorBuffers(fixture([STAIR, ELEVATOR]), opts({ splitLevel: 2, ...out('EL1') }))
+    /** y of each strong diagonal of the outage role: flat strokes that change both x and z. */
+    const diagonalYs = (b: Buffers) =>
+      Array.from({ length: count(b) }, (_, k) => k)
+        .filter((k) => color(b, k)[0] === ROLES.indexOf('outage'))
+        .map((k) => Array.from(b.positions.subarray(k * 6, k * 6 + 6)))
+        .filter((s) => s[1] === s[4] && s[0] !== s[3] && s[2] !== s[5])
+        .map((s) => s[1])
+    // Platform at y -8 drawn x2 = -16; the mezzanine at -4 is -8.
+    expect(diagonalYs(only.strong)).toEqual([-16, -16])
+    expect(diagonalYs(only.overStrong)).toEqual([-8, -8])
   })
 })

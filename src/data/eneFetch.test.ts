@@ -78,6 +78,12 @@ describe('eneUrlFrom', () => {
     expect(eneUrlFrom('https://x.workers.dev/rt?x=1')).toBe('https://x.workers.dev/ene')
   })
 
+  it('handles a trailing slash', () => {
+    expect(eneUrlFrom('https://x.workers.dev/rt/')).toBe('https://x.workers.dev/ene')
+    expect(eneUrlFrom('http://localhost:8787/rt//')).toBe('http://localhost:8787/ene')
+    expect(eneUrlFrom('https://x.workers.dev/')).toBe('https://x.workers.dev/ene')
+  })
+
   it('is null, and logged, for a URL that does not parse', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(eneUrlFrom('not a url')).toBeNull()

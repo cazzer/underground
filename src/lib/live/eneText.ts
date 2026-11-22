@@ -38,8 +38,10 @@ export interface OutageRow {
   kind: MachineOutage['kind']
   /** "Elevator out of service". */
   title: string
-  /** "Mezzanine to platform · EL358 · back about 6 AM"; no return part when the MTA gave none. */
-  detail: string
+  /** "Mezzanine to platform": the panel's first detail line. */
+  levels: string
+  /** The second line's parts, each kept whole: the code, then "back about 6 AM" or "return time passed" (none when the MTA gave no time). */
+  meta: string[]
 }
 
 export type OutagePanelBody =
@@ -50,6 +52,8 @@ export type OutagePanelBody =
 export interface OutagePanelView {
   /** Fresh data says which machines are out (or that none are): the only time a change is news. */
   known: boolean
+  /** An outage leaves some platform of an accessible station with no step-free way to the street (`noStepFreeNow`). */
+  noStepFree: boolean
   body: OutagePanelBody
 }
 
@@ -58,24 +62,24 @@ export function unknownText(kinds: 'elevator' | 'escalator' | 'both'): string {
 }
 
 function outageRow(o: MachineOutage, nowS: number): OutageRow {
-  const parts = [o.levels, o.id]
+  const meta = [o.id]
   if (o.returnAt !== null) {
     const back = nyReturnLabel(o.returnAt, nowS)
-    parts.push(back === null ? 'return time passed' : `back ${back}`)
+    meta.push(back === null ? 'return time passed' : `back ${back}`)
   }
-  return { id: o.id, kind: o.kind, title: `${KIND_NAME[o.kind]} out of service`, detail: parts.join(' · ') }
+  return { id: o.id, kind: o.kind, title: `${KIND_NAME[o.kind]} out of service`, levels: o.levels, meta }
 }
 
 /** What the station panel shows for a join, as of `nowS`. */
-export function outagePanelView(join: OutageJoin, nowS: number): OutagePanelView {
+export function outagePanelView(join: OutageJoin, nowS: number, noStepFree = false): OutagePanelView {
   const { panel } = join
-  const known = join.status.known
+  const known = join.known
   switch (panel.kind) {
     case 'none':
-      return { known, body: { kind: 'none' } }
+      return { known, noStepFree: false, body: { kind: 'none' } }
     case 'unknown':
-      return { known, body: { kind: 'unknown', text: unknownText(panel.kinds) } }
+      return { known, noStepFree: false, body: { kind: 'unknown', text: unknownText(panel.kinds) } }
     case 'out':
-      return { known, body: { kind: 'out', rows: panel.outages.map((o) => outageRow(o, nowS)), shown: OUTAGE_ROWS_SHOWN } }
+      return { known, noStepFree, body: { kind: 'out', rows: panel.outages.map((o) => outageRow(o, nowS)), shown: OUTAGE_ROWS_SHOWN } }
   }
 }

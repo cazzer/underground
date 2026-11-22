@@ -183,11 +183,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and `ReadyLine` for a loaded interior (null for authored ones; for a generated one the dim line "Estimated layout",
   shown whether or not the interior is in view so it is announced once, and keyed by station so a cached generated
   station after another one is announced too; the one place a ready-state line goes)
-  `OutageStatus.tsx` the panel's out-of-service machines under `InteriorStatus`: up to 2 rows as plain text (title, then "Mezzanine to
-  platform · EL358 · back about 6 AM"; no live region, so opening a panel never speaks them over "Showing <station>" or
+  `OutageStatus.tsx` the panel's out-of-service machines under `InteriorStatus`: up to 2 rows as plain text (title; levels on one line, "EL358 · back about 6 AM" on the next, each part
+  whole; a first line "No step-free access now", also in the heading's sr-only access text, when an outage leaves an accessible station's
+  platform with no step-free route, `stepFreeLoss.ts`; no live region, so opening a panel never speaks them over "Showing <station>" or
   "Estimated layout"), a "Show N more" toggle (focus goes to the station heading if it unmounts while focused), or a dim
   "status unavailable" line; one always-mounted polite sr-only region speaks only a change to the machines out at the station
-  whose panel stays open (`outageAnnounce.ts`, pure; silent on open, station change or stale data)
+  whose panel stays open and clears its text after 6 s (`outageAnnounce.ts`, pure; silent on open, station change or stale data)
   `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a combobox over a
   listbox of `SearchResult.tsx` rows (name and access icon, the borough on a dim line only for names whose stations span boroughs
   (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart); choosing a result
@@ -253,7 +254,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     half the depth fade). An escalator is a band with fine handrails and travel chevrons; an elevator is four
     shaft verticals, a doored square at each stop and a fine cab inside it. A machine in `ConnectorContext.outOfService` (from
     `InteriorBufferOptions.outOfService`) takes the `outage` role, strong and fine, on both sides of the roof cut: an escalator loses its
-    chevrons and gets a cross over the band at mid-run, an elevator a cross over each stop's cab; tested in `interiorOutage.test.ts`; `escalatorBanks.ts` `spreadBanks`: zero-run escalators whose bands would touch
+    chevrons and gets a 3 m cross over the band at mid-run, an elevator a cross over each stop's whole shaft square, in strong strokes at a fixed size so it reads at the landing zoom; tested in `interiorOutage.test.ts`; `escalatorBanks.ts` `spreadBanks`: zero-run escalators whose bands would touch
     sit side by side across the axis in id order (an authored one off its entrance stays put; one listed
     by two entrances throws);
     `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;
@@ -443,8 +444,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   one request at a time, a hidden tab aborts and stops, backoff via `lib/live/enePoll.ts`; `eneFetch.ts` validates one body
   (`realtimeFetch.ts`'s timeout, errors and `parseRetryAfter` are reused). Pure joins in `lib/live/`: `eneJoin.ts`
   (`joinStationOutages`: outage codes to the focused interior's `Connector.id`; a snapshot over `ENE_MAX_AGE_S` 480 s old
-  by the /rt live clock, else the device clock, is unknown, never "in service"; also `MachineStatus`, the step-free routing's
-  input: `chooseExit({ closed: new Set(join.outIds) })`, checked on L08 in `exitOutage.test.ts`; no UI calls it yet), `eneText.ts` (panel text, New York return times). `App` passes `outages.outIds` to `Scene` > `StationInterior`, which
+  by the /rt live clock, else the device clock, is unknown, never "in service" (`useEne` republishes 20 s after it would go stale);
+  `closedForRouting(join)` is the step-free routing's input: `chooseExit({ closed })`, or null when status is unknown (callers must
+  then say step-free status is unknown; checked on L08 in `exitOutage.test.ts`; no UI routes with it yet), `eneText.ts` (panel text, New York return times). `App` passes `outages.outIds` to `Scene` > `StationInterior`, which
   rebuilds its four line layers only when that set changes (`interiorLayers`; `InteriorModel` itself never changes)
 - `src/data/useStationHash.ts` keeps `#station=<id>` and the focused station in step with `history.replaceState`
   (no history entries): reads on mount and `hashchange`, writes on every focus change; an unknown id clears the

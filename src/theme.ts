@@ -91,6 +91,8 @@ export interface Theme {
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
 export const MACHINE_DEPTH_FADE_SHARE = 0.5
 
+/** Shared by the status color and the interior's out-of-service machines, which mark the same thing. */
+const statusError = '#ff6b6b'
 const mono = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
 
 export const THEMES = {
@@ -116,7 +118,7 @@ export const THEMES = {
     trainCarEndShade: 0.75,
     statusLive: '#7cf5a6',
     statusWarn: '#ffd166',
-    statusError: '#ff6b6b',
+    statusError,
     ink: '#e6f6ff',
     inkDim: '#8fb4de',
     panel: 'rgba(11, 33, 71, 0.82)',
@@ -129,7 +131,7 @@ export const THEMES = {
     interiorFine: '#8fb4de',
     interiorElevator: '#c38cff',
     interiorEscalator: '#7cf5a6',
-    interiorOutage: '#ff6b6b',
+    interiorOutage: statusError,
     interiorLineWidth: 1.5,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,

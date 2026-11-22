@@ -50,7 +50,7 @@ function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, 
     >
       <div className="flex items-start justify-between gap-3">
         <h2 ref={headingRef} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
-          <StationName name={station.name} access={station.access} context="card" />
+          <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} />
         </h2>
         <button
           type="button"

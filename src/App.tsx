@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useBands } from './data/useBands'
 import { useEne } from './data/useEne'
 import { ENE_URL } from './data/realtime'
@@ -10,6 +10,7 @@ import { useStationInterior } from './data/useStationInterior'
 import { FocusProvider, useFocus } from './lib/focus'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
 import { outagePanelView } from './lib/live/eneText'
+import { noStepFreeNow } from './lib/live/stepFreeLoss'
 import { markedPlacement } from './lib/locate'
 import type { Insets } from './lib/framing'
 import type { ScreenRect } from './lib/interiorCamera'
@@ -44,10 +45,19 @@ function MapView({ network, bands, live }: MapViewProps) {
   const placement = markedPlacement(locate.state)
   const here = placement && { ground: placement.ground, accuracyM: placement.accuracyM }
   const model = interior.load.status === 'ready' ? interior.load.model : null
-  // Elevators and escalators out of service at the loaded interior; `outages.status` is the step-free routing's input.
+  // Elevators and escalators out of service at the loaded interior; `closedForRouting(outages)` is the step-free routing's input.
   const ene = useEne(ENE_URL)
   const nowS = eneNowS(live.arrivals?.offsetS ?? null, performance.now(), Date.now())
   const outages = joinStationOutages(model?.interior ?? null, ene, nowS)
+  const accessible = focusedId !== null && (network.stationById.get(focusedId)?.access.status ?? 'none') !== 'none'
+  const outKey = outages.outIds.join(',')
+  const unknownStatus = outages.closed === null
+  // Searches the interior's graph, so it reruns only when the machines out (or whether that is known) change.
+  const noStepFree = useMemo(
+    () => (model ? noStepFreeNow(model.interior, accessible, outages.closed) : false),
+    // `outages.closed` is a new Set per render: outKey and unknownStatus say when it really differs.
+    [model, accessible, outKey, unknownStatus],
+  )
   return (
     <>
       <ErrorBoundary fallback={(e) => <SceneCrash message={e.message} />}>
@@ -78,7 +88,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           locate={locate}
           linkNotice={{ show: stationHash.linkNotice, onDismiss: stationHash.dismissLinkNotice }}
           interior={{ load: interior.load, onRetry: interior.retry }}
-          outages={outagePanelView(outages, nowS)}
+          outages={outagePanelView(outages, nowS, noStepFree)}
         />
       </ErrorBoundary>
       <LiveDebug debug={live.debug} technical={live.technical} />

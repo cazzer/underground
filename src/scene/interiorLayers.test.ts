@@ -26,7 +26,8 @@ describe('interiorLayers', () => {
     const before = [model.strong, model.fine, model.overStrong, model.overFine]
     const out = interiorLayers(model, 'EL358')
     expect(out).not.toBe(model)
-    expect(out.fine.positions.length).toBeGreaterThan(model.fine.positions.length)
+    // The two stops' strong diagonals (2 each, 6 floats a segment), split between the layers under and over the trains.
+    expect(out.strong.positions.length + out.overStrong.positions.length).toBe(model.strong.positions.length + model.overStrong.positions.length + 4 * 6)
     expect([model.strong, model.fine, model.overStrong, model.overFine]).toEqual(before)
     // The outaged machine adds colors the model never uses (the outage role's, at each level it spans).
     const base = colorsOf(model.strong, model.fine, model.overStrong, model.overFine)
