@@ -39,6 +39,7 @@ describe('expectStationIndex complex members', () => {
     ['a non-string file', { ...base, U01: { provenance: 'authored', file: 5 } }],
     ['a path traversal', { ...base, U01: { provenance: 'authored', file: '../x' } }],
     ['the index file as a target', { index: { provenance: 'authored' }, U01: { provenance: 'authored', file: 'index' } }],
+    ['the equipment file as a target', { equipment: { provenance: 'authored' }, U01: { provenance: 'authored', file: 'equipment' } }],
     ['an inherited key', { U01: { provenance: 'authored', file: 'toString' } }],
   ])('rejects %s', (_name, stations) => {
     expect(() => expectStationIndex({ stations }, URL)).toThrow(URL)

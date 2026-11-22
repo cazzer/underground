@@ -17,8 +17,11 @@ export interface MachineOutage {
   /**
    * "Mezzanine to platform": the end nearest the street first. An escalator with a known direction of travel names it
    * instead: "Mezzanine up to street", "Street down to mezzanine" (the end it starts at first).
+   * A machine the interior doesn't draw (`source` 'catalog') carries the inventory's own text, or null when it has none.
    */
-  levels: string
+  levels: string | null
+  /** Where the machine and its text come from: the loaded interior, or the equipment index (panel only, see eneIndexJoin). */
+  source: 'interior' | 'catalog'
   /** Epoch seconds; null when the MTA gave none. May be past: overdue. */
   returnAt: number | null
 }
@@ -70,6 +73,11 @@ export function eneFresh(snapshot: EneSnapshot | null, nowS: number): boolean {
 type Machine = Connector & { kind: 'elevator' | 'escalator' }
 const isMachine = (c: Connector): c is Machine => c.kind === 'elevator' || c.kind === 'escalator'
 
+/** The interior's elevators and escalators (the equipment code is the connector id). */
+export function interiorMachines(interior: StationInterior): Machine[] {
+  return interior.connectors.filter(isMachine)
+}
+
 /** First words of a level name that is a common noun or an adjective, not a proper name ("Street", "Upper mezzanine"). */
 const GENERIC_LEVEL_WORDS: ReadonlySet<string> = new Set([
   'street', 'mezzanine', 'platform', 'platforms', 'concourse', 'station', 'upper', 'lower', 'intermediate', 'main',
@@ -116,7 +124,7 @@ const NO_MACHINES: OutageJoin = { ...NONE, closed: new Set() }
  * as out. A machine whose return time has passed stays out: the MTA hasn't said it is back.
  */
 export function joinStationOutages(interior: StationInterior | null, ene: EneInput, nowS: number): OutageJoin {
-  const machines = interior ? interior.connectors.filter(isMachine) : []
+  const machines = interior ? interiorMachines(interior) : []
   if (interior && machines.length === 0) return NO_MACHINES
   if (!ene.configured) return NONE
   const known = eneFresh(ene.snapshot, nowS) && !ene.schemaMismatch
@@ -131,7 +139,7 @@ export function joinStationOutages(interior: StationInterior | null, ene: EneInp
   }
   const out = machines
     .filter((m) => ene.byCode?.has(m.id))
-    .map((m): MachineOutage => ({ id: m.id, kind: m.kind, levels: levelsText(interior!, m), returnAt: ene.byCode!.get(m.id)!.returnAt }))
+    .map((m): MachineOutage => ({ id: m.id, kind: m.kind, levels: levelsText(interior!, m), source: 'interior', returnAt: ene.byCode!.get(m.id)!.returnAt }))
     .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'elevator' ? -1 : 1) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   const outIds = out.map((o) => o.id).sort()
   const ids = new Set(outIds)

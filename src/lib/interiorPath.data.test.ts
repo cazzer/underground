@@ -12,7 +12,7 @@ import { BOARD_HALF_M, exitPathBuffers, exitPathCenterline } from './interiorPat
 
 const DIR = 'public/data/stations'
 const interiors = readdirSync(DIR)
-  .filter((f) => f.endsWith('.json') && f !== 'index.json')
+  .filter((f) => f.endsWith('.json') && f !== 'index.json' && f !== 'equipment.json')
   .map((f) => JSON.parse(readFileSync(`${DIR}/${f}`, 'utf8')) as StationInterior)
 
 const Y = 2

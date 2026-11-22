@@ -87,7 +87,7 @@ describe('shipped interiors', () => {
     const dir = new URL('../../public/data/stations/', import.meta.url)
     let checked = 0
     for (const f of readdirSync(dir)) {
-      if (f === 'index.json' || !f.endsWith('.json')) continue
+      if (f === 'index.json' || f === 'equipment.json' || !f.endsWith('.json')) continue
       const shipped = read(f)
       const decks = interiorDecks(shipped)
       checked++

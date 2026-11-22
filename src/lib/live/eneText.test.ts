@@ -54,9 +54,9 @@ describe('outagePanelView', () => {
       join({
         kind: 'out',
         outages: [
-          { id: 'EL358', kind: 'elevator', levels: 'Mezzanine to platform', returnAt: ny(18, 18) },
-          { id: 'ES2', kind: 'escalator', levels: 'Street to mezzanine', returnAt: NOON - 60 },
-          { id: 'ES3', kind: 'escalator', levels: 'Street to mezzanine', returnAt: null },
+          { id: 'EL358', kind: 'elevator', levels: 'Mezzanine to platform', source: 'interior', returnAt: ny(18, 18) },
+          { id: 'ES2', kind: 'escalator', levels: 'Street to mezzanine', source: 'interior', returnAt: NOON - 60 },
+          { id: 'ES3', kind: 'escalator', levels: 'Street to mezzanine', source: 'interior', returnAt: null },
         ],
       }),
       NOON,
@@ -65,15 +65,15 @@ describe('outagePanelView', () => {
       kind: 'out',
       shown: 2,
       rows: [
-        { id: 'EL358', kind: 'elevator', title: 'Elevator out of service', levels: 'Mezzanine to platform', meta: ['EL358', 'back about 6 PM'] },
-        { id: 'ES2', kind: 'escalator', title: 'Escalator out of service', levels: 'Street to mezzanine', meta: ['ES2', 'return time passed'] },
-        { id: 'ES3', kind: 'escalator', title: 'Escalator out of service', levels: 'Street to mezzanine', meta: ['ES3'] },
+        { id: 'EL358', kind: 'elevator', title: 'Elevator out of service', levels: 'Mezzanine to platform', wraps: false, meta: ['EL358', 'back about 6 PM'] },
+        { id: 'ES2', kind: 'escalator', title: 'Escalator out of service', levels: 'Street to mezzanine', wraps: false, meta: ['ES2', 'return time passed'] },
+        { id: 'ES3', kind: 'escalator', title: 'Escalator out of service', levels: 'Street to mezzanine', wraps: false, meta: ['ES3'] },
       ],
     })
   })
 
   it('carries noStepFree only with outages', () => {
-    const out = join({ kind: 'out', outages: [{ id: 'EL1', kind: 'elevator', levels: 'Street to platform', returnAt: null }] })
+    const out = join({ kind: 'out', outages: [{ id: 'EL1', kind: 'elevator', levels: 'Street to platform', source: 'interior', returnAt: null }] })
     expect(outagePanelView(out, NOON, true).noStepFree).toBe(true)
     expect(outagePanelView(out, NOON).noStepFree).toBe(false)
     expect(outagePanelView(join({ kind: 'none' }), NOON, true).noStepFree).toBe(false)

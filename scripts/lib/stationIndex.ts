@@ -4,7 +4,9 @@ import { membersOf } from './stationMembers.ts'
 
 export const INDEX_FILE = 'index.json'
 /** The files in public/data/stations/ that are not <id>.json interiors. */
-export const NOT_INTERIOR_FILES: ReadonlySet<string> = new Set([INDEX_FILE])
+/** public/data/stations/equipment.json: the lazily loaded elevator and escalator index (scripts/lib/equipmentIndex.ts). */
+export const EQUIPMENT_FILE = 'equipment.json'
+export const NOT_INTERIOR_FILES: ReadonlySet<string> = new Set([INDEX_FILE, EQUIPMENT_FILE])
 
 /** Entries are inserted in id order, but a JS object lists integer-like keys ("101") first, numerically,
  *  so the written key order is not plain string order. Readers must not rely on it.
@@ -12,7 +14,7 @@ export const NOT_INTERIOR_FILES: ReadonlySet<string> = new Set([INDEX_FILE])
 export function buildStationIndex(interiors: readonly StationInterior[]): StationIndex {
   const sorted = [...interiors].sort((a, b) => (a.stationId < b.stationId ? -1 : a.stationId > b.stationId ? 1 : 0))
   const entries = sorted.flatMap((i) => {
-    // The index shares the directory with the <id>.json files.
+    // The index and the equipment file share the directory with the <id>.json files.
     if (NOT_INTERIOR_FILES.has(`${i.stationId}.json`)) throw new Error(`A station can not have the id "${i.stationId}": stations/${i.stationId}.json is not an interior`)
     const provenance = i.generated ? ('generated' as const) : ('authored' as const)
     return membersOf(i).map((id) => [id, id === i.stationId ? { provenance } : { provenance, file: i.stationId }] as const)

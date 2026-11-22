@@ -10,6 +10,9 @@ import { gzipSync } from 'node:zlib'
 export const GZIP_BUDGET_BYTES = 60_000
 /** stations/index.json loads after startup (not render-blocking), so it has its own cap outside the budget above. */
 export const INDEX_GZIP_CAP_BYTES = 8_000
+/** stations/equipment.json loads on the first station focus, outside the budget above, with its own cap: the measured
+ *  12,966 B (node zlib level 9, fall 2026) plus about a quarter. */
+export const EQUIPMENT_GZIP_CAP_BYTES = 16_000
 
 /** public/data/streets/<id>.json loads on focus, outside the budget above; each file has this cap... */
 export const STREETS_FILE_GZIP_CAP_BYTES = 16_000
@@ -82,6 +85,11 @@ export function checkFileCap(file: RenderedFile, capBytes: number): number {
 /** The station index must fit its own cap; returns its gzip size. */
 export function checkIndexCap(index: RenderedFile): number {
   return checkFileCap(index, INDEX_GZIP_CAP_BYTES)
+}
+
+/** The equipment index must fit its own cap; returns its gzip size. */
+export function checkEquipmentCap(file: RenderedFile): number {
+  return checkFileCap(file, EQUIPMENT_GZIP_CAP_BYTES)
 }
 
 /** The dated timetable files together must fit their total cap; returns their gzip total. */

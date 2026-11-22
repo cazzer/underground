@@ -68,7 +68,9 @@ function OutageList({ body, noStepFree, onFocusLost }: OutageListProps) {
             <span aria-hidden="true" className="mt-0.5 size-2 shrink-0 bg-status-error" />
             <span className="min-w-0">
               <span className="block text-ink">{row.title}</span>
-              <span className="block whitespace-nowrap text-ink-dim">{row.levels}</span>
+              {row.levels !== null && (
+                <span className={row.wraps ? 'block line-clamp-3 text-ink-dim' : 'block whitespace-nowrap text-ink-dim'}>{row.levels}</span>
+              )}
               <span className="block text-ink-dim">
                 {row.meta.map((part, i) => (
                   <span key={part}>
