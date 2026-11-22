@@ -8,14 +8,13 @@ import { BOARD_HALF_M, exitPathBuffers, type StationPathChoice } from '../lib/in
 import { interiorOpacity } from '../lib/interiorReveal'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
-import { exitPathLook } from './exitPathLook'
 import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
 import { strokeOrders } from './renderOrder'
 import { useLineLayer, type LineDash } from './useLineLayer'
 
 const DASH: LineDash = { size: theme.exitPathDash, gap: theme.exitPathGap }
 // Color(hex) converts sRGB to linear, which is what vertex colors must be.
-const COLOR = new Color(exitPathLook.color)
+const COLOR = new Color(theme.exitPath)
 const RGB = [COLOR.r, COLOR.g, COLOR.b] as const
 const NO_KEEP_OUT = new Float32Array(0)
 
@@ -47,7 +46,7 @@ export function ExitPath({ model, choice, keepOut }: ExitPathProps) {
         // Dashes mean the geometry is estimated (generated or `approximate`), as the interior's own strokes. A transfer
         // that is only probable because a slab doesn't state fare control draws solid: its layout is surveyed.
         dashInStation: model.interior.generated !== undefined || model.interior.approximate === true,
-        restroke: exitPathLook.restroke,
+        restroke: true,
         boardHalfM: BOARD_HALF_M,
       }),
     [model, choice],
