@@ -8,23 +8,36 @@
  *  (39hk-dx4f; refresh it with `npm run data:catalog:fetch`, then run the offline `npm run data:access`)
  *  and data/stations/access-exceptions.json.
  *
- *  Everything is built in memory first; nothing is written if a build step throws or the
- *  gzipped total is over budget. */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+ *  Also writes public/data/timetable/<serviceId>.json, one per service (see src/data/timetableSchema.ts):
+ *  loaded on demand, outside the budget, each under TIMETABLE_FILE_GZIP_CAP_BYTES. A file there for a
+ *  service the feed no longer has is removed.
+ *
+ *  Everything is built in memory first; nothing is written if a build step throws, the
+ *  gzipped total is over budget or a timetable file is over its cap. */
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { unzipSync } from 'fflate'
 import { readFeed } from './lib/gtfs.ts'
 import { buildRoutes, buildStations, buildTransfers } from './lib/network.ts'
 import { addAccess } from './lib/stationAccess.ts'
 import { readAccessExceptions, readCatalogStations } from './lib/accessInputs.ts'
-import { GZIP_BUDGET_BYTES, checkBudget, committedGzip, renderedFile } from './lib/budget.ts'
+import {
+  GZIP_BUDGET_BYTES,
+  TIMETABLE_FILE_GZIP_CAP_BYTES,
+  checkBudget,
+  checkFileCap,
+  committedGzip,
+  renderedFile,
+} from './lib/budget.ts'
 import { buildSegments } from './lib/segments.ts'
 import { buildShapes } from './lib/shapes.ts'
 import { toStableJson } from './lib/stableJson.ts'
+import { buildTimetables } from './lib/timetable.ts'
 import { buildTripIndex } from './lib/tripIndex.ts'
 
 const FEED_URL = 'https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip'
 const OUT_DIR = new URL('../public/data/', import.meta.url)
+const TIMETABLE_DIR = new URL('timetable/', OUT_DIR)
 const SIMPLIFY_TOLERANCE_M = 3
 const NEEDED = new Set(
   ['stops', 'routes', 'trips', 'stop_times', 'shapes', 'transfers', 'calendar', 'calendar_dates', 'feed_info'].map(
@@ -63,6 +76,7 @@ async function main(): Promise<void> {
   const { file: tripIndex, skippedNoShape } = buildTripIndex(feed)
   const access = addAccess(buildStations(feed), readCatalogStations(), readAccessExceptions())
   for (const warning of access.warnings) console.warn(`WARNING: ${warning}`)
+  const timetables = buildTimetables(feed)
   const outputs: [string, unknown, number][] = [
     ['stations.json', { feedVersion, stations: access.stations }, 2],
     ['routes.json', { feedVersion, routes: buildRoutes(feed) }, 2],
@@ -76,15 +90,33 @@ async function main(): Promise<void> {
   // station-depths.json (data:stations) counts too: the shared budget covers everything loaded up front.
   const others = committedGzip(OUT_DIR, new Set(rendered.map((f) => f.name)))
   const totalGzip = checkBudget(rendered, others)
+  const timetableFiles = timetables.files.map(({ serviceId, file }) => renderedFile(`${serviceId}.json`, toStableJson(file, 4)))
+  for (const f of timetableFiles) checkFileCap(f, TIMETABLE_FILE_GZIP_CAP_BYTES)
 
   mkdirSync(OUT_DIR, { recursive: true })
   for (const f of rendered) writeFileSync(new URL(f.name, OUT_DIR), f.text)
+  mkdirSync(TIMETABLE_DIR, { recursive: true })
+  for (const f of timetableFiles) writeFileSync(new URL(f.name, TIMETABLE_DIR), f.text)
+  const written = new Set(timetableFiles.map((f) => f.name))
+  for (const name of readdirSync(TIMETABLE_DIR).sort()) {
+    if (!name.endsWith('.json') || written.has(name)) continue
+    rmSync(new URL(name, TIMETABLE_DIR))
+    console.log(`timetable/${name}: removed (no such service any more)`)
+  }
 
   console.table([
     ...rendered.map((f) => ({ file: f.name, 'raw B': f.raw, 'gzip B': f.gzip })),
     ...Object.entries(others).map(([file, gzip]) => ({ file: `${file} (committed)`, 'raw B': null, 'gzip B': gzip })),
   ])
   console.log(`Total gzip: ${totalGzip} B (budget ${GZIP_BUDGET_BYTES} B)`)
+  console.table(timetableFiles.map((f) => ({ file: `timetable/${f.name}`, 'raw B': f.raw, 'gzip B': f.gzip, 'cap B': TIMETABLE_FILE_GZIP_CAP_BYTES })))
+  const patternCount = timetables.files.reduce((sum, { file }) => sum + file.patterns.length, 0)
+  const tripCount = timetables.files.reduce((sum, { file }) => sum + file.patterns.reduce((n, p) => n + p.trips.length, 0), 0)
+  console.log(
+    `Timetables: ${timetables.files.length} files, ${patternCount} patterns, ${tripCount} trips, ` +
+      `${timetables.files[0]?.file.changes.length ?? 0} station changes, ${timetables.skippedShort} trips under two stops skipped, ` +
+      `${timetables.splitPatterns} patterns split for overtaking`,
+  )
   console.log(`Skipped: ${skippedSegments} non-positive segment samples, ${skippedNoShape} trips without a shape`)
 }
 

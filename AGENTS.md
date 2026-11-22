@@ -26,6 +26,9 @@ so dev and preview serve under that path.
 - `npm run typecheck`: `tsc --noEmit` for `src/`, then `tsc --noEmit -p scripts`
 - `npm run data [-- --zip path]`: rebuild `public/data/*.json` from the regular GTFS zip
   (downloads it unless `--zip` or `$GTFS_ZIP` is given; needs Node >= 22.18). Never commit the zip.
+  Also writes `public/data/timetable/<serviceId>.json` (stop times by stop pattern in 30 s units plus the
+  same-station transfer rows; outside the 60 KB budget, each under its own 48 KB gzip cap, fails above it;
+  removes a file for a service the feed dropped).
   Also reads the pinned `data/stations/catalog/stations.json` for each station's borough and ADA status;
   after `data:catalog:fetch` run `npm run data:access` instead (offline).
   A station the catalog lacks, or an orphan catalog row, needs an entry in
@@ -363,6 +366,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/schema.ts`: types of the six `public/data/*.json` files (`Station` carries `borough`, `ada`,
   and `adaPartial` on the 8 partial stations, from 39hk-dx4f via `scripts/lib/stationAccess.ts`); `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
+- `src/data/timetableSchema.ts`: the `TimetableFile` contract for `public/data/timetable/<serviceId>.json` (patterns by
+  stop sequence, 30 s units, same-station change rows; its header lists the rules a client may rely on) and
+  `timetableCodec.ts` `decodePatternTimes` (pure, `.ts` imports): a pattern's trips to arrival and departure seconds
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
 - `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`,
   `PackedDepthsFile` for `public/data/station-depths.json`, and `StationDepthsFile`, its per-track decoded form
@@ -394,7 +400,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   station), written only by `scripts/fetch-streets.ts`; `manifest.json` (license, query, the station ids fetched for, shard list) and `cell-<lat>_<lon>.json`
   shards, each with its own node table (ways index OSM node ids; coordinates 1e-6 deg). Pure trim and shard layout in
   `scripts/lib/streetsOsm.ts` and `streetsShard.ts`; `fetchJson.ts` is the retrying fetch both pin scripts share
-- `scripts/`: `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
+- `scripts/`: `lib/timetable.ts` (`buildTimetables`, `buildStationChanges`: pure, used by `build-data.ts`),
+  `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge; `lib/stationProvenance.ts` (`markGenerated`: authored to generated, depth sources, archetype and
   confidence) and `lib/stationIndex.ts` (`buildStationIndex`, `NOT_INTERIOR_FILES`) are pure, and `build-stations.ts`
@@ -708,7 +715,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
-  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors and street files don't count (street and walk files have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, and a total for each).
+  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each, and 48 KB per `public/data/timetable/` file).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow
