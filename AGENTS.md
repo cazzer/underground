@@ -210,7 +210,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     on a portrait free area (`landingAzimuth`, ground height ≥ 1.5× width: phones) turned just enough that the
     platforms (`stationAxis`, `InteriorModel.axis`) run within 25° of screen-vertical, decided once per flight;
     `orbitLimits.ts` azimuth cap by tilt, short-way spring to north-up, soft pan radius, focus-point pivot;
-    `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`)
+    `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`); `turnMeter.ts` the
+    hint's max net turn (signed, wrapped steps); `reducedMotion.ts` `prefersReducedMotion()`, one live query shared by
+    the camera, live and line code
   - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
     `stationSearch.ts` ranks stations for a query (exact, prefix, typo-tolerant; a number only prefix-matches as the
     last word and never with an explicit ordinal, so "14 st" and "14th" skip 145 St; half-typed long forms and ordinals
