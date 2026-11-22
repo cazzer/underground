@@ -9,6 +9,7 @@ import { nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
+import type { AwaitingInterior } from '../lib/interiorReframe'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
 import { prefersReducedMotion } from '../lib/reducedMotion'
@@ -25,6 +26,7 @@ import {
   type MapControlsImpl,
 } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
+import { useInteriorReframe } from './useInteriorReframe'
 import { useStationOrbit } from './useStationOrbit'
 import { useTrainFollow } from './useTrainFollow'
 
@@ -68,8 +70,8 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
   const gesture = useRef(false)
   /** A gesture ended since the last frame: that frame restarts the wait too, however long frames take. */
   const gestureEnded = useRef(false)
-  /** Station a reduced-motion flight snapped to before its interior loaded; reframed once when it arrives. */
-  const snapped = useRef<string | null>(null)
+  /** A station flight that set off before its interior was known: reframed onto it after landing (useInteriorReframe). */
+  const awaiting = useRef<AwaitingInterior | null>(null)
 
   // Fit the whole city once; resizing later keeps the user's view.
   useLayoutEffect(() => {
@@ -101,7 +103,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       if (!c) throw new Error('Fly request before the map controls mounted')
       hold.current = null
       flushMotion(c, camera)
-      snapped.current = null
+      awaiting.current = null
       const l = latest.current
       const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
       flight.current = newFlight(dest, c, camera, prefersReducedMotion())
@@ -116,7 +118,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     flushMotion(c, camera)
     const reduced = prefersReducedMotion()
     const known = l.interior?.stationId === station.id ? l.interior : null
-    snapped.current = reduced && !known ? station.id : null
+    awaiting.current = known ? null : { stationId: station.id, reduced }
     const dest = known
       ? interiorFlight(known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
       : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
@@ -125,17 +127,11 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
 
   // The interior (first visit) or the panel's measurement (it grows as arrivals fill in) can land
   // mid-flight: retarget that flight's destination. It rebases on the camera's current pose and keeps
-  // the timing, so the camera doesn't jump. Focus reached by zooming has no flight, and the camera
-  // never moves on its own.
+  // the timing, so the camera doesn't jump. An interior that arrives late in the flight, or after it,
+  // is framed after landing (useInteriorReframe). Focus reached by zooming has no flight.
   useEffect(() => {
     const f = flight.current
     const c = controls.current
-    if (c && !f && interior && snapped.current === interior.stationId) {
-      // A reduced-motion flight already snapped to the bare station: snap once more onto the interior, no turn.
-      snapped.current = null
-      flight.current = newFlight(interiorFlight(interior, size, insets, panel, camera.fov, c.getAzimuthalAngle(), false), c, camera, true)
-      return
-    }
     if (!c || !f || f.stationId === null) return
     const station = network.stationById.get(f.stationId)
     if (!station) return
@@ -146,10 +142,13 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       dest = stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
     } else {
       const turn = retargetTurn(f.turnDecided, e0)
+      // Later: too late to fold in without a lurch; the flight lands as it is and the reframe takes over.
+      if (turn === 'later') return
       // Keep: frame for the azimuth already chosen (the landing turn, or the current one when there is none).
       dest = interiorFlight(interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide')
       if (turn === 'keep') dest.azimuth = f.azimuth
       f.turnDecided = true
+      awaiting.current = null
     }
     f.from.copy(c.target)
     f.fromDistance = camera.position.distanceTo(c.target)
@@ -167,7 +166,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       const c = controls.current
       if (!c) return
       hold.current = null
-      snapped.current = null
+      awaiting.current = null
       flushMotion(c, camera)
       flight.current = newFlight(dest, c, camera, prefersReducedMotion())
     },
@@ -189,6 +188,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     following: follow.active,
     holdAzimuth: follow.holdAzimuth,
   })
+  const landed = useInteriorReframe({ controls, camera, flight, awaiting, layout: latest, interior, focusedId, following: follow.active })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((state, delta) => {
@@ -215,6 +215,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       if (e >= 1) {
         flight.current = null
         flushMotion(c, camera)
+        landed()
       }
     } else if (hold.current && focusedId !== hold.current.stationId) {
       hold.current = null
@@ -259,7 +260,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       }
     }
     flight.current = null
-    snapped.current = null
+    awaiting.current = null
     gesture.current = true
     onGestureStart()
     follow.onGestureStart()

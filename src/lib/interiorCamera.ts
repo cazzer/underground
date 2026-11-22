@@ -75,20 +75,23 @@ export function freeCenterShift(
  */
 export const PORTRAIT_GROUND_RATIO = 1.5
 
-/** An interior arriving after this much of its flight (eased progress) lands without a turn. */
+/**
+ * An interior arriving after this much of its flight (eased progress) waits for the landing: retargeting then would
+ * squeeze its pan and turn into the flight's last instant, so the post-landing reframe (interiorReframe.ts) does both.
+ */
 export const LATE_TURN_PROGRESS = 0.9
 
 /** How a mid-flight retarget handles the landing turn. */
-export type RetargetTurn = 'keep' | 'decide' | 'none'
+export type RetargetTurn = 'keep' | 'decide' | 'later'
 
 /**
  * The landing turn on a retarget onto an interior, at eased progress `e0`: keep the turn already decided (once
- * per flight, so it can't stop halfway or whip), decide it now if the interior just arrived, or land without
- * one when it arrived after LATE_TURN_PROGRESS.
+ * per flight, so it can't stop halfway or whip), decide it now if the interior just arrived, or leave the flight on
+ * the bare station and frame the interior after landing, turn included, when it arrived after LATE_TURN_PROGRESS.
  */
 export function retargetTurn(decided: boolean, e0: number): RetargetTurn {
   if (decided) return 'keep'
-  return e0 <= LATE_TURN_PROGRESS ? 'decide' : 'none'
+  return e0 <= LATE_TURN_PROGRESS ? 'decide' : 'later'
 }
 
 /**
