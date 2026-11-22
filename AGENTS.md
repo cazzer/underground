@@ -168,13 +168,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     tilt or turn; the tubes are open so no end face crosses a joint, and two 2-instance cap meshes (`writeEndCaps`) close the train's two ends);
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
-    `cameraDistance.ts` helpers; `renderOrder.ts`
-  - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms (12
-    trains, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
+    `cameraDistance.ts` helpers; `renderOrder.ts` (also `strokeOrders` and `spanCarOrders`, the per-band and per-deck orders)
+  - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms, one layer
+    per platform deck (LiveTrains keeps three, splitting the spans with `deckSpans`; 12
+    trains each, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
     veil blends, so a copy at weight 0 renders exactly like its veiled street car. Along those platforms the map
     track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
-  - `StationInterior.tsx` the focused station's interior (two line layers on each side of the lifted-train split; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, level
+  - `StationInterior.tsx` the focused station's interior (two line layers per stroke band, up to four bands; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, level
     labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
   - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
@@ -286,7 +287,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trackProfile.ts` a shape's vertical profile (knots, `profileAt`, `resampleForProfile`) and
     `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
-    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`; `memberSpans` unions a complex's members per shape, the `interiorSpans` that SubwayLines, LineHighlight, usePlatformFade and LiveTrains take instead of a station id) and its
+    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`; `memberSpans` unions a complex's members per shape, the `interiorSpans` that SubwayLines, LineHighlight and usePlatformFade take instead of a station; `deckSpans` splits them by `PlatformSpan.stopId` per deck for LiveTrains id) and its
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
     adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
     `lineBreaks`, every extra vertex a drawn line needs (ramps via `rampSampling.ts`, band tapers every 30 m but only once the slot
@@ -331,7 +332,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     sit side by side across the axis in id order (an authored one off its entrance stays put; one listed
     by two entrances throws);
     `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;
-    `interiorSegments.ts` the shared segment writer; `interiorFixture.ts` the tests' mini interior;
+    `interiorSegments.ts` the shared segment writer (`SplitAtY` nests, one cut per deck roof); `interiorDecks.ts` the platform
+    decks (`interiorDecks`, deepest first, at most `MAX_DECKS` 3), `strokeBandOf`, `bandCutYs`, `trainRoofY`, `trackDecks`;
+    `interiorFixture.ts` the tests' mini interior;
     `interiorFraming.ts` bounds, focus anchor (plan center, toward-camera shift, half-extent), level
     labels (`levelHeightText`: authored levels "−4.3 m"; on a generated interior an `ee-rise` depth is signed to one
     decimal, "+" above the street, and any other is "≈ −9 m", signed whole meters), padded hull; `interiorFade.ts` per-level fade share by distance from the street level;
@@ -773,6 +776,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   you-are-here reticle 6.55, street-file entrance marks 7.6 (above the veil at 7, under the interior strokes),
   above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
+  at a multi-deck interior the band between decks 9.53 (fine) and 9.54 (strong) and the next deck's cars 9.55 to
+  9.565 (a third deck: 9.57 to 9.595; `strokeOrders`, `spanCarOrders`),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom), and the other members of its complex once the interior that covers them is loaded, draw no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
@@ -781,7 +786,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior) has depthTest false.
   The above-veil platform car bodies (9.5) test and write depth too: they copy their street cars' matrices, so
   they pass where those drew and a nearer street car stays in front. The selected outline shells (street and platform)
-  test depth but never write it.
+  test depth but never write it, and so do the platform car footprints of every deck above the deepest (9.55, 9.58).
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
@@ -831,7 +836,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   instance `slot * MAX_CARS + c`). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
 - The station interior is a group at `toGround(anchor)` with depths drawn ×2 × the depth factor (the group's
-  `scale.y`; x/z true and never rescaled, since dashes are object-space; labels give real depths). Merged `LineSegments2` (fine, then strong strokes, a pair on each side of the split below) are built from the deepest
+  `scale.y`; x/z true and never rescaled, since dashes are object-space; labels give real depths). Merged `LineSegments2` (fine, then strong strokes, a pair per stroke band below) are built from the deepest
   level up, so upper levels paint over lower ones; levels farther from the street (in level count; deeper, or
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
@@ -839,14 +844,22 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   layer, live trains included, in one draw call, at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
   level labels show by `labelOpacity` (gated between depth 0.35 and 0.65); the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
-  are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.4 to 9.5; not in look C),
-  and the levels above it draw over those trains at 9.6 (fine) and 9.7 (strong): `buildInteriorBuffers` splits at
-  `splitLevel` (`trainLevelIndex`, the deepest level with a platform track). That level and below stay at 8/9; a
-  level above it goes over; a stair, escalator or elevator shaft from it (or below) up to a level above it is cut
-  at the trains' roof (`trainRoofY`: rail ×yScale plus the car's floor and body height from `src/lib/carDims.ts`,
-  not exaggerated; `SplitAtY` in `interiorSegments.ts`), so a car in front of a stair foot hides it and the
-  stair above the roof draws over the car (an elevator's stop stays with its level). The cut is by height alone, so a
-  foot behind a car is hidden too. One platform level is assumed: with platform tracks on more than one level (Union Sq, 635) `trainLevelIndex` takes the shallowest deck, so each deck's trains draw above both decks' strokes and under the levels above (a stopgap: the upper deck should be in front of the deeper deck's trains, 2q7.28). At most four interior line layers; look C doesn't split. Every car within
+  are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.45 to 9.52; not in look C),
+  and the levels above it draw over those trains. A deck is a level with a platform track (`interiorDecks`, deepest
+  first); level i draws in stroke band `strokeBandOf(i, decks)`, the number of decks deeper than it, so band j is deck
+  j and the levels between it and the deck below, and deck j's lifted trains draw right after band j: band 0 at 8/9,
+  the top band (above the shallowest deck) at 9.6 (fine) and 9.7 (strong), the bands between decks in between
+  (`buildInteriorBuffers`' `decks`, the model's `mid` layers). A stair, escalator or elevator shaft rising from one
+  band to a later one is cut at each lower deck's train roof (`bandCutYs`, `trainRoofY`: rail ×yScale plus the car's
+  floor and body height from `src/lib/carDims.ts`, not exaggerated; nested `SplitAtY` in `interiorSegments.ts`), so a
+  car in front of a stair foot hides it and the stair above the roof draws over the car (an elevator's stop stays with
+  its level's band). The cut is by height alone, so a foot behind a car is hidden too. The lifted trains split by deck
+  the same way: each span carries its track's `stopId` (`ProfileRun.stopId`), the model's `trackDecks` maps it to its
+  deck and `deckSpans` (Scene) gives each deck's SpanCars layer its own spans; above deck 0 the footprints test depth,
+  so where decks cross on screen a farther deck's footprint never covers a nearer lifted car. At Union Sq (635) the L
+  draws over the Canarsie deck and under the Lexington and Broadway deck, whose trains draw under the mezzanine; every
+  other shipped interior has one deck and draws exactly as before. At most eight interior line layers (two per band);
+  look C doesn't split. Every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
   toward the background after shading by `veilTint` (veil opacity × veilWeight × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal

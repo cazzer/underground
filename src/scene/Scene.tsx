@@ -11,7 +11,7 @@ import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { createLabelBlockers } from '../lib/labelBlockers'
 import type { Network } from '../lib/network'
-import { memberSpans } from '../lib/platformSpan'
+import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
@@ -32,6 +32,8 @@ import { YouAreHere } from './YouAreHere'
 
 /** TEMPORARY `?basemap=off` (basemapLook.ts) draws no basemap and loads no tiles. */
 const basemapConfig = basemapLook === 'off' ? null : BASEMAP
+
+const NO_DECKS: ReadonlyMap<string, number> = new Map()
 
 interface SceneProps {
   network: Network
@@ -71,6 +73,11 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
     () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),
     [interior, network],
   )
+  /** The same spans split by the deck each track rides, so each deck's trains draw between its strokes and the next band's. */
+  const spansByDeck = useMemo(
+    () => deckSpans(interiorSpans, interior?.trackDecks ?? NO_DECKS, interior?.decks.length ?? 0),
+    [interiorSpans, interior],
+  )
   // The index says who shares the file; the model says who it draws. Their markers and ties go with the focused one's.
   const hiddenSiblings = useMemo(() => hiddenSiblingIds(siblings, interior), [siblings, interior])
   /** Written by the level labels each frame, read by the street labels: their screen rects. */
@@ -93,7 +100,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
-          <LiveTrains {...live} network={network} trainPick={trainPick} interiorSpans={interiorSpans} view={bandView} anchor={anchor} />
+          <LiveTrains {...live} network={network} trainPick={trainPick} deckSpans={spansByDeck} view={bandView} anchor={anchor} />
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}

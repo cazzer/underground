@@ -1,10 +1,13 @@
+import { useLayoutEffect } from 'react'
 import { theme } from '../theme'
 import { MAX_CARS } from '../lib/live/consist'
-import { RENDER_ORDER } from './renderOrder'
+import { spanCarOrders } from './renderOrder'
 import { SPAN_CARS, type SpanCarsLayer } from './useSpanCars'
 
 interface SpanCarsProps {
   layer: SpanCarsLayer
+  /** The platform deck these trains ride (interiorDecks.ts; 0 is the deepest, and a single-deck station's only one). */
+  deck: number
 }
 
 /**
@@ -21,47 +24,53 @@ interface SpanCarsProps {
  * Any car with weight above 0 also draws (with its footprint) above the platform-level strokes, so one crossing a car
  * inside the 40 m ramp hides until the weight reaches 0, then returns. Bedford Av's interior barely reaches past its
  * platform ends; an interior that extends past its platforms should check this.
+ * At a multi-deck interior each deck has its own layer, drawn right after its own stroke band (spanCarOrders). A
+ * deeper deck's lifted car can be nearer the camera than a shallower deck's where the decks cross on screen, so above
+ * deck 0 the footprints test depth too: a farther car's footprint can't cut a hole in a nearer lifted car.
  */
-export function SpanCars({ layer }: SpanCarsProps) {
+export function SpanCars({ layer, deck }: SpanCarsProps) {
+  const orders = spanCarOrders(deck)
+  // Before LiveTrains' own layout effect (a child's runs first), and again on a remount.
+  useLayoutEffect(() => layer.prepare(), [layer])
   return (
     <>
       <instancedMesh
         ref={layer.halos}
         args={[layer.geometry.halo, undefined, SPAN_CARS]}
         frustumCulled={false}
-        renderOrder={RENDER_ORDER.spanCarHalo}
+        renderOrder={orders.halo}
       >
-        <meshBasicMaterial color={theme.background} transparent depthTest={false} depthWrite={false} />
+        <meshBasicMaterial color={theme.background} transparent depthTest={deck > 0} depthWrite={false} />
       </instancedMesh>
       <instancedMesh
         ref={layer.bodies}
         args={[layer.geometry.body, layer.material.body, SPAN_CARS]}
         frustumCulled={false}
-        renderOrder={RENDER_ORDER.spanCars}
+        renderOrder={orders.body}
       />
       <instancedMesh
         ref={layer.rims}
         args={[layer.geometry.rim, layer.material.rim, MAX_CARS]}
         frustumCulled={false}
-        renderOrder={RENDER_ORDER.spanCarRim}
+        renderOrder={orders.rim}
       />
       <instancedMesh
         ref={layer.rimCaps}
         args={[layer.geometry.rimCap, layer.material.rim, 2]}
         frustumCulled={false}
-        renderOrder={RENDER_ORDER.spanCarRim}
+        renderOrder={orders.rim}
       />
       <instancedMesh
         ref={layer.gaps}
         args={[layer.geometry.gap, layer.material.gap, MAX_CARS]}
         frustumCulled={false}
-        renderOrder={RENDER_ORDER.spanCarGap}
+        renderOrder={orders.gap}
       />
       <instancedMesh
         ref={layer.gapCaps}
         args={[layer.geometry.gapCap, layer.material.gap, 2]}
         frustumCulled={false}
-        renderOrder={RENDER_ORDER.spanCarGap}
+        renderOrder={orders.gap}
       />
     </>
   )

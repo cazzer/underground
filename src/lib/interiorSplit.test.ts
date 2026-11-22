@@ -1,8 +1,9 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
 import type { Connector, StationInterior as Interior } from '../data/stationSchema'
 import { CAR_FLOOR_M, CAR_HEIGHT_M } from './carDims'
-import { buildInteriorBuffers, trainLevelIndex, trainRoofY, type Buffers } from './interiorGeometry'
+import { interiorDecks } from './interiorDecks'
+import { buildInteriorBuffers, trainRoofY, type Buffers } from './interiorGeometry'
 import { color, count, ELEVATOR, fixture, opts, ROLES, seg, STAIR } from './interiorFixture'
 import { SegmentWriter, SplitAtY } from './interiorSegments'
 
@@ -55,50 +56,13 @@ describe('SplitAtY', () => {
   })
 })
 
-describe('trainLevelIndex', () => {
-  it('is the level of a single platform deck', () => {
-    expect(trainLevelIndex(fixture())).toBe(2)
-  })
-
-  it('is the shallowest deck when platform tracks are on more than one level, warning once', () => {
-    const twoDecks = fixture()
-    twoDecks.platforms.push({ ...twoDecks.platforms[0]!, id: 'P2', level: 'mezz' })
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(twoDecks.levels.findIndex((l) => l.id === 'mezz')).toBe(1)
-    expect(trainLevelIndex(twoDecks)).toBe(1)
-    expect(trainLevelIndex(twoDecks)).toBe(1)
-    expect(warn).toHaveBeenCalledTimes(1)
-    expect(warn.mock.calls[0]![0]).toContain('both decks')
-    warn.mockRestore()
-  })
-
-  it('gives every shipped interior its shallowest platform track level (its only one when single-deck)', () => {
-    const dir = new URL('../../public/data/stations/', import.meta.url)
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    let checked = 0
-    for (const f of readdirSync(dir)) {
-      if (f === 'index.json' || !f.endsWith('.json')) continue
-      const shipped = JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as Interior
-      const trackLevels = shipped.levels.flatMap((l, i) =>
-        shipped.platforms.some((p) => p.level === l.id && p.tracks.length > 0) ? [i] : [])
-      expect(trainLevelIndex(shipped), shipped.stationId).toBe(trackLevels[0])
-      checked++
-    }
-    warn.mockRestore()
-    expect(checked).toBeGreaterThan(200)
-  })
-
-  it('is undefined when no platform has a track', () => {
-    const base = fixture()
-    expect(trainLevelIndex({ ...base, platforms: [{ ...base.platforms[0]!, tracks: [] }] })).toBeUndefined()
-  })
-})
-
-describe('buildInteriorBuffers with splitLevel', () => {
+describe('buildInteriorBuffers with one deck', () => {
   const whole = buildInteriorBuffers(fixture(), opts())
-  const split = buildInteriorBuffers(fixture(), opts({ splitLevel: 2 }))
+  const split = buildInteriorBuffers(fixture(), opts({ decks: [2] }))
 
   it('without a split, draws everything in the base layers', () => {
+    expect(whole.mid).toEqual([])
+    expect(split.mid).toEqual([])
     expect(count(whole.overStrong)).toBe(0)
     expect(count(whole.overFine)).toBe(0)
   })
@@ -129,7 +93,7 @@ describe('buildInteriorBuffers with splitLevel', () => {
   })
 
   it('writes dash distances in all four layers: the platform outline dashes below, the slab and its guides over', () => {
-    const dashed = buildInteriorBuffers(fixture(), opts({ splitLevel: 2, dashStructure: true }))
+    const dashed = buildInteriorBuffers(fixture(), opts({ decks: [2], dashStructure: true }))
     for (const b of [dashed.strong, dashed.fine, dashed.overStrong, dashed.overFine]) {
       expect(b.distances.length).toBe(count(b) * 2)
     }
@@ -151,7 +115,7 @@ describe('a platform stair and escalator through the split', () => {
   })
   const interior = fixture([STAIR, ELEVATOR, up(STAIR, 'ST2', 'stair'), { ...up(STAIR, 'ES1', 'escalator'), travel: 'up' }])
   const whole = buildInteriorBuffers(interior, opts())
-  const out = buildInteriorBuffers(interior, opts({ splitLevel: 2 }))
+  const out = buildInteriorBuffers(interior, opts({ decks: [2] }))
   const roof = trainRoofY({ y: -8 }, 1.1, 2)
 
   it.each(['stair', 'escalator'])('draws the %s\'s foot, up to the roof, under the trains and the rest over', (role) => {
@@ -173,11 +137,12 @@ describe('a platform stair and escalator through the split', () => {
 describe('L08 (Bedford Av) split at its platform', () => {
   const read = (path: string) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')) as Interior
   const l08 = read('../../public/data/stations/L08.json')
-  const platform = trainLevelIndex(l08)
-  const out = buildInteriorBuffers(l08, opts({ splitLevel: platform }))
+  const decks = interiorDecks(l08)
+  const out = buildInteriorBuffers(l08, opts({ decks }))
 
   it('splits at the platform, the deepest level', () => {
-    expect(platform).toBe(2)
+    expect(decks).toEqual([2])
+    expect(out.mid).toEqual([])
     expect(l08.levels[2]!.kind).toBe('platform')
   })
 
