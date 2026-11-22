@@ -46,3 +46,13 @@ export function isStreet(way: WayTags, closed: boolean): boolean {
     way.name !== null && searchTokens(way.name).length > 0 && ROADWAY_HIGHWAYS.has(way.highway) && !isArea(way, closed)
   )
 }
+
+/** The name reduced to what makes streets the same street: "N 7th St" and "North 7th Street" share a key.
+ *  It reuses the station-search synonym table (src/lib/searchText.ts), so a change to search spellings changes join
+ *  keys too: rerun the street build and read its diff after touching that table. The entrance join (scripts/) and
+ *  the client's street labels (streetRuns.ts) both key streets by it. */
+export function streetKey(name: string): string {
+  return searchTokens(name)
+    .map((t) => t.canon)
+    .join(' ')
+}

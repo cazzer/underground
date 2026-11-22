@@ -161,7 +161,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
   - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
-    with the reveal and goes with the focus); keyed by station; `streetsLook.ts` TEMPORARY draw-order switch
+    with the reveal and goes with the focus); keyed by station; `streetsLook.ts` TEMPORARY draw-order switch. It also
+    draws a fine `theme.interiorEntrance` 2.5 m square at each street-file entrance the interior doesn't draw itself
+    (`src/lib/entranceMarks.ts`: no interior entrance within 1.5 m on the scene ground with the same type; none while
+    an interior is still loading), and calls `useStreetLabels.ts`: aria-hidden DOM divs in the canvas container like the
+    level labels (z-index 0, same halo `LABEL_HALO`), entrances first (`entranceLabel`, normal case, `text-ink`, one of
+    four spots 6 px off the mark), then streets longest first (the level labels' style, turned along the street on
+    screen, on the run with the most on-screen points within 150 m on a phone / 250 m on a desktop, from that
+    stretch's middle outward). Sized once after mount and again after `document.fonts.ready`; placed
+    (`streetLabelPlacement.ts`, then `labelDeclutter.ts`) only on a frame where the camera, canvas, insets, panel or
+    opacity changed, kept clear of the header, footer and panel (+8 px), last frame's spot tried first; opacity
+    `streetLabelOpacity` (the level labels' depth gate)
 - `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
@@ -471,8 +481,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   checks its outer shape; a 404 is null with one warning (cached for the session), other failures reject (evicted,
   retried on the next focus). `useStationStreets.ts` loads the focused station's file on focus only (never at
   startup) into a cached `StreetLayer`: `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways
-  (`src/lib/streetClass.ts`), decimeters to meters, mixing to the background over the last 70 m of `radiusM` (`edgeFade`;
-  segments are split at the ramp's ends). `fetchJson` throws `HttpError` (with `status`) on a non-OK response
+  (`src/lib/streetClass.ts`, which also holds `streetKey`, shared with the entrance join), decimeters to meters,
+  mixing to the background over the last 70 m of `radiusM` (`edgeFade`; segments are split at the ramp's ends), plus
+  the label sources: `src/lib/streetRuns.ts` (`streetLabelSources`: street ways grouped by `streetKey`, chained into
+  runs at shared end nodes while the street turns under 60°, so a dual carriageway is two runs of one label;
+  candidates every 40 m) and `src/lib/streetName.ts` (`abbreviateStreet`, MTA style "W 96 St"; `entranceLabel`,
+  street first: "Bedford Av & N 7 St · NE corner", "Broadway median at W 95 St", " · elevator", " · exit only").
+  `src/lib/labelGeometry.ts` (oriented screen boxes, separating-axis overlap) and `labelDeclutter.ts` (greedy, by
+  priority, sticky) are pure and allocation-free; `streetLabelReveal.ts` the labels' opacity and radius. `fetchJson` throws `HttpError` (with `status`) on a non-OK response
 - `src/data/schema.ts`: types of the six `public/data/*.json` files (`Station` carries `borough`, `ada`,
   and `adaPartial` on the 8 partial stations, from 39hk-dx4f via `scripts/lib/stationAccess.ts`); `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
@@ -653,7 +669,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55, above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
+  you-are-here reticle 6.55, street-file entrance marks 7.6 (above the veil at 7, under the interior strokes),
+  above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom), and the other members of its complex once the interior that covers them is loaded, draw no marker and no
   station tie: its panel and interior mark it, and it stays pickable.

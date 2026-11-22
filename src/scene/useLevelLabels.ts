@@ -3,8 +3,9 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { Vector3, type Group } from 'three'
 import type { LevelLabel } from '../lib/interiorFraming'
 
-const HALO = '[text-shadow:0_0_2px_var(--ug-bg),0_0_2px_var(--ug-bg),0_0_5px_var(--ug-bg)]'
-const CLASS = `pointer-events-none absolute top-0 left-0 -translate-x-1/2 font-mono text-[10px] whitespace-nowrap text-ink-dim uppercase tracking-widest ${HALO}`
+/** A background-colored halo instead of a filled chip, so strokes show through; the street labels share it. */
+export const LABEL_HALO = '[text-shadow:0_0_2px_var(--ug-bg),0_0_2px_var(--ug-bg),0_0_5px_var(--ug-bg)]'
+const CLASS = `pointer-events-none absolute top-0 left-0 -translate-x-1/2 font-mono text-[10px] whitespace-nowrap text-ink-dim uppercase tracking-widest ${LABEL_HALO}`
 const EPS = 0.01
 
 const world = new Vector3()

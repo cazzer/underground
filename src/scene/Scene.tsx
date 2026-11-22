@@ -90,7 +90,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
-      <StationStreets />
+      <StationStreets interior={interior} interiorPending={!interior && !focusedMarker} insets={insets} panel={panel} />
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
       {basemapProbe && <BasemapProbe config={basemapProbe} />}

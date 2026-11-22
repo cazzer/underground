@@ -44,6 +44,9 @@ export const RENDER_ORDER = {
   interiorVeil: 7,
   // TEMPORARY (?streets=over, streetsLook.ts): the streets above the interior veil, under the interior strokes.
   streetsOver: 7.5,
+  // The street file's entrance marks the interior doesn't draw itself: above the veil like the interior's own
+  // entrance squares, under its strokes.
+  streetEntrance: 7.6,
   interiorFine: 8,
   interior: 9,
   // Trains on a revealed station's platforms, redrawn above the veil and those strokes: footprints, bodies

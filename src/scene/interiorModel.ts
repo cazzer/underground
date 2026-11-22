@@ -36,6 +36,8 @@ export interface InteriorModel {
   /** Look B's cutaway outline (group-local), or null. */
   hull: LocalPoint[] | null
   yScale: number
+  /** The street entrances it draws, group-local: the street layer skips its own mark for these (entranceMarks.ts). */
+  entrances: { x: number; z: number; type: string }[]
 }
 
 const ROLE_TOKEN: Record<InteriorRole, string> = {
@@ -161,5 +163,6 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     axis: stationAxis(interior),
     hull,
     yScale,
+    entrances: interior.entrances.map(({ x, z, type }) => ({ x, z, type })),
   }
 }

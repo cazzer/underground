@@ -1,19 +1,54 @@
 import { useEffect, useState } from 'react'
 import { Color } from 'three'
+import { entranceLocal } from '../lib/entranceMarks'
 import type { LineBuffers, Rgb } from '../lib/lineBuffers'
 import { toGround, type Ground } from '../lib/projection'
 import { streetBuffers } from '../lib/streetBuffers'
+import { entranceLabel } from '../lib/streetName'
+import { streetLabelSources, type StreetLabelSource } from '../lib/streetRuns'
 import { theme } from '../theme'
 import { createInteriorCache } from './interiorCache'
 import { loadStationStreets } from './loadStationStreets'
+import type { StationStreets } from './streetSchema'
 
 const BASE_URL = import.meta.env.BASE_URL
 
-/** One station's streets, ready to draw: line buffers in meters from `anchor` (its scene ground point). */
+/** A labelled entrance: meters from the layer's anchor, and its text (`entranceLabel`). */
+export interface EntranceLabelSource {
+  x: number
+  z: number
+  text: string
+}
+
+/** One station's streets, ready to draw: line buffers in meters from `anchor` (its scene ground point), the street
+ *  and entrance labels' sources, and the file itself (its entrances' marks depend on the interior, drawn later). */
 export interface StreetLayer {
   stationId: string
   anchor: Ground
   buffers: LineBuffers
+  file: StationStreets
+  streets: StreetLabelSource[]
+  entrances: EntranceLabelSource[]
+}
+
+function entranceLabels(file: StationStreets): EntranceLabelSource[] {
+  const out: EntranceLabelSource[] = []
+  file.entrances.forEach((e, i) => {
+    const text = entranceLabel(e)
+    if (text !== null) out.push({ ...entranceLocal(file, i), text })
+  })
+  return out
+}
+
+function buildLayer(id: string, file: StationStreets): StreetLayer {
+  return {
+    stationId: id,
+    anchor: toGround(file.anchor),
+    buffers: streetBuffers(file, STREET_RGB, BACKGROUND_RGB),
+    file,
+    streets: streetLabelSources(file),
+    entrances: entranceLabels(file),
+  }
 }
 
 // Color(hex) converts sRGB to linear, which is what vertex colors must be.
@@ -27,10 +62,7 @@ const BACKGROUND_RGB: Rgb = [BACKGROUND.r, BACKGROUND.g, BACKGROUND.b]
  * evicted, so the next focus retries). A station with no street file resolves to null, which stays cached.
  */
 const cache = createInteriorCache((id) =>
-  loadStationStreets(BASE_URL, id).then(
-    (file): StreetLayer | null =>
-      file && { stationId: id, anchor: toGround(file.anchor), buffers: streetBuffers(file, STREET_RGB, BACKGROUND_RGB) },
-  ),
+  loadStationStreets(BASE_URL, id).then((file): StreetLayer | null => file && buildLayer(id, file)),
 )
 
 /**
