@@ -30,6 +30,8 @@ const E120: Offset[] = [[-72.3, 93.7], [-63.8, 77.6], [-43.1, 109.7], [-34.6, 93
 const PHONE: Viewport = { width: 390, height: 844 }
 /** Measured on the app at 127 and 120 with live arrivals: six rows and the entrances row top out at 265 px. */
 const PHONE_LIVE: ScreenRect = { left: 0, top: 60, right: 390, bottom: 249.5 }
+/** Looking from 127's sibling 725 (27 m north-west): the camera sits on that side of the station. */
+const TOWARD_725 = -2.47
 /** The same phone with a three-row panel. */
 const PHONE_SHORT: ScreenRect = { left: 0, top: 60, right: 390, bottom: 430 }
 /** Measured with no live data: the panel holds one line. */
@@ -110,10 +112,10 @@ describe('bareStationFrame above a three-row phone panel', () => {
     // name, entrances, azimuth, entrances shown
     ['120', E120, 0, 5],
     ['120', E120, 0.6, 6],
-    ['120', E120, -2.47, 6],
+    ['120', E120, TOWARD_725, 6],
     ['127', E127, 0, 11],
     ['127', E127, 0.6, 11],
-    ['127', E127, -2.47, 11],
+    ['127', E127, TOWARD_725, 11],
   ]
   for (const [name, marks, azimuth, shown] of cases) {
     it(`shows the station and ${shown} of ${name}'s entrances at azimuth ${azimuth}, none it could have`, () => {
@@ -140,8 +142,8 @@ describe('bareStationFrame above a three-row phone panel', () => {
 
 describe('bareStationFrame above the live six-row phone panel', () => {
   // The 190 px strip (six arrival rows: the uncapped panel) leaves no target within PAN_RADIUS_BARE that keeps even
-  // the station inside it (the plain landing's is 138 m off), so the station alone is framed with the target up to
-  // 120 m off: inside the strip, 1 px short of the 12 px pad.
+  // the station inside it (the plain landing's is 138 m off), nor one within 120 m at the 12 px pad (1 px short), so
+  // these hit the last clamp: the plain landing pulled within 120 m, the station inside the strip but in the pad.
   for (const [name, marks] of [['127', E127], ['120', E120]] as const) {
     it(`keeps ${name}'s station in the free rect with the target within ${STATION_ONLY_RADIUS_M} m`, () => {
       const i = input(marks.map(at), PHONE_LIVE, 0)
@@ -154,6 +156,17 @@ describe('bareStationFrame above the live six-row phone panel', () => {
       expect(inside(STATION, i, f)).toBe(true)
     })
   }
+
+  it('frames the station alone within 120 m, at the pad, when 100 m is not enough', () => {
+    const strip: ScreenRect = { left: 0, top: 60, right: 390, bottom: 262 }
+    const i = input(E127.map(at), strip, 0)
+    expect(fitsAnywhere(i, [])).toBe(false)
+    expect(fitsAnywhere(i, [], STATION_ONLY_RADIUS_M)).toBe(true)
+    const f = bareStationFrame(i)
+    expect(gap(f.target, STATION)).toBeGreaterThan(PAN_RADIUS_BARE)
+    expect(gap(f.target, STATION)).toBeLessThanOrEqual(STATION_ONLY_RADIUS_M)
+    expect(inside(STATION, i, f, PAD)).toBe(true)
+  })
 
   it('pulls the plain landing within 120 m when not even that frames the station', () => {
     const strip: ScreenRect = { left: 0, top: 60, right: 390, bottom: 150 }

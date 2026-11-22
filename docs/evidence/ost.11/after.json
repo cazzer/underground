@@ -4,19 +4,19 @@
     "reduced": false,
     "station": "127",
     "distance": 400,
-    "offset": 98.1,
+    "offset": 98.7,
     "inside": "9/11",
-    "minMarginPx": -67.7,
+    "minMarginPx": -83.3,
     "stationPx": {
-      "x": 203,
-      "y": 264
+      "x": 118,
+      "y": 269
     },
-    "stationMarginPx": 94.4,
+    "stationMarginPx": 68.9,
     "free": {
       "left": 0,
       "top": 60,
       "right": 390,
-      "bottom": 358.5
+      "bottom": 337.5
     },
     "focusedAfter": "127"
   },
@@ -27,17 +27,17 @@
     "distance": 400,
     "offset": 98.1,
     "inside": "2/6",
-    "minMarginPx": -68.5,
+    "minMarginPx": -107.5,
     "stationPx": {
       "x": 195,
       "y": 264
     },
-    "stationMarginPx": 112.4,
+    "stationMarginPx": 73.4,
     "free": {
       "left": 0,
       "top": 60,
       "right": 390,
-      "bottom": 376.5
+      "bottom": 337.5
     },
     "focusedAfter": "120"
   },
@@ -47,18 +47,18 @@
     "station": "127",
     "distance": 400,
     "offset": 98.1,
-    "inside": "9/11",
+    "inside": "8/11",
     "minMarginPx": -67.7,
     "stationPx": {
       "x": 203,
       "y": 264
     },
-    "stationMarginPx": 94.4,
+    "stationMarginPx": 73.4,
     "free": {
       "left": 0,
       "top": 60,
       "right": 390,
-      "bottom": 358.5
+      "bottom": 337.5
     },
     "focusedAfter": "127"
   },
@@ -110,19 +110,19 @@
     "deepLink": true,
     "station": "127",
     "distance": 400,
-    "offset": 98.1,
+    "offset": 98.7,
     "inside": "9/11",
-    "minMarginPx": -67.7,
+    "minMarginPx": -83.3,
     "stationPx": {
-      "x": 203,
-      "y": 264
+      "x": 118,
+      "y": 269
     },
-    "stationMarginPx": 94.4,
+    "stationMarginPx": 68.9,
     "free": {
       "left": 0,
       "top": 60,
       "right": 390,
-      "bottom": 358.5
+      "bottom": 337.5
     }
   }
 ]
