@@ -8,7 +8,7 @@
     "lon": -73.9902
   },
   "license": "ODbL-1.0",
-  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata, and level heights whose depthSource is ee-rise, contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
   "levels": [
     {"id":"street","name":"Street","kind":"street","y":0},
     {"id":"mezzanine","name":"Mezzanine","kind":"mezzanine","y":-3.82,"depthSource":"ee-rise"},

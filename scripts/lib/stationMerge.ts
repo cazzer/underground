@@ -21,8 +21,9 @@ const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
   nyopendata: MTA_CREDIT,
 }
 
-/** Appended after the MTA credit: the nyopendata elements are not ODbL (user's licensing decision, card 9wc.1.1 option A). */
-export const OPEN_NY_NOTE = 'Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
+/** Appended after the MTA credit: the nyopendata elements, and level heights derived from E&E rises, are not ODbL (user's licensing decisions, cards 9wc.1.1 option A and 2q7.29.1 option A). */
+export const OPEN_NY_NOTE =
+  'Elements whose sources include nyopendata, and level heights whose depthSource is ee-rise, contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
 
 /** The street files' counterpart of OPEN_NY_NOTE: their entrance points are MTA data, the rest of the file is OSM. */
 export const ENTRANCES_OPEN_NY_NOTE = 'Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'

@@ -1009,8 +1009,8 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   same holds for an E&E machine's `entrance` override (one of its two levels must be the street). The merge
   requires every entrance to have a connector and lists each connector under at most one entrance.
 - Every element has `sources` (`osm`, `nyopendata`, `authored`, `generated`). The file is marked ODbL 1.0 and
-  carries `attribution`. Licensing is split: OSM-derived parts are ODbL, `nyopendata` elements are MTA data under
-  the OPEN-NY Terms of Use, and `attribution` says so (`OPEN_NY_NOTE` in `stationMerge.ts`).
+  carries `attribution`. Licensing is split: OSM-derived parts are ODbL, `nyopendata` elements, and level heights whose
+  `depthSource` is `ee-rise`, are MTA data under the OPEN-NY Terms of Use, and `attribution` says so (`OPEN_NY_NOTE` in `stationMerge.ts`).
 - An authored interior may set `approximate: true` (whole file) and `approximate: true` on slabs (a rough trace): the
   panel says "Estimated layout" for the file flag, and an approximate slab's outline and guides draw dashed (platforms
   stay solid; the layer material is dashed when any slab is). An authored non-street level may carry `depthSource`,
