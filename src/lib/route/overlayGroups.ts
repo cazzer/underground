@@ -19,6 +19,7 @@ export interface Group {
   stops: Int32Array
   stopIds: StopId[]
   direction: Direction
+  /** Routes of the scheduled trips; never grows with the overlay's own trips. */
   routes: Set<RouteId>
   /** The scheduled trips; `arr` and `dep` are views of their lane. */
   rows: Row[]

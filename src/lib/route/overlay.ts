@@ -4,19 +4,24 @@
  * are added with predicted times (scheduled run times after the last prediction when the feed's horizon cut it
  * off). A trip that fits no scheduled stop sequence gets a pattern of its own. A stale or failing feed keeps its
  * schedule. Pure; feed data never throws (the caller falls back to the schedule on a programmer error).
+ *
+ * Queries should be at the live clock or later: stops a realtime trip has passed are pinned to one second before
+ * `nowS`, so they cannot be boarded, and an earlier query would see them as late. Trips are matched by route and
+ * first departure, not by feed, so a trip of a stale feed's route that arrives in a healthy feed (`offFeed`) still
+ * replaces its twin: intentional, its prediction is the better data.
  */
-import { parseTripId } from '../../data/codec'
+import { parseTripId, type ParsedTripId } from '../../data/codec'
 import { ARRIVAL_HORIZON_S, FEED_IDS, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import type { Direction, RouteId } from '../../data/schema'
 import { SNAPSHOT_MAX_AGE_S } from '../live/clock'
 import { ROUTE_FEED } from '../live/feedHealth'
 import { ghostReason } from '../realtime/filters'
-import { joinTrip, matchScheduled } from '../realtime/joinTrip'
+import { joinTrip, matchScheduled, type ScheduledMatch } from '../realtime/joinTrip'
 import { serviceDayStart } from '../realtime/serviceDate'
 import type { TripLookup } from '../realtime/tripLookup'
 import { buildTimetable } from './patterns'
 import { assignTwins, type TwinQuery } from './overlayMatch'
-import { ONE_OFF_PREFIX, groupPatterns, oneOffGroup, oneOffKey, rebuildPatterns, type Group } from './overlayGroups'
+import { ONE_OFF_PREFIX, groupPatterns, oneOffGroup, oneOffKey, rebuildPatterns, type Group, type Row } from './overlayGroups'
 import { findRun, nearestRow, predictedRun, rowOnPattern, type PredictedRun } from './overlayRows'
 import type { Timetable } from './types'
 
@@ -61,6 +66,9 @@ interface Pending {
   feed: FeedId
   trip: RealtimeTrip
   run: PredictedRun
+  p: ParsedTripId | null
+  /** The first scheduled key the trip id hits (`matchScheduled`), computed once. */
+  match: ScheduledMatch | null
 }
 
 const emptyCounts = (): OverlayCounts => ({
@@ -87,7 +95,49 @@ function beats(a: Group, aExact: number, b: Group, bExact: number): boolean {
   return a.key < b.key
 }
 
-const directionOfStop =(id: string): Direction => (id.endsWith('S') ? 'S' : 'N')
+const directionOfStop = (id: string): Direction => (id.endsWith('S') ? 'S' : 'N')
+
+interface HostChoice {
+  group: Group
+  /** Where the run starts in the group's stops. */
+  at: number
+  /** A scheduled row of the group to take run times from; never boarded, so it may be removed. */
+  ref: Row
+}
+
+/**
+ * The stop sequences a trip can sit on, best first: its twin's when it holds the run (the ref is the twin), then
+ * the other scheduled sequences of its direction that hold it and have a scheduled trip on the trip's route or
+ * its join's. Reroutes never host, and nor does what this overlay added (`group.routes` is only the schedule's).
+ */
+function hostsFor(
+  groups: ReadonlyMap<string, Group>,
+  stopIds: readonly string[],
+  run: PredictedRun,
+  twin: Row | null,
+  tripRoute: RouteId,
+  joinPattern: { routeId: RouteId; stops: readonly string[] } | undefined,
+  refFor: (group: Group, at: number) => Row | null,
+): HostChoice[] {
+  const out: HostChoice[] = []
+  const twinAt = twin ? findRun(twin.group.stops, run.stops) : -1
+  if (twin && twinAt >= 0) out.push({ group: twin.group, at: twinAt, ref: twin })
+  const routes = new Set([tripRoute, ...(joinPattern ? [joinPattern.routeId] : [])])
+  const direction = directionOfStop(stopIds[run.stops[0]!]!)
+  const found: { group: Group; at: number; exact: number }[] = []
+  for (const group of groups.values()) {
+    if (group.key.startsWith(ONE_OFF_PREFIX) || group.direction !== direction || group === twin?.group) continue
+    if (![...routes].some((r) => group.routes.has(r))) continue
+    const at = findRun(group.stops, run.stops)
+    if (at >= 0) found.push({ group, at, exact: sameStops(group.stopIds, joinPattern?.stops) ? 0 : 1 })
+  }
+  found.sort((a, b) => (beats(a.group, a.exact, b.group, b.exact) ? -1 : beats(b.group, b.exact, a.group, a.exact) ? 1 : 0))
+  for (const { group, at } of found) {
+    const ref = refFor(group, at)
+    if (ref) out.push({ group, at, ref })
+  }
+  return out
+}
 
 export function overlayRealtime(scheduled: Timetable, input: OverlayInput): OverlayResult {
   const { snapshot, nowS, day, lookup } = input
@@ -124,13 +174,12 @@ export function overlayRealtime(scheduled: Timetable, input: OverlayInput): Over
         counts.skipped.noKnownStop += 1
         continue
       }
-      pending.push({ feed, trip, run })
+      const p = parseTripId(trip.tripId)
+      pending.push({ feed, trip, run, p, match: p && matchScheduled(trip, p, lookup, nowS) })
     }
   }
 
-  const queries = pending.map(({ trip, run }): TwinQuery | null => {
-    const p = parseTripId(trip.tripId)
-    const m = p && matchScheduled(trip, p, lookup, nowS)
+  const queries = pending.map(({ trip, run, p, match: m }): TwinQuery | null => {
     if (!p || !m) return null
     const routes = new Set<RouteId>()
     for (const s of m.shapes) {
@@ -171,41 +220,16 @@ export function overlayRealtime(scheduled: Timetable, input: OverlayInput): Over
     const routeId = twin?.routeId ?? joinPattern?.routeId ?? trip.route
     const times = run.times
 
-    // The twin's own stop sequence when it holds the run, else the best scheduled sequence that does.
-    let host: Group | null = null
-    let j0 = -1
-    if (twin && findRun(twin.group.stops, run.stops) >= 0) {
-      host = twin.group
-      j0 = findRun(host.stops, run.stops)
-    } else {
-      const routes = new Set([trip.route, ...(joinPattern ? [joinPattern.routeId] : [])])
-      const direction = directionOfStop(index.stopIds[run.stops[0]!]!)
-      let best: { group: Group; at: number; exact: number } | null = null
-      for (const group of groups.values()) {
-        if (group.key.startsWith(ONE_OFF_PREFIX) || group.direction !== direction) continue
-        if (![...routes].some((r) => group.routes.has(r))) continue
-        const at = findRun(group.stops, run.stops)
-        if (at < 0) continue
-        const exact = sameStops(group.stopIds, joinPattern?.stops) ? 0 : 1
-        if (!best || beats(group, exact, best.group, best.exact)) best = { group, at, exact }
-      }
-      if (best) {
-        host = best.group
-        j0 = best.at
-      }
-    }
-    if (host) {
-      const ref = twin && twin.group === host ? twin : nearestRow(host.rows, j0, times[0]!)
-      const placed = ref && rowOnPattern(host.stops.length, j0, run, ref, bounds)
-      if (placed) {
-        host.added.push({ id, routeId, arr: placed.arr, dep: placed.dep, live: true })
-        host.changed = true
-        host.routes.add(routeId)
-        if (ref === twin) counts.onTwin += 1
-        else counts.onHost += 1
-        if (placed.extended) counts.extended += 1
-        return
-      }
+    const hosts = hostsFor(groups, index.stopIds, run, twin, trip.route, joinPattern, (g, at) => nearestRow(g.rows, at, times[0]!))
+    for (const { group, at, ref } of hosts) {
+      const placed = rowOnPattern(group.stops.length, at, run, ref, bounds)
+      if (!placed) continue
+      group.added.push({ id, routeId, arr: placed.arr, dep: placed.dep, live: true })
+      group.changed = true
+      if (ref === twin) counts.onTwin += 1
+      else counts.onHost += 1
+      if (placed.extended) counts.extended += 1
+      return
     }
 
     if (run.stops.length < 2) {
@@ -220,7 +244,6 @@ export function overlayRealtime(scheduled: Timetable, input: OverlayInput): Over
       groups.set(key, group)
     }
     group.added.push({ id, routeId, arr: times, dep: times, live: true })
-    group.routes.add(routeId)
     group.changed = true
     counts.oneOff += 1
   })

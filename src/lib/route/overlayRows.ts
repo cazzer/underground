@@ -56,12 +56,11 @@ export function findRun(stops: Int32Array, run: Int32Array): number {
   return -1
 }
 
-/** The unremoved row whose arrival at position `j0` is nearest `t0`; the first of equals. */
+/** The row whose arrival at position `j0` is nearest `t0`, removed or not (it only lends run times); the first of equals. */
 export function nearestRow(rows: readonly Row[], j0: number, t0: number): Row | null {
   let best: Row | null = null
   let bestGap = Infinity
   for (const row of rows) {
-    if (row.removed) continue
     const gap = Math.abs(row.arr[j0]! - t0)
     if (gap < bestGap) {
       best = row
@@ -105,6 +104,7 @@ export function rowOnPattern(
   const dep = new Int32Array(n)
 
   const shift0 = t[0]! - ref.arr[j0]!
+  // `ref` is monotone, so the `t[0]` cap changes nothing today; it keeps the row valid if a ref ever is not.
   const passed = Math.min(bounds.nowDay - 1, t[0]!)
   for (let i = 0; i < j0; i++) {
     arr[i] = Math.min(ref.arr[i]! + shift0, passed)

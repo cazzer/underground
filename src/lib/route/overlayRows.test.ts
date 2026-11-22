@@ -40,11 +40,12 @@ describe('findRun', () => {
 
 describe('nearestRow', () => {
   const mk = (id: string, t: number, removed = false) => ({ id, arr: [0, t], dep: [0, t], removed }) as unknown as Row
-  it('takes the nearest unremoved row, the first of equals', () => {
+  it('takes the nearest row, removed or not, the first of equals', () => {
     const rows = [mk('a', 100), mk('b', 190, true), mk('c', 200), mk('d', 300)]
-    expect(nearestRow(rows, 1, 195)?.id).toBe('c')
+    expect(nearestRow(rows, 1, 195)?.id).toBe('b')
     expect(nearestRow(rows, 1, 250)?.id).toBe('c')
-    expect(nearestRow([mk('x', 1, true)], 1, 0)).toBeNull()
+    expect(nearestRow([mk('x', 1, true)], 1, 0)?.id).toBe('x')
+    expect(nearestRow([], 1, 0)).toBeNull()
   })
 })
 
