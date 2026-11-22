@@ -9,7 +9,8 @@
  *  the regular zip only: 6,958 of the supplemented feed's trips have no shape_id. The supplemented zip (the next
  *  seven days with planned work applied) feeds only public/data/timetable/dated/ (see src/data/timetableSchema.ts).
  *  A failed supplemented download or build fails the whole run (the refresh then opens no PR that day), and the
- *  dated files age out: outside the window the client uses the per-service files, which are exact there.
+ *  dated files age out: on a date with no dated file the client uses the per-service files, which are exact there.
+ *  A date gets a file when the supplemented feed runs different trips on it than the regular feed (see lib/datedTimetable.ts).
  *
  *  Borough and ADA status per station come from the pinned data/stations/catalog/stations.json
  *  (39hk-dx4f; refresh it with `npm run data:catalog:fetch`, then run the offline `npm run data:access`)
@@ -45,7 +46,7 @@ import {
   renderedFile,
   type RenderedFile,
 } from './lib/budget.ts'
-import { buildDatedTimetables } from './lib/datedTimetable.ts'
+import { buildDatedTimetables, serviceDays, type ServiceDays } from './lib/datedTimetable.ts'
 import { buildSegments } from './lib/segments.ts'
 import { buildShapes } from './lib/shapes.ts'
 import { toStableJson } from './lib/stableJson.ts'
@@ -77,14 +78,14 @@ async function loadZip(zipPath: string | undefined, url: string): Promise<Uint8A
   return bytes
 }
 
-/** `skipShapes` keeps shapes.txt's header only: the dated build never reads shapes, and they cost memory. */
-function decodeTables(zip: Uint8Array, skipShapes = false): Record<string, string> {
-  const files = unzipSync(zip, { filter: (f) => NEEDED.has(f.name) && !(skipShapes && f.name === 'shapes.txt') })
-  const missing = [...NEEDED].filter((name) => !(name in files) && !(skipShapes && name === 'shapes.txt'))
+/** `shapes: false` leaves shapes.txt out (the dated build never reads shapes, and they cost memory); pass the same flag to readFeed. */
+function decodeTables(zip: Uint8Array, shapes = true): Record<string, string> {
+  const needed = new Set([...NEEDED].filter((name) => shapes || name !== 'shapes.txt'))
+  const files = unzipSync(zip, { filter: (f) => needed.has(f.name) })
+  const missing = [...needed].filter((name) => !(name in files))
   if (missing.length > 0) throw new Error(`Zip is missing ${missing.join(', ')}`)
   const decoder = new TextDecoder('utf-8', { fatal: true })
-  const tables = Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, decoder.decode(bytes)]))
-  return skipShapes ? { ...tables, 'shapes.txt': 'shape_id,shape_pt_sequence,shape_pt_lat,shape_pt_lon\n' } : tables
+  return Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, decoder.decode(bytes)]))
 }
 
 /** Everything the regular zip yields, rendered, plus what the dated build needs from it. The feed itself stays in
@@ -117,6 +118,7 @@ async function buildRegular(zip: Uint8Array) {
     // Every child stop stations.json lists: the dated files may call at no other.
     knownStops: new Set<StopId>(access.stations.flatMap((s) => s.stops)),
     changes: buildStationChanges(feed),
+    days: serviceDays(feed),
     stats:
       `Timetables: ${timetables.files.length} files, ${patterns.length} patterns, ` +
       `${patterns.reduce((n, p) => n + p.trips.length, 0)} trips, ` +
@@ -127,23 +129,23 @@ async function buildRegular(zip: Uint8Array) {
 }
 
 /** The dated files and manifest, rendered, built from the supplemented zip with the regular feed's station changes. */
-function buildDated(feed: GtfsFeed, regular: { feedVersion: string; changes: readonly StationChange[]; knownStops: ReadonlySet<StopId> }) {
+function buildDated(feed: GtfsFeed, regular: { feedVersion: string; changes: readonly StationChange[]; knownStops: ReadonlySet<StopId>; days: ServiceDays }) {
   console.log(`Supplemented feed version: ${feed.feedVersion}`)
   if (feed.feedVersion !== regular.feedVersion) {
     console.warn(`WARNING: the supplemented feed_version (${feed.feedVersion}) differs from the regular one (${regular.feedVersion}); the two feeds may not match`)
   }
-  const built = buildDatedTimetables(feed, regular.changes, regular.knownStops)
+  const built = buildDatedTimetables(feed, regular.days, regular.changes, regular.knownStops)
   const { dates } = built.index
   if (dates.length === 0) {
-    console.warn('WARNING: the supplemented feed has no date-only service, so there are no dated timetables')
+    console.warn('WARNING: the supplemented feed runs the same trips as the regular one on every date, so there are no dated timetables')
   } else if (dates[dates.length - 1]! < nyDate(Date.now() / 1000)) {
-    console.warn(`WARNING: the dated window ends ${dates[dates.length - 1]}, before today in New York; the files are stale`)
+    console.warn(`WARNING: the last dated file is ${dates[dates.length - 1]}, before today in New York; the files are stale`)
   }
   const files = built.files.map(({ date, file }) => renderedFile(`${date}.json`, toStableJson(file, 4)))
   const index = renderedFile('index.json', toStableJson(built.index, 1))
   const patterns = built.files.flatMap(({ file }) => file.patterns)
   const summary =
-    `Dated timetables: ${dates.length} files ${dates[0] ?? '-'}..${dates[dates.length - 1] ?? '-'}, ${patterns.length} patterns, ` +
+    `Dated timetables: ${dates.length} files [${dates.join(' ')}], ${patterns.length} patterns, ` +
     `${patterns.reduce((n, p) => n + p.trips.length, 0)} trips, ${built.skippedShort} trips under two stops skipped, ` +
     `${built.splitPatterns} patterns split for overtaking`
   return { files, index, summary }
@@ -163,7 +165,7 @@ async function main(): Promise<void> {
   const regular = await buildRegular(await loadZip(values.zip ?? process.env.GTFS_ZIP, FEED_URL))
   // buildRegular's feed is out of scope here, so it can be collected before the supplemented one is read.
   const suppZip = await loadZip(values['supplemented-zip'] ?? process.env.GTFS_SUPPLEMENTED_ZIP, SUPPLEMENTED_URL)
-  const dated = buildDated(readFeed(decodeTables(suppZip, true)), regular)
+  const dated = buildDated(readFeed(decodeTables(suppZip, false), { shapes: false }), regular)
 
   const { rendered, timetableFiles } = regular
   // station-depths.json (data:stations) counts too: the shared budget covers everything loaded up front.
@@ -181,7 +183,7 @@ async function main(): Promise<void> {
   mkdirSync(DATED_DIR, { recursive: true })
   const datedOut: RenderedFile[] = [...dated.files, dated.index]
   for (const f of datedOut) writeFileSync(new URL(f.name, DATED_DIR), f.text)
-  pruneJson(DATED_DIR, new Set(datedOut.map((f) => f.name)), 'timetable/dated/', 'outside the window')
+  pruneJson(DATED_DIR, new Set(datedOut.map((f) => f.name)), 'timetable/dated/', 'its date has no planned work now')
 
   console.table([
     ...rendered.map((f) => ({ file: f.name, 'raw B': f.raw, 'gzip B': f.gzip })),

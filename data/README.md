@@ -205,21 +205,24 @@ checks the committed files against the rest of the data.
 (`https://rrgtfsfeeds.s3.amazonaws.com/gtfs_supplemented.zip`, rebuilt hourly, the next seven days with planned
 work applied). `npm run data -- --zip <regular> --supplemented-zip <supplemented>` (or `$GTFS_ZIP` and
 `$GTFS_SUPPLEMENTED_ZIP`; both are downloaded when absent) writes them; the regular zip still builds everything
-else, because about 7,000 supplemented trips have no `shape_id`. A dated file has the same layout as a service
+else, because about 7,000 supplemented trips have no `shape_id` (the supplemented shapes.txt isn't read). A dated file has the same layout as a service
 file plus `date` (equal to its name); its `services` lists that day's active supplemented service ids (the base
 calendars split into chunks, minus chunks removed for work, plus date-only services). It replaces the day's
 service files in the client's router; `index.json` (`{ format, feedVersion, dates }`) lists the dates that have one.
 
-- Window: every date from the first to the last on which a date-only service runs (a `calendar_dates` add that
-  `calendar.txt` doesn't list), gap days included. Nothing reads the clock to choose it. More than 14 days (`DATED_MAX_DAYS`)
-  fails the build; none writes an empty index.
-- Outside the window the supplemented feed equals the regular one, so the client falls back to the per-service
-  files, which are exact there. A window that lapses between refreshes is therefore harmless.
+- Which dates: of every date with a supplemented `calendar_dates` row, plus every date from the first to the last on
+  which a date-only service runs (a `calendar_dates` add that `calendar.txt` doesn't list), those whose active trip ids
+  (`servicesOn` over each feed's calendar and exceptions) differ between the supplemented and the regular feed. Work
+  that only removes trains counts; a holiday both feeds treat alike does not (so 20261225 gets no file). The set need
+  not be contiguous. Nothing reads the clock to choose it. More than 14 dates (`DATED_MAX_DAYS`) fails the build,
+  naming them; none writes an empty index. Each date must be a real YYYYMMDD, since it becomes a file name.
+- On any other date the two feeds run the same trips, so the client falls back to the per-service files, which are
+  exact there. Dated files that lapse between refreshes are therefore harmless.
 - Caps: each file under `TIMETABLE_FILE_GZIP_CAP_BYTES` (the largest, a heavy weekday, is about 40.6 KB of 48 KB), the
   directory under `TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES` (400 KB; the nine measured days total about 238 KB).
 - Fails the whole run, writing nothing (the refresh opens no PR that day): the supplemented download or parse, the
-  window over 14 days, a pattern calling at a stop `stations.json` lacks (the error names the stop and dates), and the
-  checks above. A differing `feed_version` between the two zips, an empty window and a window already over are only
+  set over 14 dates, a bad date, a pattern calling at a stop `stations.json` lacks (the error names the stop and dates), and the
+  checks above. A differing `feed_version` between the two zips, no dated date at all and a last dated file already past are only
   `WARNING:` lines.
 - Churn: the files change daily, so each merged refresh adds about 5.7 MB raw (a few hundred KB packed) to git history.
 - `scripts/lib/datedTimetableOutputs.test.ts` and `src/data/datedTimetable.data.test.ts` check the committed files.

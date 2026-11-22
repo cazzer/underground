@@ -68,7 +68,7 @@ If the Worker decodes and serves JSON (§6), the client ships **no protobuf libr
   string, `stops.txt` and `transfers.txt` byte-identical to the regular zip. The three base calendars are split into
   chunks (Weekday, Weekday_C4/_C5/_C11; Saturday_C1-C3; Sunday_C6-C9) that partition the regular trips exactly; planned work is
   `calendar_dates`: type 2 removes chunks, type 1 adds date-only services (L0S1..9, L1S1..5, L2S1..3) absent from `calendar.txt`. The
-  window was 20261121..20261129 (nine contiguous days); outside it the feed is hash-identical to the regular one (the
+  add-window was 20261121..20261129 (nine contiguous days; all nine run trips the regular feed doesn't, and no removal-only day lies outside it); outside it the feed is hash-identical to the regular one (the
   following Monday, Saturday and Sunday equal Weekday, Saturday, Sunday). `npm run data` turns the window into
   `public/data/timetable/dated/<date>.json`: 14.9 to 40.6 KB gzipped each (the heavy weekdays), about 238 KB for the nine days,
   about 200 ms per date. Only the timetable comes from it; the static network stays on the regular zip. Loading both zips
@@ -131,6 +131,7 @@ All five are ADA-accessible in `39hk-dx4f`.
   - Indicate that data "may not be real time".
   - Don't claim the data is accurate. Citing MTA as the source is fine.
   - The terms state no rate limits or caching rules.
+  - The supplemented GTFS feed (`gtfs_supplemented.zip`) is under the same developer terms as the regular one.
 - **MTA IP** ([licensing-info](https://www.mta.info/developers/licensing-info)): logos, maps, and symbols need a license; it's free for free apps. Avoid the official route bullets and the map. Using hex colors from `routes.txt` is probably fine (UNVERIFIED).
 - **NY Open Data:** attribute to "Metropolitan Transportation Authority", linking `https://www.mta.info/open-data`. The terms are in §5.1.
 - **OSM ODbL** (UNVERIFIED for 2026): show "© OpenStreetMap contributors". A committed derived database, such as extracted platform polygons, must be offered under ODbL; add a LICENSE note next to those files. Extract once at build time rather than querying Overpass from the app.

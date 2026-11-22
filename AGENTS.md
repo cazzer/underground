@@ -33,10 +33,11 @@ so dev and preview serve under that path.
   Also writes `public/data/timetable/<serviceId>.json` (stop times by stop pattern in 30 s units plus the
   same-station transfer rows; outside the 60 KB budget, each under its own 48 KB gzip cap, fails above it;
   removes a file for a service the feed dropped).
-  Also writes `public/data/timetable/dated/<YYYYMMDD>.json` (one per date of the supplemented feed's planned-work window,
-  at most 14 days) and `dated/index.json` (the dates): the day's regular service plus planned work, each file under the
-  same 48 KB cap and the directory under `TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES`; a failed supplemented download, a
-  window over 14 days or a stop `stations.json` lacks fails the whole run; files outside the window are removed.
+  Also writes `public/data/timetable/dated/<YYYYMMDD>.json` (one per date on which the supplemented feed runs different
+  trips than the regular one, so work that only removes trains counts; at most 14, not necessarily contiguous) and
+  `dated/index.json` (the dates): the day's regular service plus planned work, each file under the same 48 KB cap and the
+  directory under `TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES`; a failed supplemented download, more than 14 such dates, a
+  date that isn't a real YYYYMMDD or a stop `stations.json` lacks fails the whole run; other dated files are removed.
   Also reads the pinned `data/stations/catalog/stations.json` for each station's borough and ADA status;
   after `data:catalog:fetch` run `npm run data:access` instead (offline).
   A station the catalog lacks, or an orphan catalog row, needs an entry in
@@ -529,8 +530,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
 - `src/data/loadTimetable.ts` (`expectTimetable`, `expectDatedIndex`, `expectServiceCalendar`; one lazy cached promise per file via
   `interiorCache.ts`: `timetable/<service>.json`, `timetable/dated/<date>.json` and its `index.json`, `transfers.json`, and the calendar from `trip-index.json`) and
-  `planTrip.ts` (`planTripLive(stations, from, to, atS, live)`: reads the calendar, picks the window, fetches the files it
-  needs, builds one `RouterTimetable` per window and `feedVersion`, kept as a single cache entry, then `planOnLive`
+  `planTrip.ts` (`planTripLive(stations, from, to, atS, live)`: reads the calendar and the dated index (fetched together; a failed
+  index fetch rejects the plan, retried by the next one, never a silent fallback), picks the window, fetches the files it
+  needs (a date the index lists reads its dated file, not its service files), builds one `RouterTimetable` per window and `feedVersion`, kept as a single cache entry, then `planOnLive`
   (`lib/route/planLive.ts`, pure: `overlayRealtime` over it with the snapshot, memoised on the timetable and snapshot
   identity, a snapshot over `SNAPSHOT_MAX_AGE_S` old never cached; a throwing overlay is one `console.error` per snapshot and the
   schedule answers, `overlay` null; `planTrip` is the scheduled-only form); `NoServiceError`
@@ -975,11 +977,11 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
-  into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
+  into `public/data/*.json` and the supplemented zip into `public/data/timetable/dated/`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
   about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), and 36 KB per `public/data/search/streets/` shard with a total).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
-  opens or updates one PR on `chore/data-refresh` (its title and body name the dated timetable window, `first..last`
+  opens or updates one PR on `chore/data-refresh` (its title and body name the dated timetable files, `first..last(count)`
   or `none`; the dated files roll daily, so nearly every day has a PR) when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow
   the stations), then `npm run data:walk`, then `npm run data:search:streets`, change `public/data`. A station new to the feed gets a street file from whatever pinned ways lie

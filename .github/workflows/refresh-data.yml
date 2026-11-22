@@ -67,13 +67,16 @@ jobs:
           old=$(node -p "require('./public/data/stations.json').feedVersion" | head -n1 | tr -cd '[:alnum:]._-')
           # Informational only; the diff below decides whether anything changed.
           lm=$({ curl -sIf "$FEED_URL" || true; } | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified: *//p' | head -n1 | tr -cd '[:alnum:] ,:-')
-          # The dated window as first..last, or none (no file yet on main, or an empty window).
-          old_dates=$({ node -p "const d = require('./public/data/timetable/dated/index.json').dates; d.length ? d[0] + '..' + d[d.length - 1] : 'none'" 2>/dev/null || echo none; } | head -n1 | tr -cd '[:alnum:]._-')
+          # The dated files as first..last(count), or none (no file yet on main, or no dated date).
+          old_dates=$({ node -p "const d = require('./public/data/timetable/dated/index.json').dates; d.length ? d[0] + '..' + d[d.length - 1] + '(' + d.length + ')' : 'none'" 2>/dev/null || echo none; } | head -n1 | tr -cd '[:alnum:]._()-')
           echo "old_version=$old" >> "$GITHUB_OUTPUT"
           echo "old_dates=$old_dates" >> "$GITHUB_OUTPUT"
           echo "last_modified=$lm" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate public/data
+        # Both zips are in memory at once (about 2 GB peak): leave V8 room above its default heap limit.
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run data 2>&1 | tee "$RUNNER_TEMP/data.log"
 
       # Generated station interiors are built from the shapes and stations just written; without this a
@@ -106,7 +109,7 @@ jobs:
         run: |
           new=$(node -p "require('./public/data/stations.json').feedVersion" | head -n1 | tr -cd '[:alnum:]._-')
           echo "new_version=$new" >> "$GITHUB_OUTPUT"
-          new_dates=$({ node -p "const d = require('./public/data/timetable/dated/index.json').dates; d.length ? d[0] + '..' + d[d.length - 1] : 'none'" 2>/dev/null || echo none; } | head -n1 | tr -cd '[:alnum:]._-')
+          new_dates=$({ node -p "const d = require('./public/data/timetable/dated/index.json').dates; d.length ? d[0] + '..' + d[d.length - 1] + '(' + d.length + ')' : 'none'" 2>/dev/null || echo none; } | head -n1 | tr -cd '[:alnum:]._()-')
           echo "new_dates=$new_dates" >> "$GITHUB_OUTPUT"
           changed=$({ git diff --name-only; git ls-files --others --exclude-standard; })
           if [ -z "$changed" ]; then

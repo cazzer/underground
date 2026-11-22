@@ -1,7 +1,7 @@
 /**
  * The committed dated timetables (public/data/timetable/dated/) against the other committed data: the manifest and its
  * files agree, each file is under its cap, every stop is real, no trip overtakes another, and the station changes are
- * the service files'. Whatever window the last refresh wrote is fine; the counts are asserted only while it is the one
+ * the service files'. Whatever dates the last refresh wrote are fine; the counts are asserted only while it is the one
  * measured. Rerun `npm run data` when it fails. (Each file through the router: src/data/datedTimetable.data.test.ts.)
  */
 import { readdirSync, readFileSync } from 'node:fs'
@@ -12,6 +12,7 @@ import { decodePatternTimes } from '../../src/data/timetableCodec.ts'
 import { TIMETABLE_FORMAT, type DatedTimetableIndex, type TimetableFile } from '../../src/data/timetableSchema.ts'
 import { TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES, TIMETABLE_FILE_GZIP_CAP_BYTES } from './budget.ts'
 import { DATED_MAX_DAYS } from './datedTimetable.ts'
+import { addDays } from '../../src/lib/realtime/serviceDate.ts'
 
 const DATA = new URL('../../public/data/', import.meta.url)
 const DIR = new URL('timetable/dated/', DATA)
@@ -24,7 +25,6 @@ const names = readdirSync(DIR).filter((f) => f.endsWith('.json')).sort()
 const files = new Map(index.dates.map((date) => [date, json(new URL(`${date}.json`, DIR)) as TimetableFile]))
 
 const tripCount = (file: TimetableFile): number => file.patterns.reduce((n, p) => n + p.trips.length, 0)
-const dayOf = (date: string): number => Date.UTC(Number(date.slice(0, 4)), Number(date.slice(4, 6)) - 1, Number(date.slice(6, 8))) / 86_400_000
 
 describe('public/data/timetable/dated', () => {
   it('holds index.json and exactly one file per date it lists', () => {
@@ -32,13 +32,13 @@ describe('public/data/timetable/dated', () => {
     expect(index.format).toBe(TIMETABLE_FORMAT)
   })
 
-  it('lists sorted, contiguous dates, at most the window limit', () => {
+  it('lists sorted, unique, real dates (not necessarily contiguous), at most the limit', () => {
     expect(index.dates.length).toBeLessThanOrEqual(DATED_MAX_DAYS)
-    expect(index.dates).toEqual([...index.dates].sort())
-    index.dates.forEach((date, i) => {
+    expect(index.dates).toEqual([...new Set(index.dates)].sort())
+    for (const date of index.dates) {
       expect(date).toMatch(/^\d{8}$/)
-      if (i > 0) expect(dayOf(date) - dayOf(index.dates[i - 1]!), date).toBe(1)
-    })
+      expect(addDays(date, 0), date).toBe(date)
+    }
   })
 
   it('keeps each file and the directory under their gzip caps', () => {

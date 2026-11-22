@@ -28,7 +28,7 @@ Route colors come from `routes.txt`. MTA's IP status for those colors is UNVERIF
   stop_sequence, shapes and headsigns; plus the same-station `transfers.txt` rows; loaded on demand, outside the
   startup budget)
 - `timetable/dated/<YYYYMMDD>.json` and `timetable/dated/index.json` (derived the same way from the MTA's supplemented
-  GTFS feed: each date's scheduled service with the next days' planned work applied; a rolling window of at most 14 days,
+  GTFS feed: each date's scheduled service with the next days' planned work applied; the dates planned work changes, at most 14,
   loaded on demand, outside the startup budget; the data may not be real time)
 
 ## OpenStreetMap (ODbL 1.0)

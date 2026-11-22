@@ -23,7 +23,8 @@
  *  - Dated files: dated/<date>.json holds every trip that runs on that date in the MTA's supplemented feed (planned
  *    work applied) and replaces the day's service files for the router; `date` equals the file name and `services`
  *    lists that day's active supplemented service ids (informational). dated/index.json (DatedTimetableIndex) lists
- *    the dates that have a file: a contiguous window, at most 14 days. Any other date uses the service files.
+ *    the dates that have a file: those on which planned work changes the trips that run (additions or removals), at
+ *    most 14, not necessarily contiguous. Any other date uses the service files.
  *  - Key order: format, feedVersion, [date,] services, changes, patterns. The file is rendered one trip per line.
  *  - No trip identity: a trip is found by its first departure.
  */
@@ -67,6 +68,6 @@ export interface DatedTimetableIndex {
   format: 1
   /** feed_info feed_version of the supplemented zip the files were built from. */
   feedVersion: string
-  /** YYYYMMDD, sorted, contiguous, at most DATED_MAX_DAYS. */
+  /** YYYYMMDD, sorted, unique, at most DATED_MAX_DAYS; not necessarily contiguous. */
   dates: string[]
 }

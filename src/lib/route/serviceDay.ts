@@ -10,7 +10,8 @@ export const YESTERDAY_UNTIL_S = 4 * 3600
 export const TOMORROW_FROM_S = 22 * 3600
 
 /** One day's services. `shiftS` moves that day's timetable seconds onto the query day's time base. A `dated` frame
- *  reads the day's dated file (which replaces its service files), so `services` is then only the calendar's answer. */
+ *  reads the day's dated file (which replaces its service files), so `services` is then only the calendar's answer.
+ *  A dated file with no patterns is a day with no trains: the router then finds no journeys (not a NoServiceError). */
 export interface ServiceFrame {
   date: string
   services: readonly ServiceId[]

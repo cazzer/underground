@@ -5,7 +5,6 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { route } from '../lib/route/raptor'
 import { buildRouterTimetable } from '../lib/route/timetable'
 import type { StationsFile, TransfersFile } from './schema'
 import type { DatedTimetableIndex, TimetableFile } from './timetableSchema'
@@ -23,8 +22,6 @@ describe('the committed dated timetables', () => {
       const tt = buildRouterTimetable([{ label: `${date}:dated`, shiftS: 0, file }], stations, transfers)
       expect(tt.patterns.length).toBeGreaterThan(0)
       expect(warn).not.toHaveBeenCalled()
-      // A morning trip across Manhattan: some trip exists on any day of the window.
-      expect(route(tt, ['127'], ['635'], 8 * 3600).length).toBeGreaterThan(0)
     } finally {
       warn.mockRestore()
     }

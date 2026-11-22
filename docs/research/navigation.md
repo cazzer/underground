@@ -68,7 +68,7 @@ real departures). The Worker drops `trip_replacement_period` and schedule_relati
 erroring feed falls back to the schedule, so gaps aren't invented.
 
 **Planned service changes** (weekend work) are only in the supplemented feed (19.5 MB, hourly, 7 days). `npm run data`
-reads it for the dated timetable files (`public/data/timetable/dated/`, one per date of its window), and the planner
+reads it for the dated timetable files (`public/data/timetable/dated/`, one per date planned work changes), and the planner
 uses a date's file when the manifest lists it and the per-service files otherwise (2q7.7). The UI doesn't say yet
 that a trip follows planned work ("planned work through <date>" is a follow-up).
 
