@@ -131,6 +131,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   notice, then the station, and closing either of the first two returns focus to the station heading or else
   the location button); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
+  `FocusAnnouncer.tsx` a polite sr-only live region ("Showing <station>", name only) for a panel the camera auto-focused, 300 ms
+  after it is entered and only if it is still focused, not covered by a train panel and not already holding focus; user picks are never announced; never moves focus;
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
   `LocateButton.tsx` the header's location button (shows locating and located); `LocateStatus.tsx` its message (the sentence alone is the always-mounted live region)
@@ -225,7 +227,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     like "14 stre" and "14t" keep matching). `stationHash.ts` parses and builds `#station=<id>`
   - `focus.tsx` focused/dismissed-station React context (not pure); it also carries point flights
     (`flyToPoint`, used by the location button; drops focus, so an orbited view springs back north-up during the flight). In dev only it exposes
-    `window.__underground.select(stationId)` for screenshots and Playwright checks
+    `window.__underground.select(stationId)` for screenshots and Playwright checks. It carries `cause` (`focusCause.ts`):
+    `select` is `'user'`, a station the camera newly focuses is `'camera'`
   - `locate.ts` a geolocation fix to a placement (near a station: frame the fix; inside the network but far:
     frame the fix and its nearest station; outside: nearest station only, no marker), failure codes, and the
     state transitions (the last good fix stays drawn through a re-locate or a failure); `locateMessage.ts` its HUD text (never

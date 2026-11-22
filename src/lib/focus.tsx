@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { causeAfterCamera, type FocusCause } from './focusCause'
 import { nextFocus, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'
@@ -17,6 +18,8 @@ interface FocusValue {
   focusedId: string | null
   /** Station the user closed; the camera won't auto-focus it until it moves away. */
   dismissedId: string | null
+  /** Who focused the current station: a visitor action ('user') or the camera's auto-focus ('camera'). */
+  cause: FocusCause
   flyRequest: FlyRequest | null
   /** Explicit pick (click): focus the station and fly the camera to it. */
   select: (stationId: string) => void
@@ -56,22 +59,22 @@ declare global {
 const FocusContext = createContext<FocusValue | null>(null)
 
 export function FocusProvider({ children }: FocusProviderProps) {
-  const [state, setState] = useState<FocusState>({ focusedId: null, dismissedId: null })
+  const [state, setState] = useState<FocusState & { cause: FocusCause }>({ focusedId: null, dismissedId: null, cause: 'user' })
   const [flyRequest, setFlyRequest] = useState<FlyRequest | null>(null)
 
   const select = useCallback((stationId: string) => {
-    setState({ focusedId: stationId, dismissedId: null })
+    setState({ focusedId: stationId, dismissedId: null, cause: 'user' })
     setFlyRequest((prev) => ({ kind: 'station', stationId, nonce: (prev?.nonce ?? 0) + 1 }))
   }, [])
   const flyToPoint = useCallback(
     (center: Ground, radiusM: number) => {
-      setState((s) => (s.focusedId === null ? s : { focusedId: null, dismissedId: s.dismissedId }))
+      setState((s) => (s.focusedId === null ? s : { ...s, focusedId: null }))
       setFlyRequest((prev) => ({ kind: 'point', center, radiusM, nonce: (prev?.nonce ?? 0) + 1 }))
     },
     [],
   )
   const dismiss = useCallback(
-    () => setState((s) => (s.focusedId === null ? s : { focusedId: null, dismissedId: s.focusedId })),
+    () => setState((s) => (s.focusedId === null ? s : { ...s, focusedId: null, dismissedId: s.focusedId })),
     [],
   )
   const updateFromCamera = useCallback(
@@ -80,7 +83,11 @@ export function FocusProvider({ children }: FocusProviderProps) {
         const next = nextFocus({ ...prev, distance, target, stations, settled })
         return next.focusedId === prev.focusedId && next.dismissedId === prev.dismissedId
           ? prev
-          : { focusedId: next.focusedId, dismissedId: next.dismissedId }
+          : {
+              focusedId: next.focusedId,
+              dismissedId: next.dismissedId,
+              cause: causeAfterCamera(prev.focusedId, next.focusedId, prev.cause),
+            }
       }),
     [],
   )
@@ -94,10 +101,10 @@ export function FocusProvider({ children }: FocusProviderProps) {
     }
   }, [select])
 
-  const { focusedId, dismissedId } = state
+  const { focusedId, dismissedId, cause } = state
   const value = useMemo<FocusValue>(
-    () => ({ focusedId, dismissedId, flyRequest, select, flyToPoint, dismiss, updateFromCamera }),
-    [focusedId, dismissedId, flyRequest, select, flyToPoint, dismiss, updateFromCamera],
+    () => ({ focusedId, dismissedId, cause, flyRequest, select, flyToPoint, dismiss, updateFromCamera }),
+    [focusedId, dismissedId, cause, flyRequest, select, flyToPoint, dismiss, updateFromCamera],
   )
   return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>
 }
