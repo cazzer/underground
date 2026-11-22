@@ -32,6 +32,10 @@ export const RENDER_ORDER = {
   // "You are here": the accuracy disc and its edge sit under the lines; the reticle sits over the trains, under the veil.
   hereAccuracy: 0.5,
   hereAccuracyEdge: 0.6,
+  // The focused station's streets, at street level under the location disc and the route lines.
+  streets: 0.35,
+  // TEMPORARY (?streets=over, streetsLook.ts): the streets above the interior veil, under the interior strokes.
+  streetsOver: 7.5,
   hereHalo: 6.4,
   here: 6.55,
   // Station interior. Look C (?interior=c, temporary) draws it under the street layers.

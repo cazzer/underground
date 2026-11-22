@@ -68,6 +68,14 @@ export interface Theme {
   /** Dash and gap of a generated interior's platform and slab outlines and slab guides, in world meters. */
   interiorApproxDash: number
   interiorApproxGap: number
+  /**
+   * The focused station's streets (StationStreets.tsx), a faint street-level layer under the route lines. Faint by
+   * color, not alpha (a translucent LineSegments2 beads at its joints); at least 2.5:1 on the background, since the
+   * interior veil dims it, and apart from the selected-train rim (theme.test.ts).
+   */
+  streetStroke: string
+  /** Street line width in CSS px. */
+  streetWidth: number
 }
 
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
@@ -116,6 +124,8 @@ export const THEMES = {
     interiorDepthFade: 0.5,
     interiorApproxDash: 1.5,
     interiorApproxGap: 0.75,
+    streetStroke: '#4a6aa0',
+    streetWidth: 1,
   },
 } as const satisfies Record<string, Theme>
 

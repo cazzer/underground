@@ -81,6 +81,15 @@ describe('here token', () => {
   })
 })
 
+describe('street tokens', () => {
+  it('read at 2.5:1 on the background and stay apart from the selected-train rim', async () => {
+    for (const t of Object.values(await themes())) {
+      expect(contrastRatio(t.streetStroke, t.background), `${t.name} ${t.streetStroke}`).toBeGreaterThanOrEqual(2.5)
+      expect(colorDistance(t.streetStroke, t.trainSelectedRim), `${t.name} street vs rim`).toBeGreaterThanOrEqual(MIN_HERE_DISTANCE)
+    }
+  })
+})
+
 /** OKLab distance (about 0.1 is a clearly different color): rims are told apart from lines by hue, not only lightness. */
 function oklabDistance(a: string, b: string): number {
   const lab = (hex: string): number[] => {

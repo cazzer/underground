@@ -51,11 +51,22 @@ export function expectStationDepths(raw: unknown, url: string): PackedDepthsFile
   return raw as PackedDepthsFile
 }
 
-/** Fetches and parses JSON, throwing `<url>: HTTP <status>` or `<url>: invalid JSON (...)`. */
+/** A non-OK response from `fetchJson`; the message is `<url>: HTTP <status>`. */
+export class HttpError extends Error {
+  readonly status: number
+
+  constructor(url: string, status: number) {
+    super(`${url}: HTTP ${status}`)
+    this.name = 'HttpError'
+    this.status = status
+  }
+}
+
+/** Fetches and parses JSON, throwing an `HttpError` (`<url>: HTTP <status>`) or `<url>: invalid JSON (...)`. */
 export async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
   // no-cache revalidates (cheap 304s), so a stale cached file can't mix two builds.
   const res = await fetch(url, { signal, cache: 'no-cache' })
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`)
+  if (!res.ok) throw new HttpError(url, res.status)
   try {
     return await res.json()
   } catch (err) {
