@@ -99,6 +99,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         insets={insets}
         panel={panel}
         labelBlockers={labelBlockers}
+        network={network}
       />
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} labelBlockers={labelBlockers} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />

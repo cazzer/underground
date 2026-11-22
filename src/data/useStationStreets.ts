@@ -4,7 +4,7 @@ import { entranceLocal } from '../lib/entranceMarks'
 import type { LineBuffers, Rgb } from '../lib/lineBuffers'
 import { toGround, type Ground } from '../lib/projection'
 import { streetBuffers } from '../lib/streetBuffers'
-import { entranceLabel } from '../lib/streetName'
+import { entranceTexts, type EntranceText } from '../lib/entranceText'
 import { streetLabelSources, type StreetLabelSource } from '../lib/streetRuns'
 import { veiledStreetHex } from '../lib/streetVeil'
 import { theme } from '../theme'
@@ -14,15 +14,14 @@ import type { StationStreets } from './streetSchema'
 
 const BASE_URL = import.meta.env.BASE_URL
 
-/** A labelled entrance: meters from the layer's anchor, and its text (`entranceLabel`). */
-export interface EntranceLabelSource {
-  x: number
-  z: number
-  text: string
+/** A labelled entrance (entranceText.ts), with the indexes into `StreetLayer.streets` of the streets it names. */
+export interface EntranceLabelSource extends EntranceText {
+  streets: number[]
 }
 
 /** One station's streets, ready to draw: line buffers in meters from `anchor` (its scene ground point), the street
- *  and entrance labels' sources, and the file itself (its entrances' marks depend on the interior, drawn later). */
+ *  and entrance labels' sources, every entrance's mark point, and the file itself (its entrances' marks depend on the
+ *  interior, drawn later). */
 export interface StreetLayer {
   stationId: string
   anchor: Ground
@@ -32,26 +31,29 @@ export interface StreetLayer {
   file: StationStreets
   streets: StreetLabelSource[]
   entrances: EntranceLabelSource[]
+  /** Every entrance of the file, labelled or not, meters from `anchor`: labels keep clear of their marks. */
+  marks: Ground[]
 }
 
-function entranceLabels(file: StationStreets): EntranceLabelSource[] {
-  const out: EntranceLabelSource[] = []
-  file.entrances.forEach((e, i) => {
-    const text = entranceLabel(e)
-    if (text !== null) out.push({ ...entranceLocal(file, i), text })
-  })
-  return out
+function entranceLabels(file: StationStreets, streets: readonly StreetLabelSource[]): EntranceLabelSource[] {
+  const byKey = new Map(streets.map((s, i) => [s.key, i]))
+  return entranceTexts(file).map((t) => ({
+    ...t,
+    streets: t.keys.map((k) => byKey.get(k)).filter((i): i is number => i !== undefined),
+  }))
 }
 
 function buildLayer(id: string, file: StationStreets): StreetLayer {
+  const streets = streetLabelSources(file)
   return {
     stationId: id,
     anchor: toGround(file.anchor),
     buffers: streetBuffers(file, STREET_RGB, BACKGROUND_RGB),
     veiledBuffers: streetBuffers(file, VEILED_RGB, BACKGROUND_RGB),
     file,
-    streets: streetLabelSources(file),
-    entrances: entranceLabels(file),
+    streets,
+    entrances: entranceLabels(file, streets),
+    marks: file.entrances.map((_, i) => entranceLocal(file, i)),
   }
 }
 

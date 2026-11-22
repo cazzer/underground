@@ -16,7 +16,12 @@ const PHONE_MAX_SIDE_PX = 600
 export const PHONE_LABEL_RADIUS_M = 150
 export const DESKTOP_LABEL_RADIUS_M = 250
 
+/** A phone-sized viewport: its shorter side is under PHONE_MAX_SIDE_PX. Entrance labels take two lines there. */
+export function isPhoneViewport(viewport: Viewport): boolean {
+  return Math.min(viewport.width, viewport.height) < PHONE_MAX_SIDE_PX
+}
+
 /** How far from the station a street label may sit, meters: closer on a phone, whose screen holds fewer. */
 export function streetLabelRadiusM(viewport: Viewport): number {
-  return Math.min(viewport.width, viewport.height) < PHONE_MAX_SIDE_PX ? PHONE_LABEL_RADIUS_M : DESKTOP_LABEL_RADIUS_M
+  return isPhoneViewport(viewport) ? PHONE_LABEL_RADIUS_M : DESKTOP_LABEL_RADIUS_M
 }

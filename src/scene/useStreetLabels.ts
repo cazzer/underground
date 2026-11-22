@@ -5,23 +5,38 @@ import type { StreetLayer } from '../data/useStationStreets'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import type { LabelBlockers } from '../lib/labelBlockers'
-import { streetLabelRadiusM } from '../lib/streetLabelReveal'
-import { createLabelPlacement, placeLabels, type LabelPlacement, type PlacementView } from './streetLabelPlacement'
+import type { Ground } from '../lib/projection'
+import { isPhoneViewport, streetLabelRadiusM } from '../lib/streetLabelReveal'
+import type { InteriorModel } from './interiorModel'
+import { createLabelPlacement, type LabelPlacement, type PlacementView } from './labelPlacementState'
+import { placeLabels } from './streetLabelPlacement'
 import { LABEL_HALO } from './useLevelLabels'
 
 const WRAPPER_CLASS = 'pointer-events-none absolute inset-0'
-const BASE = 'absolute top-0 left-0 font-mono text-[10px] whitespace-nowrap'
-// Streets read like the level labels; entrances in normal case and full ink, as places to walk to.
-const STREET_CLASS = `${BASE} text-ink-dim uppercase tracking-widest ${LABEL_HALO}`
-const ENTRANCE_CLASS = `${BASE} text-ink ${LABEL_HALO}`
+const BASE = 'absolute top-0 left-0 font-mono text-[10px]'
+// Streets uppercase and dim but not letter-spaced (that is the level labels' look); entrances in normal case and
+// full ink, as places to walk to, on two lines on a phone.
+const STREET_CLASS = `${BASE} whitespace-nowrap text-ink-dim uppercase ${LABEL_HALO}`
+const ENTRANCE_CLASS = `${BASE} whitespace-pre text-ink ${LABEL_HALO}`
 /** Labels keep this far clear of the station panel, px. */
 const PANEL_PAD_PX = 8
+/** Frames without a change before the labels are placed once more from scratch (the view has settled). */
+const SETTLE_FRAMES = 10
 const EPS = 0.01
 
 const a = new Vector3()
 const b = new Vector3()
 
+/** What the street layer knows that the labels need, written by its frame: the interior (null when there is none),
+ *  the focused station's point while it draws a focus ring, and the interior group's y scale. */
+export interface LabelContext {
+  interior: InteriorModel | null
+  focusRing: Ground | null
+  depthScale: number
+}
+
 interface LabelDom {
+  host: HTMLElement
   /** Holds every label: its opacity and visibility fade them all at once. */
   wrapper: HTMLDivElement
   els: HTMLDivElement[]
@@ -38,12 +53,18 @@ interface LabelDom {
   insets: Insets | null
   levelsVersion: number
   dirty: boolean
-  /** The last placement's view (canvas, insets, panel); reused, written field by field, never reallocated. */
+  /** Frames since the inputs last changed; the settled re-place runs once at SETTLE_FRAMES. */
+  still: number
+  /** The last placement's view; reused, written field by field, never reallocated. */
   view: PlacementView
 }
 
+/** Sizes every label, entrances on two lines on a phone; one layout (all writes, then all reads). */
 function measure(dom: LabelDom): void {
-  // Read every size in one pass after the writes, so it is one layout.
+  const phone = isPhoneViewport({ width: dom.host.clientWidth, height: dom.host.clientHeight })
+  dom.place.entrances.forEach((e, i) => {
+    dom.els[i]!.textContent = phone && e.tail !== '' ? `${e.head}\n${e.tail}` : e.text
+  })
   for (let i = 0; i < dom.els.length; i++) {
     dom.place.w[i] = dom.els[i]!.offsetWidth
     dom.place.h[i] = dom.els[i]!.offsetHeight
@@ -87,21 +108,86 @@ function makeLabel(wrapper: HTMLDivElement, text: string, className: string): HT
   return el
 }
 
+function newView(camera: PlacementView['camera'], markHalfM: number, stationHalfM: number): PlacementView {
+  return {
+    camera,
+    width: 0,
+    height: 0,
+    left: 0,
+    top: 0,
+    insetTop: 0,
+    insetBottom: 0,
+    panel: null,
+    panelPad: PANEL_PAD_PX,
+    radiusM: 0,
+    markHalfM,
+    stationHalfM,
+    focusRing: null,
+    interior: null,
+    depthScale: 1,
+    fresh: false,
+    focusX: 0,
+    focusY: 0,
+    stationX: 0,
+    stationY: 0,
+  }
+}
+
+/** The view's inputs changed since the last placement (the camera, canvas, insets, panel, level labels, interior or
+ *  focus ring); copies them into the view when they did. */
+function viewChanged(d: LabelDom, camera: PlacementView['camera'], size: { width: number; height: number; left: number; top: number }, ins: Insets, pan: ScreenRect | null, ctx: LabelContext, levels: LabelBlockers): boolean {
+  const v = d.view
+  const moved =
+    d.dirty ||
+    !d.cam.equals(camera.matrixWorld) ||
+    !d.proj.equals(camera.projectionMatrix) ||
+    v.width !== size.width ||
+    v.height !== size.height ||
+    v.left !== size.left ||
+    v.top !== size.top ||
+    d.insets !== ins ||
+    v.panel !== pan ||
+    v.interior !== ctx.interior ||
+    v.focusRing !== ctx.focusRing ||
+    d.levelsVersion !== levels.version
+  if (!moved) return false
+  d.dirty = false
+  d.cam.copy(camera.matrixWorld)
+  d.proj.copy(camera.projectionMatrix)
+  d.insets = ins
+  d.levelsVersion = levels.version
+  v.width = size.width
+  v.height = size.height
+  v.left = size.left
+  v.top = size.top
+  v.insetTop = ins.top
+  v.insetBottom = ins.bottom
+  v.panel = pan
+  v.interior = ctx.interior
+  v.focusRing = ctx.focusRing
+  v.depthScale = ctx.depthScale
+  v.radiusM = streetLabelRadiusM(size)
+  return true
+}
+
 /**
  * The focused station's street and entrance labels: one aria-hidden wrapper div in the canvas's container (z-index
  * 0, under the HUD) holding a div per label, as the level labels are placed (useLevelLabels.ts). Sized after mount,
- * after the fonts load and on resize. Each frame where the camera, canvas, insets, panel, level labels (`levels`,
- * read a frame late) or opacity changed, the candidates are projected and decluttered (entrances first, then streets,
- * longest first), keeping clear of the header, footer, panel, entrance marks and level labels; nothing else touches
- * the DOM. `opacity` is read every frame (0 hides them all). Register it after the frame that writes it.
+ * after the fonts load and on resize. On a frame where the view's inputs or the opacity changed, the candidates are
+ * projected and decluttered (streetLabelPlacement.ts), and once more from scratch when the view has held still for
+ * SETTLE_FRAMES; nothing else touches the DOM. `levels` is read a frame late. `opacity` and `context` are read every
+ * frame (opacity 0 hides them all). Register it after the frame that writes them.
  */
 export function useStreetLabels(
   layer: StreetLayer,
+  stations: readonly Ground[],
   opacity: RefObject<number>,
+  context: RefObject<LabelContext>,
   insets: RefObject<Insets>,
   panel: RefObject<ScreenRect | null>,
   levels: LabelBlockers,
   markHalfM: number,
+  stationHalfM: number,
 ): void {
   const host = useThree((s) => s.gl.domElement.parentElement)
   const camera = useThree((s) => s.camera)
@@ -121,9 +207,10 @@ export function useStreetLabels(
     host.appendChild(wrapper)
     const n = els.length
     const state: LabelDom = {
+      host,
       wrapper,
       els,
-      place: createLabelPlacement(layer.entrances, layer.streets),
+      place: createLabelPlacement(layer.entrances, layer.streets, layer.marks, stations),
       x: new Float32Array(n).fill(NaN),
       y: new Float32Array(n).fill(NaN),
       turn: new Float32Array(n).fill(NaN),
@@ -134,24 +221,13 @@ export function useStreetLabels(
       insets: null,
       levelsVersion: NaN,
       dirty: true,
-      view: {
-        camera,
-        width: 0,
-        height: 0,
-        left: 0,
-        top: 0,
-        insetTop: 0,
-        insetBottom: 0,
-        panel: null,
-        panelPad: PANEL_PAD_PX,
-        radiusM: 0,
-        markHalfM,
-      },
+      still: 0,
+      view: newView(camera, markHalfM, stationHalfM),
     }
     measure(state)
     dom.current = state
     let live = true
-    // A web font arriving later, or a phone turning, changes the sizes.
+    // A web font arriving later, or a phone turning, changes the sizes (and a phone's entrance lines).
     document.fonts.ready.then(
       () => {
         if (live) measure(state)
@@ -166,7 +242,7 @@ export function useStreetLabels(
       wrapper.remove()
       dom.current = null
     }
-  }, [host, camera, layer, markHalfM])
+  }, [host, camera, layer, stations, markHalfM, stationHalfM])
 
   useFrame(({ size }) => {
     const d = dom.current
@@ -182,35 +258,10 @@ export function useStreetLabels(
       return
     }
     camera.updateMatrixWorld()
-    const { view } = d
-    const ins = insets.current
-    const pan = panel.current
-    const moved =
-      d.dirty ||
-      !d.cam.equals(camera.matrixWorld) ||
-      !d.proj.equals(camera.projectionMatrix) ||
-      view.width !== size.width ||
-      view.height !== size.height ||
-      view.left !== size.left ||
-      view.top !== size.top ||
-      d.insets !== ins ||
-      view.panel !== pan ||
-      d.levelsVersion !== levels.version
-    if (!moved) return
-    d.dirty = false
-    d.cam.copy(camera.matrixWorld)
-    d.proj.copy(camera.projectionMatrix)
-    d.insets = ins
-    d.levelsVersion = levels.version
-    view.width = size.width
-    view.height = size.height
-    view.left = size.left
-    view.top = size.top
-    view.insetTop = ins.top
-    view.insetBottom = ins.bottom
-    view.panel = pan
-    view.radiusM = streetLabelRadiusM(size)
-    placeLabels(d.place, layer.anchor, view, levels, a, b)
+    if (viewChanged(d, camera, size, insets.current, panel.current, context.current, levels)) d.still = 0
+    else if (++d.still !== SETTLE_FRAMES) return
+    d.view.fresh = d.still === SETTLE_FRAMES
+    placeLabels(d.place, layer.anchor, d.view, levels, a, b)
     writeLabels(d)
   })
 }

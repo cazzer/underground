@@ -9,8 +9,10 @@ import type { ScreenRect } from '../lib/interiorCamera'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { LabelBlockers } from '../lib/labelBlockers'
 import type { Rgb } from '../lib/lineBuffers'
-import { streetLabelOpacity } from '../lib/streetLabelReveal'
-import { depthFactor } from '../lib/tilt'
+import { DESKTOP_LABEL_RADIUS_M, streetLabelOpacity } from '../lib/streetLabelReveal'
+import type { Network } from '../lib/network'
+import type { Ground } from '../lib/projection'
+import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
 import { interiorLook } from './interiorLook'
@@ -18,7 +20,8 @@ import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
 import { RENDER_ORDER } from './renderOrder'
 import { streetsLook } from './streetsLook'
 import { useLineLayer } from './useLineLayer'
-import { useStreetLabels } from './useStreetLabels'
+import { MARKER_MIN_METERS } from './markerShape'
+import { useStreetLabels, type LabelContext } from './useStreetLabels'
 
 // Color(hex) converts sRGB to linear, which is what vertex colors must be.
 const MARK_COLOR = new Color(theme.interiorEntrance)
@@ -33,6 +36,8 @@ interface StationStreetsProps {
   panel: ScreenRect | null
   /** The level labels' screen rects, which the street labels keep clear of. */
   labelBlockers: LabelBlockers
+  /** For the station markers the labels keep clear of. */
+  network: Network
 }
 
 /**
@@ -51,6 +56,18 @@ interface StreetLinesProps extends StationStreetsProps {
   layer: StreetLayer
 }
 
+/** A station marker's half size the labels keep clear of, meters: its smallest world radius (MARKER_MIN_METERS)
+ *  grown as a focused marker grows. */
+const STATION_HALF_M = MARKER_MIN_METERS * 1.4
+/** Stations this far beyond the street label radius still block (their marker reaches in), meters. */
+const STATION_REACH_M = DESKTOP_LABEL_RADIUS_M + 50
+
+function nearbyStations(network: Network, layer: StreetLayer): Ground[] {
+  return network.stations
+    .filter((s) => s.id !== layer.stationId && Math.hypot(s.pos.x - layer.anchor.x, s.pos.z - layer.anchor.z) <= STATION_REACH_M)
+    .map((s) => s.pos)
+}
+
 /**
  * How the streets draw: above the interior veil at the veiled stroke (about 1.9:1, streetVeil.ts) with the station's
  * interior loaded under look A (the screen veil), so they rest faint behind the interior instead of vanishing under
@@ -65,10 +82,14 @@ function streetMode(interior: InteriorModel | null): 'under' | 'over' | 'veiled'
  * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
  * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
  */
-function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers }: StreetLinesProps) {
+function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network }: StreetLinesProps) {
   const group = useRef<Group>(null)
   const shown = useRef(-1)
   const labelShown = useRef(0)
+  const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1 })
+  // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring.
+  const stations = useMemo(() => nearbyStations(network, layer), [network, layer])
+  const focused = network.stationById.get(layer.stationId)?.pos ?? null
   const insetsRef = useRef(insets)
   const panelRef = useRef(panel)
   // Read per frame by the labels; synced after commit, before the next frame.
@@ -98,7 +119,12 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     if (!g) return
     const distance = cameraDistance(state)
     const o = interiorOpacity(distance)
-    labelShown.current = streetLabelOpacity(o, depthFactor(distance))
+    const depth = depthFactor(distance)
+    labelShown.current = streetLabelOpacity(o, depth)
+    const ctx = labelContext.current
+    ctx.interior = interior
+    ctx.focusRing = interior || interiorPending ? null : focused
+    ctx.depthScale = depthScaleY(depth)
     if (marks && marks.material.opacity !== o) marks.material.opacity = o
     if (o === shown.current) return
     shown.current = o
@@ -106,7 +132,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     g.visible = o > 0
   })
 
-  useStreetLabels(layer, labelShown, insetsRef, panelRef, labelBlockers, ENTRANCE_SIZE_M / 2)
+  useStreetLabels(layer, stations, labelShown, labelContext, insetsRef, panelRef, labelBlockers, ENTRANCE_SIZE_M / 2, STATION_HALF_M)
 
   return (
     <group ref={group} position={[layer.anchor.x, 0, layer.anchor.z]} visible={false}>

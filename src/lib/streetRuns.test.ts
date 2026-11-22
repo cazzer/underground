@@ -63,6 +63,11 @@ describe('streetLabelSources', () => {
     expect(new Set(s!.runs[0]!.map((p) => p.tx))).toEqual(new Set([1]))
   })
 
+  it('orders each run’s candidates nearest the station first', () => {
+    const file = fixture([[-100, 0], [100, 0]], [way(1, 'residential', 'Main Street', [0, 1])])
+    expect(streetLabelSources(file)[0]!.runs[0]!.map((p) => p.x)).toEqual([0, -40, 40, -80, 80])
+  })
+
   it('keeps the two carriageways of a dual street as two runs of one label, even where they meet', () => {
     // Two parallel carriageways 20 m apart, joined at a fork at the east end: chaining there would fold a U.
     const file = fixture(

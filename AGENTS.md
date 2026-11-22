@@ -171,16 +171,22 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     1.5 m on the scene ground with the same type; none while an interior is still loading;
     `entranceMarks.data.test.ts` checks L08 adds none), and calls `useStreetLabels.ts`: one aria-hidden wrapper div
     in the canvas container (z-index 0, its opacity the labels' fade) holding a div per label, with the level labels'
-    halo `LABEL_HALO`: entrances first (`entranceLabel`, normal case, `text-ink`, one of four spots 6 px off the mark),
-    then streets longest first (the level labels' style, turned along the street on screen and kept reading the same
-    way until 15° past vertical, on the run with the most on-screen points within 150 m on a phone / 250 m on a
-    desktop (last frame's run while it has at most one fewer), from that stretch's middle outward, falling back to
-    the other runs). Sized after mount, after `document.fonts.ready` and on resize; placed
-    (`streetLabelPlacement.ts`, then `labelDeclutter.ts`) only on a frame where the camera, canvas, insets, panel,
-    level labels or opacity changed, kept clear of the header, footer, panel (+8 px), entrance marks and the level
-    labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, at priority
-    0 each frame; the street labels read them a frame late), last frame's spot tried first; opacity
-    `streetLabelOpacity` (the level labels' depth gate)
+    halo `LABEL_HALO`. Placement (`streetLabelPlacement.ts` over `labelPlacementState.ts`, `entranceLabelBoxes.ts`,
+    `streetLabelBoxes.ts`, then `labelDeclutter.ts` in two passes) runs only on a frame where the camera, canvas,
+    insets, panel, level labels, interior, focus ring or opacity changed, last placement's spot tried first, and once
+    more from scratch after 10 still frames. Entrances first (`text-ink`, normal case; on a phone, shorter side
+    under 600 px, on two lines, street part then the rest), ranked elevators, then labels no other entrance shares,
+    then nearest the free area's middle; six spots: right or left of the mark, or a label corner at a mark corner.
+    Then streets (`text-ink-dim`, uppercase, not letter-spaced), those a placed entrance label names first, then
+    longest; turned along the street and kept reading the same way until 15° past vertical; offset off the
+    centerline (half the label height + 3 px) away from the station, then the other side, then centered; on the run
+    with the most on-screen points within 150 m on a phone / 250 m on a desktop (last placement's run while it has
+    at most one fewer), nearest the station first, falling back to the other runs. Every label keeps clear of the
+    header, footer, panel (+8 px), every entrance mark, the other stations' markers within 300 m and the focus ring,
+    and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`,
+    at priority 0 each frame; read a frame late); street names also keep clear of the interior's outlines
+    (`InteriorModel.outline`, `src/lib/interiorOutline.ts`). Sized after mount, after `document.fonts.ready` and on
+    resize; opacity `streetLabelOpacity` (the level labels' depth gate)
 - `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
@@ -494,8 +500,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   mixing to the background over the last 70 m of `radiusM` (`edgeFade`; segments are split at the ramp's ends), plus
   the label sources: `src/lib/streetRuns.ts` (`streetLabelSources`: street ways grouped by `streetKey`, chained into
   runs at shared end nodes while the street turns under 60°, so a dual carriageway is two runs of one label;
-  candidates every 40 m) and `src/lib/streetName.ts` (`abbreviateStreet`, MTA style "W 96 St"; `entranceLabel`,
-  street first: "Bedford Av & N 7 St · NE corner", "Broadway median at W 95 St", " · elevator", " · exit only").
+  candidates every 40 m, nearest the station first), `src/lib/streetName.ts` (`abbreviateStreet`, MTA style "W 96 St",
+  "Park Av S", "Flatbush Av Ext"; `entranceParts` / `entranceLabel`, street first: "Bedford Av & N 7 St · NE corner",
+  "Broadway median at W 95 St", "elevator", "exit only", "entry only") and `src/lib/entranceText.ts` (`entranceTexts`,
+  the station's labels worded together, client-side only: one order per street pair, avenue-type first; an entrance
+  with no cross street names the nearest other street within 60 m, "Broadway · west side at W 94 St", and two that
+  still match take a compass side of it, "N of W 94 St").
   `src/lib/labelGeometry.ts` (oriented screen boxes, separating-axis overlap) and `labelDeclutter.ts` (greedy, by
   priority, sticky; blocked rects packed in a Float32Array) are pure and allocation-free; `streetLabelReveal.ts` the labels' opacity and radius. `fetchJson` throws `HttpError` (with `status`) on a non-OK response
 - `src/data/schema.ts`: types of the six `public/data/*.json` files (`Station` carries `borough`, `ada`,

@@ -16,7 +16,8 @@ function candidates(items: [number, number][][]): LabelCandidates {
     size[i] = list.length
     for (const [x, y] of list) writeBox(boxes, b++, x, y, 40, 10, 0)
   })
-  return { boxes, start, size, count: items.length }
+  const order = new Int16Array(items.length).map((_, i) => i)
+  return { boxes, start, size, order, count: items.length }
 }
 
 type Rect = { left: number; top: number; right: number; bottom: number }
@@ -60,5 +61,19 @@ describe('declutter', () => {
 
   it('places nothing for an item with no candidates', () => {
     expect(place(candidates([[], [[100, 100]]]))).toEqual([-1, 0])
+  })
+
+  it('ranks by `order`, not by index, and places a range around what is already placed', () => {
+    const c = candidates([[[110, 100]], [[100, 100]]])
+    c.order.set([1, 0])
+    expect(place(c)).toEqual([-1, 0])
+    // Phase two places item 0 around item 1, placed in phase one.
+    const out = new Int16Array(2)
+    const none = new Int16Array([-1, -1])
+    const b: LabelBounds = { viewport, rects: new Float32Array(0), count: 0 }
+    declutter(c, b, none, out, 0, 1)
+    expect(out[1]).toBe(0)
+    declutter(c, b, none, out, 1, 2)
+    expect([...out]).toEqual([-1, 0])
   })
 })

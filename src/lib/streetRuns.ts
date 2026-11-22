@@ -25,7 +25,8 @@ export interface StreetLabelSource {
   text: string
   /** Total length of its ways, meters: longer streets label first. */
   lengthM: number
-  /** One list per run of ways chained end to end (a dual carriageway is two runs), candidates in run order. */
+  /** One list per run of ways chained end to end (a dual carriageway is two runs), candidates nearest the anchor (the
+   *  station) first. */
   runs: LabelCandidate[][]
 }
 
@@ -117,7 +118,7 @@ function polylineLength(points: readonly Point[]): number {
 
 /**
  * The file's streets (`isStreet`) grouped by `streetKey`, longest first (ties by key), each with its label text and
- * candidates every `spacingM` along each of its runs. Throws on a node index outside the node table.
+ * candidates every `spacingM` along each of its runs, nearest the station first. Throws on a node index outside the node table.
  */
 export function streetLabelSources(file: StationStreets, spacingM = 40): StreetLabelSource[] {
   const nodes = file.x.length
@@ -140,7 +141,7 @@ export function streetLabelSources(file: StationStreets, spacingM = 40): StreetL
     let name = ways[0]!.name!
     for (const [n, c] of counts) if (c > counts.get(name)!) name = n
     const runs = chainRuns(ways, at)
-      .map((run) => runCandidates(run.map(at), spacingM))
+      .map((run) => runCandidates(run.map(at), spacingM).sort((p, q) => p.x * p.x + p.z * p.z - (q.x * q.x + q.z * q.z)))
       .filter((c) => c.length > 0)
     if (runs.length === 0) continue
     const lengthM = ways.reduce((sum, w) => sum + polylineLength(w.nodes.map(at)), 0)

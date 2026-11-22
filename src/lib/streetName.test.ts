@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abbreviateStreet, entranceLabel, type LabelledEntrance } from './streetName'
+import { abbreviateStreet, entranceLabel, entranceParts, type LabelledEntrance } from './streetName'
 
 describe('abbreviateStreet', () => {
   it('shortens a closing type word', () => {
@@ -38,6 +38,9 @@ describe('abbreviateStreet', () => {
     expect(abbreviateStreet('Pelham Parkway South')).toBe('Pelham Pkwy S')
     expect(abbreviateStreet('Hoyt Avenue North')).toBe('Hoyt Av N')
     expect(abbreviateStreet('Avenue S')).toBe('Av S')
+    expect(abbreviateStreet('Flatbush Avenue Extension')).toBe('Flatbush Av Ext')
+    expect(abbreviateStreet('Mermaid Avenue Bus Loop')).toBe('Mermaid Av Bus Loop')
+    expect(abbreviateStreet('Court Street')).toBe('Court St')
   })
 
   it('always shortens Saint and Fort', () => {
@@ -91,5 +94,28 @@ describe('entranceLabel', () => {
     expect(entranceLabel({ ...base, side: 'east', entry: false })).toBe('Bedford Av · east side · exit only')
     expect(entranceLabel({ ...base, side: 'east', exit: false })).toBe('Bedford Av · east side · entry only')
     expect(entranceLabel({ ...base, street: null, plaza: 'Times Square', entry: false })).toBe('Times Square · exit only')
+  })
+})
+
+describe('entranceParts', () => {
+  it('splits the street part from the rest, for two lines', () => {
+    expect(entranceParts({ ...base, cross: 'North 7th Street', side: 'NE', type: 'Elevator' })).toEqual({
+      head: 'Bedford Av & N 7 St',
+      tail: 'NE corner · elevator',
+    })
+    expect(entranceParts(base)).toEqual({ head: 'Bedford Av', tail: '' })
+  })
+
+  it('takes the station-level wording: pair order, a nearby street and its side', () => {
+    expect(entranceLabel({ ...base, cross: 'North 7th Street', side: 'NE' }, { swap: true })).toBe('N 7 St & Bedford Av · NE corner')
+    expect(entranceLabel({ ...base, street: 'Broadway', side: 'west' }, { near: 'West 94th Street' })).toBe(
+      'Broadway · west side at W 94 St',
+    )
+    expect(entranceLabel({ ...base, street: 'Broadway', side: 'median' }, { near: 'West 96th Street', of: 'S' })).toBe(
+      'Broadway median S of W 96 St',
+    )
+    expect(entranceParts({ ...base, street: 'Broadway' }, { near: 'West 94th Street' })).toEqual({ head: 'Broadway', tail: 'at W 94 St' })
+    // A corner keeps its own cross street.
+    expect(entranceLabel({ ...base, cross: 'North 7th Street', side: 'NE' }, { near: 'Driggs Avenue' })).toBe('Bedford Av & N 7 St · NE corner')
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LABELS_FROM_DEPTH, LABELS_FULL_DEPTH } from './interiorReveal'
-import { DESKTOP_LABEL_RADIUS_M, PHONE_LABEL_RADIUS_M, streetLabelOpacity, streetLabelRadiusM } from './streetLabelReveal'
+import { DESKTOP_LABEL_RADIUS_M, isPhoneViewport, PHONE_LABEL_RADIUS_M, streetLabelOpacity, streetLabelRadiusM } from './streetLabelReveal'
 
 describe('streetLabelOpacity', () => {
   it('stays hidden while the view is a flat plan, whatever the reveal', () => {
@@ -29,5 +29,7 @@ describe('streetLabelRadiusM', () => {
     expect(streetLabelRadiusM({ width: 390, height: 844 })).toBe(PHONE_LABEL_RADIUS_M)
     expect(streetLabelRadiusM({ width: 844, height: 390 })).toBe(PHONE_LABEL_RADIUS_M)
     expect(streetLabelRadiusM({ width: 1440, height: 900 })).toBe(DESKTOP_LABEL_RADIUS_M)
+    expect(isPhoneViewport({ width: 390, height: 844 })).toBe(true)
+    expect(isPhoneViewport({ width: 768, height: 1024 })).toBe(false)
   })
 })
