@@ -194,6 +194,7 @@
     {"x":-1024,"z":-438,"type":"Stair","entry":true,"exit":true,"stopIds":["G14"],"street":"Broadway","wayId":484432105,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-650,"z":-682,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["G14"],"street":"Diversity Plaza","wayId":864232273,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-114,"z":76,"type":"Stair","entry":true,"exit":true,"stopIds":["G14"],"street":"74th Street","wayId":5708528,"cross":"Broadway","crossWayId":484432107,"side":"SW","plaza":null},
+    {"x":-63,"z":-530,"type":"Stair","entry":true,"exit":true,"stopIds":["710"],"street":"74th Street","wayId":198924815,"cross":"37th Road","crossWayId":346658400,"side":"SE","plaza":null},
     {"x":313,"z":4,"type":"Station House","entry":true,"exit":true,"stopIds":["G14"],"street":"Broadway","wayId":1435145585,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":336,"z":-193,"type":"Station House","entry":true,"exit":true,"stopIds":["G14"],"street":"Roosevelt Avenue","wayId":198924636,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":478,"z":-50,"type":"Station House","entry":true,"exit":true,"stopIds":["G14"],"street":"Roosevelt Avenue","wayId":198924636,"cross":"Broadway","crossWayId":939547207,"side":"SE","plaza":null},

@@ -65,6 +65,9 @@ so dev and preview serve under that path.
   `streetsData.test.ts` checks it. Rerun `data:streets`, `data:walk` and `data:search:streets` after it.
 - `npm run data:streets`: offline; builds `public/data/streets/<stationId>.json` for every `stations.json` station from
   the street pin and the catalog entrances (clip to 300 m, simplify, project to decimeters, join each entrance to its street).
+  Every member of a station complex gets the complex's whole entrance set (membership: `catalog/stations.json`
+  `gtfsStopId` to `complexId`; a row's own `complexId` is not trusted), each at x/z around that member's own point;
+  an entrance past a member's 300 m clip has no street there (logged "no street", a mark but no label).
   Rerun it after `data`, `data:streets:fetch`, `data:catalog:fetch` or a change to the `searchText.ts` synonyms (street join
   keys use them); `streetsOutputs.test.ts` fails while the files are stale. It builds and cap-checks every file before
   writing, prints the largest files, the totals and the join log (no street, near misses, bridge/tunnel ways, far entrances),
@@ -666,7 +669,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `public/data/streets/<stationId>.json`: one file per station (`StationStreets`, `src/data/streetSchema.ts`), built by
   `scripts/build-streets.ts` (IO only) from the pin and `catalog/entrances.json`. Pure: `scripts/lib/streetsPin.ts`
   (`loadPin`, `waysNear`), `streetsBuild.ts` (`buildStationStreets`: `clipSpan`, `simplifySpans`, `onewayOf`, packing),
-  `streetsEntrances.ts` (the station's entrances, `joinEntrance` from `entranceStreet.ts` and the join log), with
+  `streetsEntrances.ts` (the station's entrances: `entrancesByStation` expands a complex's rows to every member by
+  `parseComplexOf`; `joinEntrance` from `entranceStreet.ts` and the join log), with
   `streetsFixture.ts` the tests' mini pin. Outside the startup budget; own caps in `scripts/lib/budget.ts`
 - `data/basemap/`: `basemap.json` (the NYC basemap's `spec`: bbox, z15, layers kept and dropped; and its `pin`, null until the
   first publish: `asset`, sha256 and bytes of the tarball, `files` and `tileBytes` of the unpacked tiles; a pin without `asset`

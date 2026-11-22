@@ -104,6 +104,7 @@
     {"id":1536674162,"highway":"primary","name":"Atlantic Avenue","oneway":1,"nodes":[60,112]}
   ],
   "entrances": [
-    {"x":-33,"z":-537,"type":"Station House","entry":true,"exit":true,"stopIds":["S01"],"street":"Fulton Street","wayId":221696380,"cross":"Franklin Avenue","crossWayId":37394901,"side":"SW","plaza":null}
+    {"x":-33,"z":-537,"type":"Station House","entry":true,"exit":true,"stopIds":["S01"],"street":"Fulton Street","wayId":221696380,"cross":"Franklin Avenue","crossWayId":37394901,"side":"SW","plaza":null},
+    {"x":202,"z":-729,"type":"Stair","entry":true,"exit":true,"stopIds":["A45"],"street":"Franklin Avenue","wayId":817722190,"cross":"Fulton Street","crossWayId":350687715,"side":"NE","plaza":null}
   ]
 }

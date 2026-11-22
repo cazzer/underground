@@ -207,7 +207,15 @@
     {"id":1534922299,"highway":"residential","name":"Worth Street","oneway":0,"nodes":[173,271]}
   ],
   "entrances": [
+    {"x":-1510,"z":1495,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Park Row","wayId":520532096,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1378,"z":1590,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Park Row","wayId":520532096,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1369,"z":622,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Centre Street","wayId":1043517682,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-1278,"z":496,"type":"Elevator","entry":true,"exit":true,"stopIds":["640"],"street":"Centre Street","wayId":1043517682,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-1170,"z":398,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Centre Street","wayId":1043517682,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-815,"z":954,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Centre Street","wayId":1457886237,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-589,"z":602,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["M21"],"street":"Centre Street","wayId":1111954748,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-387,"z":-674,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Reade Street","wayId":5671314,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-203,"z":-752,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Lafayette Street","wayId":496990369,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":180,"z":-1066,"type":"Stair","entry":true,"exit":true,"stopIds":["M21"],"street":"Duane Street","wayId":46332307,"cross":"Lafayette Street","crossWayId":1030282418,"side":"NE","plaza":null}
   ]
 }

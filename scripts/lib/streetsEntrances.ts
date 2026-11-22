@@ -62,10 +62,38 @@ export function parseEntranceRows(json: unknown): EntranceInput[] {
   })
 }
 
-/** Rows grouped by every station id they list, so a two-stop row reaches both stations. */
-export function entrancesByStation(rows: readonly EntranceInput[]): Map<StationId, EntranceInput[]> {
+/** The catalog's complex of each stop: `gtfsStopId` to `complexId` over data/stations/catalog/stations.json (the
+ *  catalog's own membership; stations.json carries none). */
+export function parseComplexOf(json: unknown): Map<StationId, string> {
+  const rows = list(record(json, 'catalog/stations.json').rows, 'catalog/stations.json.rows')
+  return new Map(rows.map((raw, i): [StationId, string] => {
+    const at = `catalog/stations.json.rows[${i}]`
+    const row = record(raw, at)
+    return [text(row.gtfsStopId, `${at}.gtfsStopId`), text(row.complexId, `${at}.complexId`)]
+  }))
+}
+
+/** Rows grouped by every station id they list, so a two-stop row reaches both stations. With `complexOf`, every
+ *  station of a complex also gets every row that lists any of its members: a complex's entrances are one set, and
+ *  each member's file draws all of them (positions are relative to that member's own anchor, in `buildEntrances`).
+ *  A row's own `complexId` is not used: a few rows carry another complex's id (R20's four stairs say 607), while
+ *  the stop ids they list are right. A station `complexOf` lacks keeps only the rows that list it. */
+export function entrancesByStation(rows: readonly EntranceInput[], complexOf?: ReadonlyMap<StationId, string>): Map<StationId, EntranceInput[]> {
   const out = new Map<StationId, EntranceInput[]>()
-  for (const row of rows) for (const id of new Set(row.gtfsStopIds)) out.set(id, [...(out.get(id) ?? []), row])
+  const add = (id: StationId, row: EntranceInput): void => {
+    const have = out.get(id)
+    if (have === undefined) out.set(id, [row])
+    else if (!have.includes(row)) have.push(row)
+  }
+  const members = new Map<string, StationId[]>()
+  for (const [id, complex] of complexOf ?? []) members.set(complex, [...(members.get(complex) ?? []), id])
+  for (const row of rows) {
+    for (const id of new Set(row.gtfsStopIds)) {
+      add(id, row)
+      const complex = complexOf?.get(id)
+      if (complex !== undefined) for (const member of members.get(complex)!) add(member, row)
+    }
+  }
   return out
 }
 

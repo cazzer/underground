@@ -170,10 +170,17 @@
     {"id":1538944650,"highway":"secondary","name":"Court Street","oneway":1,"nodes":[274,273]}
   ],
   "entrances": [
+    {"x":-2257,"z":-2315,"type":"Stair","entry":true,"exit":true,"stopIds":["R28"],"street":"Montague Street","wayId":845359326,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-2095,"z":-2037,"type":"Stair","entry":true,"exit":true,"stopIds":["R28"],"street":"Montague Street","wayId":845359326,"cross":"Clinton Street","crossWayId":902782270,"side":"SW","plaza":null},
+    {"x":-2074,"z":-2248,"type":"Stair","entry":true,"exit":true,"stopIds":["R28"],"street":"Montague Street","wayId":845359326,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-921,"z":-129,"type":"Stair","entry":true,"exit":true,"stopIds":["423"],"street":"Joralemon Street","wayId":221759318,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-401,"z":-1485,"type":"Stair","entry":true,"exit":true,"stopIds":["232"],"street":"Montague Street","wayId":5677340,"cross":"Cadman Plaza West","crossWayId":1080943374,"side":"SW","plaza":null},
+    {"x":-374,"z":-1313,"type":"Stair","entry":true,"exit":true,"stopIds":["232"],"street":"Court Street","wayId":5678318,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-346,"z":67,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["423"],"street":"Joralemon Street","wayId":46121864,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-333,"z":-224,"type":"Stair","entry":true,"exit":true,"stopIds":["423"],"street":"Joralemon Street","wayId":46121864,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-130,"z":-1328,"type":"Elevator","entry":true,"exit":true,"stopIds":["232"],"street":"Court Street","wayId":5678318,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-127,"z":112,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["423"],"street":"Joralemon Street","wayId":46121864,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":31,"z":-1605,"type":"Stair","entry":true,"exit":true,"stopIds":["232"],"street":"Cadman Plaza West","wayId":46121844,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":35,"z":-172,"type":"Stair","entry":true,"exit":true,"stopIds":["423"],"street":"Joralemon Street","wayId":46121864,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

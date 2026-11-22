@@ -13,7 +13,7 @@ import { isClosedRing } from '../../src/lib/streetClass.ts'
 import { STREETS_FILE_GZIP_CAP_BYTES, STREETS_TOTAL_GZIP_CAP_BYTES } from './budget.ts'
 import { toStableJson } from './stableJson.ts'
 import { buildAllStreets, WALK_RADIUS_M } from './streetsBuild.ts'
-import { entrancesByStation, parseEntranceRows } from './streetsEntrances.ts'
+import { entrancesByStation, parseComplexOf, parseEntranceRows } from './streetsEntrances.ts'
 import { loadPin } from './streetsPin.ts'
 import type { StreetShard, StreetsManifest } from './streetsShard.ts'
 
@@ -24,7 +24,10 @@ const json = (url: URL): unknown => JSON.parse(readFileSync(url, 'utf8'))
 const stations = (json(new URL('../../public/data/stations.json', import.meta.url)) as StationsFile).stations
 const manifest = json(new URL('manifest.json', PIN)) as StreetsManifest
 const pin = loadPin(manifest, new Map(manifest.shards.map((s) => [s.file, json(new URL(s.file, PIN)) as StreetShard])))
-const entranceRows = entrancesByStation(parseEntranceRows(json(new URL('../../data/stations/catalog/entrances.json', import.meta.url))))
+const entranceRows = entrancesByStation(
+  parseEntranceRows(json(new URL('../../data/stations/catalog/entrances.json', import.meta.url))),
+  parseComplexOf(json(new URL('../../data/stations/catalog/stations.json', import.meta.url))),
+)
 const names = readdirSync(OUT).filter((f) => f.endsWith('.json')).sort()
 const fresh = buildAllStreets(stations, pin, entranceRows)
 const pinClosed = new Map(pin.ways.map((w) => [w.way.id, isClosedRing(w.way.nodes)]))
@@ -80,6 +83,22 @@ describe('committed street files', () => {
         if (prev !== undefined) expect(prev.x < e.x || (prev.x === e.x && prev.z <= e.z), `${name} entrance order`).toBe(true)
       })
     }
+  })
+
+  it("give every member of a complex the whole complex's entrances (Union Sq L03, R20 and 635 alike)", () => {
+    const catalog = (json(new URL('../../data/stations/catalog/stations.json', import.meta.url)) as { rows: { gtfsStopId: string; complexId: string }[] }).rows
+    const complexOf = new Map(catalog.map((r) => [r.gtfsStopId, r.complexId]))
+    const byComplex = new Map<string, string[]>()
+    for (const s of stations) byComplex.set(complexOf.get(s.id)!, [...(byComplex.get(complexOf.get(s.id)!) ?? []), s.id])
+    const sizes = new Map<string, number>()
+    for (const ids of byComplex.values()) {
+      if (ids.length < 2) continue
+      for (const id of ids) sizes.set(id, (json(new URL(`${id}.json`, OUT)) as StationStreets).entrances.length)
+      expect(new Set(ids.map((id) => sizes.get(id))).size, `complex of ${ids.join(', ')}`).toBe(1)
+    }
+    expect(sizes.get('L03')).toBeGreaterThan(0)
+    expect(sizes.get('L03')).toBe(sizes.get('635'))
+    expect(sizes.get('R20')).toBe(sizes.get('635'))
   })
 
   it('give Bedford Av (L08) its Bedford Av and North 7th Street corner', () => {

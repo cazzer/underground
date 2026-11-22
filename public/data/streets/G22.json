@@ -130,7 +130,14 @@
     {"id":1581232332,"highway":"tertiary","name":"44th Drive","oneway":1,"nodes":[206,203,202]}
   ],
   "entrances": [
+    {"x":-2873,"z":-1561,"type":"Stair","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1581232328,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-2804,"z":-1840,"type":"Stair","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1581232328,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-1624,"z":356,"type":"Stair","entry":true,"exit":true,"stopIds":["719"],"street":"45th Road","wayId":1419755025,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1325,"z":450,"type":"Elevator","entry":true,"exit":true,"stopIds":["719"],"street":"23rd Street","wayId":198924715,"cross":"Jackson Avenue","crossWayId":308337558,"side":"NE","plaza":null},
+    {"x":-1255,"z":444,"type":"Stair","entry":true,"exit":true,"stopIds":["719"],"street":"Jackson Avenue","wayId":308337558,"cross":"23rd Street","crossWayId":198924715,"side":"NE","plaza":null},
     {"x":-867,"z":321,"type":"Stair","entry":true,"exit":true,"stopIds":["G22"],"street":"Jackson Avenue","wayId":308337558,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-723,"z":-1321,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1089784562,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-372,"z":-913,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1581232330,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-152,"z":341,"type":"Stair","entry":true,"exit":true,"stopIds":["G22"],"street":"Court Square West","wayId":5704813,"cross":"Jackson Avenue","crossWayId":293571889,"side":"SW","plaza":null},
     {"x":264,"z":-373,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["G22"],"street":"Jackson Avenue","wayId":1089780546,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]

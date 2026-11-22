@@ -197,6 +197,14 @@
     {"id":1577910131,"highway":"secondary","name":"Broadway","oneway":0,"nodes":[227,228]}
   ],
   "entrances": [
-    {"x":-21,"z":-296,"type":"Stair","entry":true,"exit":true,"stopIds":["710"],"street":"74th Street","wayId":198924815,"cross":"37th Road","crossWayId":346658400,"side":"SE","plaza":null}
+    {"x":-981,"z":-205,"type":"Stair","entry":true,"exit":true,"stopIds":["G14"],"street":"Broadway","wayId":484432105,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-608,"z":-449,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["G14"],"street":"Diversity Plaza","wayId":864232273,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-72,"z":309,"type":"Stair","entry":true,"exit":true,"stopIds":["G14"],"street":"74th Street","wayId":5708528,"cross":"Broadway","crossWayId":484432107,"side":"SW","plaza":null},
+    {"x":-21,"z":-296,"type":"Stair","entry":true,"exit":true,"stopIds":["710"],"street":"74th Street","wayId":198924815,"cross":"37th Road","crossWayId":346658400,"side":"SE","plaza":null},
+    {"x":355,"z":238,"type":"Station House","entry":true,"exit":true,"stopIds":["G14"],"street":"Broadway","wayId":1435145585,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":378,"z":40,"type":"Station House","entry":true,"exit":true,"stopIds":["G14"],"street":"Roosevelt Avenue","wayId":198924636,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":520,"z":183,"type":"Station House","entry":true,"exit":true,"stopIds":["G14"],"street":"Roosevelt Avenue","wayId":198924636,"cross":"Broadway","crossWayId":939547207,"side":"SE","plaza":null},
+    {"x":933,"z":501,"type":"Stair","entry":true,"exit":true,"stopIds":["G14"],"street":"75th Street","wayId":939547209,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":1005,"z":991,"type":"Stair","entry":true,"exit":true,"stopIds":["G14"],"street":"75th Street","wayId":939981410,"cross":null,"crossWayId":null,"side":"east","plaza":null}
   ]
 }

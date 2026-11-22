@@ -185,6 +185,12 @@
     {"id":1576170670,"highway":"secondary","name":"Lafayette Street","oneway":1,"nodes":[191,23]}
   ],
   "entrances": [
+    {"x":-1603,"z":792,"type":"Stair","entry":true,"exit":true,"stopIds":["D21"],"street":"East Houston Street","wayId":420352246,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1429,"z":442,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["D21"],"street":"East Houston Street","wayId":420352244,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-948,"z":994,"type":"Stair","entry":true,"exit":true,"stopIds":["D21"],"street":"East Houston Street","wayId":420352243,"cross":"Crosby Street","crossWayId":1530150881,"side":"SE","plaza":null},
+    {"x":-807,"z":629,"type":"Stair","entry":true,"exit":true,"stopIds":["D21"],"street":"Crosby Street","wayId":524388531,"cross":"East Houston Street","crossWayId":1049854215,"side":"NE","plaza":null},
+    {"x":-802,"z":1038,"type":"Stair","entry":true,"exit":true,"stopIds":["D21"],"street":"East Houston Street","wayId":420352243,"cross":"Lafayette Street","crossWayId":420358894,"side":"SW","plaza":null},
+    {"x":-706,"z":672,"type":"Elevator","entry":true,"exit":true,"stopIds":["D21"],"street":"East Houston Street","wayId":1049854215,"cross":"Crosby Street","crossWayId":524388531,"side":"NE","plaza":null},
     {"x":-529,"z":1117,"type":"Stair","entry":true,"exit":true,"stopIds":["637"],"street":"East Houston Street","wayId":1498943995,"cross":"Lafayette Street","crossWayId":420358894,"side":"SE","plaza":null},
     {"x":-201,"z":806,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["637"],"street":"Mulberry Street","wayId":1498943997,"cross":"East Houston Street","crossWayId":524387551,"side":"NW","plaza":null},
     {"x":-128,"z":-34,"type":"Stair","entry":true,"exit":true,"stopIds":["637"],"street":"Bleecker Street","wayId":157012386,"cross":"Lafayette Street","crossWayId":420358898,"side":"SW","plaza":null},

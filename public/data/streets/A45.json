@@ -83,6 +83,7 @@
     {"id":1536674162,"highway":"primary","name":"Atlantic Avenue","oneway":1,"nodes":[47,86]}
   ],
   "entrances": [
+    {"x":827,"z":331,"type":"Station House","entry":true,"exit":true,"stopIds":["S01"],"street":"Fulton Street","wayId":221696380,"cross":"Franklin Avenue","crossWayId":37394901,"side":"SW","plaza":null},
     {"x":1062,"z":138,"type":"Stair","entry":true,"exit":true,"stopIds":["A45"],"street":"Franklin Avenue","wayId":817722190,"cross":"Fulton Street","crossWayId":350687715,"side":"NE","plaza":null}
   ]
 }

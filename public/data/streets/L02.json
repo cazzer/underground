@@ -65,7 +65,25 @@
     {"id":1266830888,"highway":"secondary","name":"6th Avenue","oneway":1,"nodes":[7,79]}
   ],
   "entrances": [
+    {"x":-3421,"z":-69,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":196117091,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-3028,"z":152,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 12th Street","wayId":646635889,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-3005,"z":-764,"type":"Stair","entry":false,"exit":true,"stopIds":["132"],"street":"West 13th Street","wayId":5669806,"cross":"7th Avenue","crossWayId":196117091,"side":"NW","plaza":null},
+    {"x":-2711,"z":-1349,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 14th Street","wayId":1080982438,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-2634,"z":-560,"type":"Stair","entry":false,"exit":true,"stopIds":["132"],"street":"West 13th Street","wayId":5669806,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-2455,"z":-1626,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":852992099,"cross":"West 14th Street","crossWayId":1080982438,"side":"NW","plaza":null},
+    {"x":-2437,"z":-1085,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":196117091,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-2188,"z":-1381,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 14th Street","wayId":1080982437,"cross":"7th Avenue","crossWayId":852992099,"side":"NE","plaza":null},
+    {"x":-343,"z":-89,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-254,"z":-249,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-232,"z":-27,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":"6th Avenue","crossWayId":496979224,"side":"SW","plaza":null},
+    {"x":-145,"z":-194,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":"6th Avenue","crossWayId":496978510,"side":"NW","plaza":null},
     {"x":52,"z":132,"type":"Stair","entry":true,"exit":true,"stopIds":["L02"],"street":"West 14th Street","wayId":1080982435,"cross":"6th Avenue","crossWayId":496979224,"side":"SE","plaza":null},
-    {"x":196,"z":215,"type":"Stair","entry":true,"exit":true,"stopIds":["L02"],"street":"West 14th Street","wayId":1080982435,"cross":null,"crossWayId":null,"side":"south","plaza":null}
+    {"x":196,"z":215,"type":"Stair","entry":true,"exit":true,"stopIds":["L02"],"street":"West 14th Street","wayId":1080982435,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":212,"z":-14,"type":"Elevator","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982435,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":311,"z":61,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982435,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":574,"z":-1521,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 16th Street","wayId":496993763,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":654,"z":-1663,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 16th Street","wayId":496993763,"cross":"6th Avenue","crossWayId":1266830886,"side":"NW","plaza":null},
+    {"x":860,"z":-1363,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 16th Street","wayId":348477349,"cross":"6th Avenue","crossWayId":1266830886,"side":"SE","plaza":null},
+    {"x":953,"z":-1495,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 16th Street","wayId":348477349,"cross":"6th Avenue","crossWayId":1266830886,"side":"NE","plaza":null}
   ]
 }

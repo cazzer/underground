@@ -193,7 +193,13 @@
     {"id":1576170671,"highway":"secondary","name":"4th Avenue","oneway":1,"nodes":[296,69,21]}
   ],
   "entrances": [
+    {"x":-1151,"z":-247,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"East 14th Street","wayId":666752576,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-969,"z":-674,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"East 14th Street","wayId":666752576,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-877,"z":-95,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"East 14th Street","wayId":666752576,"cross":"Broadway","crossWayId":421825692,"side":"SW","plaza":null},
+    {"x":-575,"z":-1823,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square West","wayId":667344132,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-408,"z":-2090,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square West","wayId":5670731,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-312,"z":143,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":420522695,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-265,"z":-713,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square East","wayId":420598402,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-179,"z":218,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":420522695,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":148,"z":-578,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["635"],"street":"East 15th Street","wayId":451808492,"cross":"Union Square East","crossWayId":34080149,"side":"SE","plaza":null},
     {"x":215,"z":460,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":1080982440,"cross":"4th Avenue","crossWayId":1576170671,"side":"SE","plaza":null},

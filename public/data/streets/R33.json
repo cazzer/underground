@@ -117,6 +117,9 @@
     {"id":1283378839,"highway":"tertiary","name":"9th Street","oneway":0,"nodes":[13,119,146]}
   ],
   "entrances": [
+    {"x":-963,"z":997,"type":"Station House","entry":true,"exit":true,"stopIds":["F23"],"street":"10th Street","wayId":46846379,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-803,"z":895,"type":"Station House","entry":true,"exit":true,"stopIds":["F23"],"street":"4th Avenue","wayId":1053562976,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-499,"z":1085,"type":"Station House","entry":true,"exit":true,"stopIds":["F23"],"street":"4th Avenue","wayId":420346477,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-403,"z":347,"type":"Stair","entry":true,"exit":true,"stopIds":["R33"],"street":"4th Avenue","wayId":420346455,"cross":"9th Street","crossWayId":227074810,"side":"NW","plaza":null},
     {"x":-157,"z":495,"type":"Stair","entry":true,"exit":true,"stopIds":["R33"],"street":"4th Avenue","wayId":680830803,"cross":"9th Street","crossWayId":1283378839,"side":"NE","plaza":null}
   ]

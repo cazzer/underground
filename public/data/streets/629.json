@@ -118,6 +118,10 @@
     {"x":101,"z":-507,"type":"Stair","entry":true,"exit":true,"stopIds":["629"],"street":"East 60th Street","wayId":46334594,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":328,"z":-144,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["629"],"street":"East 60th Street","wayId":963856064,"cross":"Lexington Avenue","crossWayId":458180200,"side":"SE","plaza":null},
     {"x":335,"z":-364,"type":"Stair","entry":true,"exit":true,"stopIds":["629"],"street":"East 60th Street","wayId":963856064,"cross":"Lexington Avenue","crossWayId":1106471568,"side":"NE","plaza":null},
-    {"x":496,"z":-93,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["629"],"street":"East 60th Street","wayId":963856064,"cross":null,"crossWayId":null,"side":"south","plaza":null}
+    {"x":496,"z":-93,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["629"],"street":"East 60th Street","wayId":963856064,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":1358,"z":488,"type":"Stair","entry":true,"exit":true,"stopIds":["R11"],"street":"3rd Avenue","wayId":420806145,"cross":"East 60th Street","crossWayId":46521995,"side":"SW","plaza":null},
+    {"x":1541,"z":162,"type":"Stair","entry":true,"exit":true,"stopIds":["R11"],"street":"3rd Avenue","wayId":375165666,"cross":"East 60th Street","crossWayId":46521995,"side":"NW","plaza":null},
+    {"x":1560,"z":597,"type":"Stair","entry":true,"exit":true,"stopIds":["R11"],"street":"3rd Avenue","wayId":420806145,"cross":"East 60th Street","crossWayId":962829746,"side":"SE","plaza":null},
+    {"x":1736,"z":276,"type":"Stair","entry":true,"exit":true,"stopIds":["R11"],"street":"3rd Avenue","wayId":375165666,"cross":"East 60th Street","crossWayId":962829746,"side":"NE","plaza":null}
   ]
 }

@@ -202,6 +202,8 @@
     {"x":-126,"z":505,"type":"Easement - Street","entry":false,"exit":true,"stopIds":["F15"],"street":"Essex Street","wayId":1156475401,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-102,"z":-197,"type":"Stair","entry":true,"exit":true,"stopIds":["F15"],"street":"Essex Street","wayId":1317731497,"cross":"Delancey Street","crossWayId":40337681,"side":"NW","plaza":null},
     {"x":201,"z":-370,"type":"Stair","entry":true,"exit":true,"stopIds":["F15"],"street":"Essex Street","wayId":421826773,"cross":null,"crossWayId":null,"side":"east","plaza":null},
-    {"x":239,"z":-432,"type":"Easement - Street","entry":false,"exit":true,"stopIds":["F15"],"street":"Essex Street","wayId":1499239356,"cross":null,"crossWayId":null,"side":"east","plaza":null}
+    {"x":239,"z":-432,"type":"Easement - Street","entry":false,"exit":true,"stopIds":["F15"],"street":"Essex Street","wayId":1499239356,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":390,"z":57,"type":"Stair","entry":true,"exit":true,"stopIds":["M18"],"street":"Delancey Street","wayId":420354145,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":786,"z":215,"type":"Stair","entry":true,"exit":true,"stopIds":["M18"],"street":"Delancey Street","wayId":463035843,"cross":"Norfolk Street","crossWayId":1354943102,"side":"NE","plaza":null}
   ]
 }

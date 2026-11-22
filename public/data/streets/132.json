@@ -101,6 +101,18 @@
     {"x":239,"z":-15,"type":"Stair","entry":false,"exit":true,"stopIds":["132"],"street":"West 13th Street","wayId":5669806,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":418,"z":-1081,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":852992099,"cross":"West 14th Street","crossWayId":1080982438,"side":"NW","plaza":null},
     {"x":436,"z":-540,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":196117091,"cross":null,"crossWayId":null,"side":"east","plaza":null},
-    {"x":685,"z":-836,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 14th Street","wayId":1080982437,"cross":"7th Avenue","crossWayId":852992099,"side":"NE","plaza":null}
+    {"x":685,"z":-836,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 14th Street","wayId":1080982437,"cross":"7th Avenue","crossWayId":852992099,"side":"NE","plaza":null},
+    {"x":2530,"z":456,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":2619,"z":296,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":2641,"z":518,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":"6th Avenue","crossWayId":496979224,"side":"SW","plaza":null},
+    {"x":2728,"z":351,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":"6th Avenue","crossWayId":496978510,"side":"NW","plaza":null},
+    {"x":2925,"z":676,"type":"Stair","entry":true,"exit":true,"stopIds":["L02"],"street":"West 14th Street","wayId":1080982435,"cross":"6th Avenue","crossWayId":496979224,"side":"SE","plaza":null},
+    {"x":3069,"z":760,"type":"Stair","entry":true,"exit":true,"stopIds":["L02"],"street":"West 14th Street","wayId":1080982435,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":3085,"z":531,"type":"Elevator","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982435,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":3185,"z":606,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982435,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":3447,"z":-976,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 16th Street","wayId":496993763,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":3527,"z":-1119,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 16th Street","wayId":496993763,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":3733,"z":-819,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 16th Street","wayId":496993763,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":3827,"z":-950,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 16th Street","wayId":496993763,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

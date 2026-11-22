@@ -221,7 +221,9 @@
     {"x":-663,"z":307,"type":"Elevator","entry":true,"exit":true,"stopIds":["640"],"street":"Centre Street","wayId":1043517682,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-555,"z":209,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Centre Street","wayId":1043517682,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-200,"z":765,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Centre Street","wayId":1457886237,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":26,"z":413,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["M21"],"street":"Centre Street","wayId":1111954748,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":228,"z":-863,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Reade Street","wayId":5671314,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":412,"z":-941,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Lafayette Street","wayId":496990369,"cross":null,"crossWayId":null,"side":"west","plaza":null}
+    {"x":412,"z":-941,"type":"Stair","entry":true,"exit":true,"stopIds":["640"],"street":"Lafayette Street","wayId":496990369,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":795,"z":-1255,"type":"Stair","entry":true,"exit":true,"stopIds":["M21"],"street":"Duane Street","wayId":46332307,"cross":"Lafayette Street","crossWayId":1030282418,"side":"NE","plaza":null}
   ]
 }

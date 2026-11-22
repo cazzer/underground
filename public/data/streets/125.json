@@ -201,11 +201,23 @@
     {"id":1550701429,"highway":"primary","name":"9th Avenue","oneway":1,"nodes":[369,368]}
   ],
   "entrances": [
+    {"x":-1210,"z":1645,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A24"],"street":"West 57th Street","wayId":505582406,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1124,"z":1948,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A24"],"street":"8th Avenue","wayId":439933933,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-863,"z":1416,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A24"],"street":"8th Avenue","wayId":196117092,"cross":"West 57th Street","crossWayId":505582406,"side":"NW","plaza":null},
+    {"x":-683,"z":593,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A24"],"street":"West 58th Street","wayId":46525065,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-636,"z":1958,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A24"],"street":"West 57th Street","wayId":196117083,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-557,"z":503,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A24"],"street":"Columbus Circle","wayId":460065822,"cross":"West 58th Street","crossWayId":46525065,"side":"NW","plaza":null},
+    {"x":-540,"z":1677,"type":"Stair","entry":true,"exit":true,"stopIds":["A24"],"street":"West 57th Street","wayId":196117083,"cross":"8th Avenue","crossWayId":196117092,"side":"NE","plaza":null},
+    {"x":-477,"z":623,"type":"Elevator","entry":true,"exit":true,"stopIds":["A24"],"street":"West 58th Street","wayId":46525065,"cross":"8th Avenue","crossWayId":420890023,"side":"NW","plaza":null},
     {"x":-317,"z":-1221,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Broadway","wayId":835176555,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-317,"z":-1131,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Broadway","wayId":835176555,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-206,"z":949,"type":"Stair","entry":true,"exit":true,"stopIds":["A24"],"street":"West 58th Street","wayId":308322446,"cross":"8th Avenue","crossWayId":420890023,"side":"NE","plaza":null},
     {"x":-157,"z":-642,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Broadway","wayId":835176554,"cross":"West 60th Street","crossWayId":425335557,"side":"median","plaza":null},
     {"x":-153,"z":-369,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Broadway","wayId":835176554,"cross":null,"crossWayId":null,"side":"median","plaza":null},
+    {"x":116,"z":-534,"type":"Stair","entry":true,"exit":true,"stopIds":["A24"],"street":"Broadway","wayId":91383966,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":286,"z":-495,"type":"Elevator","entry":true,"exit":true,"stopIds":["A24"],"street":"Central Park West","wayId":1024425032,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":414,"z":651,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Central Park South","wayId":1211612937,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":589,"z":667,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Central Park South","wayId":167922075,"cross":null,"crossWayId":null,"side":"south","plaza":null}
+    {"x":589,"z":667,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Central Park South","wayId":167922075,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":638,"z":-476,"type":"Stair","entry":true,"exit":true,"stopIds":["A24"],"street":"Central Park West","wayId":1024425032,"cross":null,"crossWayId":null,"side":"east","plaza":null}
   ]
 }

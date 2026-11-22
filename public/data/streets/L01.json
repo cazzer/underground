@@ -124,6 +124,15 @@
   ],
   "entrances": [
     {"x":-212,"z":40,"type":"Stair","entry":true,"exit":true,"stopIds":["L01"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":169,"z":250,"type":"Stair","entry":true,"exit":true,"stopIds":["L01"],"street":"West 14th Street","wayId":1080982439,"cross":"8th Avenue","crossWayId":465098295,"side":"SE","plaza":null}
+    {"x":-121,"z":-185,"type":"Elevator","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-82,"z":-205,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":169,"z":250,"type":"Stair","entry":true,"exit":true,"stopIds":["L01"],"street":"West 14th Street","wayId":1080982439,"cross":"8th Avenue","crossWayId":465098295,"side":"SE","plaza":null},
+    {"x":301,"z":6,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":1080982439,"cross":"8th Avenue","crossWayId":194923811,"side":"NE","plaza":null},
+    {"x":309,"z":-926,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 15th Street","wayId":458106347,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":618,"z":-1356,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["A31"],"street":"8th Avenue","wayId":420598345,"cross":"West 16th Street","crossWayId":348477348,"side":"SW","plaza":null},
+    {"x":687,"z":-715,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 15th Street","wayId":496993920,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":705,"z":-1633,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 16th Street","wayId":348477348,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":1016,"z":-1274,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 16th Street","wayId":496986855,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":1094,"z":-1422,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 16th Street","wayId":496986855,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

@@ -101,6 +101,7 @@
     {"id":1473509957,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[110,60,63]}
   ],
   "entrances": [
+    {"x":-827,"z":77,"type":"Stair","entry":true,"exit":true,"stopIds":["S04"],"street":"Eastern Parkway Service Road","wayId":110277551,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":132,"z":370,"type":"Stair","entry":true,"exit":true,"stopIds":["239"],"street":"Franklin Avenue","wayId":495491358,"cross":"Eastern Parkway Service Road","crossWayId":110277551,"side":"SE","plaza":null},
     {"x":307,"z":-287,"type":"Stair","entry":true,"exit":true,"stopIds":["239"],"street":"Franklin Avenue","wayId":965605728,"cross":"Eastern Parkway Service Road","crossWayId":658936633,"side":"NE","plaza":null},
     {"x":343,"z":220,"type":"Stair","entry":true,"exit":true,"stopIds":["239"],"street":"Eastern Parkway Service Road","wayId":110277551,"cross":null,"crossWayId":null,"side":"north","plaza":null},

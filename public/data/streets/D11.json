@@ -147,9 +147,17 @@
     {"id":1431542568,"highway":"footway","name":null,"oneway":0,"nodes":[172,234]}
   ],
   "entrances": [
+    {"x":-626,"z":568,"type":"Stair","entry":true,"exit":true,"stopIds":["414"],"street":"River Avenue","wayId":1418891429,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-599,"z":499,"type":"Stair","entry":true,"exit":true,"stopIds":["414"],"street":"River Avenue","wayId":1418891429,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-565,"z":424,"type":"Stair","entry":true,"exit":true,"stopIds":["414"],"street":"River Avenue","wayId":1418891429,"cross":"East 161st Street","crossWayId":232824512,"side":"SW","plaza":null},
+    {"x":-532,"z":339,"type":"Stair","entry":true,"exit":true,"stopIds":["414"],"street":"East 161st Street","wayId":232824512,"cross":"River Avenue","crossWayId":1418891429,"side":"SW","plaza":null},
     {"x":-505,"z":488,"type":"Stair","entry":true,"exit":true,"stopIds":["D11"],"street":"River Avenue","wayId":1418891429,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-464,"z":406,"type":"Stair","entry":true,"exit":true,"stopIds":["D11"],"street":"River Avenue","wayId":1418891429,"cross":"East 161st Street","crossWayId":232824512,"side":"SW","plaza":null},
+    {"x":-379,"z":168,"type":"Stair","entry":true,"exit":true,"stopIds":["414"],"street":"East 161st Street","wayId":232824512,"cross":"River Avenue","crossWayId":581475790,"side":"median","plaza":null},
     {"x":-298,"z":469,"type":"Stair","entry":true,"exit":true,"stopIds":["D11"],"street":"River Avenue","wayId":1418891429,"cross":"East 161st Street","crossWayId":521150769,"side":"SE","plaza":null},
+    {"x":-294,"z":-36,"type":"Stair","entry":true,"exit":true,"stopIds":["414"],"street":"East 161st Street","wayId":1290576312,"cross":"River Avenue","crossWayId":223883745,"side":"median","plaza":null},
+    {"x":-162,"z":250,"type":"Stair","entry":true,"exit":true,"stopIds":["414"],"street":"East 161st Street","wayId":521150769,"cross":"River Avenue","crossWayId":581475790,"side":"median","plaza":null},
+    {"x":-80,"z":62,"type":"Stair","entry":true,"exit":true,"stopIds":["414"],"street":"East 161st Street","wayId":963602838,"cross":"River Avenue","crossWayId":223883745,"side":"median","plaza":null},
     {"x":5,"z":-98,"type":"Elevator","entry":true,"exit":true,"stopIds":["D11"],"street":"East 161st Street","wayId":589104139,"cross":"River Avenue","crossWayId":581475798,"side":"NE","plaza":null},
     {"x":52,"z":-112,"type":"Stair","entry":true,"exit":true,"stopIds":["D11"],"street":"East 161st Street","wayId":589104139,"cross":"River Avenue","crossWayId":581475798,"side":"NE","plaza":null},
     {"x":1206,"z":598,"type":"Underpass","entry":true,"exit":true,"stopIds":["D11"],"street":"East 161st Street","wayId":469111997,"cross":"Walton Avenue","crossWayId":278572389,"side":"median","plaza":null},

@@ -218,6 +218,12 @@
     {"x":-355,"z":1095,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"East 14th Street","wayId":666752576,"cross":"Broadway","crossWayId":421825692,"side":"SW","plaza":null},
     {"x":-52,"z":-633,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square West","wayId":667344132,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":114,"z":-900,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square West","wayId":5670731,"cross":null,"crossWayId":null,"side":"east","plaza":null},
-    {"x":257,"z":477,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square East","wayId":420598402,"cross":null,"crossWayId":null,"side":"west","plaza":null}
+    {"x":210,"z":1333,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":420522695,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":257,"z":477,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square East","wayId":420598402,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":344,"z":1408,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":420522695,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":670,"z":612,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["635"],"street":"East 15th Street","wayId":451808492,"cross":"Union Square East","crossWayId":34080149,"side":"SE","plaza":null},
+    {"x":737,"z":1650,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":1080982440,"cross":"4th Avenue","crossWayId":1576170671,"side":"SE","plaza":null},
+    {"x":873,"z":1709,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":195743164,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":931,"z":1472,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":1080982440,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

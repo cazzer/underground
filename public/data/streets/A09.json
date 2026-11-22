@@ -192,6 +192,9 @@
     {"id":1502794635,"highway":"secondary","name":"Saint Nicholas Avenue","oneway":0,"nodes":[263,215]}
   ],
   "entrances": [
+    {"x":-547,"z":-166,"type":"Stair","entry":true,"exit":true,"stopIds":["112"],"street":"Broadway","wayId":541442319,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-452,"z":-349,"type":"Stair","entry":true,"exit":true,"stopIds":["112"],"street":"Broadway","wayId":541442319,"cross":"West 168th Street","crossWayId":1452139902,"side":"SW","plaza":null},
+    {"x":-139,"z":-7,"type":"Stair","entry":true,"exit":true,"stopIds":["112"],"street":"Saint Nicholas Avenue","wayId":541442322,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-10,"z":-1283,"type":"Stair","entry":true,"exit":true,"stopIds":["A09"],"street":"West 169th Street","wayId":763331303,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":83,"z":-1353,"type":"Stair","entry":true,"exit":true,"stopIds":["A09"],"street":"Broadway","wayId":242514168,"cross":"West 169th Street","crossWayId":763331303,"side":"NW","plaza":null},
     {"x":106,"z":-21,"type":"Elevator","entry":true,"exit":true,"stopIds":["A09"],"street":"Saint Nicholas Avenue","wayId":541442322,"cross":null,"crossWayId":null,"side":"east","plaza":null},

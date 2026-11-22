@@ -156,7 +156,33 @@
     {"id":1320232776,"highway":"primary","name":"West 42nd Street","oneway":0,"nodes":[20,7]}
   ],
   "entrances": [
+    {"x":-4053,"z":-19,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A27"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null},
+    {"x":-3950,"z":-150,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":"West 40th Street","wayId":542258060,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-3707,"z":-410,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["A27"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null},
+    {"x":-3648,"z":193,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":"West 40th Street","wayId":542258060,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-3344,"z":-1072,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["A27"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null},
+    {"x":-3188,"z":-1661,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null},
+    {"x":-2813,"z":-2185,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":"West 43rd Street","wayId":1049845754,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-2715,"z":-1617,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A27"],"street":"West 42nd Street","wayId":525729008,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-2468,"z":-2892,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A27"],"street":"West 44th Street","wayId":1198594027,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-2346,"z":-3019,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":"West 44th Street","wayId":1198594027,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-2060,"z":-2675,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":"West 44th Street","wayId":1198594027,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1689,"z":1293,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 40th Street","wayId":542258060,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1330,"z":1514,"type":"Stair","entry":true,"exit":true,"stopIds":["127"],"street":"West 40th Street","wayId":569345546,"cross":"7th Avenue","crossWayId":1049920716,"side":"SE","plaza":null},
+    {"x":-1215,"z":454,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 41st Street","wayId":195743209,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-1082,"z":-169,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 42nd Street","wayId":525729008,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-953,"z":814,"type":"Stair","entry":true,"exit":true,"stopIds":["127"],"street":"West 41st Street","wayId":803047266,"cross":"7th Avenue","crossWayId":195743344,"side":"SE","plaza":null},
+    {"x":-896,"z":-411,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 42nd Street","wayId":525729008,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-812,"z":890,"type":"Stair","entry":true,"exit":true,"stopIds":["127"],"street":"West 41st Street","wayId":803047266,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-745,"z":1626,"type":"Stair","entry":true,"exit":true,"stopIds":["R16"],"street":"West 40th Street","wayId":569345546,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-706,"z":1837,"type":"Stair","entry":true,"exit":true,"stopIds":["R16"],"street":"West 40th Street","wayId":569345546,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-627,"z":207,"type":"Easement - Street","entry":false,"exit":true,"stopIds":["127"],"street":"7th Avenue","wayId":167922070,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-587,"z":131,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"7th Avenue","wayId":167922070,"cross":"West 42nd Street","crossWayId":167922076,"side":"SE","plaza":null},
+    {"x":-487,"z":137,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 42nd Street","wayId":167922076,"cross":"7th Avenue","crossWayId":167922070,"side":"SE","plaza":null},
+    {"x":-412,"z":1994,"type":"Stair","entry":true,"exit":true,"stopIds":["R16"],"street":"West 40th Street","wayId":542258061,"cross":"Broadway","crossWayId":958919323,"side":"SE","plaza":null},
+    {"x":-343,"z":1853,"type":"Stair","entry":true,"exit":true,"stopIds":["R16"],"street":"West 40th Street","wayId":542258061,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-193,"z":-136,"type":"Elevator","entry":true,"exit":true,"stopIds":["902"],"street":"Broadway","wayId":1117680758,"cross":null,"crossWayId":null,"side":"west","plaza":null},
-    {"x":-137,"z":-219,"type":"Stair","entry":true,"exit":true,"stopIds":["902"],"street":"Broadway","wayId":1117680758,"cross":null,"crossWayId":null,"side":"west","plaza":null}
+    {"x":-137,"z":-219,"type":"Stair","entry":true,"exit":true,"stopIds":["902"],"street":"Broadway","wayId":1117680758,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-97,"z":436,"type":"Stair","entry":true,"exit":true,"stopIds":["127"],"street":"Broadway","wayId":35027229,"cross":"West 42nd Street","crossWayId":1136952921,"side":"SE","plaza":null}
   ]
 }

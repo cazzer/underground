@@ -118,8 +118,15 @@
     {"id":1581232332,"highway":"tertiary","name":"44th Drive","oneway":1,"nodes":[172,170,164,169]}
   ],
   "entrances": [
+    {"x":-1668,"z":-1039,"type":"Stair","entry":true,"exit":true,"stopIds":["F09"],"street":"21st Street","wayId":1204543480,"cross":"44th Drive","crossWayId":1089784563,"side":"SE","plaza":null},
+    {"x":-1600,"z":-1317,"type":"Stair","entry":true,"exit":true,"stopIds":["F09"],"street":"21st Street","wayId":108297469,"cross":"44th Drive","crossWayId":1089784563,"side":"NE","plaza":null},
     {"x":-420,"z":879,"type":"Stair","entry":true,"exit":true,"stopIds":["719"],"street":"45th Road","wayId":1419755025,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-121,"z":972,"type":"Elevator","entry":true,"exit":true,"stopIds":["719"],"street":"23rd Street","wayId":198924715,"cross":"Jackson Avenue","crossWayId":308337558,"side":"NE","plaza":null},
-    {"x":-51,"z":966,"type":"Stair","entry":true,"exit":true,"stopIds":["719"],"street":"Jackson Avenue","wayId":308337558,"cross":"23rd Street","crossWayId":198924715,"side":"NE","plaza":null}
+    {"x":-51,"z":966,"type":"Stair","entry":true,"exit":true,"stopIds":["719"],"street":"Jackson Avenue","wayId":308337558,"cross":"23rd Street","crossWayId":198924715,"side":"NE","plaza":null},
+    {"x":338,"z":843,"type":"Stair","entry":true,"exit":true,"stopIds":["G22"],"street":"Jackson Avenue","wayId":308337558,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":481,"z":-798,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1089784562,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":833,"z":-390,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1581232330,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":1052,"z":864,"type":"Stair","entry":true,"exit":true,"stopIds":["G22"],"street":"Court Square West","wayId":5704813,"cross":"Jackson Avenue","crossWayId":293571889,"side":"SW","plaza":null},
+    {"x":1468,"z":149,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["G22"],"street":"Jackson Avenue","wayId":1089780546,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

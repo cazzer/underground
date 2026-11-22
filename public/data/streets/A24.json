@@ -203,9 +203,15 @@
     {"x":-717,"z":558,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A24"],"street":"Columbus Circle","wayId":460065822,"cross":"West 58th Street","crossWayId":46525065,"side":"NW","plaza":null},
     {"x":-700,"z":1732,"type":"Stair","entry":true,"exit":true,"stopIds":["A24"],"street":"West 57th Street","wayId":196117083,"cross":"8th Avenue","crossWayId":196117092,"side":"NE","plaza":null},
     {"x":-637,"z":679,"type":"Elevator","entry":true,"exit":true,"stopIds":["A24"],"street":"West 58th Street","wayId":46525065,"cross":"8th Avenue","crossWayId":420890023,"side":"NW","plaza":null},
+    {"x":-477,"z":-1165,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Broadway","wayId":835176555,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-477,"z":-1075,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Broadway","wayId":835176555,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-366,"z":1005,"type":"Stair","entry":true,"exit":true,"stopIds":["A24"],"street":"West 58th Street","wayId":308322446,"cross":"8th Avenue","crossWayId":420890023,"side":"NE","plaza":null},
+    {"x":-317,"z":-587,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Broadway","wayId":835176554,"cross":"West 60th Street","crossWayId":425335557,"side":"median","plaza":null},
+    {"x":-313,"z":-314,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Broadway","wayId":835176554,"cross":null,"crossWayId":null,"side":"median","plaza":null},
     {"x":-44,"z":-478,"type":"Stair","entry":true,"exit":true,"stopIds":["A24"],"street":"Broadway","wayId":91383966,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":126,"z":-439,"type":"Elevator","entry":true,"exit":true,"stopIds":["A24"],"street":"Central Park West","wayId":1024425032,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":254,"z":707,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Central Park South","wayId":1211612937,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":429,"z":722,"type":"Stair","entry":true,"exit":true,"stopIds":["125"],"street":"Central Park South","wayId":167922075,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":478,"z":-421,"type":"Stair","entry":true,"exit":true,"stopIds":["A24"],"street":"Central Park West","wayId":1024425032,"cross":null,"crossWayId":null,"side":"east","plaza":null}
   ]
 }

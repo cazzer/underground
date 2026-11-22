@@ -6,7 +6,7 @@
   },
   "format": 1,
   "license": "ODbL-1.0",
-  "attribution": ["© OpenStreetMap contributors"],
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
   "osmTimestamp": "2026-11-22T04:33:58Z",
   "radiusM": 300,
   "walkRadiusM": 100,
@@ -110,5 +110,10 @@
     {"id":1453527164,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[117,118]},
     {"id":1453542211,"highway":"residential","name":"East 150th Street","oneway":1,"nodes":[3,2,1]}
   ],
-  "entrances": []
+  "entrances": [
+    {"x":-790,"z":168,"type":"Stair","entry":true,"exit":true,"stopIds":["415"],"street":"Grand Concourse","wayId":1314076594,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-742,"z":27,"type":"Stair","entry":true,"exit":true,"stopIds":["415"],"street":"Grand Concourse","wayId":1314076594,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-454,"z":161,"type":"Stair","entry":true,"exit":true,"stopIds":["415"],"street":"Grand Concourse","wayId":232551789,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-321,"z":6,"type":"Stair","entry":true,"exit":true,"stopIds":["415"],"street":"East 149th Street","wayId":521149959,"cross":"Grand Concourse","crossWayId":232551789,"side":"SE","plaza":null}
+  ]
 }

@@ -200,6 +200,11 @@
   "entrances": [
     {"x":-68,"z":-344,"type":"Stair","entry":true,"exit":true,"stopIds":["112"],"street":"Broadway","wayId":541442319,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":28,"z":-527,"type":"Stair","entry":true,"exit":true,"stopIds":["112"],"street":"Broadway","wayId":541442319,"cross":"West 168th Street","crossWayId":1452139902,"side":"SW","plaza":null},
-    {"x":341,"z":-185,"type":"Stair","entry":true,"exit":true,"stopIds":["112"],"street":"Saint Nicholas Avenue","wayId":541442322,"cross":null,"crossWayId":null,"side":"west","plaza":null}
+    {"x":341,"z":-185,"type":"Stair","entry":true,"exit":true,"stopIds":["112"],"street":"Saint Nicholas Avenue","wayId":541442322,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":469,"z":-1461,"type":"Stair","entry":true,"exit":true,"stopIds":["A09"],"street":"West 169th Street","wayId":763331303,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":562,"z":-1531,"type":"Stair","entry":true,"exit":true,"stopIds":["A09"],"street":"Broadway","wayId":242514168,"cross":"West 169th Street","crossWayId":763331303,"side":"NW","plaza":null},
+    {"x":585,"z":-199,"type":"Elevator","entry":true,"exit":true,"stopIds":["A09"],"street":"Saint Nicholas Avenue","wayId":541442322,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":745,"z":-216,"type":"Stair","entry":true,"exit":true,"stopIds":["A09"],"street":"West 168th Street","wayId":196117081,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":895,"z":-1353,"type":"Stair","entry":true,"exit":true,"stopIds":["A09"],"street":"Saint Nicholas Avenue","wayId":441637777,"cross":"Broadway","crossWayId":44164412,"side":"SE","plaza":null}
   ]
 }

@@ -6,7 +6,7 @@
   },
   "format": 1,
   "license": "ODbL-1.0",
-  "attribution": ["© OpenStreetMap contributors"],
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
   "osmTimestamp": "2026-11-22T04:33:58Z",
   "radiusM": 300,
   "walkRadiusM": 100,
@@ -205,5 +205,18 @@
     {"id":1547788689,"highway":"residential","name":"Irving Place","oneway":0,"nodes":[11,229]},
     {"id":1576170671,"highway":"secondary","name":"4th Avenue","oneway":1,"nodes":[356,70,20]}
   ],
-  "entrances": []
+  "entrances": [
+    {"x":-494,"z":-113,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"East 14th Street","wayId":666752576,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-312,"z":-540,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"East 14th Street","wayId":666752576,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-220,"z":39,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"East 14th Street","wayId":666752576,"cross":"Broadway","crossWayId":421825692,"side":"SW","plaza":null},
+    {"x":82,"z":-1689,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square West","wayId":667344132,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":249,"z":-1956,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square West","wayId":5670731,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":345,"z":276,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":420522695,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":392,"z":-579,"type":"Stair","entry":true,"exit":true,"stopIds":["R20"],"street":"Union Square East","wayId":420598402,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":479,"z":352,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":420522695,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":805,"z":-444,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["635"],"street":"East 15th Street","wayId":451808492,"cross":"Union Square East","crossWayId":34080149,"side":"SE","plaza":null},
+    {"x":872,"z":594,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":1080982440,"cross":"4th Avenue","crossWayId":1576170671,"side":"SE","plaza":null},
+    {"x":1008,"z":652,"type":"Stair","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":195743164,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":1066,"z":415,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["635"],"street":"East 14th Street","wayId":1080982440,"cross":null,"crossWayId":null,"side":"north","plaza":null}
+  ]
 }

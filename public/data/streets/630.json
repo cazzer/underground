@@ -115,6 +115,16 @@
     {"x":84,"z":113,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":658583340,"cross":"Lexington Avenue","crossWayId":458180193,"side":"SE","plaza":null},
     {"x":157,"z":-32,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":658583340,"cross":"Lexington Avenue","crossWayId":458180193,"side":"NE","plaza":null},
     {"x":194,"z":171,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":658583340,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":334,"z":63,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":658583340,"cross":null,"crossWayId":null,"side":"north","plaza":null}
+    {"x":334,"z":63,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":658583340,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":656,"z":-772,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F11"],"street":"East 52nd Street","wayId":743358443,"cross":"Lexington Avenue","crossWayId":458180193,"side":"NE","plaza":null},
+    {"x":692,"z":-749,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F11"],"street":"East 52nd Street","wayId":743358443,"cross":"Lexington Avenue","crossWayId":458180193,"side":"NE","plaza":null},
+    {"x":810,"z":-1123,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F11"],"street":"Lexington Avenue","wayId":458180193,"cross":"East 53rd Street","crossWayId":46521998,"side":"SE","plaza":null},
+    {"x":1140,"z":-1355,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F11"],"street":"East 53rd Street","wayId":46521998,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":1931,"z":-597,"type":"Stair","entry":true,"exit":true,"stopIds":["F11"],"street":"3rd Avenue","wayId":458166897,"cross":"East 53rd Street","crossWayId":46521998,"side":"SW","plaza":null},
+    {"x":2016,"z":-816,"type":"Stair","entry":true,"exit":true,"stopIds":["F11"],"street":"East 53rd Street","wayId":46521998,"cross":"3rd Avenue","crossWayId":458166897,"side":"NW","plaza":null},
+    {"x":2100,"z":-284,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F11"],"street":"3rd Avenue","wayId":458166897,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":2249,"z":-356,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["F11"],"street":"East 53rd Street","wayId":420806146,"cross":"3rd Avenue","crossWayId":458166897,"side":"SE","plaza":null},
+    {"x":2371,"z":-761,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F11"],"street":"3rd Avenue","wayId":458166897,"cross":"East 53rd Street","crossWayId":420806146,"side":"NE","plaza":null},
+    {"x":2406,"z":-631,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F11"],"street":"East 53rd Street","wayId":420806146,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

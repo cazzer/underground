@@ -104,7 +104,10 @@
     {"id":1349594592,"highway":"residential","name":"15th Avenue","oneway":0,"nodes":[141,25,140]}
   ],
   "entrances": [
+    {"x":-433,"z":-2577,"type":"Stair","entry":true,"exit":true,"stopIds":["B16"],"street":"14th Avenue","wayId":247960488,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-405,"z":-852,"type":"Station House","entry":true,"exit":true,"stopIds":["N04"],"street":"New Utrecht Avenue","wayId":247960482,"cross":"62nd Street","crossWayId":671828852,"side":"SE","plaza":null},
+    {"x":-328,"z":-2793,"type":"Stair","entry":true,"exit":true,"stopIds":["B16"],"street":"New Utrecht Avenue","wayId":524565317,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-97,"z":-2734,"type":"Stair","entry":true,"exit":true,"stopIds":["B16"],"street":"14th Avenue","wayId":587079695,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":327,"z":660,"type":"Station House","entry":true,"exit":true,"stopIds":["N04"],"street":"15th Avenue","wayId":1349594592,"cross":"63rd Street","crossWayId":348697771,"side":"SE","plaza":null}
   ]
 }

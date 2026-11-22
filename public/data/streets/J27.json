@@ -6,7 +6,7 @@
   },
   "format": 1,
   "license": "ODbL-1.0",
-  "attribution": ["© OpenStreetMap contributors"],
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
   "osmTimestamp": "2026-11-22T04:33:58Z",
   "radiusM": 300,
   "walkRadiusM": 100,
@@ -125,5 +125,7 @@
     {"id":1570234949,"highway":"pedestrian","name":"Truxton Street","oneway":0,"nodes":[46,118]},
     {"id":1577561366,"highway":"tertiary","name":"Van Sinderen Avenue","oneway":0,"nodes":[2,94,163]}
   ],
-  "entrances": []
+  "entrances": [
+    {"x":486,"z":1276,"type":"Station House","entry":true,"exit":true,"stopIds":["A51"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null}
+  ]
 }
