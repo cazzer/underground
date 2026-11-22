@@ -112,7 +112,7 @@ function writeLabels(dom: LabelDom): void {
 
 /** Tints the trip's exit label (`view.priorityEntrance`) in the exit path's color, and only it. */
 function tintExit(d: LabelDom): void {
-  const row = d.place.entrances.findIndex((e) => e.index === d.view.priorityEntrance)
+  const row = d.place.entrances.findIndex((e) => e.members.includes(d.view.priorityEntrance))
   const el = row >= 0 ? d.els[row]! : null
   if (el === d.tinted) return
   if (d.tinted) d.tinted.style.color = ''

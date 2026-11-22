@@ -5,7 +5,7 @@ import { rankEntrances } from './entranceLabelBoxes'
 import { createLabelPlacement, newView } from './labelPlacementState'
 
 function entrance(index: number, over: Partial<EntranceLabelSource> = {}): EntranceLabelSource {
-  return { index, x: index * 10, z: 0, head: `E${index}`, tail: '', text: `E${index}`, spoken: `E${index}`, count: 1, elevator: false, unique: true, keys: [], headHouse: index, streets: [], ...over }
+  return { index, x: index * 10, z: 0, head: `E${index}`, tail: '', text: `E${index}`, spoken: `E${index}`, count: 1, members: [index], elevator: false, unique: true, keys: [], headHouse: index, streets: [], ...over }
 }
 
 /** The rank order of `entrances` with each mark `distance[i]` px from the free area's middle. */
@@ -37,5 +37,10 @@ describe('rankEntrances', () => {
     const rows = [entrance(5), entrance(7, { elevator: true })]
     expect(order(rows, [10, 50], 5)).toEqual([0, 1])
     expect(order(rows, [10, 50], 1)).toEqual([1, 0])
+  })
+
+  it('finds the exit among a label’s merged twins (its members)', () => {
+    const rows = [entrance(2, { elevator: true }), entrance(5, { members: [5, 6], count: 2 })]
+    expect(order(rows, [10, 50], 6)).toEqual([1, 0])
   })
 })

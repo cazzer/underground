@@ -149,8 +149,8 @@ export interface PlacementView {
   /** The loaded interior, whose outlines the street names keep clear of, and its group's y scale. */
   interior: InteriorModel | null
   depthScale: number
-  /** The street-file entrance index (`EntranceText.index`) of the trip's exit label, ranked before every other
-   *  entrance while its path is drawn; -1 for none. */
+  /** The street-file entrance index of the trip's exit; the label that has it among its `members` ranks before every
+   *  other entrance while its path is drawn; -1 for none. */
   priorityEntrance: number
   /** Ignore last placement's picks this time (the view has settled): every label takes its best spot again. */
   fresh: boolean

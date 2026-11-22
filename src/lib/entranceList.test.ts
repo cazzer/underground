@@ -16,6 +16,7 @@ function text(index: number, head: string, tail: string, o: Partial<EntranceText
     keys: [],
     headHouse: 0,
     count: 1,
+    members: [index],
     ...o,
   }
 }

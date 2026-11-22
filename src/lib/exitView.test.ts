@@ -97,11 +97,13 @@ describe('exitLineView', () => {
     const file = streets(interior, [[20, 10, {}], [9, 10, {}]])
     const labels = entranceTexts(file)
     expect(labels.map((l) => l.index)).toEqual([0])
+    expect(labels[0]!.members).toEqual([0, 1])
     const o = toGround(interior.anchor)
     const toward: ExitChoice = { ...choice, destination: { x: o.x + 60, z: o.z }, walk: { kind: 'route', points: [], meters: 150, seconds: 130 } }
     const view = exitLineView(toward, interior, [{ file, labels }], true)
     expect(view.text).toBe('Exit at Bedford Av & N 7 St')
-    expect(view.mapLabel).toEqual({ stationId: 'X01', index: 0 })
+    // The exit is the merged twin (file entrance 1): the map label keys by it, a member of row 0.
+    expect(view.mapLabel).toEqual({ stationId: 'X01', index: 1 })
     expect(view.note).toBe('NE corner · then 3 min walk')
     expect(view.spoken).toContain('Then a 3 minute walk.')
   })

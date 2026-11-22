@@ -73,7 +73,7 @@ function frame(p: LabelPlacement, anchor: Ground, view: PlacementView, a: Vector
 function exemptExitFromMarks(p: LabelPlacement, view: PlacementView): void {
   if (view.priorityEntrance < 0) return
   for (let i = 0; i < p.entrances.length && i < 32; i++) {
-    if (p.entrances[i]!.index !== view.priorityEntrance) continue
+    if (!p.entrances[i]!.members.includes(view.priorityEntrance)) continue
     const exempt = p.bounds.exempt!
     for (let k = FIXED_RECTS; k < FIXED_RECTS + p.marks.length; k++) exempt[k] = exempt[k]! | (1 << i)
     return

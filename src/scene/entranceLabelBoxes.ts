@@ -84,7 +84,7 @@ export function rankEntrances(p: LabelPlacement, view: PlacementView): void {
   for (let i = 0; i < n; i++) {
     const e = p.entrances[i]!
     const near = p.cand.size[i]! > 0 ? Math.hypot(p.markX[i]! - view.focusX, p.markY[i]! - view.focusY) : 1e8
-    p.score[i] = (e.index === view.priorityEntrance ? 0 : EXIT_TIER) + (e.elevator ? 0 : ELEVATOR_TIER) + (e.unique ? 0 : UNIQUE_TIER) + near - (p.lastSrc[i]! >= 0 ? STICKY_PX : 0)
+    p.score[i] = (e.members.includes(view.priorityEntrance) ? 0 : EXIT_TIER) + (e.elevator ? 0 : ELEVATOR_TIER) + (e.unique ? 0 : UNIQUE_TIER) + near - (p.lastSrc[i]! >= 0 ? STICKY_PX : 0)
     if (p.score[i]! < p.houseBest[e.headHouse]!) p.houseBest[e.headHouse] = p.score[i]!
     order[i] = i
   }

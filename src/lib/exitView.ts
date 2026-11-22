@@ -53,33 +53,39 @@ export interface StreetSource {
   labels: readonly EntranceText[]
 }
 
-/** Which map label names the exit: the street file's station and the label's entrance index (`EntranceText.index`). */
+/** Which map label names the exit: the street file's station and a file entrance index among the label's `members`. */
 export interface ExitLabel {
   stationId: string
   index: number
 }
 
 /**
- * The street label for the exit, from the first source with a file entrance at the exit (its own label, or, merged into
- * a same-text twin, the nearest label of the same kind within MERGE_M), else the nearest such label in any source.
+ * The street label for the exit, from the first source with a file entrance at the exit (the label it is a member of:
+ * its own, or the same-text twin it merged into), else the nearest label of the same kind within MERGE_M in any source.
  * A complex passes its file's streets and the alighting member's.
  */
-function labelOf(choice: ExitChoice, interior: StationInterior, sources: readonly StreetSource[]): { label: EntranceText; stationId: string } | null {
+/** A label found for the exit, its file's station and the exit's own file entrance index (one of its `members`). */
+interface Found extends ExitLabel {
+  label: EntranceText
+}
+
+function labelOf(choice: ExitChoice, interior: StationInterior, sources: readonly StreetSource[]): Found | null {
   if (choice.exit.entranceId === null) return null
   const origin = toGround(interior.anchor)
   const scene = { x: origin.x + choice.exit.point[0], z: origin.z + choice.exit.point[1] }
   const elevator = choice.exit.type === 'Elevator'
-  let best: { label: EntranceText; stationId: string } | null = null
+  let best: Found | null = null
   let bestD = MERGE_M + STREET_MATCH_M
   for (const { file, labels } of sources) {
     const i = streetEntranceIndex(scene, choice.exit.type, file)
-    const own = i === null ? undefined : labels.find((l) => l.index === i)
-    if (own) return { label: own, stationId: file.stationId }
+    // A same-text twin merged into another label is one of that label's members.
+    const own = i === null ? undefined : labels.find((l) => l.members.includes(i))
+    if (own) return { label: own, stationId: file.stationId, index: i! }
     const fileOrigin = toGround(file.anchor)
     const [x, z] = [scene.x - fileOrigin.x, scene.z - fileOrigin.z]
     for (const l of labels) {
       const d = Math.hypot(l.x - x, l.z - z)
-      if (l.elevator === elevator && d <= bestD) [best, bestD] = [{ label: l, stationId: file.stationId }, d]
+      if (l.elevator === elevator && d <= bestD) [best, bestD] = [{ label: l, stationId: file.stationId, index: l.index }, d]
     }
   }
   return best
@@ -118,7 +124,7 @@ export function exitLineView(
   if (walk) sentences.push(`${walk.kind === 'route' ? 'Then a' : 'About a'} ${minutes} minute walk.`)
   if (status) sentences.push(`${capitalize(status)}.`)
   if (choice.probable) sentences.push('Probably: the station layout is estimated.')
-  const mapLabel = found && { stationId: found.stationId, index: found.label.index }
+  const mapLabel = found && { stationId: found.stationId, index: found.index }
   return { mapLabel, text: `${lead} ${head}`, note: note.length > 0 ? note.join(' · ') : null, spoken: sentences.join(' ') }
 }
 

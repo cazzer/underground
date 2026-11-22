@@ -82,6 +82,8 @@ describe('entranceTexts', () => {
     ])
     expect(texts.map((t) => t.headHouse)).toEqual([0, 0, 1])
     expect(texts.map((t) => t.count)).toEqual([2, 1, 1])
+    // The merged stair (file entrance 2) is a member of the label it merged into.
+    expect(texts.map((t) => t.members)).toEqual([[0, 2], [1], [3]])
   })
 
   it('names both cross streets around a median entrance', () => {
