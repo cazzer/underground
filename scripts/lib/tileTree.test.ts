@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { gzipTileBody, tileBody } from './tarFixture.ts'
 import { PROBE_TILES, tilePath } from './tileProbe.ts'
-import { probeSizes, scanProblems, scanTiles } from './tileTree.ts'
+import { probeSizes, scanProblems, scanTiles, treeEncoding } from './tileTree.ts'
 
 let dir: string
 beforeEach(async () => {
@@ -93,5 +93,22 @@ describe('probeSizes', () => {
     expect(sizes[tilePath(PROBE_TILES[1]!)]).toEqual({ stored: gz.length, inflated: 503, gzip: true })
     await put(tilePath(PROBE_TILES[0]!), gz.subarray(0, 20))
     await expect(probeSizes(dir)).rejects.toThrow(/z0 world.*bad gzip stream/)
+  })
+})
+
+describe('treeEncoding', () => {
+  it('names an empty, plain, gzip and mixed tree', () => {
+    expect(treeEncoding({ files: 0, gzipFiles: 0 })).toBe('none')
+    expect(treeEncoding({ files: 3, gzipFiles: 0 })).toBe('plain')
+    expect(treeEncoding({ files: 3, gzipFiles: 3 })).toBe('gzip')
+    expect(treeEncoding({ files: 3, gzipFiles: 1 })).toBe('mixed')
+  })
+
+  it('agrees with a scan of real trees', async () => {
+    expect(treeEncoding(await scanTiles(dir, { verify: true }))).toBe('none')
+    await put('0/0/0.mvt', gzipTileBody(3))
+    expect(treeEncoding(await scanTiles(dir, { verify: true }))).toBe('gzip')
+    await put('1/0/0.mvt', tileBody(3))
+    expect(treeEncoding(await scanTiles(dir, { verify: true }))).toBe('mixed')
   })
 })

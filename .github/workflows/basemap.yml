@@ -188,8 +188,11 @@ jobs:
           rm stage/tiles/metadata.json
           find stage/tiles -name '*.pbf' | while IFS= read -r f; do mv "$f" "${f%.pbf}.mvt"; done
           # sh -e so a failed gzip stops its batch (a loop's status is its last command's); xargs then exits non-zero.
+          # The list is written first (outside stage/) so gzip's temp files never join it and a failed find stops the step.
+          find stage/tiles -type f -name '*.mvt' -print0 > mvt-list.bin
+          test -s mvt-list.bin
           # shellcheck disable=SC2016  # the single quotes are on purpose: the inner sh expands $f
-          find stage/tiles -type f -name '*.mvt' -print0 | xargs -0 -n 64 -P "$(nproc)" sh -ec 'for f; do gzip -n -9 -c "$f" > "$f.tmp"; mv "$f.tmp" "$f"; done' sh
+          xargs -0 -n 64 -P "$(nproc)" sh -ec 'for f; do gzip -n -9 -c "$f" > "$f.tmp"; mv "$f.tmp" "$f"; done' sh < mvt-list.bin
           maxzoom=$(jq -r '.spec.maxzoom' data/basemap/basemap.json)
           node scripts/basemap-tiles.ts check stage/tiles --gzip --max-zoom "$maxzoom" | tee tiles-report.txt
           node scripts/basemap-tiles.ts probe-sizes stage/tiles 2>&1 | tee -a tiles-report.txt

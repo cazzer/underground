@@ -261,7 +261,7 @@ gzips each tile in place (`gzip -n -9`: no name, no time, so the bytes follow th
 `scripts/basemap-tiles.ts check --gzip` reads every tile (each must be gzip, an MVT once inflated, named on its zoom's grid, at
 most z15; a tree mixing plain and gzip tiles is refused) before the tree is
 packed into one deterministic tarball (sorted names, files only, mtime 0, owner 0, ustar, `gzip -9n`; the outer gzip gains
-nothing on already-compressed tiles, and the deploy's reader expects the format), which is unpacked again
+little on already-compressed tiles, and the deploy's reader expects the format), which is unpacked again
 with the deploy's own extractor and compared with the tree. The tarball, `nyc-tiles.tar.gz`, is published as a GitHub Release
 (`basemap-<build>-<sha8>`, with the licence notes and the counts in the release text). The release is our own copy because
 Protomaps asks not to hotlink builds and keeps them only about a week.
@@ -330,11 +330,10 @@ z13 5.9 MB), larger than the 33 MB `.pmtiles` because that stores each tile gzip
 Pages serves `.mvt` as `application/vnd.mapbox-vector-tile` and does not compress it, so a tile costs its raw size on the wire,
 more than its gzipped entry in the `.pmtiles` did.
 
-**Gzipped tiles (ost.9.5).** The fix is to store the tiles gzipped: Pages adds no content-encoding to a file that is already
-compressed, so the stored bytes are the wire bytes and the browser hands the worker a gzip body, which `inflate.ts`
+**Gzipped tiles (ost.9.5).** The fix is to store the tiles gzipped: Pages never compresses this content type, so the stored bytes are the wire bytes and the browser hands the worker a gzip body, which `inflate.ts`
 (`DecompressionStream('gzip')`, every target browser has it) inflates before decoding; raw MVT still passes through, so the client
 needs no release for the switch and the two formats can coexist during it. The name stays `.mvt`: a `.gz` suffix would not make
-the browser decode anything. In the scripts, `node:zlib` inflates (`tileProbe.ts` `readTile`, capped at 16 MiB a tile). The pin's
+the browser decode anything. In the scripts, `node:zlib` inflates (`tileProbe.ts` `readTile`, capped at 2 MiB a tile, as `inflate.ts` is). The pin's
 `tileBytes` is the stored size (the sum of the gzip files); the workflow report, release notes and probe line also give the
 inflated size.
 Wire size of the live Midtown tile `15/9649/12314.mvt`: before (plain, deploy 44991770994) 12,993 B. After: to be recorded

@@ -7,7 +7,7 @@
  *      Walks the tree, reads every file and fails unless each is an MVT (inflated first when gzip) named <z>/<x>/<y>.mvt on
  *      its zoom's grid (and, when given, the count and total size are N and M; with --gzip, unless each is gzip). Prints the
  *      stored and inflated totals per zoom; with $GITHUB_OUTPUT set it writes `files=`, `tile_bytes=` (stored),
- *      `inflated_bytes=` and `encoding=` (gzip or plain).
+ *      `inflated_bytes=` and `encoding=` (`treeEncoding`: gzip or plain; a mixed or empty tree fails first).
  *  node scripts/basemap-tiles.ts unpack <tar.gz> <dest-dir> --files N --tile-bytes M [--max-zoom Z] [--gzip]
  *      The deploy's extraction, on a tarball at hand (the basemap workflow round-trips what it packed with it).
  *  node scripts/basemap-tiles.ts probe-sizes <tiles-dir>
@@ -22,7 +22,7 @@
 import { appendFileSync, readFileSync } from 'node:fs'
 import { parseBasemapFile } from './lib/basemapSpec.ts'
 import { unpackTarGz } from './lib/basemapUnpack.ts'
-import { probeSizes, scanProblems, scanTiles } from './lib/tileTree.ts'
+import { probeSizes, scanProblems, scanTiles, treeEncoding } from './lib/tileTree.ts'
 
 function option(args: string[], name: string): number | undefined {
   const i = args.indexOf(name)
@@ -44,7 +44,7 @@ async function check(dir: string, args: string[]): Promise<void> {
   const tileBytes = option(args, '--tile-bytes')
   const problems = scanProblems(scan, { files: files ?? scan.files, tileBytes: tileBytes ?? scan.bytes })
   if (scan.files === 0) problems.push('no tile files')
-  const encoding = scan.files > 0 && scan.gzipFiles === scan.files ? 'gzip' : 'plain'
+  const encoding = treeEncoding(scan)
   console.log(`${dir}: ${scan.files} tile files, ${scan.bytes} bytes stored (${encoding}), ${scan.inflatedBytes} bytes inflated`)
   for (const [z, v] of Object.entries(scan.byZoom)) console.log(`  z${z}: ${v.files} files, ${v.bytes} bytes stored, ${v.inflatedBytes} inflated`)
   if (problems.length > 0) throw new Error(`the tile tree is not what it should be:\n- ${problems.join('\n- ')}`)

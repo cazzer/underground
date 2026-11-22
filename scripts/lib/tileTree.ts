@@ -75,8 +75,18 @@ export async function scanTiles(dir: string, { verify = false, gzip = false, max
       }
     }
   }
-  if (verify && scan.gzipFiles > 0 && scan.gzipFiles < scan.files) report(`${scan.gzipFiles} of ${scan.files} tiles are gzip and the rest plain: a tree is all one or the other`)
+  if (verify && treeEncoding(scan) === 'mixed') report(`${scan.gzipFiles} of ${scan.files} tiles are gzip and the rest plain: a tree is all one or the other`)
   return scan
+}
+
+export type TreeEncoding = 'none' | 'plain' | 'gzip' | 'mixed'
+
+/** How a scan's tiles are stored: `none` for an empty tree, else `gzip` or `plain` when every file is, `mixed` otherwise.
+ *  Only meaningful for a scan made with `verify` (it is what counts the gzip files). */
+export function treeEncoding(scan: Pick<TreeScan, 'files' | 'gzipFiles'>): TreeEncoding {
+  if (scan.files === 0) return 'none'
+  if (scan.gzipFiles === scan.files) return 'gzip'
+  return scan.gzipFiles === 0 ? 'plain' : 'mixed'
 }
 
 export interface ProbeSize {

@@ -70,7 +70,7 @@ describe('readTile', () => {
   it('stops a gzip that inflates past the cap, and refuses a plain body when gzip is required', () => {
     const bomb = readTile(gzipSync(new Uint8Array(MAX_INFLATED_TILE_BYTES + 1)))
     expect(bomb.mvt).toBeNull()
-    expect(bomb.problems[0]).toMatch(/^bad gzip stream/)
+    expect(bomb.problems).toEqual([`inflates past ${MAX_INFLATED_TILE_BYTES} bytes`])
     expect(readTile(tileBody(5), { requireGzip: true }).problems).toEqual(['not gzip-compressed (the body does not start 1f 8b)'])
     expect(readTile(gzipTileBody(5), { requireGzip: true }).problems).toEqual([])
     expect(readTile(new Uint8Array(), { requireGzip: true }).problems).toHaveLength(2)

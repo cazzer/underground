@@ -69,9 +69,9 @@ export function mvtProblems(body: Uint8Array): string[] {
   return layers > 0 ? [] : ['no layers']
 }
 
-/** The most a tile may inflate to. The largest real tile inflates to about 90 KB, so this is generous; the cap
- *  only stops a decompression bomb from filling the runner's memory. */
-export const MAX_INFLATED_TILE_BYTES = 16 * 1024 * 1024
+/** The most a tile may inflate to (the client's inflate.ts caps at the same number). The largest real tile inflates to
+ *  about 90 KB, so this is generous; the cap only stops a decompression bomb from filling memory. */
+export const MAX_INFLATED_TILE_BYTES = 2 * 1024 * 1024
 
 export function isGzipBody(body: Uint8Array): boolean {
   return body.length >= 2 && body[0] === 0x1f && body[1] === 0x8b
@@ -97,6 +97,7 @@ export function readTile(body: Uint8Array, { requireGzip = false }: { requireGzi
   try {
     mvt = gunzipSync(body, { maxOutputLength: MAX_INFLATED_TILE_BYTES })
   } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') return { gzip: true, mvt: null, problems: [`inflates past ${MAX_INFLATED_TILE_BYTES} bytes`] }
     return { gzip: true, mvt: null, problems: [`bad gzip stream: ${err instanceof Error ? err.message : String(err)}`] }
   }
   return { gzip: true, mvt, problems: mvtProblems(mvt).map((p) => `inflated body: ${p}`) }
