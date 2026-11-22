@@ -112,7 +112,9 @@ export function useStationOrbit({
     focusRef.current = focusPos
   }, [focusPos])
 
-  // A two-finger touch turns by twist (useTouchOrbit), never by the controls' own rotate.
+  // A two-finger touch turns by twist (useTouchOrbit), never by the controls' own rotate. Its rule is the
+  // mouse's below (inp.focused && rotating): holdAzimuth keeps an armed twist turning when the focus drops
+  // mid-gesture while a train stays selected, as a right-drag does.
   const canTurn = useCallback(
     () => rotating.current && (focusRef.current !== null || following() || holdAzimuth()),
     [following, holdAzimuth],

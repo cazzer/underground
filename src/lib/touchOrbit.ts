@@ -91,6 +91,12 @@ function end(t: TouchOrbit): void {
   t.dueSlide = 0
 }
 
+/** Forgets every finger: a new first touch, so a lost pointerup can't leave a stale one counted. */
+export function touchReset(t: TouchOrbit): void {
+  t.count = 0
+  end(t)
+}
+
 export function touchDown(t: TouchOrbit, id: number, x: number, y: number): void {
   const known = slotOf(t, id)
   if (known >= 0) {
@@ -174,10 +180,11 @@ export function takeTurn(t: TouchOrbit, heightPx: number): number {
 
 /**
  * An azimuth goal held inside the controls' window. An open window (either bound infinite) leaves the goal
- * unwrapped; a finite one, which lies within [-π, π], wraps it there first.
+ * unwrapped. A finite one lies within [-π, π] but the goal may not: it is first taken to the turn nearest the
+ * view's azimuth `theta`, so a goal just past ±π next to a cap near π clamps at that cap, not the far one.
  */
-export function clampAzimuth(v: number, min: number, max: number): number {
+export function clampAzimuth(v: number, theta: number, min: number, max: number): number {
   if (!Number.isFinite(min) || !Number.isFinite(max)) return v
-  const w = wrapAngle(v)
+  const w = theta + wrapAngle(v - theta)
   return Math.max(min, Math.min(max, w))
 }

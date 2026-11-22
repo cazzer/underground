@@ -147,6 +147,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?landturn=half` lets a landing on an interior with a priority frame (trip path, machines out of service) turn half
   way round when the far side shows more of it (`priorityTurn` in `lib/pathFrame.ts`; south up at Pelham Pkwy on a phone) until the
   2q7.25 landing-turn card is decided (default off: the usual landing turn); the removal list is in `src/scene/landingLook.ts`
+  TEMPORARY: `?twist=both` lets a two-finger touch that locked to rotate keep zooming (a twist and a pinch at once) until the
+  pah.6 twist card is decided (default `lock`: a rotate lock holds zoom until the lift); the removal list is in `src/scene/twistLook.ts`
   Exit tokens `exitPath` (pink, 3:1, held apart from the interior, focus, location and route colors, also under simulated
   red-green color blindness; theme.test.ts), `exitPathWidth` (3 px), `exitPathDash` / `exitPathGap` (world m) draw the trip's
   way out.
@@ -870,9 +872,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   live touches and `src/lib/touchOrbit.ts` locks each gesture once: to zoom when the spread changes by 15% (checked first), else,
   armed only, to rotate on a 12° twist or a midpoint slide of 40 px plus the spread's change. Under the rotate lock the view
   turns by the twist (a clockwise twist turns the content clockwise) plus the slide as before (-2π · dx / height), the whole
-  turn since the gesture started, through `setAzimuthalAngle` on an unwrapped goal clamped to the azimuth window (so the
-  controls' damped lag and glide stay), and `zoomSpeed` is 0 until the gesture ends. A third finger, any lift or a cancel
-  ends it; only a later touch making exactly two fingers down starts the next. A pinch with modest drift turns nothing.
+  turn since the gesture started. Moves only move an unwrapped goal, clamped to the azimuth window on the turn nearest the
+  view; a -2 frame applies it once per frame through `setAzimuthalAngle` (so the controls' damped lag and glide stay, at
+  the same pace at any touch event rate). `zoomSpeed` is 0 until the lock ends (not under `?twist=both`), so a mouse
+  wheel on a touchscreen laptop doesn't zoom either until the lift. A third finger, any lift or a cancel ends it, a new
+  first touch forgets every finger (a lost pointerup can't count a stale one), and only a later touch making exactly two
+  fingers down starts the next. A pinch with modest drift turns nothing.
   A bare station pivots on its own point while that point is within its 100 m pan radius of the free
   area's middle, else on that middle, so a far-off or held station can't swing the view away. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
@@ -882,7 +887,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   drei's `update()` at -1; the pivot and pan clamp at -0.5; the band view at -0.25), not as changing props. Never use a
   positive `useFrame` priority (it takes over rendering). The frame order: -3 LiveTrains steps every slot and writes
   the follow anchor (with the last frame's band view); -2 CameraRig (the follow's `beforeFlight`, the flight step,
-  focus, the polar lock) and the orbit's bounds; -1 drei's `update()`; -0.75 the train follow; -0.5 the orbit's pivot
+  focus, the polar lock), the touch twist's goal (`useTouchOrbit`) and the orbit's bounds; -1 drei's `update()`; -0.75 the train follow; -0.5 the orbit's pivot
   and pan clamp; -0.25 the band view; 0 the draws (and `useBasemapTiles` reading the camera, read-only).
 - Selecting a train follows it (`useTrainFollow.ts`): a flight retargeted each frame to the moving train, at the
   distance where its consist spans 80% of the free width, held to 400..600 m (`followDistanceFor`; a desktop stays at

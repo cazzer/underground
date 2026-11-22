@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampAzimuth, createTouchOrbit, takeTurn, touchDown, touchMove, touchUp, wrapAngle, type TouchOrbit } from './touchOrbit'
+import { clampAzimuth, createTouchOrbit, takeTurn, touchDown, touchMove, touchReset, touchUp, wrapAngle, type TouchOrbit } from './touchOrbit'
 
 const H = 844
 const DEG = Math.PI / 180
@@ -106,6 +106,16 @@ describe('touchOrbit', () => {
     expect(Math.abs(t.twist)).toBeLessThan(0.01)
   })
 
+  it('forgets a finger whose lift was lost once a new first touch resets it', () => {
+    const t = createTouchOrbit()
+    touchDown(t, 1, 100, 100)
+    touchReset(t)
+    touchDown(t, 5, 100, 300)
+    touchDown(t, 6, 250, 300)
+    expect(t.count).toBe(2)
+    expect(t.lock).toBe('pending')
+  })
+
   it('ignores pointers it never saw go down', () => {
     const t = createTouchOrbit()
     touchUp(t, 9)
@@ -116,21 +126,33 @@ describe('touchOrbit', () => {
 })
 
 describe('clampAzimuth', () => {
+  const CAP = 2.98
+
   it('holds a goal at the cap and turns back at once on reversing', () => {
     let goal = 0
-    for (let i = 0; i < 20; i++) goal = clampAzimuth(goal + 10 * DEG, -0.5, 0.5)
+    for (let i = 0; i < 20; i++) goal = clampAzimuth(goal + 10 * DEG, goal, -0.5, 0.5)
     expect(goal).toBe(0.5)
-    goal = clampAzimuth(goal - 10 * DEG, -0.5, 0.5)
+    goal = clampAzimuth(goal - 10 * DEG, 0.5, -0.5, 0.5)
     expect(goal).toBeCloseTo(0.5 - 10 * DEG, 12)
   })
 
-  it('leaves an open window unwrapped', () => {
-    expect(clampAzimuth(7, -Infinity, Infinity)).toBe(7)
-    expect(clampAzimuth(7, -Infinity, 1)).toBe(7)
+  it('holds a goal that crosses π at the near cap, and turns back from it at once', () => {
+    let goal = clampAzimuth(2.9 + 0.28, 2.9, -CAP, CAP)
+    expect(goal).toBe(CAP)
+    goal = clampAzimuth(goal + 0.2, CAP, -CAP, CAP)
+    expect(goal).toBe(CAP)
+    goal = clampAzimuth(goal - 0.1, CAP, -CAP, CAP)
+    expect(goal).toBeCloseTo(CAP - 0.1, 12)
+    expect(clampAzimuth(-3.2, -3.0, -CAP, CAP)).toBe(-CAP)
   })
 
-  it('wraps into [-π, π] before a finite window', () => {
-    expect(clampAzimuth(2 * Math.PI + 0.2, -Math.PI, Math.PI)).toBeCloseTo(0.2, 12)
+  it('takes a goal a turn away to the turn nearest the view', () => {
+    expect(clampAzimuth(2 * Math.PI + 0.2, 0.1, -Math.PI, Math.PI)).toBeCloseTo(0.2, 12)
+  })
+
+  it('leaves an open window unwrapped', () => {
+    expect(clampAzimuth(7, 0.7, -Infinity, Infinity)).toBe(7)
+    expect(clampAzimuth(7, 0.7, -Infinity, 1)).toBe(7)
   })
 })
 

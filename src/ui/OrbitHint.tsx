@@ -22,5 +22,5 @@ export function OrbitHint() {
   const touch = useSyncExternalStore(subscribeCoarse, isCoarse)
   const turned = useSyncExternalStore(subscribeTurned, hasTurned)
   if (!focusedId || turned || following) return null
-  return <p className="text-xs text-ink-dim">{touch ? 'Drag two fingers sideways to turn' : 'Right-drag or Shift-drag to turn'}</p>
+  return <p className="text-xs text-ink-dim">{touch ? 'Twist or slide two fingers to turn' : 'Right-drag or Shift-drag to turn'}</p>
 }
