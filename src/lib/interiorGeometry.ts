@@ -81,29 +81,31 @@ export function trainRoofY(level: { y: number }, railDrop: number, yScale: numbe
 }
 
 /**
- * Index of the deepest level with a platform track (levels run highest first, so the last such index): where the
- * deepest lifted platform trains ride. Undefined when no platform has a track.
- * Assumes one platform level: on a two-deck station the upper deck's own strokes would go over its trains, so that
- * case logs once (no such station ships today) rather than regressing silently.
+ * Index of the level the lifted platform trains ride (levels run highest first, so the first such index is the
+ * shallowest). Undefined when no platform has a track. The split level and everything below it stay in the base
+ * layers (8/9), levels above it draw over (9.6/9.7), and lifted train copies draw at 9.4 to 9.52. With platform
+ * tracks on more than one level (a two-deck station) it is the SHALLOWEST deck: both decks' strokes stay in the base
+ * layers, each deck's trains draw above both decks' strokes, and mezzanines and levels above still draw over all
+ * trains. A stopgap: the upper deck should be in front of the deeper deck's trains (2q7.28). Logs once per station.
  */
 export function trainLevelIndex(interior: StationInterior): number | undefined {
-  let deepest: number | undefined
+  let shallowest: number | undefined
   let decks = 0
   interior.levels.forEach((level, i) => {
     if (interior.platforms.some((p) => p.level === level.id && p.tracks.length > 0)) {
-      deepest = i
+      shallowest ??= i
       decks++
     }
   })
   if (decks > 1) warnTwoDecks(interior.stationId)
-  return deepest
+  return shallowest
 }
 
 const warnedDecks = new Set<string>()
 function warnTwoDecks(id: string): void {
   if (warnedDecks.has(id)) return
   warnedDecks.add(id)
-  console.warn(`Interior ${id} has platform tracks on more than one level; its upper deck draws over its own trains`)
+  console.warn(`Interior ${id} has platform tracks on more than one level; trains draw above both decks' strokes, so the upper deck is not in front of the deeper deck's trains (2q7.28)`)
 }
 
 /**
