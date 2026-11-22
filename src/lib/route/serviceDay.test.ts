@@ -60,6 +60,19 @@ describe('serviceWindow', () => {
     expect(w.frames[0]).toMatchObject({ date: '20270313', shiftS: -82800 })
   })
 
+  it('shifts by 25 h on the fall-back day, where q is negative before the day starts', () => {
+    const calendar = {
+      Saturday: { days: [6], start: '20261001', end: '20270515' },
+      Sunday: { days: [0], start: '20261001', end: '20270515' },
+    }
+    const w = serviceWindow(at(2026, 10, 1, 4, 30), calendar, []) // Sun 00:30 EDT; the day starts at 01:00 EDT
+    expect(w.startS).toBe(at(2026, 10, 1, 5))
+    expect(w.frames).toEqual([
+      { date: '20261031', services: ['Saturday'], shiftS: -90000 },
+      { date: '20261101', services: ['Sunday'], shiftS: 0 },
+    ])
+  })
+
   it('has no frames past the calendar', () => {
     expect(win(at(2027, 5, 1, 16)).frames).toEqual([])
   })

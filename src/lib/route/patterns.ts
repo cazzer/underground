@@ -4,7 +4,7 @@ import type { Pattern, StopIndex, Timetable } from './types'
 export interface TripInput {
   id: string
   routeId: RouteId
-  /** Seconds since the query day's midnight, one per stop. */
+  /** Seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days), one per stop. */
   arr: ArrayLike<number>
   dep: ArrayLike<number>
 }

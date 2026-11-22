@@ -4,7 +4,9 @@ import { addDays, nyDate, serviceDayStart, servicesOn } from '../realtime/servic
 
 /** Before this many seconds into the service day, yesterday's trips past 24:00 may still be running. */
 export const YESTERDAY_UNTIL_S = 4 * 3600
-/** From this many seconds into the day, trips that left after midnight (tomorrow's file) are in reach. */
+/** From this many seconds into the day, trips that left after midnight (tomorrow's file) are in reach. A query
+ *  before this can't use tomorrow's file, so a journey of 2 h or more leaving around 21:30 may miss post-midnight
+ *  trains it could have caught (the trip panel should know). */
 export const TOMORROW_FROM_S = 22 * 3600
 
 /** One day's services. `shiftS` moves that day's timetable seconds onto the query day's time base. */

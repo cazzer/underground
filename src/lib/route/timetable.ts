@@ -1,9 +1,10 @@
 /** Timetable files to the router's Timetable. Pure. */
-import type { StationId, StationsFile, StopId, Transfer } from '../../data/schema'
+import type { ServiceId, StationId, StationsFile, StopId, Transfer } from '../../data/schema'
 import { decodePatternTimes } from '../../data/timetableCodec'
 import type { TimetableFile } from '../../data/timetableSchema'
 import { buildTimetable, makePatterns, type TripInput } from './patterns'
-import { buildStopIndex } from './stops'
+import { buildStopIndex, stationOfStopId } from './stops'
+import type { ServiceWindow } from './serviceDay'
 import type { Pattern, Timetable } from './types'
 
 export interface TimetableSource {
@@ -12,6 +13,17 @@ export interface TimetableSource {
   /** Added to every time, to put the file's service day on the query day's time base. */
   shiftS: number
   file: TimetableFile
+}
+
+/** One source per frame and service of `window`, labelled `<date>:<service>`, shifted by its frame. */
+export function sourcesFor(window: ServiceWindow, filesByService: ReadonlyMap<ServiceId, TimetableFile>): TimetableSource[] {
+  return window.frames.flatMap((frame) =>
+    frame.services.map((id) => {
+      const file = filesByService.get(id)
+      if (!file) throw new Error(`no timetable file for service ${id}`)
+      return { label: `${frame.date}:${id}`, shiftS: frame.shiftS, file }
+    }),
+  )
 }
 
 /**
@@ -26,7 +38,8 @@ export function buildRouterTimetable(
   transfers: readonly Transfer[],
 ): Timetable {
   const known = new Set<StopId>(stations.stations.flatMap((s) => s.stops))
-  const knownStations = new Set<StationId>(stations.stations.map((s) => s.id))
+  // From the stop set, so a station with no stops or an id that isn't its stops' prefix is skipped, not thrown on.
+  const knownStations = new Set<StationId>([...known].map(stationOfStopId))
   const unknownStops = new Set<StopId>()
   const unknownStations = new Set<StationId>()
   let droppedPatterns = 0

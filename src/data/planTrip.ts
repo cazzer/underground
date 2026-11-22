@@ -1,8 +1,8 @@
-import type { ServiceId, StationId, StationsFile } from './schema'
+import type { StationId, StationsFile } from './schema'
 import { serviceCalendar, timetableFile, transfersFile } from './loadTimetable'
 import { planOn, type RouterTimetable, type TripJourney } from '../lib/route/plan'
 import { serviceWindow, windowKey } from '../lib/route/serviceDay'
-import { buildRouterTimetable, type TimetableSource } from '../lib/route/timetable'
+import { buildRouterTimetable, sourcesFor } from '../lib/route/timetable'
 import type { RouteOptions } from '../lib/route/types'
 
 /** The calendar has no service on the query's date (past its end, or before its start). */
@@ -25,11 +25,8 @@ async function build(stations: StationsFile, atS: number): Promise<RouterTimetab
   if (last?.key === key) return last.promise
   const serviceIds = [...new Set(window.frames.flatMap((f) => f.services))]
   const promise = Promise.all([transfersFile(), ...serviceIds.map(timetableFile)]).then(([transfers, ...files]) => {
-    const byService = new Map<ServiceId, (typeof files)[number]>(serviceIds.map((id, i) => [id, files[i]!]))
-    const sources: TimetableSource[] = window.frames.flatMap((frame) =>
-      frame.services.map((id) => ({ label: `${frame.date}:${id}`, shiftS: frame.shiftS, file: byService.get(id)! })),
-    )
-    return { timetable: buildRouterTimetable(sources, stations, transfers.transfers), window }
+    const byService = new Map(serviceIds.map((id, i) => [id, files[i]!]))
+    return { timetable: buildRouterTimetable(sourcesFor(window, byService), stations, transfers.transfers), window }
   })
   const entry = { key, promise }
   last = entry

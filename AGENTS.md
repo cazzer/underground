@@ -337,7 +337,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `<label>/<file index>` so split lanes stay apart, trip id `<key>/<trip>`, label `<date>:<service>`; unknown
     stops and stations are skipped with one `console.warn`); `plan.ts` `planOn` runs `route` for epoch seconds and
     returns `TripJourney`s (`departAt`/`arriveAt`/`startAt`/`endAt` in epoch seconds)
-  - Times are integer seconds since the query day's midnight (may be negative or past 86400, |t| < 2^29); a loader shifts other
+  - Times are integer seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days; may be negative or past 86400, |t| < 2^29); a loader shifts other
     service days itself and keeps their patterns separate
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share

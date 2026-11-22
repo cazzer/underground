@@ -4,7 +4,8 @@ import type { StationChange, TimetableFile, TimetablePattern, TimetableTrip } fr
 import { stations } from '../realtime/fixture'
 import { route } from './raptor'
 import { DEFAULT_CHANGE_S } from './stops'
-import { buildRouterTimetable, type TimetableSource } from './timetable'
+import type { ServiceWindow } from './serviceDay'
+import { buildRouterTimetable, sourcesFor, type TimetableSource } from './timetable'
 import type { Timetable } from './types'
 
 // Times in the files are 30 s units: 960 = 08:00.
@@ -70,6 +71,15 @@ describe('buildRouterTimetable', () => {
     expect(warn.mock.calls[0]![0]).toMatch(/999.*998|998.*999/)
   })
 
+  it('skips a station with no stops instead of throwing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const bare = { ...stations, stations: [...stations.stations, { ...stations.stations[0]!, id: 'ZZ', stops: [] }] }
+    const f = file([pattern(MAIN, [[960, [4, 4]]])], [{ station: 'ZZ', minTransferSec: 30 }])
+    const tt = buildRouterTimetable([source(f)], bare, [{ from: 'ZZ', to: '101', minTransferSec: 60 }])
+    expect(tt.patterns).toHaveLength(1)
+    expect(warn.mock.calls[0]![0]).toContain('ZZ')
+  })
+
   it('does not warn when everything is known', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     build([source(file([pattern(MAIN, [[960, [4, 4]]])]))])
@@ -93,5 +103,30 @@ describe('buildRouterTimetable', () => {
   it('keeps a station no trip serves, so routing to it finds nothing', () => {
     const tt = build([source(file([pattern(MAIN, [[960, [4, 4]]])]))])
     expect(route(tt, ['101'], ['S01'], 28800)).toEqual([])
+  })
+})
+
+describe('sourcesFor', () => {
+  const window: ServiceWindow = {
+    date: '20261127',
+    startS: 0,
+    frames: [
+      { date: '20261126', services: ['Sunday'], shiftS: -86400 },
+      { date: '20261127', services: ['Weekday'], shiftS: 0 },
+    ],
+  }
+  const sunday = { ...file([]), services: ['Sunday'] }
+  const weekday = { ...file([]), services: ['Weekday'] }
+
+  it('labels each frame and service and carries the frame shift', () => {
+    const sources = sourcesFor(window, new Map([['Sunday', sunday], ['Weekday', weekday]]))
+    expect(sources).toEqual([
+      { label: '20261126:Sunday', shiftS: -86400, file: sunday },
+      { label: '20261127:Weekday', shiftS: 0, file: weekday },
+    ])
+  })
+
+  it('throws for a service with no file', () => {
+    expect(() => sourcesFor(window, new Map([['Weekday', weekday]]))).toThrow('no timetable file for service Sunday')
   })
 })
