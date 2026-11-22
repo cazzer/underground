@@ -34,6 +34,8 @@ export interface Pattern {
   /** Seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days; negative or past 86400 is fine), row per trip: [trip * n + i]. */
   arr: Int32Array
   dep: Int32Array
+  /** Per trip: 1 when its times are realtime predictions (overlay.ts), 0 when scheduled. */
+  live: Uint8Array
 }
 
 /** Never mutated after build. */
@@ -57,6 +59,8 @@ export interface RideLeg {
   stops: readonly StopId[]
   departS: number
   arriveS: number
+  /** The trip's times are realtime predictions (overlay.ts); false for the schedule. */
+  live: boolean
 }
 
 /** A change inside a station (`sameStation`, possibly 0 s), a transfer between stations, or a walk to the target. */

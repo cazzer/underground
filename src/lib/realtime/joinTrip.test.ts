@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { lookup } from './fixture'
-import { joinTrip } from './joinTrip'
+import { parseTripId } from '../../data/codec'
+import { joinTrip, matchScheduled } from './joinTrip'
 
 const NOW = 1795228554 // 2026-11-20 21:35 New York
 
@@ -85,5 +86,33 @@ describe('joinTrip', () => {
     expect(join('129600_1..N', '1', { startDate: null, now: afterMidnight })).toEqual(hit('1..N03R', 'tripKey'))
     // Same time of day with an explicit Saturday start date has no such trip.
     expect(join('129600_1..N', '1', { startDate: '20261121', now: afterMidnight })).toEqual(hit('1..N03R', 'primary'))
+  })
+})
+
+describe('matchScheduled', () => {
+  function match(tripId: string, route: string, startDate: string | null = '20261120') {
+    return matchScheduled({ route, startDate }, parseTripId(tripId)!, lookup, NOW)
+  }
+
+  it('names the day, service, origin, route and shapes of a key hit', () => {
+    expect(match('145000_1..N', '1')).toEqual({ day: '20261120', service: 'Weekday', origin: 145000, route: '1', shapes: ['1..N03R'] })
+  })
+
+  it('counts a 24:xx static origin from the day before', () => {
+    expect(match('001000_1..N', '1', '20261121')).toEqual({
+      day: '20261120',
+      service: 'Weekday',
+      origin: 145000,
+      route: '1',
+      shapes: ['1..N03R'],
+    })
+  })
+
+  it('reports the route of the key that hit', () => {
+    expect(match('128750_N..N', 'W')).toMatchObject({ route: 'N', shapes: ['N..N70R'] })
+  })
+
+  it('is null without a key', () => {
+    expect(match('120416_1..N', '1')).toBeNull()
   })
 })

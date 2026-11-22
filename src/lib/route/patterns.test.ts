@@ -21,6 +21,15 @@ describe('makePatterns', () => {
     expect(journey?.legs[0]).toMatchObject({ kind: 'ride', tripId: 'fast', patternKey: 'p#1' })
   })
 
+  it('carries the live flag per trip, into the lane an overtaking live trip lands in', () => {
+    const slow = trip('slow', [0, 1200])
+    const fast: TripInput = { ...trip('fast', [60, 600]), live: true }
+    const [first, second] = makePatterns(index, pattern([fast, slow]))
+    expect(first!.live).toEqual(Uint8Array.of(0))
+    expect(second!.key).toBe('p#1')
+    expect(second!.live[0]).toBe(1)
+  })
+
   it('keeps trips that never overtake in one pattern, sorted by first departure', () => {
     const [only, ...rest] = makePatterns(index, pattern([trip('b', [100, 700]), trip('a', [0, 600]), trip('c', [100, 800])]))
     expect(rest).toEqual([])
