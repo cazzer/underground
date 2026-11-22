@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abbreviateStreet, entranceLabel, entranceParts, streetPair, type LabelledEntrance } from './streetName'
+import { abbreviateStreet, entranceLabel, entranceParts, entranceSpoken, streetPair, type LabelledEntrance } from './streetName'
 
 describe('abbreviateStreet', () => {
   it('shortens a closing type word', () => {
@@ -133,5 +133,33 @@ describe('streetPair', () => {
     expect(streetPair('West 95th Street', 'West 96th Street')).toBe('W 95 & W 96 St')
     expect(streetPair('Broadway', 'West 96th Street')).toBe('Broadway & W 96 St')
     expect(streetPair('5th Avenue', 'West 42nd Street')).toBe('5 Av & W 42 St')
+  })
+})
+
+describe('entranceSpoken', () => {
+  it('says the file’s full names, spells corners out and joins with commas', () => {
+    expect(entranceSpoken({ ...base, cross: 'North 7th Street', side: 'NE', type: 'Elevator' })).toBe(
+      'Bedford Avenue and North 7th Street, northeast corner, elevator',
+    )
+  })
+
+  it('keeps the label’s street order, sides, and entry or exit only', () => {
+    expect(entranceSpoken({ ...base, street: 'West 94th Street', cross: 'Broadway', side: 'SE' }, { swap: true })).toBe(
+      'Broadway and West 94th Street, southeast corner',
+    )
+    expect(entranceSpoken({ ...base, side: 'east', exit: false }, { near: 'North 7th Street', of: 'N' })).toBe(
+      'Bedford Avenue, east side, north of North 7th Street, entry only',
+    )
+    expect(entranceSpoken({ ...base, side: 'west', entry: false }, { near: 'North 7th Street' })).toBe(
+      'Bedford Avenue, west side at North 7th Street, exit only',
+    )
+  })
+
+  it('says a median entrance with its streets in full, and a plaza by name', () => {
+    expect(entranceSpoken({ ...base, street: 'Broadway', side: 'median' }, { between: ['West 95th Street', 'West 96th Street'] })).toBe(
+      'Broadway median, between West 95th Street and West 96th Street',
+    )
+    expect(entranceSpoken({ ...base, street: null, plaza: 'Union Square' })).toBe('Union Square')
+    expect(entranceSpoken({ ...base, street: null, plaza: null })).toBeNull()
   })
 })

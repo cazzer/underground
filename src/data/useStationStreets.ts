@@ -70,7 +70,13 @@ const VEILED_RGB: Rgb = [VEILED.r, VEILED.g, VEILED.b]
  * evicted, so the next focus retries). A station with no street file resolves to null, which stays cached.
  */
 const cache = createInteriorCache((id) =>
-  loadStationStreets(BASE_URL, id).then((file): StreetLayer | null => file && buildLayer(id, file)),
+  loadStationStreets(BASE_URL, id)
+    .then((file): StreetLayer | null => file && buildLayer(id, file))
+    .catch((err: unknown) => {
+      // Logged here, once per load, however many components (the scene, the panel) wait on it.
+      console.error(`Failed to load the streets of station ${id}`, err)
+      throw err
+    }),
 )
 
 /**
@@ -89,8 +95,8 @@ export function useStationStreets(stationId: string | null): StreetLayer | null 
       () => {
         if (!cancelled) setLoadedId(stationId)
       },
-      (err: unknown) => {
-        console.error(`Failed to load the streets of station ${stationId}`, err)
+      () => {
+        // The loader logged it; the load is evicted, so the next focus retries.
       },
     )
     return () => {

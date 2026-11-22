@@ -37,6 +37,7 @@ describe('entranceTexts', () => {
     expect(t!.text).toBe('Broadway · west side at W 94 St')
     expect(t!.head).toBe('Broadway')
     expect(t!.tail).toBe('west side at W 94 St')
+    expect(t!.spoken).toBe('Broadway, west side at West 94th Street')
     expect(t!.keys).toEqual(['broadway', 'w 94 st'])
   })
 
@@ -80,6 +81,7 @@ describe('entranceTexts', () => {
       [3, false, false],
     ])
     expect(texts.map((t) => t.headHouse)).toEqual([0, 0, 1])
+    expect(texts.map((t) => t.count)).toEqual([2, 1, 1])
   })
 
   it('names both cross streets around a median entrance', () => {

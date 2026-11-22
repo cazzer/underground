@@ -4,7 +4,7 @@
  *  as it is (the join and the files are left alone). */
 import type { StationStreets } from '../data/streetSchema'
 import { isClosedRing, isStreet, streetKey } from './streetClass'
-import { abbreviateStreet, entranceLabel, entranceParts, joinParts, type EntranceWording } from './streetName'
+import { abbreviateStreet, entranceLabel, entranceParts, entranceSpoken, joinParts, type EntranceWording } from './streetName'
 
 /** The file's coordinates are integer decimeters. */
 const DM_PER_M = 10
@@ -22,6 +22,8 @@ export interface EntranceText {
   head: string
   tail: string
   text: string
+  /** The label as a screen reader says it (full street names, corners spelled out). */
+  spoken: string
   elevator: boolean
   /** No other entrance of the station has this text. */
   unique: boolean
@@ -29,6 +31,8 @@ export interface EntranceText {
   keys: string[]
   /** Its head house: entrances chained within HEAD_HOUSE_M share one index. */
   headHouse: number
+  /** How many entrances this label stands for: itself and the same-text ones within MERGE_M it absorbed. */
+  count: number
 }
 
 interface NamedLine {
@@ -164,7 +168,10 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
     if (!parts) continue
     const text = joinParts(parts)
     const twin = out.find((u) => u.text === text && Math.hypot(u.x - d.p[0], u.z - d.p[1]) <= MERGE_M)
-    if (twin) continue
+    if (twin) {
+      twin.count++
+      continue
+    }
     out.push({
       index: d.index,
       x: d.p[0],
@@ -172,10 +179,12 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
       head: parts.head,
       tail: parts.tail,
       text,
+      spoken: entranceSpoken(d.e, d.w)!,
       elevator: d.e.type === 'Elevator',
       unique: true,
       keys: d.keys,
       headHouse: 0,
+      count: 1,
     })
   }
   for (const t of out) t.unique = out.filter((u) => u.text === t.text).length === 1
