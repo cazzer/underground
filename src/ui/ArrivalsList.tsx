@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { arrivalsAt, formatArrivalTimes, minutesAway, selectableArrival, type ArrivalGroup, type ArrivalsSource } from '../lib/live/arrivals'
+import { arrivalsAt, formatArrivalTimes, selectableArrival, type ArrivalGroup, type ArrivalsSource } from '../lib/live/arrivals'
 import { deriveArrivalsView } from '../lib/live/arrivalsView'
 import { clockNow } from '../lib/live/clock'
 import { stationFeedHealth } from '../lib/live/feedHealth'
@@ -22,10 +22,11 @@ interface ArrivalRowProps {
 }
 
 /**
- * One route, direction and destination. When the map draws one of its trains the row is a button that selects
- * the soonest such train (the camera then follows it and its panel takes focus); otherwise it is plain text.
- * The soonest listed train is not drawn when it has not left its terminal yet, so the button then says which
- * arrival it picks.
+ * One route, direction and destination. The row is always a button, so a poll that changes which trains are
+ * drawn never drops focus. When the map draws one of its trains it selects the soonest such train (the camera
+ * then follows it and its panel takes focus) and its description says which arrival that is (the soonest listed
+ * train is not drawn when it has not left its terminal yet); otherwise it is aria-disabled, a no-op that looks
+ * like text.
  */
 function ArrivalRow({ group, network, nowS, drawnKeys, onSelect }: ArrivalRowProps) {
   const route = network.routeById.get(group.routeId)
@@ -43,25 +44,22 @@ function ArrivalRow({ group, network, nowS, drawnKeys, onSelect }: ArrivalRowPro
           <span className="text-ink-dim">to</span> {group.headsign}
         </span>
         <span className="mt-0.5 block font-mono text-sm tabular-nums">{formatArrivalTimes(group.times, nowS)}</span>
-        {target !== null && target.time !== group.times[0] && (
-          <span className="sr-only">. Shows the train due in {minutesAway(target.time, nowS)}</span>
-        )}
       </span>
     </>
   )
   return (
     <li>
-      {target === null ? (
-        <div className="flex items-start gap-2 py-1.5">{content}</div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onSelect(target.tripKey)}
-          className="-mx-1 flex w-[calc(100%+0.5rem)] cursor-pointer items-start gap-2 px-1 py-1.5 text-left hover:bg-edge/20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-        >
-          {content}
-        </button>
-      )}
+      <button
+        type="button"
+        aria-disabled={target === null ? true : undefined}
+        aria-description={target === null ? undefined : `Shows the train due in ${formatArrivalTimes([target.time], nowS)}`}
+        onClick={target === null ? undefined : () => onSelect(target.tripKey)}
+        className={`-mx-1 flex w-[calc(100%+0.5rem)] items-start gap-2 px-1 py-1.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+          target === null ? 'cursor-default' : 'cursor-pointer hover:bg-edge/20'
+        }`}
+      >
+        {content}
+      </button>
     </li>
   )
 }

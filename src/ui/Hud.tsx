@@ -94,10 +94,14 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
   const locateButton = useRef<HTMLButtonElement>(null)
   const stationHeading = useRef<HTMLHeadingElement>(null)
   // Closing the train panel or the notice (× or Esc) hands focus to the station panel's heading when that
-  // panel is underneath, else to the location button; the auto-dismissed notice leaves focus alone.
+  // panel is underneath, else to the Search button; the auto-dismissed notice leaves focus alone. It waits one
+  // frame so a station panel that auto-focus mounts as the train closes is found and wins; it is read once,
+  // so a later auto-focus is not chased.
   const [focusReturns, setFocusReturns] = useState(0)
   useEffect(() => {
-    if (focusReturns > 0) (stationHeading.current ?? locateButton.current)?.focus({ preventScroll: true })
+    if (focusReturns === 0) return
+    const frame = requestAnimationFrame(() => (stationHeading.current ?? searchButton.current)?.focus({ preventScroll: true }))
+    return () => cancelAnimationFrame(frame)
   }, [focusReturns])
   const closeTrain = useCallback(() => {
     clearTrain()
