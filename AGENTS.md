@@ -152,6 +152,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   notice, then the station, and closing either of the first two returns focus to the station heading or else
   the location button); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
+  `FocusAnnouncer.tsx` a polite sr-only live region ("Showing <station>", name only) for any newly focused station (auto-focus, tap, link,
+  "Go to"), 300 ms after it is entered and only if still focused, not covered by a train panel and not already holding focus (a
+  search pick moves focus to the heading, so it stays silent); pure rules in `focusAnnounce.ts`; never moves focus;
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
   stages, per-feed trips/stale, offset/skew/age; updates per poll)
   `LocateButton.tsx` the header's location button (shows locating and located); `LocateStatus.tsx` its message (the sentence alone is the always-mounted live region)

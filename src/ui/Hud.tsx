@@ -12,6 +12,7 @@ import type { LocateControls } from '../data/useLocate'
 import { PartialAccessNote, StationName } from './AccessIcon'
 import { ArrivalsList } from './ArrivalsList'
 import { Attribution } from './Attribution'
+import { FocusAnnouncer } from './FocusAnnouncer'
 import { LiveStatus } from './LiveStatus'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
 import { LinkNotice } from './LinkNotice'
@@ -213,6 +214,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
           <p role="status" aria-live="polite" className="sr-only">
             {notice ?? ''}
           </p>
+          <FocusAnnouncer network={network} covered={trainOpen || noticeOpen} panel={panel} />
           <LinkNotice
             show={linkNotice.show}
             onDismiss={linkNotice.onDismiss}
