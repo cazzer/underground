@@ -109,10 +109,18 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     insetsRef.current = insets
     panelRef.current = panel
   }, [insets, panel])
-  // The street pieces that run under a route line are left out, so none reads as one more track in its bundle.
-  const clip = useMemo(() => buildRouteClip(localTracks(network.shapes, layer.anchor, layer.file.radiusM + ROUTE_NEAR_M)), [network, layer])
+  // The street pieces that run under a route line are left out, so none reads as one more track in its bundle. Not
+  // at a station with an interior (loaded or loading): there the tracks sink under it, clear of the streets.
+  const clipped = !interior && !interiorPending
+  const clip = useMemo(
+    () => (clipped ? buildRouteClip(localTracks(network.shapes, layer.anchor, layer.file.radiusM + ROUTE_NEAR_M)) : null),
+    [clipped, network, layer],
+  )
   const mode = streetMode(interior)
-  const buffers = useMemo(() => clipLineBuffers(mode === 'veiled' ? layer.veiledBuffers : layer.buffers, clip), [mode, layer, clip])
+  const buffers = useMemo(() => {
+    const base = mode === 'veiled' ? layer.veiledBuffers : layer.buffers
+    return clip ? clipLineBuffers(base, clip) : base
+  }, [mode, layer, clip])
   const lines = useLineLayer(
     buffers,
     mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,

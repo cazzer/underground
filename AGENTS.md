@@ -182,7 +182,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
     with the reveal and goes with the focus); keyed by station. Street pieces running under a route line are left out
     (`clipLineBuffers.ts` over a `routeClip.ts` clip of `localTracks`, the shapes' runs within the file's radius + 12 m),
-    so no 1 px centerline reads as one more track in a bundle; the labels still name the street. Its draw order is auto: above the veil (7.5), built from
+    so no 1 px centerline reads as one more track in a bundle; the labels still name the street. Not while the station
+    has an interior (loaded or loading): its tracks sink under it, so the streets above stay whole. Its draw order is auto: above the veil (7.5), built from
     `StreetLayer.veiledBuffers` (the 1.9:1 stroke, fading to the background like the others; material color stays
     white), while the station's interior is loaded under look A; else 0.35 at full color; `streetsLook.ts` TEMPORARY
     override. It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
@@ -589,8 +590,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   50 m cells; `keptPieces`: a street piece within 12 m (`ROUTE_NEAR_M`) and 15° of a track, projected inside the track
   segment ± 3 m, is cut, stretches under 2 m left by a cut dropped, no allocation per call), `src/lib/routeTracks.ts`
   (`packTracks`/`unpackTracks` for the worker, `localTracks` for one station) and `src/lib/clipLineBuffers.ts` (cuts a
-  plain layer's buffers, positions and colors interpolated at the cuts); the clip reads the ground paths only, so it
-  also cuts a street over a deep platform (L08 tilted shows N 7 St gone along the L), plus
+  plain layer's buffers, positions and colors interpolated at the cuts); the clip reads the ground paths only, not
+  depth, so the station layer skips it at a station with an interior (the basemap's roads, masked there, stay cut), plus
   the label sources: `src/lib/streetRuns.ts` (`streetLabelSources`: street ways grouped by `streetKey`, chained into
   runs at shared end nodes while the street turns under 60°, so a dual carriageway is two runs of one label;
   candidates every 40 m, nearest the station first), `src/lib/streetName.ts` (`abbreviateStreet`, MTA style "W 96 St",
