@@ -31,7 +31,7 @@ interface InteriorReframeOptions {
  * Frames a station's interior that arrived too late for its flight: once the flight has landed and the interior is
  * known, a short eased flight (reframeDuration) moves onto the interior framing with the landing turn decided then;
  * reduced motion snaps there, no turn. Asked when the interior or the focus changes, and on landing; returns the
- * landing call, which is stable (underground-by0) and only allocates when it starts a flight.
+ * landing call, which is stable (underground-by0). Runs per event (interior, focus, landing), never per frame.
  */
 export function useInteriorReframe({
   controls,

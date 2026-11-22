@@ -538,9 +538,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
   up the screen); a bare station lands at the same distance with its point in the free area above the panel. Both
-  retarget mid-flight when the interior or the panel's final size arrives (an interior arriving after 90% of
-  the flight adds no turn). Under prefers-reduced-motion station and point flights snap, with no turn; a snapped station whose interior
-  loads afterwards is reframed once onto it (snapped, no turn) unless a gesture started since. The
+  retarget mid-flight when the interior or the panel's final size arrives. An interior arriving after 90% of the
+  flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,
+  unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,
+  `interiorReframe.ts`). Under prefers-reduced-motion station and point flights snap with no turn, and a late
+  interior snaps once onto it, no turn. The
   location button frames its fix at ENTER_DISTANCE × 1.1 (about 1210 m) or farther.
   The level labels sit at z-index 0 in the canvas container, so they stay under the HUD panel.
 
