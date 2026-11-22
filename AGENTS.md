@@ -82,6 +82,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `follows` marks a flight to the selected
     train), `newFlight`, `flushMotion` and the landing turn;
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);
+    `useInteriorReframe.ts` frames an interior that loaded too late for its station flight (after LATE_TURN_PROGRESS
+    or after landing): once landed, a 0.6-1 s eased flight onto it with the landing turn decided then (reduced motion
+    snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
@@ -181,7 +184,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     per point, the direction tracks merge under 6.5 px apart and split by 8.5 px, plus the bundle's width, so they
     split only once both bundles fit); `trackOffset.ts` also exports `miterNormals`;
     `focusMachine.ts` camera-driven focus transitions; `focusDwell.ts` `settled`, the 400 ms stillness auto-focus
-    waits for; `focusHold.ts` interrupted-flight release rule; `follow.ts` the train follow's math (`followTargetInto`:
+    waits for; `focusHold.ts` interrupted-flight release rule; `interiorReframe.ts` when a landed station flight reframes onto its interior, and how long; `follow.ts` the train follow's math (`followTargetInto`:
     the ground target that puts a world point on a screen point, exact under perspective at any height; the catch-up
     ease, the 8 px pan break (16 px on touch), the 100 px jump re-fly, `followDistanceFor`); `followStep.ts` `stepFollow`,
     one follow frame (pan break, the 0.35 s lag `stepLag`, catch-up), tested on its own
@@ -535,9 +538,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
   up the screen); a bare station lands at the same distance with its point in the free area above the panel. Both
-  retarget mid-flight when the interior or the panel's final size arrives (an interior arriving after 90% of
-  the flight adds no turn). Under prefers-reduced-motion station and point flights snap, with no turn; a snapped station whose interior
-  loads afterwards is reframed once onto it (snapped, no turn) unless a gesture started since. The
+  retarget mid-flight when the interior or the panel's final size arrives. An interior arriving after 90% of the
+  flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,
+  unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,
+  `interiorReframe.ts`). Under prefers-reduced-motion station and point flights snap with no turn, and a late
+  interior snaps once onto it, no turn. The
   location button frames its fix at ENTER_DISTANCE × 1.1 (about 1210 m) or farther.
   The level labels sit at z-index 0 in the canvas container, so they stay under the HUD panel.
 

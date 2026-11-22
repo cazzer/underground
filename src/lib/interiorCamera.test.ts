@@ -172,9 +172,9 @@ describe('retargetTurn', () => {
     expect(retargetTurn(true, 0.99)).toBe('keep')
   })
 
-  it('decides when the interior arrives up to LATE_TURN_PROGRESS, and lands without a turn after it', () => {
+  it('decides when the interior arrives up to LATE_TURN_PROGRESS, and leaves it to the post-landing reframe after it', () => {
     expect(retargetTurn(false, 0.2)).toBe('decide')
     expect(retargetTurn(false, LATE_TURN_PROGRESS)).toBe('decide')
-    expect(retargetTurn(false, LATE_TURN_PROGRESS + 0.01)).toBe('none')
+    expect(retargetTurn(false, LATE_TURN_PROGRESS + 0.01)).toBe('later')
   })
 })
