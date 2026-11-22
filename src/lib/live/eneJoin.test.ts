@@ -6,6 +6,8 @@ import { ENE_MAX_AGE_S, eneFresh, eneNowS, joinStationOutages, closedForRouting,
 
 const l08 = JSON.parse(readFileSync(new URL('../../../public/data/stations/L08.json', import.meta.url), 'utf8')) as StationInterior
 
+const unionSq = JSON.parse(readFileSync(new URL('../../../public/data/stations/635.json', import.meta.url), 'utf8')) as StationInterior
+
 const NOW = 2_000_000
 const outage = (code: string, returnAt: number | null = NOW + 3600): EneOutage => ({ code, reason: null, since: NOW - 100, returnAt })
 function feed(codes: EneOutage[], generatedAt = NOW, over: Partial<EneInput> = {}): EneInput {
@@ -54,6 +56,12 @@ describe('joinStationOutages', () => {
     it('reads two opposite escalators between the same levels differently', () => {
       const i = withEscalators({ ES257X: 'up', ES258X: 'down' })
       expect(levelsOf(i, 'ES257X')).not.toBe(levelsOf(i, 'ES258X'))
+    })
+
+    it("reads Union Sq's ES257X and ES258X as opposite directions on the real data", () => {
+      const j = joinStationOutages(unionSq, feed([outage('ES257X'), outage('ES258X')]), NOW)
+      const texts = j.panel.kind === 'out' ? Object.fromEntries(j.panel.outages.map((o) => [o.id, o.levels])) : {}
+      expect(texts).toEqual({ ES257X: 'Mezzanine up to street', ES258X: 'Street down to mezzanine' })
     })
 
     it('keeps the street-first wording for an escalator with no travel', () => {
