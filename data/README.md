@@ -118,7 +118,8 @@ pinned ways lie near it and a `WARNING:` line from the build (not a failure) unt
 (`src/data/walkSchema.ts`). Rerun it after `data` or `data:streets:fetch`; `walkOutputs.test.ts` fails while the files are stale.
 Each file keeps every walkable pinned way within 300 m, named roads included (as kind `road`; the router prices them), minus
 `foot=no|private|use_sidepath` and `access=no|private` without a `foot` that allows it. Vehicle `oneway` is ignored (the graph is
-undirected). Ways are clipped and rounded to decimeters exactly as the street files do (a node has the same x/z in both),
+undirected). Ways are clipped with the street files' method, at 300 m for every class (the street files clip footways at 100 m), and rounded to decimeters
+as they are (a node has the same x/z in both),
 simplified to 0.5 m, and cut into edges at every shared node, so junctions are real graph nodes; `steps` edges are the
 step-free flag. Caps are in `scripts/lib/budget.ts` (64 KB per file, 4.5 MB total gzipped), outside the startup budget; the
 build also fails if the startup total moves. A station missing from the pin's `stationIds` gets a `WARNING:` line (its file may
@@ -154,7 +155,7 @@ the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `n
 - `streets/` is © OpenStreetMap contributors, available under the ODbL 1.0 (see `../public/data/LICENSE-ODbL.md`).
   The street files built from it (`public/data/streets/`) are ODbL derivatives; their entrance points are MTA data (i9wp-a4ja)
   under the OPEN-NY Terms of Use, which each file's `attribution` says. The walk files (`public/data/walk/`) are ODbL derivatives
-  of the same pin and carry the OSM credit only (no MTA data).
+  of the same pin and carry the OSM credit only: the anchor is the station's `stations.json` point (MTA GTFS), everything else is OSM.
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.

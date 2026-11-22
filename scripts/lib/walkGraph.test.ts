@@ -126,6 +126,12 @@ describe('buildStationWalk', () => {
     expect(ids).toEqual(expect.arrayContaining([7, 8, 9, 10, 11, 12]))
   })
 
+  it('keeps an open way whose clipped span would close on itself whole', () => {
+    const nodes: NodeMeters = { 1: [0, -700], 2: [0, -310], 3: [50, -100], 4: [-50, -100], 5: [0, -700] }
+    const { file } = walk(nodes, [way(1, { highway: 'footway' }, [1, 2, 3, 4, 2, 5])])
+    expect(deltaDecode(file.nodeId)).toEqual([1, 2, 3, 4, 5])
+  })
+
   it('drops ways pedestrians may not use, counts them, and does not split at a node only they touch', () => {
     const nodes: NodeMeters = { 1: [0, 0], 2: [10, 10], 3: [30, 0], 4: [0, 50], 5: [40, 50], 6: [0, -50], 7: [40, -50], 8: [0, 80], 9: [40, 80], 10: [-40, 20] }
     const { file, excluded } = walk(nodes, [

@@ -8,6 +8,7 @@ import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { deltaDecode } from '../../src/data/codec.ts'
 import type { StationsFile } from '../../src/data/schema.ts'
+import type { StationStreets } from '../../src/data/streetSchema.ts'
 import { WALK_KINDS, type StationWalk } from '../../src/data/walkSchema.ts'
 import { WALK_FILE_GZIP_CAP_BYTES, WALK_TOTAL_GZIP_CAP_BYTES } from './budget.ts'
 import { toStableJson } from './stableJson.ts'
@@ -76,6 +77,23 @@ describe('committed walk files', () => {
       })
       expect([...uses.keys()].length, `${name}: every listed node is used`).toBe(n)
     }
+  })
+
+  it('put every node at the same x/z as the street file of the same station', () => {
+    const streetsOut = new URL('../../public/data/streets/', import.meta.url)
+    let shared = 0
+    for (const name of names) {
+      const walk = json(new URL(name, OUT)) as StationWalk
+      const streets = json(new URL(name, streetsOut)) as StationStreets
+      const at = new Map(deltaDecode(streets.nodeId).map((id, i) => [id, [streets.x[i], streets.z[i]]]))
+      deltaDecode(walk.nodeId).forEach((id, i) => {
+        const s = at.get(id)
+        if (s === undefined) return
+        shared++
+        expect([walk.x[i], walk.z[i]], `${name} node ${id}`).toEqual(s)
+      })
+    }
+    expect(shared).toBeGreaterThan(0)
   })
 
   it('give Bedford Av (L08) sidewalks, crossings and roads in one mostly connected graph', () => {

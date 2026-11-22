@@ -50,6 +50,10 @@ function main(): void {
   const written = new Set(files.map((f) => f.name))
   for (const name of readdirSync(OUT_DIR)) {
     if (!name.endsWith('.json') || written.has(name)) continue
+    if (!FILE_RE.test(name)) {
+      console.warn(`WARNING: walk/${name}: not a station file name, left in place`)
+      continue
+    }
     rmSync(new URL(name, OUT_DIR))
     console.log(`walk/${name}: removed (no such station any more)`)
   }
@@ -60,7 +64,7 @@ function main(): void {
   for (const [i, r] of results.entries()) {
     if (r.file.edgeNodes.length === 0) console.log(`WARNING: no walkable ways within ${WALK_GRAPH_RADIUS_M} m, wrote an empty walk file: ${stations[i]!.id} ${stations[i]!.name}`)
   }
-  console.log(`walk: ${results.reduce((sum, r) => sum + r.excluded, 0)} ways within ${WALK_GRAPH_RADIUS_M} m excluded for foot/access tags`)
+  console.log(`walk: ${results.reduce((sum, r) => sum + r.excluded, 0)} way/station pairs within ${WALK_GRAPH_RADIUS_M} m excluded for foot/access tags`)
   console.log(`walk: ${TOP_FILES} largest files`)
   for (const f of [...files].sort((a, b) => b.gzip - a.gzip || (a.name < b.name ? -1 : 1)).slice(0, TOP_FILES)) {
     console.log(`  walk/${f.name}: ${f.raw} bytes (${f.gzip} gzipped, cap ${WALK_FILE_GZIP_CAP_BYTES})`)

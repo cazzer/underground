@@ -55,7 +55,8 @@ at deploy, and an ODbL 1.0 derivative database under the same credit. Their lice
 sources and terms in `docs/research/data-sources.md` §5.3.
 `walk/<id>.json` (one per station) is the walkable graph of the same OSM ways within 300 m (sidewalks, crossings, steps, paths,
 pedestrian streets and roads), packed as OSM node ids, decimeter coordinates and edges (`npm run data:walk`). The whole file is a
-derivative database under the ODbL and carries the OSM credit only. It sits outside the startup budget.
+derivative database under the ODbL and carries the OSM credit only: the anchor is the station's `stations.json` point (MTA GTFS),
+everything else is OSM. It sits outside the startup budget.
 
 ## NY Open Data / MTA Elevator and Escalator feeds
 

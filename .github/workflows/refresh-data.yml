@@ -5,7 +5,7 @@ name: Refresh GTFS data
 # to create and approve pull requests".
 #
 # Two jobs so the write token never sits next to npm:
-#   generate  read-only; runs npm (data, data:stations, typecheck, test, build); uploads public/data
+#   generate  read-only; runs npm (data, data:stations, data:streets, data:walk, typecheck, test, build); uploads public/data
 #   publish   write token; never runs npm; commits the artifact and opens/updates the PR
 #
 # GitHub disables scheduled workflows after 60 days without repo activity; re-enable
@@ -79,7 +79,14 @@ jobs:
 
       # The walk files follow the stations too (same pin, same stations.json); also writes only under public/data/.
       - name: Regenerate walk files
-        run: npm run data:walk 2>&1 | tee -a "$RUNNER_TEMP/data.log"
+        # The full output (the low-connectivity list, the largest files) goes to walk.log; only the totals and warnings reach
+        # data.log, so the PR body's last 20,000 characters still show the data and data:stations lines. A failure shows its tail.
+        run: |
+          status=0
+          npm run data:walk > "$RUNNER_TEMP/walk.log" 2>&1 || status=$?
+          grep -E '^(WARNING|walk/:|walk: [0-9]+ (way/station|stations)|public/data startup)' "$RUNNER_TEMP/walk.log" | tee -a "$RUNNER_TEMP/data.log" || true
+          if [ "$status" -ne 0 ]; then tail -n 40 "$RUNNER_TEMP/walk.log" | tee -a "$RUNNER_TEMP/data.log"; fi
+          exit "$status"
 
       - name: Check for changes
         id: diff

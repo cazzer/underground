@@ -17,8 +17,8 @@ export const STREETS_TOTAL_GZIP_CAP_BYTES = 1_800_000
 
 /** public/data/walk/<id>.json loads on demand (the walk router), outside the budget above; each file has this cap... */
 export const WALK_FILE_GZIP_CAP_BYTES = 64_000
-/** ...and the directory this one: the measured total (3.57 MB) plus a quarter, rounded up. */
-export const WALK_TOTAL_GZIP_CAP_BYTES = 4_500_000
+/** ...and the directory this one: the measured total (3,629,681 B) plus about a quarter, rounded up. */
+export const WALK_TOTAL_GZIP_CAP_BYTES = 4_600_000
 
 export interface RenderedFile {
   name: string

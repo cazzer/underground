@@ -102,6 +102,9 @@ export function buildStationWalk(station: Station, pin: Pin): StationWalkResult 
   let excluded = 0
   const kept: { way: PinWay; kind: WalkKind; nodes: number[] }[] = []
   for (const { way } of waysNear(pin, station, WALK_GRAPH_RADIUS_M)) {
+    for (const id of way.nodes) {
+      if (!pin.nodes.has(id)) throw new Error(`way ${way.id}: node ${id} is not in the pin's node table`)
+    }
     const closed = isClosedRing(way.nodes)
     const span = clipSpan(way.nodes.map(ptOf), WALK_GRAPH_RADIUS_M * 10, closed)
     if (span === null) continue

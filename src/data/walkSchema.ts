@@ -10,7 +10,8 @@
  *    use_sidepath` and `access=no|private` without a `foot=yes|designated|permissive`. The graph is undirected: the
  *    vehicle `oneway` is ignored (`oneway:foot` is not pinned). Roads are walkable, kind `road`; the router prices them.
  *  - The file is complete within `radiusM` of the anchor and partial beyond: a way is kept through the first vertex past
- *    the circle, and one that leaves and re-enters is one span, as in the street files. A closed way is whole or absent.
+ *    the circle, and one that leaves and re-enters is one span, as in the street files. A closed way is whole or absent, and an open way whose
+ *    clipped span would close on itself (first node equals last) is kept whole rather than read as a ring.
  *  - Every `nodeId` is a real OSM node id, strictly ascending (delta-coded), and only nodes some edge uses are listed.
  *    x/z are integer decimeters (x east, z south). The client decoder owns turning them into meters.
  *  - An edge is a run of one way between two graph nodes: its first and last entries are graph nodes (way ends, or
