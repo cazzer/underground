@@ -10,7 +10,7 @@ import type { EnsureDeps } from './basemapFetch.ts'
 import { releaseAssetUrl, releaseTag } from './basemapSpec.ts'
 import type { BasemapPin } from './basemapSpec.ts'
 import { unpackTarGz } from './basemapUnpack.ts'
-import { makeTarGz, tileBody } from './tarFixture.ts'
+import { gzipTileBody, makeTarGz, tileBody } from './tarFixture.ts'
 import type { FixtureEntry } from './tarFixture.ts'
 
 const entries: FixtureEntry[] = [
@@ -112,7 +112,7 @@ describe('ensureTiles', () => {
 })
 
 describe('unpackTarGz', () => {
-  const unpack = async (list: FixtureEntry[], expect: Partial<typeof expect2> = {}) => {
+  const unpack = async (list: FixtureEntry[], expect: Partial<typeof expect2> & { gzip?: boolean } = {}) => {
     const file = join(dir, 'in.tar.gz')
     await writeFile(file, makeTarGz(list))
     return unpackTarGz(file, join(dir, 'dest'), { ...expect2, ...expect })
@@ -145,6 +145,29 @@ describe('unpackTarGz', () => {
     await writeFile(file, makeTarGz([0, 1, 2].map((i) => ({ name: `tiles/2/${i}/0.mvt`, body: tileBody(10000) }))))
     await expect(unpackTarGz(file, join(dir, 'dest2'), { files: 1, tileBytes: 10, maxZoom: 15 })).rejects.toThrow(/at most/)
     await expect(readdir(join(dir, 'dest2'))).rejects.toThrow(/ENOENT/)
+  })
+
+  it('unpacks gzip-compressed tiles as they are, counting their stored sizes', async () => {
+    const gz = [
+      { name: 'tiles/0/0/0.mvt', body: gzipTileBody(3) },
+      { name: 'tiles/15/9649/12314.mvt', body: gzipTileBody(700) },
+    ]
+    const bytes = gzipTileBody(3).length + gzipTileBody(700).length
+    expect(await unpack(gz, { tileBytes: bytes, gzip: true })).toEqual({ files: 2, bytes })
+    expect(await readFile(join(dir, 'dest/tiles/15/9649/12314.mvt'))).toEqual(Buffer.from(gzipTileBody(700)))
+  })
+
+  it('refuses a corrupt gzip tile, a plain tile when gzip is required, and a tarball that mixes the two', async () => {
+    const good = gzipTileBody(700)
+    const corrupt = [{ name: 'tiles/0/0/0.mvt', body: good.subarray(0, good.length - 12) }]
+    await expect(unpack(corrupt, { files: 1, tileBytes: good.length - 12 })).rejects.toThrow(/tiles\/0\/0\/0\.mvt is not an MVT tile: bad gzip stream/)
+    await expect(unpack(entries, { gzip: true })).rejects.toThrow(/not an MVT tile: not gzip-compressed/)
+    const mixed = [
+      { name: 'tiles/0/0/0.mvt', body: tileBody(3) },
+      { name: 'tiles/15/9649/12314.mvt', body: good },
+    ]
+    await expect(unpack(mixed, { tileBytes: 5 + good.length })).rejects.toThrow(/1 gzip tiles of 2 and the rest plain/)
+    await expect(readdir(join(dir, 'dest'))).rejects.toThrow(/ENOENT/)
   })
 
   it('does not follow a symlink already at the destination', async () => {

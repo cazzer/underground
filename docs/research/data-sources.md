@@ -245,7 +245,8 @@ files (ost.3) are what ship.
 
 The citywide basemap (epic ost.9: streets, water and parks from same-origin vector tiles) is cut from a
 Protomaps daily build ([build.protomaps.com](https://build.protomaps.com), planetiler, basemap schema 4.15.2 at the time
-of writing). It is served as a static directory of uncompressed Mapbox Vector Tiles, `basemap/tiles/{z}/{x}/{y}.mvt`, fetched
+of writing). It is served as a static directory of Mapbox Vector Tiles, `basemap/tiles/{z}/{x}/{y}.mvt`, each gzip-compressed on
+disk since ost.9.5 (still named `.mvt`; the first release, before it, held plain tiles, and every reader still takes both), fetched
 on demand only (no startup file mentions it; the client loads tiles in ost.9.2). Nothing reads a byte range: GitHub Pages
 gzips a Range answer with a wrong total (section 6), which is why the first design, one `nyc.pmtiles` read in ranges, was
 dropped (ost.9.4). It is never in git (`.gitignore`: `public/basemap/`, `*.pmtiles`).
@@ -255,20 +256,24 @@ boroughs' bbox (`-74.2591,40.4774,-73.7004,40.9176`) up to z15 (`data/basemap/ba
 metadata against the terms below (`scripts/gate-basemap.ts`), drops the unused layers with tippecanoe's `tile-join` (tag
 2.79.0, built from source in that workflow only) and verifies the subset with `pmtiles verify`, checks the output metadata
 again, then writes the tile directory from that subset (`tile-join -pC -e`: one uncompressed tile per file, named
-`<z>/<x>/<y>.pbf`, XYZ rows; renamed `.mvt`; its `metadata.json` is left out, the gate having read the metadata already).
-`scripts/basemap-tiles.ts check` reads every tile (each must be an MVT, named on its zoom's grid, at most z15) before the tree is
-packed into one deterministic tarball (sorted names, files only, mtime 0, owner 0, ustar, `gzip -9n`), which is unpacked again
+`<z>/<x>/<y>.pbf`, XYZ rows; renamed `.mvt`; its `metadata.json` is left out, the gate having read the metadata already) and
+gzips each tile in place (`gzip -n -9`: no name, no time, so the bytes follow the content alone; the file keeps its `.mvt` name).
+`scripts/basemap-tiles.ts check --gzip` reads every tile (each must be gzip, an MVT once inflated, named on its zoom's grid, at
+most z15; a tree mixing plain and gzip tiles is refused) before the tree is
+packed into one deterministic tarball (sorted names, files only, mtime 0, owner 0, ustar, `gzip -9n`; the outer gzip gains
+nothing on already-compressed tiles, and the deploy's reader expects the format), which is unpacked again
 with the deploy's own extractor and compared with the tree. The tarball, `nyc-tiles.tar.gz`, is published as a GitHub Release
 (`basemap-<build>-<sha8>`, with the licence notes and the counts in the release text). The release is our own copy because
 Protomaps asks not to hotlink builds and keeps them only about a week.
 A normal PR then sets the `pin` in `data/basemap/basemap.json` (build, release, asset, sha256 and bytes of the tarball, `files`
-and `tileBytes` of the unpacked tree); `deploy.yml` runs `scripts/fetch-basemap.ts --out dist/basemap`, which downloads the
+and `tileBytes` of the unpacked tree: the sum of the stored, compressed file sizes); `deploy.yml` runs `scripts/fetch-basemap.ts --out dist/basemap`, which downloads the
 asset (sha256 and size checked, byte-limited), refuses any tar entry that is not exactly `tiles/<z>/<x>/<y>.mvt` as a regular file
 (an allowlist: no absolute path, `..`, link, directory entry or extension; nothing is written before every entry and the file
 count and byte total pass), and unpacks to `dist/basemap/tiles/`; the unpacked tree is checked again against the pin. A pin
 without `asset` (the first, `nyc.pmtiles` format) is skipped with a warning, as is a null pin. Its `verify-basemap` job
 fetches three tiles from the live site (z0, a z15 tile over Midtown and one over Brooklyn), with and without a browser's
-`Accept-Encoding`, and fails unless each is a 200 with the tile's exact bytes. `npm run basemap:fetch` fetches the same tree
+`Accept-Encoding`, and fails unless each is a 200 with the tile's exact bytes (for a gzip tree, `--gzip`: gzip bytes, inflated
+to a valid MVT; the summary lists the served and inflated sizes). `npm run basemap:fetch` fetches the same tree
 into the gitignored `public/basemap/tiles/` for dev (offline after the first fetch; vite serves it, and answers 404 for a tile
 that is not in the tree, as Pages does).
 
@@ -323,7 +328,18 @@ z13 5.9 MB), larger than the 33 MB `.pmtiles` because that stores each tile gzip
 31,372,949 bytes (`gzip -9n`). Unpacking takes about 0.6 s with `scripts/basemap-tiles.ts unpack` (2.4 s for the deploy's whole
 `ensureTiles`, which also hashes and scans). Measured on the first tile-pinned deploy (basemap-20261121-ddcef445, section 6):
 Pages serves `.mvt` as `application/vnd.mapbox-vector-tile` and does not compress it, so a tile costs its raw size on the wire,
-more than its gzipped entry in the `.pmtiles` did (shipping gzipped tiles is a follow-up; the client already inflates them). The
+more than its gzipped entry in the `.pmtiles` did.
+
+**Gzipped tiles (ost.9.5).** The fix is to store the tiles gzipped: Pages adds no content-encoding to a file that is already
+compressed, so the stored bytes are the wire bytes and the browser hands the worker a gzip body, which `inflate.ts`
+(`DecompressionStream('gzip')`, every target browser has it) inflates before decoding; raw MVT still passes through, so the client
+needs no release for the switch and the two formats can coexist during it. The name stays `.mvt`: a `.gz` suffix would not make
+the browser decode anything. In the scripts, `node:zlib` inflates (`tileProbe.ts` `readTile`, capped at 16 MiB a tile). The pin's
+`tileBytes` is the stored size (the sum of the gzip files); the workflow report, release notes and probe line also give the
+inflated size.
+Wire size of the live Midtown tile `15/9649/12314.mvt`: before (plain, deploy 44991770994) 12,993 B. After: to be recorded
+once the gzip release is published and deployed (`verify-basemap`'s summary lists the served bytes of each probe tile, and the
+tile-directory report of the workflow run lists both sizes). The
 Pages artifact limit is
 1 GB (the deploy fails above 900 MB and prints the artifact's size and file count); the tiles add 45 MB to it. The artifact is
 uploaded as a single tar, so the 3,820 files should not slow `upload-pages-artifact` (the job summary times it).
@@ -423,7 +439,9 @@ browser decodes transparently. There is no Range dependency anywhere now (`scrip
   `content-type: application/vnd.mapbox-vector-tile`, no `content-encoding` with or without gzip offered (Pages does not
   compress this type), `cache-control: max-age=600`. So a tile's wire size is its raw size. A tile the pack lacks (z15, x 0,
   y 0) answers `404` with `text/html`, which the client treats as an empty tile. Each deploy's `verify-basemap` job records
-  these headers in its summary.
+  these headers in its summary. (ost.9.5 ships the tiles pre-gzipped for this reason; Pages then sends the stored bytes with the
+  same headers, so the worker inflates them. Whether Pages adds a `content-encoding` to a gzip-bodied `.mvt` is checked by the
+  first `verify-basemap` run on the gzip release, which fails if the served body is not the stored gzip file.)
 - That deploy's artifact: 69.75 MB in 5,149 files; `upload-pages-artifact` took 4 s; the basemap download 0.9 s and the unpack
   1.1 s.
 - Vite dev (sirv) serves `public/basemap/tiles/...` uncompressed with an empty content type, and a small dev-only middleware in

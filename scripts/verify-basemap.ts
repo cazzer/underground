@@ -1,19 +1,22 @@
 /** Checks that the live site serves the basemap tiles; the deploy workflow runs it after Pages published them.
  *
- *  node scripts/verify-basemap.ts <tiles-base-url> '<probe-sizes-json>' [--attempts N] [--delay-s S]
+ *  node scripts/verify-basemap.ts <tiles-base-url> '<probe-sizes-json>' [--gzip] [--attempts N] [--delay-s S]
  *
  *  Uses the network (the URL given, nothing else). `<probe-sizes-json>` is `node scripts/basemap-tiles.ts probe-sizes
  *  dist/basemap/tiles`: the file size of each probe tile in the deployed tree (scripts/lib/tileProbe.ts: z0, a z15 tile over
  *  Midtown and one over Brooklyn). Each is fetched twice, with `Accept-Encoding: identity` and with a browser's header
  *  (`gzip, deflate, br`: a browser also offers zstd, which Node cannot decode; a script can set the header, a page's JavaScript
  *  cannot), and must answer 200 with a body that,
- *  decoded, is a valid MVT of exactly the file's size and (when compressed) the identity bytes. Pages may compress the
- *  tile; the browser decodes that transparently, so a content-encoding is recorded, never a failure. A tile the pack does not
+ *  decoded, is a valid MVT of exactly the file's size and (when compressed) the identity bytes. The tiles may be stored
+ *  gzipped (still named .mvt, served with no content-encoding, so the body is the file's gzip bytes and the client inflates
+ *  it): such a body is inflated and the MVT inside checked, and with `--gzip` (the tree's tiles are gzip, from
+ *  `basemap-tiles.ts check`'s `encoding`) a body that is not gzip fails. Pages may also compress a tile; the browser decodes
+ *  that transparently, so a content-encoding is recorded, never a failure. A tile the pack does not
  *  hold is also asked for: its status (the client treats 404 as an empty tile) is recorded, not judged.
  *  A new deploy can take a moment to reach the CDN, so it retries (default 6 times, 20 s apart, none starting after 12
  *  minutes), each time with a cache-busting query. Every header, content-type and content-encoding included, goes to the job summary. */
 import { appendFileSync } from 'node:fs'
-import { MISSING_TILE, PROBE_TILES, tilePath, tileProblems } from './lib/tileProbe.ts'
+import { MISSING_TILE, PROBE_TILES, readTile, tilePath, tileProblems } from './lib/tileProbe.ts'
 import type { ProbeResponse, ProbeTile } from './lib/tileProbe.ts'
 
 /** A request that hangs is cut off at 30 s, and no new attempt starts after 12 minutes, so the worst case (a last attempt of
@@ -46,7 +49,7 @@ async function request(base: string, tile: ProbeTile, encoding: Encoding): Promi
   return { status: res.status, headers: Object.fromEntries(res.headers), body: new Uint8Array(await res.arrayBuffer()) }
 }
 
-async function runAll(base: string, sizes: Record<string, number>): Promise<Probe[]> {
+async function runAll(base: string, sizes: Record<string, number>, gzip: boolean): Promise<Probe[]> {
   const probes: Probe[] = []
   for (const tile of PROBE_TILES) {
     const size = sizes[tilePath(tile)] as number
@@ -55,7 +58,7 @@ async function runAll(base: string, sizes: Record<string, number>): Promise<Prob
       const probe: Probe = { tile, encoding, problems: [] }
       try {
         probe.response = await request(base, tile, encoding)
-        probe.problems = tileProblems({ size, encoding: encoding === 'identity' ? 'identity' : 'any', reference }, probe.response)
+        probe.problems = tileProblems({ size, gzip, encoding: encoding === 'identity' ? 'identity' : 'any', reference }, probe.response)
         if (encoding === 'identity' && probe.problems.length === 0) reference = probe.response.body
       } catch (err) {
         probe.problems = [`request failed: ${err instanceof Error ? err.message : String(err)}`]
@@ -81,9 +84,21 @@ function summary(base: string, probes: Probe[]): string {
     const h = p.response?.headers ?? {}
     const headers = SHOWN.filter((k) => h[k] !== undefined).map((k) => `${k}: ${h[k]}`).join('<br>')
     const result = p.tile === MISSING_TILE ? 'recorded (the client treats 404 as an empty tile)' : p.problems.join('; ') || 'ok'
-    return `| ${p.tile.label} (${tilePath(p.tile)}) | ${p.encoding} | ${p.response?.status ?? 'none'} | ${p.response?.body?.length ?? '-'} | ${headers || '-'} | ${result} |`
+    const body = p.response?.body
+    const read = body === undefined || p.response?.status !== 200 ? null : readTile(body)
+    const form = read === null ? '-' : read.gzip ? 'gzip' : 'plain'
+    const inflated = read?.mvt?.length ?? '-'
+    return `| ${p.tile.label} (${tilePath(p.tile)}) | ${p.encoding} | ${p.response?.status ?? 'none'} | ${body?.length ?? '-'} | ${form} | ${inflated} | ${headers || '-'} | ${result} |`
   })
-  return ['### Basemap tile check', base, '', '| Tile | Accept-Encoding | Status | Decoded bytes | Headers | Result |', '|---|---|---|---|---|---|', ...rows, ''].join('\n')
+  return [
+    '### Basemap tile check',
+    base,
+    '',
+    '| Tile | Accept-Encoding | Status | Body bytes (as the client reads them) | Body | Inflated MVT bytes | Headers | Result |',
+    '|---|---|---|---|---|---|---|---|',
+    ...rows,
+    '',
+  ].join('\n')
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
@@ -108,15 +123,16 @@ function parseSizes(json: string): Record<string, number> {
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
   const [base, sizesJson] = args
-  if (base === undefined || sizesJson === undefined) throw new Error("usage: node scripts/verify-basemap.ts <tiles-base-url> '<probe-sizes-json>' [--attempts N] [--delay-s S]")
+  if (base === undefined || sizesJson === undefined) throw new Error("usage: node scripts/verify-basemap.ts <tiles-base-url> '<probe-sizes-json>' [--gzip] [--attempts N] [--delay-s S]")
   const sizes = parseSizes(sizesJson)
+  const gzip = args.includes('--gzip')
   const attempts = option(args, '--attempts', 6)
   const delayS = option(args, '--delay-s', 20)
 
   const deadline = Date.now() + DEADLINE_MS
   let probes: Probe[] = []
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    probes = await runAll(base, sizes)
+    probes = await runAll(base, sizes, gzip)
     if (probes.every((p) => p.problems.length === 0)) break
     for (const p of probes) for (const problem of p.problems) console.log(`attempt ${attempt}/${attempts}: ${p.tile.label} (${p.encoding}): ${problem}`)
     if (attempt < attempts) {
@@ -133,7 +149,7 @@ async function main(): Promise<void> {
 
   const failed = probes.flatMap((p) => p.problems.map((problem) => `${p.tile.label} (${p.encoding}): ${problem}`))
   if (failed.length > 0) throw new Error(`the site does not serve the basemap tiles correctly:\n- ${failed.join('\n- ')}`)
-  console.log('The site serves the basemap tiles as 200 MVT bodies of the right size, with and without compression.')
+  console.log(`The site serves the basemap tiles as 200 ${gzip ? 'gzip-compressed ' : ''}MVT bodies of the right size, with and without compression.`)
 }
 
 main().catch((err: unknown) => {

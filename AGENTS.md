@@ -69,12 +69,13 @@ so dev and preview serve under that path.
   and checks the startup budget total did not move. If a file passes its cap, lower the one global `WALK_RADIUS_M` in
   `scripts/lib/streetsBuild.ts` (footways only), never per file.
 - `npm run basemap:fetch [-- --out dir]`: downloads the pinned NYC basemap (`data/basemap/basemap.json` `pin`, a GitHub Release
-  tarball of uncompressed MVT tiles) and unpacks it to the gitignored `public/basemap/tiles/<z>/<x>/<y>.mvt` (vite serves
+  tarball of MVT tiles, plain or gzip-compressed, still named `.mvt`) and unpacks it to the gitignored `public/basemap/tiles/<z>/<x>/<y>.mvt` (vite serves
   `/underground/basemap/tiles/...`, and a dev-only middleware in `vite.config.ts` answers 404 for a tile not in the tree), sha256-, size- and path-checked, no network once the tree matches; fails while the pin is
   null or the old `nyc.pmtiles` format. `npm run basemap:gate -- <source|output> <metadata.json>` is the workflow's licensing gate
-  (offline); `npm run basemap:tiles -- check|unpack|probe-sizes|pin-state ...` checks a tile tree, unpacks a tarball, classifies the pin (offline);
-  `npm run basemap:verify -- <tiles-url> '<probe-sizes-json>'` fetches three tiles from the live site (network; the deploy's
-  `verify-basemap` job runs it). The basemap is built by hand-dispatching `.github/workflows/basemap.yml` (see Data below), then
+  (offline); `npm run basemap:tiles -- check|unpack|probe-sizes|pin-state ...` checks a tile tree (a gzip tile is inflated and its MVT checked; `--gzip` refuses a plain one; the stored and inflated sizes are
+  printed, and `probe-sizes` prints both for the probe tiles to stderr), unpacks a tarball, classifies the pin (offline);
+  `npm run basemap:verify -- <tiles-url> '<probe-sizes-json>' [--gzip]` fetches three tiles from the live site and inflates the
+  gzip bodies (network; the deploy's `verify-basemap` job runs it, with `--gzip` when the tree's tiles are gzip). The basemap is built by hand-dispatching `.github/workflows/basemap.yml` (see Data below), then
   pinned in a normal PR.
 - `npm run data:walk`: offline; builds `public/data/walk/<stationId>.json` (the walk graph: every walkable pinned way within
   300 m, junctions shared, OSM node ids, x/z in dm around the stations.json point, edges with kind and length; oneway ignored)
@@ -989,15 +990,18 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   lacks); it does not block the refresh, and the next `data:streets:fetch` covers it. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).
 - **The NYC basemap (vector tiles for streets, water and parks) is never in git and loads on demand only.** It is a static
-  directory of uncompressed Mapbox Vector Tiles, `basemap/tiles/{z}/{x}/{y}.mvt`: the five boroughs at z0 to z15 (3,820 files,
-  about 45 MB unpacked), only the earth, water, landuse and roads layers of a Protomaps daily build, cut by
+  directory of Mapbox Vector Tiles, `basemap/tiles/{z}/{x}/{y}.mvt`: the five boroughs at z0 to z15 (3,820 files,
+  about 45 MB inflated), only the earth, water, landuse and roads layers of a Protomaps daily build, cut by
   `.github/workflows/basemap.yml` (manual; go-pmtiles `extract`, tippecanoe `tile-join -l` to drop layers, then `tile-join -pC -e`
-  for the directory) and published as one tarball (`nyc-tiles.tar.gz`) on a GitHub Release. Nothing reads a byte range: Pages
-  gzips a Range answer with a wrong total (measured, `docs/research/data-sources.md` section 6), so each tile is a whole file that
-  Pages may compress and the browser decodes. `deploy.yml` unpacks the pinned release into `dist/basemap/tiles/` (sha256, size,
+  for the directory, each tile then gzipped in place with `gzip -n -9`, keeping the `.mvt` name) and published as one tarball
+  (`nyc-tiles.tar.gz`) on a GitHub Release. Tiles built before ost.9.5 are plain; every reader takes both (a body starting `1f 8b`
+  is inflated, then checked as an MVT), and the pin's `tileBytes` counts the stored sizes. Nothing reads a byte range: Pages
+  gzips a Range answer with a wrong total (measured, `docs/research/data-sources.md` section 6), so each tile is a whole file.
+  Pages adds no content-encoding to `.mvt`, so a gzip tile goes over the wire as stored and the basemap worker inflates it
+  (`DecompressionStream`); never name a tile `.gz`. `deploy.yml` unpacks the pinned release into `dist/basemap/tiles/` (sha256, size,
   allowlisted entry names, file count and byte total all checked; a null or old-format pin is skipped with a warning), times
   the unpack and the Pages upload in the job summary, and fails above 900 MB; its `verify-basemap` job fetches three tiles from
-  the live site with and without gzip offered. Nothing in the startup files names it, and it is not the walk graph.
+  the live site with and without gzip offered, and for a gzip tree requires the served bytes to be gzip and the inflated MVT valid. Nothing in the startup files names it, and it is not the walk graph.
   The licensing gate (`basemapGate.ts`) fails the workflow on any credit beyond "© OpenStreetMap" (so never the landcover
   layer, which is CC BY 4.0, nor places or pois); a failure goes to a person as a licensing card. The pin changes only by a
   normal PR. Details and sizes: `docs/research/data-sources.md` §5.3. The client never fetches Protomaps' servers.

@@ -1,5 +1,7 @@
+import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { MISSING_TILE, PROBE_TILES, lonLatToTile, mvtProblems, tilePath, tileProblems } from './tileProbe.ts'
+import { gzipTileBody, tileBody } from './tarFixture.ts'
+import { MAX_INFLATED_TILE_BYTES, MISSING_TILE, PROBE_TILES, isGzipBody, lonLatToTile, mvtProblems, readTile, tilePath, tileProblems } from './tileProbe.ts'
 
 /** A layer message: tag 0x1a, a one-byte length, then `n` filler bytes. */
 const layer = (n: number) => [0x1a, n, ...new Array<number>(n).fill(0x0a)]
@@ -35,6 +37,46 @@ describe('mvtProblems', () => {
   })
 })
 
+describe('readTile', () => {
+  it('reads a plain MVT as it stands', () => {
+    const body = tileBody(40)
+    expect(readTile(body)).toEqual({ gzip: false, mvt: body, problems: [] })
+  })
+
+  it('inflates a gzipped MVT (still named .mvt) and checks the MVT inside', () => {
+    const gz = gzipTileBody(300)
+    expect(isGzipBody(gz)).toBe(true)
+    const read = readTile(gz)
+    expect(read.gzip).toBe(true)
+    expect(read.problems).toEqual([])
+    expect([...(read.mvt as Uint8Array)]).toEqual([...tileBody(300)])
+  })
+
+  it('names a corrupt or truncated gzip body, and a gzip whose payload is not an MVT', () => {
+    const gz = gzipTileBody(300)
+    const truncated = readTile(gz.subarray(0, gz.length - 12))
+    expect(truncated.mvt).toBeNull()
+    expect(truncated.problems[0]).toMatch(/^bad gzip stream/)
+    const flipped = Uint8Array.from(gz)
+    flipped[flipped.length - 6] = (flipped[flipped.length - 6] as number) ^ 0xff
+    expect(readTile(flipped).problems[0]).toMatch(/^bad gzip stream/)
+    expect(readTile(Uint8Array.from([0x1f, 0x8b, 0x08])).problems[0]).toMatch(/^bad gzip stream/)
+    const html = readTile(gzipSync(Buffer.from('<!doctype html><title>404</title>')))
+    expect(html.gzip).toBe(true)
+    expect(html.problems[0]).toMatch(/^inflated body: byte 0 is 0x3c, not a layer tag/)
+    expect(readTile(gzipSync(tileBody(3).subarray(0, 4))).problems[0]).toMatch(/^inflated body: /)
+  })
+
+  it('stops a gzip that inflates past the cap, and refuses a plain body when gzip is required', () => {
+    const bomb = readTile(gzipSync(new Uint8Array(MAX_INFLATED_TILE_BYTES + 1)))
+    expect(bomb.mvt).toBeNull()
+    expect(bomb.problems[0]).toMatch(/^bad gzip stream/)
+    expect(readTile(tileBody(5), { requireGzip: true }).problems).toEqual(['not gzip-compressed (the body does not start 1f 8b)'])
+    expect(readTile(gzipTileBody(5), { requireGzip: true }).problems).toEqual([])
+    expect(readTile(new Uint8Array(), { requireGzip: true }).problems).toHaveLength(2)
+  })
+})
+
 describe('tileProblems', () => {
   const body = tile(5, 7)
   const ok = { status: 200, headers: { 'content-type': 'application/octet-stream' }, body }
@@ -50,6 +92,19 @@ describe('tileProblems', () => {
     expect(tileProblems({ size: body.length, encoding: 'any' }, { ...ok, status: 404 })).toEqual(['status 404, not 200'])
     expect(tileProblems({ size: body.length + 1, encoding: 'any' }, ok)).toEqual([`body is ${body.length} bytes, the file is ${body.length + 1}`])
     expect(tileProblems({ size: body.length, encoding: 'any', reference: tile(7, 5) }, ok)).toEqual(['the decoded body differs from the identity body'])
-    expect(tileProblems({ size: 4, encoding: 'any' }, { status: 200, headers: {}, body: Uint8Array.from([0x1f, 0x8b, 0x08, 0x00]) })).toEqual([expect.stringMatching(/not a layer tag/)])
+    expect(tileProblems({ size: 4, encoding: 'any' }, { status: 200, headers: {}, body: Uint8Array.from([0x1f, 0x8b, 0x08, 0x00]) })).toEqual([expect.stringMatching(/^bad gzip stream/)])
+  })
+
+  it('checks a gzipped tile as served: the stored bytes, gzip when required, an MVT once inflated', () => {
+    const gz = gzipTileBody(200)
+    const ok = { status: 200, headers: { 'content-type': 'application/vnd.mapbox-vector-tile' }, body: gz }
+    expect(tileProblems({ size: gz.length, gzip: true, encoding: 'identity' }, ok)).toEqual([])
+    expect(tileProblems({ size: gz.length, gzip: true, encoding: 'any', reference: Uint8Array.from(gz) }, ok)).toEqual([])
+    // Pages (or a CDN) decoded it for us: the body is the plain MVT, not the file's gzip bytes.
+    const plain = { ...ok, body: tileBody(200) }
+    expect(tileProblems({ size: gz.length, gzip: true, encoding: 'any' }, plain)).toEqual([`body is ${plain.body.length} bytes, the file is ${gz.length}`, 'not gzip-compressed (the body does not start 1f 8b)'])
+    expect(tileProblems({ size: plain.body.length, gzip: false, encoding: 'any' }, plain)).toEqual([])
+    const corrupt = Uint8Array.from(gz.subarray(0, gz.length - 10))
+    expect(tileProblems({ size: corrupt.length, gzip: true, encoding: 'any' }, { ...ok, body: corrupt })[0]).toMatch(/^bad gzip stream/)
   })
 })

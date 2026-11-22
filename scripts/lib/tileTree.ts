@@ -1,16 +1,19 @@
 /** Reads a directory of basemap tiles (`<dir>/<z>/<x>/<y>.mvt`): the counts the pin records, and whether every file is a
  *  tile it should be. The same code runs in the basemap workflow (before packing), in the deploy (after extracting) and
- *  in the dev fetch (is the tree already there). */
+ *  in the dev fetch (is the tree already there). A tile file is a plain MVT or a gzip of one (still named `.mvt`). */
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { PROBE_TILES, mvtProblems, tilePath } from './tileProbe.ts'
+import { PROBE_TILES, readTile, tilePath } from './tileProbe.ts'
 import { tileNameProblem } from './tarTiles.ts'
 
 export interface TreeScan {
   files: number
-  /** The sum of the tile files' sizes. */
+  /** The sum of the tile files' sizes as stored (gzip sizes when the tiles are gzipped); what the pin's `tileBytes` counts. */
   bytes: number
-  byZoom: Record<number, { files: number; bytes: number }>
+  /** With `verify`: how many files are gzip, and the sum of the tiles' inflated sizes (their stored size when plain). */
+  gzipFiles: number
+  inflatedBytes: number
+  byZoom: Record<number, { files: number; bytes: number; inflatedBytes: number }>
   /** What is wrong, at most 20 (the rest are counted in `moreProblems`); empty when the tree is clean. */
   problems: string[]
   moreProblems: number
@@ -27,10 +30,19 @@ async function* walk(dir: string, rel: string): AsyncGenerator<{ path: string; r
   }
 }
 
+export interface ScanOptions {
+  /** Read every file and require an MVT, plain or gzip (scripts/lib/tileProbe.ts `readTile`). */
+  verify?: boolean
+  /** With `verify`: refuse a plain file. */
+  gzip?: boolean
+  maxZoom?: number
+}
+
 /** Walks `dir`. Every entry must be a regular file named `<z>/<x>/<y>.mvt` on its zoom's grid (at most `maxZoom`); with
- *  `verify`, every file is also read and must be an MVT (scripts/lib/tileProbe.ts). A missing directory is one problem. */
-export async function scanTiles(dir: string, { verify = false, maxZoom = 15 }: { verify?: boolean; maxZoom?: number } = {}): Promise<TreeScan> {
-  const scan: TreeScan = { files: 0, bytes: 0, byZoom: {}, problems: [], moreProblems: 0 }
+ *  `verify`, every file is also read and must be an MVT, plain or gzip, and a tree that mixes the two is a problem. A
+ *  missing directory is one problem. */
+export async function scanTiles(dir: string, { verify = false, gzip = false, maxZoom = 15 }: ScanOptions = {}): Promise<TreeScan> {
+  const scan: TreeScan = { files: 0, bytes: 0, gzipFiles: 0, inflatedBytes: 0, byZoom: {}, problems: [], moreProblems: 0 }
   const report = (message: string): void => {
     if (scan.problems.length < MAX_REPORTED) scan.problems.push(message)
     else scan.moreProblems++
@@ -48,28 +60,49 @@ export async function scanTiles(dir: string, { verify = false, maxZoom = 15 }: {
     else {
       const size = (await stat(f.path)).size
       const z = Number(f.rel.split('/')[1])
-      const zoom = (scan.byZoom[z] ??= { files: 0, bytes: 0 })
+      const zoom = (scan.byZoom[z] ??= { files: 0, bytes: 0, inflatedBytes: 0 })
       zoom.files++
       zoom.bytes += size
       scan.files++
       scan.bytes += size
-      if (verify) for (const p of mvtProblems(await readFile(f.path))) report(`${f.rel}: ${p}`)
+      if (verify) {
+        const tile = readTile(await readFile(f.path), { requireGzip: gzip })
+        for (const p of tile.problems) report(`${f.rel}: ${p}`)
+        if (tile.gzip) scan.gzipFiles++
+        const inflated = tile.mvt?.length ?? 0
+        zoom.inflatedBytes += inflated
+        scan.inflatedBytes += inflated
+      }
     }
   }
+  if (verify && scan.gzipFiles > 0 && scan.gzipFiles < scan.files) report(`${scan.gzipFiles} of ${scan.files} tiles are gzip and the rest plain: a tree is all one or the other`)
   return scan
 }
 
-/** The sizes of the probe tiles in the tree, keyed by `<z>/<x>/<y>.mvt`. Throws when one is missing: the deploy would probe a 404. */
-export async function probeSizes(dir: string): Promise<Record<string, number>> {
-  const sizes: Record<string, number> = {}
+export interface ProbeSize {
+  /** The file's size as stored: what the site serves, since Pages adds no content-encoding to it. */
+  stored: number
+  /** Its size inflated (the same when plain). */
+  inflated: number
+  gzip: boolean
+}
+
+/** The sizes of the probe tiles in the tree, keyed by `<z>/<x>/<y>.mvt`. Throws when one is missing (the deploy would
+ *  probe a 404) or is not a tile. */
+export async function probeSizes(dir: string): Promise<Record<string, ProbeSize>> {
+  const sizes: Record<string, ProbeSize> = {}
   for (const tile of PROBE_TILES) {
     const rel = tilePath(tile)
+    let body: Uint8Array
     try {
-      sizes[rel] = (await stat(join(dir, rel))).size
+      body = await readFile(join(dir, rel))
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw new Error(`the probe tile ${tile.label} (${rel}) is not in ${dir}`)
       throw err
     }
+    const read = readTile(body)
+    if (read.mvt === null || read.problems.length > 0) throw new Error(`the probe tile ${tile.label} (${rel}) is not a tile: ${read.problems[0] ?? 'unreadable'}`)
+    sizes[rel] = { stored: body.length, inflated: read.mvt.length, gzip: read.gzip }
   }
   return sizes
 }
