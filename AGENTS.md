@@ -192,7 +192,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always `LANDING_DISTANCE`, the tilt's
     near distance) in the screen area the header, footer and station panel leave free, at the current azimuth, or
     on a portrait free area (`landingAzimuth`, ground height ≥ 1.5× width: phones) turned just enough that the
-    platforms (`stationAxis`, `InteriorModel.axis`) run within 30° of screen-vertical, decided once per flight;
+    platforms (`stationAxis`, `InteriorModel.axis`) run within 25° of screen-vertical, decided once per flight;
     `orbitLimits.ts` azimuth cap by tilt, short-way spring to north-up, soft pan radius, focus-point pivot;
     `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`)
   - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;

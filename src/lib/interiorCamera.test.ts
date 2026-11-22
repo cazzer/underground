@@ -125,6 +125,10 @@ describe('landingAzimuth', () => {
   }
   const turnOf = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))
 
+  it('allows 25 degrees off vertical: the largest that keeps every sz7 station framed on a phone (J20 needs it)', () => {
+    expect(LANDING_AXIS_OFF_VERTICAL).toBeCloseTo((25 * Math.PI) / 180, 12)
+  })
+
   it('keeps the azimuth when the free area is wider than tall in ground terms (desktop)', () => {
     expect(landingAzimuth([1, 0], 0.3, deskFree)).toBe(0.3)
   })

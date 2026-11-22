@@ -76,10 +76,10 @@ export function freeCenterShift(
 export const PORTRAIT_GROUND_RATIO = 1.5
 
 /**
- * How far off screen-vertical a portrait landing leaves the platform axis, radians (30°): most of the fit
+ * How far off screen-vertical a portrait landing leaves the platform axis, radians (25°): most of the fit
  * gain of a straight-up axis, while the levels still read apart in the isometric view.
  */
-export const LANDING_AXIS_OFF_VERTICAL = (30 * Math.PI) / 180
+export const LANDING_AXIS_OFF_VERTICAL = (25 * Math.PI) / 180
 
 /**
  * Camera azimuth for landing on an interior whose platforms run along `axis` (unit plan vector, x east,
