@@ -102,8 +102,9 @@ function parseException(value: string): 1 | 2 {
 // Sunday first, so index = Date.getUTCDay().
 const DAY_COLUMNS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
-/** `texts` maps file name ("stops.txt") to its decoded content. */
-export function readFeed(texts: Record<string, string>): GtfsFeed {
+/** `texts` maps file name ("stops.txt") to its decoded content. With `shapes: false` shapes.txt is neither required nor
+ *  read, and `shapePoints` is empty (for a caller that only needs the timetable). */
+export function readFeed(texts: Record<string, string>, { shapes = true }: { shapes?: boolean } = {}): GtfsFeed {
   const table = (file: string, required: string[]) => {
     const text = texts[file]
     if (text === undefined) throw new Error(`Missing GTFS table ${file}`)
@@ -159,12 +160,14 @@ export function readFeed(texts: Record<string, string>): GtfsFeed {
       departure: parseGtfsTime(r.departure_time!),
       sequence: parseNum(r.stop_sequence!, `stop_sequence of ${r.trip_id}`),
     })),
-    shapePoints: table('shapes.txt', ['shape_id', 'shape_pt_sequence', 'shape_pt_lat', 'shape_pt_lon']).map((r) => ({
-      shapeId: r.shape_id!,
-      sequence: parseNum(r.shape_pt_sequence!, `shape_pt_sequence of ${r.shape_id}`),
-      lat: parseNum(r.shape_pt_lat!, `shape_pt_lat of ${r.shape_id}`),
-      lon: parseNum(r.shape_pt_lon!, `shape_pt_lon of ${r.shape_id}`),
-    })),
+    shapePoints: shapes
+      ? table('shapes.txt', ['shape_id', 'shape_pt_sequence', 'shape_pt_lat', 'shape_pt_lon']).map((r) => ({
+          shapeId: r.shape_id!,
+          sequence: parseNum(r.shape_pt_sequence!, `shape_pt_sequence of ${r.shape_id}`),
+          lat: parseNum(r.shape_pt_lat!, `shape_pt_lat of ${r.shape_id}`),
+          lon: parseNum(r.shape_pt_lon!, `shape_pt_lon of ${r.shape_id}`),
+        }))
+      : [],
     transfers: table('transfers.txt', ['from_stop_id', 'to_stop_id', 'min_transfer_time']).map((r) => ({
       from: r.from_stop_id!,
       to: r.to_stop_id!,

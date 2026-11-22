@@ -55,6 +55,12 @@ describe('readFeed', () => {
     const rows = groupByTrip(readFeed(texts()).stopTimes).get('X_000600_1..S03R')!
     expect(rows.map((r) => r.sequence)).toEqual([9, 10])
   })
+  it('reads no shapes, and needs no shapes.txt, with shapes: false', () => {
+    const t = texts()
+    delete t['shapes.txt']
+    expect(readFeed(t, { shapes: false }).shapePoints).toEqual([])
+    expect(readFeed(texts(), { shapes: false }).trips).toHaveLength(readFeed(texts()).trips.length)
+  })
   it('throws on a missing table', () => {
     const t = texts()
     delete t['shapes.txt']

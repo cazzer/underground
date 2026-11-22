@@ -29,6 +29,9 @@ export const SEARCH_STREETS_TOTAL_GZIP_CAP_BYTES = 660_000
 /** public/data/timetable/<serviceId>.json loads on demand, outside the budget above; each file has this cap:
  *  the committed Weekday file (39,662 B, node zlib level 9, fall 2026) plus about a fifth. */
 export const TIMETABLE_FILE_GZIP_CAP_BYTES = 48_000
+/** public/data/timetable/dated/<date>.json shares the per-file cap above (the largest, a heavy weekday, is 40,595 B, fall
+ *  2026); the directory (at most 14 files) has this total: the measured nine-day window (237,956 B) plus about two thirds. */
+export const TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES = 400_000
 
 export interface RenderedFile {
   name: string
@@ -79,6 +82,13 @@ export function checkFileCap(file: RenderedFile, capBytes: number): number {
 /** The station index must fit its own cap; returns its gzip size. */
 export function checkIndexCap(index: RenderedFile): number {
   return checkFileCap(index, INDEX_GZIP_CAP_BYTES)
+}
+
+/** The dated timetable files together must fit their total cap; returns their gzip total. */
+export function checkDatedTimetableTotal(files: readonly RenderedFile[], capBytes: number = TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES): number {
+  const total = files.reduce((sum, f) => sum + f.gzip, 0)
+  if (total > capBytes) throw new Error(`The ${files.length} dated timetable files total ${total} B gzipped, over the ${capBytes} B cap. Nothing written.`)
+  return total
 }
 
 /** The street files together must fit their total cap; returns their gzip total. */

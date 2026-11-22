@@ -1,5 +1,6 @@
-/** Contract for public/data/timetable/<serviceId>.json, written by scripts/build-data.ts (scripts/lib/timetable.ts).
- *  Change both sides together. Types and consts only; `timetableCodec.ts` decodes it.
+/** Contract for public/data/timetable/<serviceId>.json and public/data/timetable/dated/<YYYYMMDD>.json, written by
+ *  scripts/build-data.ts (scripts/lib/timetable.ts, scripts/lib/datedTimetable.ts). Change both sides together.
+ *  Types and consts only; `timetableCodec.ts` decodes it.
  *
  *  Rules the builder keeps and a client may rely on:
  *  - Time base: seconds after service-day midnight. A time may pass 86,400 (past 24:00 belongs to the
@@ -19,7 +20,12 @@
  *    lanes of one group keep their creation order.
  *  - changes: the transfers.txt rows with from = to, one per parent station, sorted by station, identical in
  *    every file of a build. Between-station transfers stay in transfers.json.
- *  - Key order: format, feedVersion, services, changes, patterns. The file is rendered one trip per line.
+ *  - Dated files: dated/<date>.json holds every trip that runs on that date in the MTA's supplemented feed (planned
+ *    work applied) and replaces the day's service files for the router; `date` equals the file name and `services`
+ *    lists that day's active supplemented service ids (informational). dated/index.json (DatedTimetableIndex) lists
+ *    the dates that have a file: those on which planned work changes the trips that run (additions or removals), at
+ *    most 14, not necessarily contiguous. Any other date uses the service files.
+ *  - Key order: format, feedVersion, [date,] services, changes, patterns. The file is rendered one trip per line.
  *  - No trip identity: a trip is found by its first departure.
  */
 import type { Direction, RouteId, ServiceId, StationId, StopId } from './schema.ts'
@@ -49,8 +55,19 @@ export interface TimetableFile {
   format: 1
   /** feed_info feed_version of the zip it was built from. Its own field: never compared with stations.json at runtime. */
   feedVersion: string
-  /** GTFS service_ids whose trips the file holds: one per file from the regular zip. */
+  /** A dated file only (dated/<date>.json): its YYYYMMDD service date, equal to the file name. */
+  date?: string
+  /** GTFS service_ids whose trips the file holds: one per file from the regular zip; for a dated file, that day's active supplemented ids. */
   services: ServiceId[]
   changes: StationChange[]
   patterns: TimetablePattern[]
+}
+
+/** public/data/timetable/dated/index.json: the dates that have a dated file. */
+export interface DatedTimetableIndex {
+  format: 1
+  /** feed_info feed_version of the supplemented zip the files were built from. */
+  feedVersion: string
+  /** YYYYMMDD, sorted, unique, at most DATED_MAX_DAYS; not necessarily contiguous. */
+  dates: string[]
 }
