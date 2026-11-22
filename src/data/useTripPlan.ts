@@ -81,8 +81,9 @@ export function useTripPlan(
           else throw e
         }
       } catch (e) {
-        if (id !== requestId.current || why === 'tick' || why === 'poll') return
-        console.error('Trip planning failed', e)
+        if (id !== requestId.current) return
+        console.error(why === 'tick' || why === 'poll' ? 'Trip refresh failed' : 'Trip planning failed', e)
+        if (why === 'tick' || why === 'poll') return
         setState({ status: 'error', message: e instanceof Error ? e.message : String(e), key: k, attempt: attempt.current, trigger: why })
       }
     },

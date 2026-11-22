@@ -1,6 +1,6 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { Network } from '../lib/network'
-import type { JourneyView, LegView } from '../lib/tripView'
+import type { JourneyView, LegView, RideLegView } from '../lib/tripView'
 import { RouteChip } from './RouteChip'
 
 interface TripJourneysProps {
@@ -43,6 +43,36 @@ function StationLink({ stationId, name, onStation }: StationLinkProps) {
   )
 }
 
+interface ShowTrainProps {
+  leg: RideLegView
+  routeName: string
+  /** The leg is live and the map draws its train. */
+  drawn: boolean
+  onShowTrain: (tripId: string) => void
+}
+
+/**
+ * Once offered, the button stays: a poll that moves the train off the map leaves it as an aria-disabled no-op (the
+ * station panel's arrival rows do the same), so focus is never dropped from under the visitor.
+ */
+function ShowTrain({ leg, routeName, drawn, onShowTrain }: ShowTrainProps) {
+  const offered = useRef(false)
+  if (drawn) offered.current = true
+  if (!offered.current) return null
+  return (
+    <button
+      type="button"
+      aria-disabled={drawn ? undefined : true}
+      aria-label={`Show train, ${routeName} to ${leg.headsign}`}
+      aria-description={drawn ? undefined : "This train isn't on the map right now"}
+      onClick={() => drawn && onShowTrain(leg.tripId)}
+      className="-ml-2 inline-flex min-h-11 cursor-pointer items-center self-start px-2 text-sm underline hover:text-focus focus-visible:outline-2 focus-visible:outline-focus aria-disabled:cursor-default aria-disabled:text-ink-dim aria-disabled:no-underline aria-disabled:hover:text-ink-dim"
+    >
+      Show train
+    </button>
+  )
+}
+
 function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain }: LegProps) {
   if (leg.kind === 'change') {
     return (
@@ -75,16 +105,7 @@ function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain }: LegProp
       <p className="text-sm">
         {leg.stopsText}, off {leg.alight.clock} at <StationLink stationId={leg.alight.stationId} name={leg.alight.name} onStation={onStation} />
       </p>
-      {leg.live && drawnKeys?.has(leg.tripId) && (
-        <button
-          type="button"
-          onClick={() => onShowTrain(leg.tripId)}
-          aria-label={`Show train, ${route?.shortName ?? leg.routeId} to ${leg.headsign}`}
-          className="-ml-2 flex min-h-11 cursor-pointer items-center px-2 text-sm underline hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
-        >
-          Show train
-        </button>
-      )}
+      <ShowTrain leg={leg} routeName={route?.shortName ?? leg.routeId} drawn={leg.live && drawnKeys?.has(leg.tripId) === true} onShowTrain={onShowTrain} />
     </li>
   )
 }

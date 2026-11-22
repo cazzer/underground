@@ -132,6 +132,15 @@ export type LegView = RideLegView | ChangeLegView | WalkLegView
 export type JourneySource = 'live' | 'mixed' | 'scheduled'
 const SOURCE_TEXT: Record<JourneySource, string> = { live: 'Live', mixed: 'Live and scheduled', scheduled: 'Scheduled' }
 
+/**
+ * What a journey is, not which trains it rides: each ride's route, board and alight stops, each walk's stops. A
+ * poll that swaps a scheduled train for its live twin (a new trip id) keeps the key, so the disclosure the visitor
+ * toggled, and focus inside it, stay put.
+ */
+export function journeyKey(j: TripJourney): string {
+  return j.legs.map((l) => (l.kind === 'ride' ? `${l.routeId}:${l.boardStop}:${l.alightStop}` : `walk:${l.fromStop}:${l.toStop}`)).join('>')
+}
+
 /** A journey's source by its ride legs (a walk-only journey has no train to be live). */
 export function journeySource(j: TripJourney): JourneySource {
   const rides = j.legs.filter((l): l is TripRideLeg => l.kind === 'ride')
@@ -209,7 +218,7 @@ export function journeyView(j: TripJourney, nowS: number, names: TripNames): Jou
     `Leaves ${stopEtaSpoken(eta)}. Arrives ${arriveClock}. ${plural(minutes, 'minute')}, ${transfersText.toLowerCase()}${via}. ` +
     `${SOURCE_TEXT[source]}.`
   return {
-    key: rides.length > 0 ? rides.map((r) => r.tripId).join('>') : `walk:${j.departAt}`,
+    key: journeyKey(j),
     departClock: eta.clock,
     departAway: eta.away,
     arriveClock,
@@ -254,7 +263,15 @@ export function tripNamesOf(network: {
 
 /** The journeys of a ready plan as views; none otherwise. */
 export function planViews(plan: TripPlanState, nowS: number, names: TripNames): JourneyView[] {
-  return plan.status === 'ready' ? plan.journeys.map((j) => journeyView(j, nowS, names)) : []
+  if (plan.status !== 'ready') return []
+  // Two journeys with the same legs on different trains would share a key: the later ones get a suffix.
+  const seen = new Map<string, number>()
+  return plan.journeys.map((j) => {
+    const view = journeyView(j, nowS, names)
+    const n = seen.get(view.key) ?? 0
+    seen.set(view.key, n + 1)
+    return n === 0 ? view : { ...view, key: `${view.key}#${n}` }
+  })
 }
 
 /** After a result settles, a station focused behind the panel stays unannounced this long, so it can't talk over it. */

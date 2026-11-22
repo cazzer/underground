@@ -2,6 +2,7 @@ import type { StationId, StationsFile } from './schema'
 import { serviceCalendar, timetableFile, transfersFile } from './loadTimetable'
 import { complexMembers } from '../lib/route/ends'
 import type { RouterTimetable, TripJourney } from '../lib/route/plan'
+import { measureSince } from '../lib/route/measure'
 import { planOnLive, type LiveInput, type LivePlan } from '../lib/route/planLive'
 import { serviceWindow, windowKey } from '../lib/route/serviceDay'
 import { buildRouterTimetable, sourcesFor } from '../lib/route/timetable'
@@ -15,11 +16,6 @@ export class NoServiceError extends Error {
     this.name = 'NoServiceError'
     this.date = date
   }
-}
-
-/** A User Timing measure from `start` (a `performance.now()` value) to now; `?debug` and devtools read it. */
-function measureSince(name: string, start: number): void {
-  performance.measure(name, { start, end: performance.now() })
 }
 
 let last: { key: string; promise: Promise<RouterTimetable> } | undefined

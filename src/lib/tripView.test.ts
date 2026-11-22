@@ -201,7 +201,8 @@ describe('tripMessage', () => {
 })
 
 describe('journeySource', () => {
-  const live = (routeId: string, board: string, alight: string, a: number, b: number) => ride(routeId, board, alight, a, b, { live: true })
+  const live = (routeId: string, board: string, alight: string, a: number, b: number, tripId?: string) =>
+    ride(routeId, board, alight, a, b, tripId ? { live: true, tripId } : { live: true })
   const sched = (routeId: string, board: string, alight: string, a: number, b: number) => ride(routeId, board, alight, a, b, { live: false })
   it('is Live when every ride leg is live, walks aside', () => {
     const two = journey([live('L', 'L08', 'L03', T, T + 300), walk('L03N', '635N', T + 300, 120, false), live('4', '635', '630', T + 600, T + 900)], 1)
@@ -214,6 +215,17 @@ describe('journeySource', () => {
   it('is Scheduled when none are, and for a walk-only journey', () => {
     expect(journeySource(journey([sched('L', 'L08', 'L03', T, T + 300)], 0))).toBe('scheduled')
     expect(journeySource(journey([walk('L08N', 'L03N', T, 300, false)], 0))).toBe('scheduled')
+  })
+  it('keeps the journey key when only trip ids change (a scheduled train swapped for its live twin)', () => {
+    const scheduled = journey([sched('L', 'L08', 'L03', T, T + 300), walk('L03N', '635N', T + 300, 120, false), sched('4', '635', '630', T + 600, T + 900)], 1)
+    const swapped = journey(
+      [live('L', 'L08', 'L03', T + 60, T + 360, 'live-1'), walk('L03N', '635N', T + 360, 120, false), live('4', '635', '630', T + 660, T + 960, 'live-2')],
+      1,
+    )
+    const a = journeyView(scheduled, NOW, names).key
+    expect(a).toBe('L:L08N:L03N>walk:L03N:635N>4:635N:630N')
+    expect(journeyView(swapped, NOW, names).key).toBe(a)
+    expect(journeyView(journey([sched('L', 'L08', 'L03', T, T + 300)], 0), NOW, names).key).not.toBe(a)
   })
   it('ends the spoken sentence with the same words and marks each leg', () => {
     const v = journeyView(journey([live('L', 'L08', 'L03', T, T + 300), sched('4', 'L03', '630', T + 600, T + 900)], 1), NOW, names)
