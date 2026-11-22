@@ -65,3 +65,8 @@ export function makeTar(entries: FixtureEntry[], { end = true, pad }: { end?: bo
 export function makeTarGz(entries: FixtureEntry[], options: { pad?: number } = {}): Buffer {
   return gzipSync(makeTar(entries, options))
 }
+
+/** `tileBody(n)` gzip-compressed, as the workflow's `gzip -n -9` stores a tile (still named .mvt). */
+export function gzipTileBody(n = 3): Uint8Array {
+  return gzipSync(tileBody(n), { level: 9 })
+}
