@@ -11,6 +11,7 @@ import type { StationsFile } from '../../src/data/schema.ts'
 import type { StationStreets } from '../../src/data/streetSchema.ts'
 import { isClosedRing } from '../../src/lib/streetClass.ts'
 import { STREETS_FILE_GZIP_CAP_BYTES, STREETS_TOTAL_GZIP_CAP_BYTES } from './budget.ts'
+import { complexLeadIds } from './stationComplexes.ts'
 import { toStableJson } from './stableJson.ts'
 import { buildAllStreets, WALK_RADIUS_M } from './streetsBuild.ts'
 import { EDGE_MARGIN_M, entrancesByStation, parseComplexOf, parseEntranceRows } from './streetsEntrances.ts'
@@ -21,7 +22,9 @@ const OUT = new URL('../../public/data/streets/', import.meta.url)
 const PIN = new URL('../../data/streets/', import.meta.url)
 const json = (url: URL): unknown => JSON.parse(readFileSync(url, 'utf8'))
 
-const stations = (json(new URL('../../public/data/stations.json', import.meta.url)) as StationsFile).stations
+const stationsFile = json(new URL('../../public/data/stations.json', import.meta.url)) as StationsFile
+const stations = stationsFile.stations
+const leads = complexLeadIds(stationsFile.complexes, stations)
 const manifest = json(new URL('manifest.json', PIN)) as StreetsManifest
 const pin = loadPin(manifest, new Map(manifest.shards.map((s) => [s.file, json(new URL(s.file, PIN)) as StreetShard])))
 const entranceRows = entrancesByStation(
@@ -29,7 +32,7 @@ const entranceRows = entrancesByStation(
   parseComplexOf(json(new URL('../../data/stations/catalog/stations.json', import.meta.url))),
 )
 const names = readdirSync(OUT).filter((f) => f.endsWith('.json')).sort()
-const fresh = buildAllStreets(stations, pin, entranceRows)
+const fresh = buildAllStreets(stations, pin, entranceRows, leads)
 const pinClosed = new Map(pin.ways.map((w) => [w.way.id, isClosedRing(w.way.nodes)]))
 
 describe('committed street files', () => {
@@ -90,13 +93,25 @@ describe('committed street files', () => {
     expect([count('L03'), count('R20'), count('635')]).toEqual([12, 12, 12])
   })
 
-  it('hold no entrance shared from another member of the complex that is an elevator or beyond 260 m', () => {
+  it("hold no entrance shared from another member of the complex that is beyond 260 m, or an elevator outside a lead's file", () => {
     for (const name of names) {
       const file = json(new URL(name, OUT)) as StationStreets
       for (const e of file.entrances) {
         if (e.stopIds.includes(file.stationId)) continue
-        expect(e.type, `${name} shared entrance at (${e.x}, ${e.z}) dm`).not.toBe('Elevator')
+        if (!leads.has(file.stationId)) expect(e.type, `${name} shared entrance at (${e.x}, ${e.z}) dm`).not.toBe('Elevator')
         expect(Math.hypot(e.x, e.z) / 10, `${name} ${e.type} at (${e.x}, ${e.z}) dm`).toBeLessThanOrEqual(file.radiusM - EDGE_MARGIN_M)
+      }
+    }
+  })
+
+  it("give a complex's lead the elevators of its other members, once each (Times Sq 725 has 902's)", () => {
+    const times = json(new URL('725.json', OUT)) as StationStreets
+    expect(times.entrances.filter((e) => e.type === 'Elevator' && e.stopIds.includes('902')).length).toBe(1)
+    for (const lead of leads) {
+      const file = json(new URL(`${lead}.json`, OUT)) as StationStreets
+      const lifts = file.entrances.filter((e) => e.type === 'Elevator')
+      for (const [i, a] of lifts.entries()) {
+        for (const b of lifts.slice(i + 1)) expect(Math.hypot(a.x - b.x, a.z - b.z), `${lead} lifts at (${a.x}, ${a.z}) dm`).toBeGreaterThan(15)
       }
     }
   })

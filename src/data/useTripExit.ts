@@ -67,8 +67,8 @@ export function useTripExit({ open, ends, plan, index, ene, nowS }: TripExitInpu
   const servedKey = served.map((s) => `${s.stopId}=${s.tripIds.join('|')}`).join(',')
   const model = useInteriorModel(interiorId)
   const fileStreets = useStationStreetsLoad(interiorId)
-  // Nearly redundant since 2q7.32: every member's street file carries its complex's entrances (minus shared elevators and
-  // far ones), so the covering file alone usually has the exit; this second read of the member's own file stays as the fallback.
+  // Nearly redundant since 2q7.32: every member's street file carries its complex's entrances (minus shared elevators
+  // and far ones; a lead's file, which the covering file is, keeps the members' elevators), so the covering file alone usually has the exit; this second read of the member's own file stays as the fallback.
   const memberStreets = useStationStreetsLoad(interiorId && stationId !== interiorId ? stationId : null)
   const settled = fileStreets.settled && memberStreets.settled
   const [target, setTarget] = useState<Ground | null>(null)

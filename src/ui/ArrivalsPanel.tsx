@@ -36,7 +36,9 @@ const LINK =
 export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, onDirections, ref, headingRef }: ArrivalsPanelProps) {
   // The street file loads on focus only (the scene's streets share it through the cache); nothing shows until it is in.
   const streets = useStationStreets(stationId)
-  const listsStation = useMemo(() => (streets ? listsStationFn(streets.file.entrances, stationId) : undefined), [streets, stationId])
+  // The merged station's members all count as "listing" the station, so another member's elevators rank like the lead's own.
+  const memberIds = network.groupById.get(stationId)?.memberIds ?? [stationId]
+  const listsStation = useMemo(() => (streets ? listsStationFn(streets.file.entrances, memberIds) : undefined), [streets, memberIds])
   const { collapsed, collapse, expand } = usePanelToggle('station', headingRef)
   const bodyId = useId()
   const setHeading = useCallback((el: HTMLElement | null) => { headingRef.current = el }, [headingRef])

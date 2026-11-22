@@ -74,7 +74,8 @@ so dev and preview serve under that path.
   Every member of a station complex gets the complex's entrance set (membership: `catalog/stations.json`
   `gtfsStopId` to `complexId`; a row's own `complexId` is not trusted), each at x/z around that member's own point;
   a shared entrance (one that doesn't list the member) is dropped when it is an elevator, since it doesn't serve the
-  member's trains, or lies more than 260 m (`radiusM` minus the 40 m edge margin) from the member's point, with one
+  member's trains (not in a complex's lead file, `stations.json` `complexes[i][0]`: the map focuses only the lead, so its
+  file stands for the merged station and keeps every member's elevators, 2q7.43), or lies more than 260 m (`radiusM` minus the 40 m edge margin) from the member's point, with one
   "dropped N shared" log line per station; the rows that list the member itself always stay.
   Rerun it after `data`, `data:streets:fetch`, `data:catalog:fetch` or a change to the `searchText.ts` synonyms (street join
   keys use them); `streetsOutputs.test.ts` fails while the files are stale. It builds and cap-checks every file before

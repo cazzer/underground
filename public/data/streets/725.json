@@ -183,6 +183,7 @@
     {"x":743,"z":-419,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 42nd Street","wayId":167922076,"cross":"7th Avenue","crossWayId":167922070,"side":"SE","plaza":null},
     {"x":818,"z":1438,"type":"Stair","entry":true,"exit":true,"stopIds":["R16"],"street":"West 40th Street","wayId":542258061,"cross":"Broadway","crossWayId":958919323,"side":"SE","plaza":null},
     {"x":887,"z":1297,"type":"Stair","entry":true,"exit":true,"stopIds":["R16"],"street":"West 40th Street","wayId":542258061,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":1037,"z":-692,"type":"Elevator","entry":true,"exit":true,"stopIds":["902"],"street":"Broadway","wayId":1117680758,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":1093,"z":-775,"type":"Stair","entry":true,"exit":true,"stopIds":["902"],"street":"Broadway","wayId":1117680758,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":1133,"z":-120,"type":"Stair","entry":true,"exit":true,"stopIds":["127"],"street":"Broadway","wayId":35027229,"cross":"West 42nd Street","crossWayId":1136952921,"side":"SE","plaza":null}
   ]
