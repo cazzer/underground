@@ -150,8 +150,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1 px, so width marks only the subway) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
   TEMPORARY: `?basemap=off` draws no basemap and loads no tiles until ost.9.3's look is signed off; the removal list is
   in `src/scene/basemapLook.ts`
-  TEMPORARY: `?twist=both` lets a two-finger touch that locked to rotate keep zooming (a twist and a pinch at once) until the
-  pah.6 twist card is decided (default `lock`: a rotate lock holds zoom until the lift); the removal list is in `src/scene/twistLook.ts`
   Exit tokens `exitPath` (pink, 3:1, held apart from the interior, focus, location and route colors, also under simulated
   red-green color blindness; theme.test.ts), `exitPathWidth` (3 px), `exitPathDash` / `exitPathGap` (world m) draw the trip's
   way out.
@@ -930,8 +928,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   turn since the gesture started. Moves only move an unwrapped goal, clamped to the azimuth window on the turn nearest the
   last goal (the damped view may trail it by over π); a -2 frame applies it through `setAzimuthalAngle` (which runs a controls
   `update()` itself) only on a frame where a move changed it, once however many moves
-  came in (so the controls' damped lag and glide stay, and fingers held still never pull the view back against a fly-to). `zoomSpeed` is 0 until the lock ends (not under `?twist=both`), so a mouse
-  wheel on a touchscreen laptop doesn't zoom either until the lift (or a mouse or pen press, which also forgets the fingers). A third finger, any lift or a cancel ends it, a new
+  came in (so the controls' damped lag and glide stay, and fingers held still never pull the view back against a fly-to). The pinch keeps zooming under a rotate lock, so a twist and a pinch in one
+  gesture do both (pah.6.1); a gesture locked to zoom never turns. A mouse or pen press forgets the fingers. A third finger, any lift or a cancel ends it, a new
   first touch forgets every finger (a lost pointerup can't count a stale one), and only a later touch making exactly two
   fingers down starts the next. A pinch with modest drift turns nothing.
   A bare station pivots on its own point while that point is within its 100 m pan radius of the free

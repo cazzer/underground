@@ -4,7 +4,6 @@ import { Vector3 } from 'three'
 import type { OrbitProbe } from '../lib/focus'
 import { clampAzimuth, createTouchOrbit, takeTurn, touchDown, touchMove, touchReset, touchUp, wrapAngle, type TouchOrbit } from '../lib/touchOrbit'
 import type { MapControlsImpl } from './cameraFlight'
-import { twistLook } from './twistLook'
 
 interface TouchOrbitOptions {
   controls: RefObject<MapControlsImpl | null>
@@ -24,19 +23,13 @@ interface TwistRun {
   goal: number
   /** A move changed the goal since the last frame applied it. */
   due: boolean
-  /** The controls whose zoomSpeed the lock holds at 0, and the value to restore. */
-  held: MapControlsImpl | null
-  heldZoom: number
 }
-
-/** TEMPORARY (twistLook.ts): under `?twist=both` a rotate lock keeps zooming. */
-const holdZoom = twistLook === 'lock'
 
 /**
  * Two-finger twist to orbit (lib/touchOrbit.ts). The controls still zoom a two-finger touch but never turn it
  * (useStationOrbit holds their rotateSpeed at 0 for touch); this follows the two live touches on the element the
- * controls listen on and, once a gesture locks to rotate, holds the controls' zoom (zoomSpeed 0, restored when the
- * lock ends; a wheel then doesn't zoom either) and steers the azimuth. Moves only move the goal; a frame at -2,
+ * controls listen on and, once a gesture locks to rotate, steers the azimuth while the controls' pinch keeps
+ * zooming (pah.6.1: a twist and a pinch in one gesture do both). Moves only move the goal; a frame at -2,
  * before drei's update(), applies it through setAzimuthalAngle, once per frame however many moves came in, whose
  * damping keeps the controls' lag and glide. No props or on* handlers of the controls change (underground-by0).
  * Its pointerdown listens in the capture phase, before the controls' own, so onGestureStart knows the pointer type;
@@ -47,7 +40,7 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
   const get = useThree((s) => s.get)
   const connected = useThree((s) => s.events.connected as HTMLElement | undefined)
   const touch = useRef(false)
-  const run = useRef<TwistRun>({ t: createTouchOrbit(), goal: 0, due: false, held: null, heldZoom: 1 })
+  const run = useRef<TwistRun>({ t: createTouchOrbit(), goal: 0, due: false })
   const canTurnRef = useRef(canTurn)
   useLayoutEffect(() => {
     canTurnRef.current = canTurn
@@ -58,21 +51,15 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
     const r = run.current
     const t = r.t
     touchReset(t)
-    const release = () => {
-      if (r.held) r.held.zoomSpeed = r.heldZoom
-      r.held = null
-    }
     const onDown = (e: PointerEvent) => {
       touch.current = e.pointerType === 'touch'
       if (!touch.current) {
-        // A mouse or pen after a lost touch lift: forget the fingers and give the wheel its zoom back.
+        // A mouse or pen after a lost touch lift: forget the fingers.
         touchReset(t)
-        release()
         return
       }
       if (e.isPrimary) touchReset(t)
       touchDown(t, e.pointerId, e.clientX, e.clientY)
-      if (t.lock !== 'rotate') release()
     }
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return
@@ -81,14 +68,7 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
       const was = t.lock
       touchMove(t, e.pointerId, e.clientX, e.clientY, canTurnRef.current())
       if (t.lock !== 'rotate') return
-      if (was !== 'rotate') {
-        r.goal = c.getAzimuthalAngle()
-        if (holdZoom) {
-          r.held = c
-          r.heldZoom = c.zoomSpeed
-          c.zoomSpeed = 0
-        }
-      }
+      if (was !== 'rotate') r.goal = c.getAzimuthalAngle()
       const turn = takeTurn(t, el.clientHeight)
       if (turn === 0) return
       // Unwrapped around the last goal, not the view: the view trails the goal (damping) and may be over π behind.
@@ -98,7 +78,6 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
     const onUp = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return
       touchUp(t, e.pointerId)
-      if (t.lock !== 'rotate') release()
     }
     el.addEventListener('pointerdown', onDown, { capture: true })
     el.addEventListener('pointermove', onMove)
@@ -131,7 +110,6 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
       el.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
-      release()
       touchReset(t)
       r.due = false
       if (import.meta.env.DEV && window.__underground) delete window.__underground.orbit
