@@ -51,7 +51,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, onClose, int
       <PartialAccessNote access={station.access} />
       <InteriorStatus info={interior} />
       <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
-      <ArrivalsList network={network} station={station} source={arrivals} status={live} />
+      <ArrivalsList key={`arrivals-${stationId}`} network={network} station={station} source={arrivals} status={live} onFocusLost={() => headingRef.current?.focus()} />
       <EntranceList key={stationId} entrances={streets?.entrances ?? null} onFocusLost={() => headingRef.current?.focus()} />
     </aside>
   )

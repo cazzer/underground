@@ -3,15 +3,15 @@
     "view": "phone",
     "reduced": false,
     "station": "127",
-    "distance": 560,
-    "offset": 52.6,
+    "distance": 520,
+    "offset": 98.7,
     "inside": "11/11",
     "minMarginPx": 12,
     "stationPx": {
       "x": 170,
-      "y": 349
+      "y": 288
     },
-    "stationMarginPx": 161,
+    "stationMarginPx": 169.9,
     "free": {
       "left": 0,
       "top": 60,
@@ -45,15 +45,15 @@
     "view": "phone",
     "reduced": true,
     "station": "127",
-    "distance": 560,
-    "offset": 52.6,
+    "distance": 520,
+    "offset": 98.7,
     "inside": "11/11",
     "minMarginPx": 12,
     "stationPx": {
       "x": 170,
-      "y": 349
+      "y": 288
     },
-    "stationMarginPx": 161,
+    "stationMarginPx": 169.9,
     "free": {
       "left": 0,
       "top": 60,
@@ -109,15 +109,15 @@
     "reduced": false,
     "deepLink": true,
     "station": "127",
-    "distance": 560,
-    "offset": 52.6,
+    "distance": 520,
+    "offset": 98.7,
     "inside": "11/11",
     "minMarginPx": 12,
     "stationPx": {
       "x": 170,
-      "y": 349
+      "y": 288
     },
-    "stationMarginPx": 161,
+    "stationMarginPx": 169.9,
     "free": {
       "left": 0,
       "top": 60,

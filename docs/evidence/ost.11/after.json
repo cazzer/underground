@@ -5,18 +5,18 @@
     "station": "127",
     "distance": 400,
     "offset": 98.1,
-    "inside": "6/11",
-    "minMarginPx": -129.4,
+    "inside": "9/11",
+    "minMarginPx": -67.7,
     "stationPx": {
-      "x": 195,
+      "x": 203,
       "y": 264
     },
-    "stationMarginPx": -14.6,
+    "stationMarginPx": 94.4,
     "free": {
       "left": 0,
       "top": 60,
       "right": 390,
-      "bottom": 249.5
+      "bottom": 358.5
     },
     "focusedAfter": "127"
   },
@@ -27,17 +27,17 @@
     "distance": 400,
     "offset": 98.1,
     "inside": "2/6",
-    "minMarginPx": -195.5,
+    "minMarginPx": -68.5,
     "stationPx": {
       "x": 195,
       "y": 264
     },
-    "stationMarginPx": -14.6,
+    "stationMarginPx": 112.4,
     "free": {
       "left": 0,
       "top": 60,
       "right": 390,
-      "bottom": 249.5
+      "bottom": 376.5
     },
     "focusedAfter": "120"
   },
@@ -46,19 +46,19 @@
     "reduced": true,
     "station": "127",
     "distance": 400,
-    "offset": 98.2,
-    "inside": "3/11",
-    "minMarginPx": -152.8,
+    "offset": 98.1,
+    "inside": "9/11",
+    "minMarginPx": -67.7,
     "stationPx": {
-      "x": 291,
-      "y": 272
+      "x": 203,
+      "y": 264
     },
-    "stationMarginPx": -22.8,
+    "stationMarginPx": 94.4,
     "free": {
       "left": 0,
       "top": 60,
       "right": 390,
-      "bottom": 249.5
+      "bottom": 358.5
     },
     "focusedAfter": "127"
   },
@@ -111,18 +111,18 @@
     "station": "127",
     "distance": 400,
     "offset": 98.1,
-    "inside": "6/11",
-    "minMarginPx": -129.4,
+    "inside": "9/11",
+    "minMarginPx": -67.7,
     "stationPx": {
-      "x": 195,
+      "x": 203,
       "y": 264
     },
-    "stationMarginPx": -14.6,
+    "stationMarginPx": 94.4,
     "free": {
       "left": 0,
       "top": 60,
       "right": 390,
-      "bottom": 249.5
+      "bottom": 358.5
     }
   }
 ]

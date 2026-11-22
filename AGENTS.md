@@ -235,7 +235,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
-  a dim aria-hidden `PartialAccessNote` line, then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only; `ArrivalsList.tsx`: a row whose train the map draws is a button that selects the soonest such train, `selectableArrival` over `ArrivalGroup.tripKeys` and `ArrivalsSource.drawnKeys`, so the keyboard reaches trains; the others are `aria-disabled` no-ops that look like text, so a poll never drops focus; every enabled row has an `aria-description` naming the arrival it picks), nothing else; closing the station panel (× or Esc) moves focus to the Search button; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
+  a dim aria-hidden `PartialAccessNote` line, then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only; `ArrivalsList.tsx`: on a stacked panel only the 3 soonest groups (`lib/live/arrivalsCollapse.ts`) and one "Show all N arrivals" / "Show fewer" button (aria-expanded, keeps focus; keyed by station so it starts collapsed; while collapsed the section's height only ratchets up, so polls don't jump the panel); a row whose train the map draws is a button that selects the soonest such train, `selectableArrival` over `ArrivalGroup.tripKeys` and `ArrivalsSource.drawnKeys`, so the keyboard reaches trains; the others are `aria-disabled` no-ops that look like text, so a poll never drops focus; every enabled row has an `aria-description` naming the arrival it picks), nothing else; closing the station panel (× or Esc) moves focus to the Search button; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
   each pick (one row under the heading: "Following" with a Stop button while the camera follows the train, else a "Follow
   train" button; the same button node, so toggling keeps focus and the panel's size; its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
@@ -314,10 +314,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `focusMachine.ts` camera-driven focus transitions; `focusDwell.ts` `settled`, the 400 ms stillness auto-focus
     waits for; `focusHold.ts` interrupted-flight release rule; `bareStationFrame.ts` a bare station's landing (the smallest
     distance in 400..600 m, and there the target nearest the centred one, that fit the station and as many entrance marks
-    as fit in the free rect less 12 px, the target within PAN_RADIUS_BARE (100 m) of the station; where the free area
-    allows, also within 100 m of the centred target and nearer the station than any neighbour within 200 m. Entrances
-    join nearest first, each only if it still fits; a free area too small for the station alone gets the centred target
-    pulled to 100 m) over
+    as fit in the free rect less 12 px, the target within PAN_RADIUS_BARE (100 m) of the station and of the centred
+    target. Entrances join nearest first, each only if it still fits; when not even the station fits within 100 m it is
+    framed alone within STATION_ONLY_RADIUS_M (120 m), else the centred target is pulled within 120 m) over
     `convexRegion.ts` (half-plane clipping, nearest point); `interiorReframe.ts` when a landed station flight reframes onto its interior, and how long; `follow.ts` the train follow's math (`followTargetInto`:
     the ground target that puts a world point on a screen point, exact under perspective at any height; the catch-up
     ease, the 8 px pan break (16 px on touch), the 100 px jump re-fly, `followDistanceFor`); `followStep.ts` `stepFollow`,
@@ -862,7 +861,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
-  up the screen); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (`bareStationFrame.ts`; streets loading late reframe after landing like an interior). Both
+  up the screen); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame.ts`; streets loading late reframe after landing like an interior). Both
   retarget mid-flight when the interior, a bare station's streets (or the index, for a deep link) or the panel's final size arrives. An interior arriving after 90% of the
   flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,
   unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,

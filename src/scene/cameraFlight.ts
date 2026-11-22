@@ -12,7 +12,7 @@ import { framePoint, type Insets, type Viewport } from '../lib/framing'
 import { frameInterior, interiorFreeRect, landingAzimuth, type ScreenRect } from '../lib/interiorCamera'
 import { stationIsBare } from '../lib/interiorReframe'
 import type { Network } from '../lib/network'
-import { PAN_RADIUS_BARE, wrapAngle } from '../lib/orbitLimits'
+import { wrapAngle } from '../lib/orbitLimits'
 import type { Ground } from '../lib/projection'
 import type { InteriorModel } from './interiorModel'
 
@@ -115,13 +115,10 @@ export function interiorFlight(
   }
 }
 
-/** Other stations this close to a bare station can bound its landing target (it stays within PAN_RADIUS_BARE). */
-const NEIGHBOUR_REACH_M = 2 * PAN_RADIUS_BARE
-
 /**
  * Fly-to for a station with no interior: its point and as many of its entrance marks `points` as fit in the free area
- * (above a stacked panel), from the landing distance out as far as they need, the target near the station and nearer
- * it than its neighbours (bareStationFrame).
+ * (above a stacked panel), from the landing distance out as far as they need, the target near the station
+ * (bareStationFrame).
  */
 export function stationFlight(
   network: Network,
@@ -135,12 +132,8 @@ export function stationFlight(
 ): Destination {
   const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Station flight to unknown station "${stationId}"`)
-  const pos = station.pos
-  const others = network.stations
-    .filter((o) => o.id !== stationId && Math.hypot(o.pos.x - pos.x, o.pos.z - pos.z) <= NEIGHBOUR_REACH_M)
-    .map((o) => o.pos)
   const free = interiorFreeRect(viewport, insets, panel)
-  const { distance, target } = bareStationFrame({ station: pos, points, others, azimuth, viewport, free, fovDeg })
+  const { distance, target } = bareStationFrame({ station: station.pos, points, azimuth, viewport, free, fovDeg })
   return { stationId, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false }
 }
 
