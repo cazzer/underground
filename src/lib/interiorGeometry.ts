@@ -22,6 +22,8 @@ export { trainRoofY } from './interiorDecks.ts'
 
 /** Estimated drop from the platform edge to the rail head, meters: where the interior draws its tracks. */
 export const RAIL_DROP_M = 1.1
+/** Real rise per drawn stair step, meters. */
+export const STEP_RISE_M = 0.18
 
 export interface InteriorBufferOptions {
   /** Vertical exaggeration; x/z are never scaled. */

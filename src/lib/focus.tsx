@@ -57,10 +57,20 @@ export interface EntranceProbe {
   viewport: { width: number; height: number }
 }
 
+export interface StationPathProbe {
+  interiorId: string
+  distance: number
+  /** The board ends and the centerline, as drawn at the current depth factor. */
+  path: { x: number; y: number }[]
+  free: { left: number; top: number; right: number; bottom: number }
+}
+
 /** Dev-only console and Playwright hooks; each provider adds and removes only its own. */
 export interface UndergroundDevHooks {
   /** The focused station's street layer probe (useEntranceProbe), while it has a streets file. */
   entrancesAt?: () => EntranceProbe
+  /** The trip's way out the camera frames (usePathProbe): its path points in viewport px, while the trip panel frames one. */
+  stationPathAt?: () => StationPathProbe
   select?: (stationId: string) => void
   selectTrain?: (key: string) => void
   trainKeys?: () => string[]

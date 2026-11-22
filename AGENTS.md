@@ -147,13 +147,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `interiorFlight` takes the focused station id, which for a complex member is not the file's `stationId`, so the focus hold follows the member; `follows` marks a flight to the selected
-    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `lib/bareStationFrame.ts`), `newFlight`, `flushMotion` and the landing turn;
-    `useStationFlights.ts` the fly-request effect and the mid-flight retarget (interior, bare streets, panel size);
+    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; with the trip panel open `interiorFlight` frames the trip's path there, `pathLanding`), `newFlight`, `flushMotion` and the landing turn;
+    `useStationFlights.ts` the fly-request effect and the mid-flight retarget (interior, bare streets, the trip's path frame, panel size);
     `useEntranceProbe.ts` dev-only `__underground.entrancesAt()` (entrance marks and station in viewport px, free rect);
+    `usePathProbe.ts` dev-only `__underground.stationPathAt()` (the framed trip path's marker ends and centerline in viewport px, free rect);
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);
     `useInteriorReframe.ts` frames an interior that loaded too late for its station flight (after LATE_TURN_PROGRESS
     or after landing): once landed, a 0.6-1 s eased flight onto it with the landing turn decided then (reduced motion
-    snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `ready` is `interiorReadyFor`, `interiorCovers(interior, awaited station)`, so a complex's other member reframes too, or for a bare station awaiting its streets (`kind: 'streets'`) `streetsReadyFor`: the same reframe onto its entrances, no turn);
+    snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `ready` is `interiorReadyFor`, `interiorCovers(interior, awaited station)`, so a complex's other member reframes too, or for a bare station awaiting its streets (`kind: 'streets'`) `streetsReadyFor`: the same reframe onto its entrances, no turn; with the trip panel open a framed interior goes on
+    awaiting the trip's path there (`kind: 'path'`, `nextAwaiting`, `pathReadyFor`): its arrival or a panel move reframes onto it, no turn, until a gesture, a focus change, a follow or the panel closing; a reframe with nothing to move is skipped);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
@@ -343,7 +345,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     per point, the direction tracks merge under 6.5 px apart and split by 8.5 px, plus the bundle's width, so they
     split only once both bundles fit); `trackOffset.ts` also exports `miterNormals`;
     `focusMachine.ts` camera-driven focus transitions; `focusDwell.ts` `settled`, the 400 ms stillness auto-focus
-    waits for; `focusHold.ts` interrupted-flight release rule; `bareStationFrame.ts` a bare station's landing (the smallest
+    waits for; `focusHold.ts` interrupted-flight release rule; `freeFrame.ts` `freeFrame` (3D points in the free rect: required ones, then wanted ones in priority order, each
+    joining only if it still fits; heights drawn at the depth factor of each distance tried, one exact quad per height; the
+    target within TARGET_RADIUS_M (100 m) of the best of several anchors and `centerRadius` of the centred target) and
+    `bareStationFrame`, a bare station's landing on it (the smallest
     distance in 400..600 m, and there the target nearest the centred one, that fit the station and as many entrance marks
     as fit in the free rect less 12 px, the target within PAN_RADIUS_BARE (100 m) of the station and of the centred
     target. Entrances join nearest first, each only if it still fits; when not even the station fits within 100 m it is
@@ -639,7 +644,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   open, a swap, an end pick or an uncover, and not while a result loads or in the 1.5 s after one settles); it is emptied whenever its text could be stale and refilled after a gap so a
   repeated sentence is spoken again. `TripPanel.tsx` (`aside` "Trip"; heading takes focus on mount; `useScrollHint.ts` a "more below" fade
   while the capped panel scrolls) with `TripEnds.tsx` (From/To rows take focus, then open their own `StationSearch`; a shortcut that fills an
-  end returns focus to that row; "Nearest to you" never offers a From equal to To) and `TripJourneys.tsx` (disclosures, first open; a
+  end returns focus to that row; "Nearest to you" never offers a From equal to To; "On the map" is not offered, nor announced, for
+  a station sharing a complex with an end, `isTripEnd` in `lib/tripEnds.ts` over the App's `siblingIdsOf`) and `TripJourneys.tsx` (disclosures, first open; a
   station name calls `select`, the only camera move; a journey ending on a train ends with `TripExitLine.tsx`, its way out: the
   visible text and note aria-hidden, one sr-only sentence, never a live region; a change through a hand-authored complex has
   `TripTransferLine.tsx` under its "Change at …" row, the same way). The header button's aria-expanded is true only while the panel is in front; pressing
@@ -953,7 +959,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
-  up the screen); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame.ts`; streets loading late reframe after landing like an interior). Both
+  up the screen); with the trip panel open, a station flight to an interior the trip draws a path at (its way out,
+  or a change of trains; `pathFrame.ts` `stationPathFrameOf`: marker ends at rail height, the centerline, the outline per level, an
+  exit's walk) lands as usual when that already shows the whole path, else on `freeFrame`'s frame of it (400 to 600 m, the
+  target within 100 m of a member) when that shows more (`pathLanding`). Above a phone's trip panel the target sits 130 m or
+  more toward the camera from what the free area shows, so at Union Sq the Lexington and Canarsie paths can't be framed within
+  100 m and land as usual (`pathFrame.data.test.ts`); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior). Both
   retarget mid-flight when the interior, a bare station's streets (or the index, for a deep link) or the panel's final size arrives. An interior arriving after 90% of the
   flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,
   unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,

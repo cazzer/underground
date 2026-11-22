@@ -9,7 +9,7 @@
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
 import { connectorContext } from './interiorGeometry'
 import { bandSinks, dist3, restroke } from './interiorPathStrokes'
-import { walkOf, type StationPathChoice, type TrackAt } from './interiorPathWalk'
+import { walkOf, type StationPathChoice, type TrackAt, type Walk } from './interiorPathWalk'
 import type { Buffers, Rgb, Vec3 } from './interiorSegments'
 import { nearestOnPolyline, slicePolyline } from './planGeometry'
 import { toGround } from './projection'
@@ -70,12 +70,41 @@ export interface PathPoint {
 /** The path's in-station centerline, platform track to street exit (or to the next train's track): each point and the
  *  level it stands on. */
 export function exitPathCenterline(interior: StationInterior, choice: StationPathChoice, opts: Pick<ExitPathOptions, 'yScale' | 'stepRise'>): PathPoint[] {
-  const ctx = connectorContext(interior, { ...opts, colorOf: () => [0, 0, 0] })
-  const { pieces } = walkOf(interior, choice, ctx)
+  return centerlineOf(walkOf(interior, choice, connectorContext(interior, { ...opts, colorOf: () => [0, 0, 0] })))
+}
+
+function centerlineOf({ pieces }: Walk): PathPoint[] {
   const first = pieces[0]!
   const out: PathPoint[] = [{ p: first.a, level: first.kind === 'flat' ? first.level : first.fromLevel }]
   for (const piece of pieces) out.push({ p: piece.b, level: piece.kind === 'flat' ? piece.level : piece.toLevel })
   return out
+}
+
+type MarkerOptions = Pick<ExitPathOptions, 'yScale' | 'railDrop' | 'boardHalfM'>
+
+/** A marker: the stretch of the track `boardHalfM` either side of the point (kept on the track), and its drawn rail height. */
+function markerSpan(interior: StationInterior, at: TrackAt, opts: MarkerOptions): { marker: LocalPoint[]; railY: number } {
+  const total = nearestOnPolyline(at.track, at.track[0]!).total
+  const length = Math.min(2 * opts.boardHalfM, total)
+  const from = Math.max(0, Math.min(at.along - length / 2, total - length))
+  return { marker: slicePolyline(at.track, from, from + length), railY: (interior.levels[at.level]!.y - opts.railDrop) * opts.yScale }
+}
+
+/**
+ * The path's points as drawn, group-local, from one walk: its markers' ends at their rail height (the board marker's,
+ * then a transfer's second) and its centerline (exitPathCenterline). Throws when the choice doesn't fit the interior.
+ */
+export function stationPathPoints(
+  interior: StationInterior,
+  choice: StationPathChoice,
+  opts: MarkerOptions & Pick<ExitPathOptions, 'stepRise'>,
+): { markers: Vec3[]; line: Vec3[] } {
+  const walk = walkOf(interior, choice, connectorContext(interior, { yScale: opts.yScale, stepRise: opts.stepRise, colorOf: () => [0, 0, 0] }))
+  const markers = [walk.start, ...(walk.end ? [walk.end] : [])].flatMap((at) => {
+    const { marker, railY } = markerSpan(interior, at, opts)
+    return [marker[0]!, marker.at(-1)!].map((p): Vec3 => [p[0], railY, p[1]])
+  })
+  return { markers, line: centerlineOf(walk).map((q) => q.p) }
 }
 
 /**
@@ -112,11 +141,7 @@ export function exitPathBuffers(interior: StationInterior, choice: StationPathCh
 
   // A marker: the stretch of track at rail height around the point (kept on the track); returns its ends and middle.
   const markerAt = (at: TrackAt): Vec3[] => {
-    const total = nearestOnPolyline(at.track, at.track[0]!).total
-    const length = Math.min(2 * opts.boardHalfM, total)
-    const from = Math.max(0, Math.min(at.along - length / 2, total - length))
-    const marker = slicePolyline(at.track, from, from + length)
-    const railY = (interior.levels[at.level]!.y - opts.railDrop) * yScale
+    const { marker, railY } = markerSpan(interior, at, opts)
     for (let i = 1; i < marker.length; i++) {
       const [p, q] = [marker[i - 1]!, marker[i]!]
       levelSink(at.level).segment([p[0], railY, p[1]], [q[0], railY, q[1]], rgb, rgb, dash)

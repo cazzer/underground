@@ -8,6 +8,7 @@ import { useNetwork } from './data/useNetwork'
 import { useLocate } from './data/useLocate'
 import { useStationHash } from './data/useStationHash'
 import { useStationInterior } from './data/useStationInterior'
+import { siblingIdsOf } from './data/interiorLoad'
 import { useTripExit } from './data/useTripExit'
 import { useTripTransfers } from './data/useTripTransfers'
 import { FocusProvider, useFocus } from './lib/focus'
@@ -73,6 +74,7 @@ function MapView({ network, bands, live }: MapViewProps) {
     () => [...(exitDraw && exitInterior ? [{ interiorId: exitInterior, choice: exitDraw }] : []), ...tripTransfers.drawn],
     [exitDraw, exitInterior, tripTransfers.drawn],
   )
+  const focusSiblings = useMemo(() => siblingIdsOf(focusedId, interior.index), [focusedId, interior.index])
   const accessible = focusedId !== null && (network.stationById.get(focusedId)?.access.status ?? 'none') !== 'none'
   const outKey = outages.outIds.join(',')
   const unknownStatus = outages.closed === null
@@ -101,6 +103,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             here={here}
             stationPaths={stationPaths}
             exitLabel={tripExit?.drawn ? tripExit.mapLabel : null}
+            tripOpen={trip.open}
           />
         )}
       </ErrorBoundary>
@@ -117,6 +120,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           outages={outagePanelView(outages, nowS, noStepFree)}
           tripExits={tripExit?.lines ?? null}
           tripTransfers={tripTransfers.lines}
+          focusSiblings={focusSiblings}
         />
       </ErrorBoundary>
       <LiveDebug debug={live.debug} technical={live.technical} />
