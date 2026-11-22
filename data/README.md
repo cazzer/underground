@@ -91,6 +91,21 @@ two mezzanines), which need hand authoring. Every position the template places i
    are stale) and review what it prints as skipped or dropped.
 6. Commit. `catalogData.test.ts` checks the files against each other.
 
+## Street pin
+
+`streets/` holds the OSM streets and walking ways within 300 m of every station point of `public/data/stations.json`:
+`manifest.json` (license, query, shard list with way and node counts, the stations feed version it was cut for) and
+`cell-<lat>_<lon>.json` shards on a 0.02 x 0.025 degree grid (a way sits in the shard of its first vertex). Each shard
+has its node table (`[id, lat, lon]`, sorted, 1e-6 degrees) and its ways (`id`, tags, node ids), one per line. Today:
+132 shards, 96,808 ways, 25 MB (4.7 MB gzipped), largest shard 1.5 MB. Nothing ships from it; `npm run data:streets:fetch`
+is the only writer and the only reader of the network (Overpass, by hand: one request, or eight latitude batches if
+Overpass refuses it; the script retries as the catalog fetch does). It writes nothing unless every station has a named
+way nearby, no shard passes 2 MB and the total stays under 30 MB (`-- --no-walk` keeps only the named roads, under 8 MB).
+Review the diff, then commit; `scripts/lib/streetsData.test.ts` checks the files against each other and against
+`stations.json` (a station added since the fetch fails it until the fetch is rerun, or the station is listed in
+`UNCOVERED_STATIONS` in `scripts/lib/streetsOsm.ts` with a reason). The source choice is in
+`../docs/research/data-sources.md` §5.2.
+
 ## Access exceptions
 
 `stations/access-exceptions.json` is hand-written and empty today:
@@ -116,6 +131,7 @@ the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `n
   see `../docs/research/data-sources.md` §5.1 (licensing decisions included).
 - `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors,
   available under the ODbL 1.0.
+- `streets/` is © OpenStreetMap contributors, available under the ODbL 1.0 (see `../public/data/LICENSE-ODbL.md`).
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.

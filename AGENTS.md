@@ -44,6 +44,9 @@ so dev and preview serve under that path.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
   `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
+- `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
+  within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
+  `streetsData.test.ts` checks it. Nothing reads it yet (ost.3 builds the per-station street files from it).
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -340,6 +343,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
     `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
     downstream), and OSM ways have none either (join by distance)
+- `data/streets/`: the street pin (OSM named roads, plus sidewalks, crossings, steps and paths, within 300 m of any
+  station), written only by `scripts/fetch-streets.ts`; `manifest.json` (license, query, shard list) and `cell-<lat>_<lon>.json`
+  shards, each with its own node table (ways index OSM node ids; coordinates 1e-6 deg). Pure trim and shard layout in
+  `scripts/lib/streetsOsm.ts` and `streetsShard.ts`; `fetchJson.ts` is the retrying fetch both pin scripts share
   - `data/stations/layout-oracle.json` (tuning, 62 layouts and 13 to decline) and `layout-holdout.json` (30, never tune
     on it): platform type, platforms, tracks, mezzanine per station, agent-checked against English Wikipedia
     (CC BY-SA 4.0, facts only, revision ids); scoring only, not shipped

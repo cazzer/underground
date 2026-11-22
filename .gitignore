@@ -19,3 +19,5 @@ coverage
 
 # Half-written catalog files from an interrupted data:catalog:fetch
 data/stations/catalog/*.tmp
+# Half-written street pin files from an interrupted data:streets:fetch
+data/streets/*.tmp
