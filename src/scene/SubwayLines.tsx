@@ -33,7 +33,7 @@ interface SubwayLinesProps {
  * interior draws its own track there.
  */
 export function SubwayLines({ network, paths, interiorStationId, view }: SubwayLinesProps) {
-  const buffers = useMemo(() => routeLineBuffers(network, paths, baseLineMix(theme, linesMode)), [network, paths])
+  const buffers = useMemo(() => routeLineBuffers(network, paths, baseLineMix(theme, linesMode), true), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lines)
   usePlatformFade(lines, buffers, paths, network, interiorStationId)
   /** When `paths` last changed: new bands ease in from 0 (BandView.ease), which draws exactly as no bands. */

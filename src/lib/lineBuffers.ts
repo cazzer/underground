@@ -18,8 +18,11 @@ export interface LineBuffers {
    * it (useLineLayer then draws them with the band offset); other line layers leave it out.
    */
   bands?: Float32Array
-  /** First segment of each path in the buffers, so a layer can rewrite one shape's per-segment attributes. */
-  firstSegment?: ReadonlyMap<ShapeId, number>
+  /**
+   * Per path, the buffer segment of each of its segments (i joins points i and i + 1), or -1 where it is left out
+   * (under its primary), so a layer can rewrite one shape's per-segment attributes.
+   */
+  segments?: ReadonlyMap<ShapeId, Int32Array>
 }
 
 /**
@@ -48,35 +51,48 @@ export function vertexBandInputs(points: readonly Ground[], band: readonly numbe
  * Flattens shape paths into LineSegments2 buffers. Segments draw in buffer order, so the order
  * is the overlap rule: non-primary shapes first, then by route order, then by id; the last
  * one drawn wins where tracks are shared. `colorOf` must return linear RGB (three.js Color).
+ * With `skipCovered`, a variant's segments that draw exactly under its primary (ShapePath.cover) are left out
+ * when that primary is among `paths`: it draws the same pixels after them. Only for opaque layers; on a
+ * translucent one the variant would show through.
  */
 export function buildLineBuffers(
   paths: readonly ShapePath[],
   routeOrder: ReadonlyMap<RouteId, number>,
   colorOf: (routeId: RouteId) => Rgb,
+  skipCovered = false,
 ): Required<LineBuffers> {
   const rank = (p: ShapePath) => routeOrder.get(p.routeId) ?? Infinity
   const sorted = [...paths].sort(
     (a, b) =>
       Number(a.primary) - Number(b.primary) || rank(a) - rank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   )
-  const segments = sorted.reduce((n, p) => n + Math.max(p.points.length - 1, 0), 0)
-  const positions = new Float32Array(segments * 6)
-  const colors = new Float32Array(segments * 6)
-  const bands = new Float32Array(segments * 2 * BAND_INPUTS)
-  const firstSegment = new Map<ShapeId, number>()
+  const ids = new Set(paths.map((p) => p.id))
+  const skipOf = (p: ShapePath) => (skipCovered && p.cover && ids.has(p.cover.primaryId) ? p.cover.segments : null)
+  let count = 0
+  for (const p of sorted) {
+    const skip = skipOf(p)
+    for (let i = 1; i < p.points.length; i++) if (!skip?.[i - 1]) count++
+  }
+  const positions = new Float32Array(count * 6)
+  const colors = new Float32Array(count * 6)
+  const bands = new Float32Array(count * 2 * BAND_INPUTS)
+  const segments = new Map<ShapeId, Int32Array>()
   let seg = 0
   for (const path of sorted) {
     const [r, g, b] = colorOf(path.routeId)
-    firstSegment.set(path.id, seg)
+    const skip = skipOf(path)
+    const of = new Int32Array(Math.max(path.points.length - 1, 0)).fill(-1)
+    segments.set(path.id, of)
     for (let i = 1; i < path.points.length; i++) {
+      if (skip?.[i - 1]) continue
       const a = path.points[i - 1]!
       const c = path.points[i]!
       positions.set([a.x, path.y[i - 1]!, a.z, c.x, path.y[i]!, c.z], seg * 6)
       colors.set([r, g, b, r, g, b], seg * 6)
       // A segment's two ends are consecutive points, so their inputs are contiguous.
       bands.set(path.bandInputs.subarray((i - 1) * BAND_INPUTS, (i + 1) * BAND_INPUTS), seg * 2 * BAND_INPUTS)
-      seg++
+      of[i - 1] = seg++
     }
   }
-  return { positions, colors, bands, firstSegment }
+  return { positions, colors, bands, segments }
 }
