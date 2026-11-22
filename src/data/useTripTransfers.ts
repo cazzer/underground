@@ -4,7 +4,7 @@ import type { StationPathDraw } from '../lib/interiorPath'
 import { chooseTransfer, type TransferChoice } from '../lib/interiorTransfer'
 import { stationOfStop } from '../lib/live/arrivals'
 import { joinStationOutages, type EneInput } from '../lib/live/eneJoin'
-import { transferLegs, transferLineView, type TransferLeg, type TransferLineView } from '../lib/transferView'
+import { firstTransferDraws, transferLegs, transferLineView, type TransferLeg, type TransferLineView } from '../lib/transferView'
 import { plannable, tripKey, type TripEnds, type TripNames, type TripPlanState } from '../lib/tripView'
 import { authoredInteriorIds, interiorIdOf, type IndexLoad } from './interiorLoad'
 import { useInteriorModels } from './useStationInterior'
@@ -21,7 +21,7 @@ interface TripTransfersInput {
 }
 
 export interface TripTransfers {
-  /** One transfer path per interior the map draws: the first journey's change there that takes a connector. */
+  /** At most one transfer path per interior: the first journey's change there, none when it takes no connector. */
   drawn: StationPathDraw[]
   /** The trip panel's transfer line, by `transferLegKey`. */
   lines: ReadonlyMap<string, TransferLineView>
@@ -49,7 +49,7 @@ const NONE: TripTransfers = { drawn: [], lines: new Map() }
  */
 export function useTripTransfers({ open, ends, plan, index, ene, nowS, names }: TripTransfersInput): TripTransfers {
   const ready = open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
-  const legs = ready && plan.status === 'ready' ? transferLegs(plan.journeys) : []
+  const legs = ready && plan.status === 'ready' ? transferLegs(plan.journeys, names.station) : []
   const authoredKey = ready ? authoredInteriorIds(index).join(',') : ''
   const models = useInteriorModels(useMemo(() => (authoredKey === '' ? [] : authoredKey.split(',')), [authoredKey]))
   const fileOf = (stop: string): string | null => interiorIdOf(stationOfStop(stop), index)
@@ -88,7 +88,6 @@ export function useTripTransfers({ open, ends, plan, index, ene, nowS, names }: 
     if (kept.length === 0) return NONE
     const known = new Map(knownKey.split(',').map((e) => e.split('=') as [string, string]))
     const lines = new Map<string, TransferLineView>()
-    const drawn: StationPathDraw[] = []
     for (const leg of kept) {
       const choice = choices.get(`${leg.fromStop}>${leg.toStop}`)
       if (!choice) continue
@@ -98,8 +97,8 @@ export function useTripTransfers({ open, ends, plan, index, ene, nowS, names }: 
       } catch (err) {
         console.error(`Couldn't describe the transfer from ${leg.fromStop} to ${leg.toStop}`, err)
       }
-      if (choice.connectorIds.length > 0 && !drawn.some((d) => d.interiorId === leg.file)) drawn.push({ interiorId: leg.file, choice })
     }
+    const drawn = firstTransferDraws(kept, (leg) => choices.get(`${leg.fromStop}>${leg.toStop}`) ?? null)
     return { drawn, lines }
     // `kept` is read through keptKey.
   }, [keptKey, choices, models, knownKey, names])

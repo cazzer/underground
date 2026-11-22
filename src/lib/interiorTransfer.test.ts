@@ -57,6 +57,15 @@ describe('chooseTransfer: the step-free transfer', () => {
     const t = transfer(base, 'U01N', 'T01S', new Set(['EL-T']))
     expect(t.connectorIds).toEqual(['st-tu'])
     expect(t.stepFreeAlt).toBeNull()
+    expect(t.noStepFree).toBe('outage')
+    expect(transfer().noStepFree).toBeNull()
+  })
+
+  it('says the layout has no step-free way when no elevator joins the platforms', () => {
+    const t = transfer(without(base, 'EL-T'), 'U01N', 'T01S', new Set(['EL-U']))
+    expect(t.stepFreeAlt).toBeNull()
+    expect(t.noStepFree).toBe('layout')
+    expect(transfer(without(base, 'EL-T')).noStepFree).toBe('layout')
   })
 
   it('offers none when the quickest way is already step-free', () => {
@@ -64,6 +73,7 @@ describe('chooseTransfer: the step-free transfer', () => {
     expect(t.connectorIds).toEqual(['EL-U', 'wk-tu', 'EL-T'])
     expect(t.stepFree).toBe(true)
     expect(t.stepFreeAlt).toBeNull()
+    expect(t.noStepFree).toBeNull()
   })
 })
 

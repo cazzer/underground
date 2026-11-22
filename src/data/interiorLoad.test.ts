@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InteriorModel } from '../scene/interiorModel'
-import { authoredInteriorIds, deriveInteriorLoad, focusedMarkerShown, interiorIdOf, type IndexLoad, type InteriorLoad } from './interiorLoad'
+import { authoredInteriorIds, deriveInteriorLoad, focusedMarkerShown, interiorIdOf, modelsToLoad, type IndexLoad, type InteriorLoad } from './interiorLoad'
 
 const model = { stationId: 'L08' } as InteriorModel
 const empty = () => undefined
@@ -38,6 +38,18 @@ describe('authoredInteriorIds', () => {
     }
     expect(authoredInteriorIds(index)).toEqual(['635', 'L08'])
     expect(authoredInteriorIds({ status: 'loading' })).toEqual([])
+  })
+})
+
+describe('modelsToLoad', () => {
+  it('fetches the ids not loaded yet', () => {
+    expect(modelsToLoad(['635', 'L08'], (id) => id === 'L08', 'L08')).toEqual({ fetch: ['635'], stale: false })
+  })
+
+  it('is stale when a load settled between the render and its effect, so the effect re-renders', () => {
+    // Rendered with nothing loaded; 635 landed in the cache before the effect ran.
+    expect(modelsToLoad(['635', 'L08'], (id) => id === '635', '')).toEqual({ fetch: ['L08'], stale: true })
+    expect(modelsToLoad(['635'], () => true, '635')).toEqual({ fetch: [], stale: false })
   })
 })
 

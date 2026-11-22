@@ -44,7 +44,9 @@ export function ExitPath({ model, choice, keepOut }: ExitPathProps) {
         entranceSize: ENTRANCE_SIZE_M,
         decks: model.decks,
         rgb: RGB,
-        dashInStation: choice.probable,
+        // Dashes mean the geometry is estimated (generated or `approximate`), as the interior's own strokes. A transfer
+        // that is only probable because a slab doesn't state fare control draws solid: its layout is surveyed.
+        dashInStation: model.interior.generated !== undefined || model.interior.approximate === true,
         restroke: exitPathLook.restroke,
         boardHalfM: BOARD_HALF_M,
       }),

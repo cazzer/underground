@@ -33,6 +33,9 @@ export interface TransferChoice extends Omit<TransferRoute, 'seconds'> {
   inStationS: number
   /** A step-free way, when the quickest one has steps and there is one; null otherwise. */
   stepFreeAlt: TransferRoute | null
+  /** Why the quickest way, which has steps, has no step-free alternative: none in the layout at all, or only machines
+   *  out of service broke it. Null when there is one, or the quickest is step-free. */
+  noStepFree: 'layout' | 'outage' | null
 }
 
 export type TransferResult = TransferChoice | { kind: 'none'; reason: 'no-track' | 'no-route' }
@@ -104,7 +107,11 @@ export function chooseTransfer(input: { interior: StationInterior; fromStop: Sto
   const shortest = transferRoute(interior, fromStop, toStop, { closed })
   if (shortest === 'no-track') return { kind: 'none', reason: 'no-track' }
   if (shortest === null) return { kind: 'none', reason: 'no-route' }
-  const alt = shortest.stepFree ? null : transferRoute(interior, fromStop, toStop, { closed, stepFree: true })
+  const found = (r: TransferRoute | 'no-track' | null): TransferRoute | null => (r === null || r === 'no-track' ? null : r)
+  const alt = shortest.stepFree ? null : found(transferRoute(interior, fromStop, toStop, { closed, stepFree: true }))
+  // Without the closures, is there one? Then an outage removed it; otherwise the layout has none.
+  const anyAlt = shortest.stepFree || alt !== null || closed === undefined || closed.size === 0 ? alt : found(transferRoute(interior, fromStop, toStop, { stepFree: true }))
+  const noStepFree = shortest.stepFree || alt !== null ? null : anyAlt !== null ? 'outage' : 'layout'
   const { seconds, ...route } = shortest
   return {
     ...route,
@@ -113,6 +120,7 @@ export function chooseTransfer(input: { interior: StationInterior; fromStop: Sto
     toStopId: toStop,
     probable: interior.generated !== undefined || interior.approximate === true || shortest.paidAssumed,
     inStationS: seconds,
-    stepFreeAlt: alt === null || alt === 'no-track' ? null : alt,
+    stepFreeAlt: alt,
+    noStepFree,
   }
 }

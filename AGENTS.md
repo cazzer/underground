@@ -396,7 +396,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `Endpoint.area`, else the outline within 0.5 m; `routesToStreet`: from a stop's platform to each exit, an `exit: true`
     entrance, or the street end of a connector no entrance lists, `entranceId` null; exits may cross unpaid slabs);
     `interiorTransfer.ts` (`transferRoute`, track to track in transfer mode, or across one platform with no connector;
-    `chooseTransfer`: the quickest plus `stepFreeAlt` when it has steps; `probable` for an estimated layout or
+    `chooseTransfer`: the quickest plus `stepFreeAlt` when it has steps, else `noStepFree` (layout or outage); `probable` for an estimated layout or
     `paidAssumed`, a slab with no `paid` stood on); `complexFixture.ts` the tests' two-deck complex (T01/U01, a direct
     stair, elevators, a walkway, override helpers); `exitChoice.ts` (`chooseExit`: the exit minimizing in-station plus outside time, the outside walk
     over the shard when the destination is within its radius, else a straight-line estimate at `WALK_DETOUR` 1.3;
@@ -414,8 +414,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     runs along the path, across bands); `exitView.ts` (`finalRideStops`, `exitLineView`: the panel's
     "Quickest way out: Bedford Av & N 7 St" plus a dim note (label tail, "probably", walk, a machine's unknown status),
     and the spoken sentence via `streetSpoken`; `machinesUsed`); `transferView.ts` (`transferLegs`, `transferLegKey`
-    (`from>to>nextRoute`), `transferLineView`: "Stairs up to the N platform", one phrase per connector in travel order,
-    merged when repeated; the dim note ("probably", a machine's unknown status) and step-free line; the spoken sentence);
+    (`from>to>nextRoute`; only walks `isChangeWalk` calls a change row), `firstTransferDraws` (per interior the first
+    journey's change, none when it takes no connector), `transferLineView`: "Stairs up to the N platform · probably",
+    one phrase per connector in travel order, merged when repeated; a dim note (a machine's unknown status); the
+    step-free line, or "No step-free way" when the layout has none (silent when only an outage removed it); the spoken
+    sentence);
     `walkFixture.ts` the tests' synthetic walk graphs
   - `searchBucket.ts` which hash bucket a street or intersection entry is filed in and which one a query reads
     (`entryBucketKeys`, `queryBucketKey`, FNV-1a over the first two characters of the first distinctive token; `.ts` imports,
@@ -1082,8 +1085,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Trip transfers.** While a plan is ready, `src/data/useTripTransfers.ts` loads every hand-authored interior in the index
   (`authoredInteriorIds`, `useInteriorModels`; today 635 and L08, under 5 KB gzipped), not only the change station's, because
   the change station is derived from the plan rather than chosen, and fetching it alone would reveal it. Each change whose two
-  stops are in one of them gets `chooseTransfer` (machines out avoided as for the exit) and a transfer line; the map draws the
-  first journey's change per interior that takes a connector. The router's change time stays transfers.json's (180 s at
+  stops are in one of them gets `chooseTransfer` (machines out avoided as for the exit) and a transfer line; the map draws, per
+  interior, the first journey's change there (none when it is across one platform). The router's change time stays transfers.json's (180 s at
   Union Sq). Revisit fetching all of them above about 8 authored files.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
   `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it. Basemap tiles
