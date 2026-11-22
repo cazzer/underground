@@ -112,6 +112,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - The Worker's Cache API layer is a no-op on workers.dev; edge caching needs a custom
   domain (tracked in 8x4.5). The per-isolate memo and upstream `cf.cacheTtl` still apply; `/geocode` likewise keeps a
   per-isolate 1 h LRU (500 entries) and upstream `cf` caching.
+- `worker/wrangler.jsonc` has a `ratelimits` entry, `GEOCODE_CLIENT_LIMIT` (namespace_id "2736", 30 per 60 s; Wrangler 4.36+),
+  Cloudflare's Workers Rate Limiting binding: `/geocode` calls `env.GEOCODE_CLIENT_LIMIT.limit({ key: CF-Connecting-IP })`. It is
+  per Cloudflare location and eventually consistent, not a strict global limit, and not visible in the dashboard. The namespace id
+  must be unique within the account (change it if another Worker there uses 2736). A request with no CF-Connecting-IP skips
+  the limit.
 - `worker/wrangler.jsonc` sets `observability.logs.invocation_logs` to false, `observability.redact_query_string` to true and
   `observability.traces.enabled` to false (`src/wrangler.test.ts` pins all three): Workers Logs invocation logs record the full
   request URL, and `/geocode`'s carries the user's query; traces record subrequest URLs. Our own `console.log` lines stay on
@@ -801,7 +806,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     refresh; its `x-rt-cache` and `x-rt-expires` header names are shared by both routes); `cache.ts` pure memo/herd-guard
     decision and the per-route TTLs; `upstream.ts` feed and outage fetches (`fetchBytes`: 5 s timeout, 2 MB cap; `readBody`
     takes its cap); `edgeCache.ts` the Cache API read and write both routes share (`EdgeCache`, `readEdge`, `writeEdge`)
-  - `/geocode`: `serveGeocode.ts` (IO orchestration, never throws: 403 unless an allowed Origin, 400, the per-isolate LRU, the
+  - `/geocode`: `serveGeocode.ts` (IO orchestration, never throws: 403 unless an allowed Origin, then 429 `rate-limited` (with
+    `retry-after` 60, exposed to CORS, no upstream call) for a client over `clientLimit.ts`'s limit, before parsing and both
+    caches so a client can't probe the cache, then 400, the per-isolate LRU, the
     edge cache, then the sources: GeoSearch first and Photon only when it had no place-like hit (an address hit satisfies a
     house-number query), or both at once for a query that looks like a business; only complete answers are cached, a source
     that timed out, failed to connect or answered 429 or 5xx is skipped for 30 s, 503 `busy` (with `retry-after`, exposed to CORS)
@@ -809,7 +816,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     only, never `q`, the focus or a label); `geocodeQuery.ts` / `geocodeText.ts` (parse, normalize, key, heuristics);
     `geosearch.ts` / `photon.ts` (the pure trims; Photon rows for transit, another state or country dropped) over
     `geocodeCandidate.ts`; `geocodeMerge.ts` (dedupe: PAD aliases, cross-source twins; rank); `geocodeOutcome.ts` (status,
-    attribution, `incomplete`, the log line); `rateLimit.ts` (per-isolate token buckets: 20 at 2/s overall, 5 at 0.5/s for
+    attribution, `incomplete`, the log line); `clientLimit.ts` (the per-client limit: Cloudflare's Workers Rate Limiting
+    binding `GEOCODE_CLIENT_LIMIT`, 30 per 60 s per `CF-Connecting-IP` per location, approximate; Cloudflare holds the counter and
+    the address is never logged, stored or echoed; fails open, logging one fixed code once per isolate, with no binding, no
+    header or a throwing binding, since the buckets below still protect Photon; `src/wrangler.test.ts` pins the `ratelimits`
+    entry to its constants); `rateLimit.ts` (per-isolate token buckets: 20 at 2/s overall, 5 at 0.5/s for
     Photon); `lru.ts` (`TtlLru`, 500 entries, 1 h); `geocodeUpstream.ts` (3 s timeout, 256 KB cap, descriptive User-Agent,
     fixed error codes only: a fetch error's text can hold the query)
   - `src/transform.ts` pure decode-to-snapshot logic; `ene.ts` pure E&E transform (`parseNyTime`,

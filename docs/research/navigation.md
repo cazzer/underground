@@ -170,7 +170,8 @@ one fetch finds it from any prefix of 2+ characters of that token (a query like 
 NYC GeoSearch (Pelias on PAD, autocomplete) first and, when that has no place-like hit or the query reads like a business
 name, Photon bounded to the NYC bbox. It merges and dedupes them, trims each to `{label, kind, lat, lon, source}`, at most 8,
 drops anything outside the bbox, returns the attribution with the results (NYC Planning; © OpenStreetMap contributors), caches
-by normalized query for 1 h, rate-limits Photon per isolate, logs no query text, and answers only the site's origins. The client
+by normalized query for 1 h, rate-limits Photon per isolate and each client (Cloudflare's Workers Rate Limiting binding keyed on
+`CF-Connecting-IP`, 30 per 60 s, checked before the cache; the address is never logged or stored; 2q7.36), logs no query text, and answers only the site's origins. The client
 never calls either service directly. The station search dialog queries it after stations and on-device street matches (3+
 characters, about 250 ms debounce, stale requests aborted) and says so in one line: "Addresses and places are looked up through
 our server; your location is never sent." `focus` is the map center or the chosen station, never the location fix.

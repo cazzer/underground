@@ -11,6 +11,17 @@
   // subrequest URLs) are off. Our own console logs (rt-miss, ene-miss, geocode-miss: counts and fixed
   // codes, never a query) stay on. `wrangler tail` and the dashboard's live logs may still show full
   // URLs to whoever tails production. src/wrangler.test.ts pins these settings.
+  // /geocode's per-client limit (src/clientLimit.ts: the numbers and why). The binding is Cloudflare's Workers
+  // Rate Limiting, keyed on CF-Connecting-IP; the counter is Cloudflare's, the address is never logged or stored.
+  // namespace_id is an account-unique positive integer as a string; period is 10 or 60. src/wrangler.test.ts
+  // pins this entry against the constants in clientLimit.ts, so change them together.
+  "ratelimits": [
+    {
+      "name": "GEOCODE_CLIENT_LIMIT",
+      "namespace_id": "2736",
+      "simple": { "limit": 30, "period": 60 }
+    }
+  ],
   "observability": {
     "enabled": true,
     "redact_query_string": true,
