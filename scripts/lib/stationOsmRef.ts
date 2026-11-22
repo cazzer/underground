@@ -1,10 +1,10 @@
 /** An authored connector or machine can cite the pinned OSM element it follows ("way/N" or "node/N"). The merge
  *  resolves the citation against the pinned ways, lines and nodes and requires an authored point of the connector
- *  within OSM_REF_TOLERANCE_M of it, so a typo or a wrong id fails the build. No IO. */
+ *  within OSM_REF_TOLERANCE_M of it (an open way: of one of its vertices), so a typo or a wrong id fails the build. No IO. */
 import type { LocalPoint } from '../../src/data/stationSchema.ts'
 import { finite, text } from './check.ts'
 import type { Ctx } from './stationCtx.ts'
-import { distanceToRing, distanceToSegment } from './stationGeometry.ts'
+import { distanceToRing } from './stationGeometry.ts'
 import type { StationSources } from './stationInputs.ts'
 
 export const OSM_REF_TOLERANCE_M = 1
@@ -15,15 +15,14 @@ function localPoints(ctx: Ctx, ll: readonly (readonly [number, number])[], what:
   return ll.map(([lat, lon], i) => ctx.frame.fromLatLon(finite(lat, `${what}[${i}].lat`), finite(lon, `${what}[${i}].lon`)))
 }
 
-/** Distance from `p` to a pinned polyline; a closed one (at least 4 points, first equal to last) counts as its
- *  area, so a point inside it is 0. */
+/** Distance from `p` to a pinned way. A closed one (at least 4 points, first equal to last) counts as its area: 0
+ *  inside, else the distance to the ring. An open one (a stair, whose vertices are its landings) is measured to its
+ *  nearest vertex, not along its segments. */
 function distanceToLine(p: LocalPoint, pts: LocalPoint[]): number {
   const first = pts[0]
   const last = pts[pts.length - 1]
   if (pts.length >= 4 && first !== undefined && last !== undefined && first[0] === last[0] && first[1] === last[1]) return distanceToRing(p, pts)
-  let nearest = Infinity
-  for (let i = 1; i < pts.length; i++) nearest = Math.min(nearest, distanceToSegment(p, pts[i - 1]!, pts[i]!))
-  return nearest
+  return Math.min(...pts.map((v) => Math.hypot(p[0] - v[0], p[1] - v[1])))
 }
 
 /**

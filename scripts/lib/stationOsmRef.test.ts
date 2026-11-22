@@ -23,11 +23,17 @@ describe('connector osmRef', () => {
     expect(connector(out, 'st-street').osmRef).toBeUndefined()
     expect(out.attribution).toContain('© OpenStreetMap contributors')
   })
-  it('accepts one end within 1 m along a segment, and a pinned platform way', () => {
+  it('measures an open way to its nearest vertex, so a mid-segment end fails', () => {
     expect(() => build((f) => {
       f.sources.osm.lines = [line(50, [[-30, 0.8], [-12, 0.8]])]
       f.authored.connectors[1]!.osmRef = 'way/50'
     })).not.toThrow()
+    expect(() => build((f) => {
+      f.sources.osm.lines = [line(50, [[-30, 0], [0, 0]])]
+      f.authored.connectors[1]!.osmRef = 'way/50'
+    })).toThrow(/no end is within 1 m of way\/50 \(nearest 9\.\d\d m\)/)
+  })
+  it('accepts a pinned platform way as an area', () => {
     expect(connector(build((f) => { f.authored.connectors[1]!.osmRef = 'way/1' }), 'st-plat').osmRef).toBe('way/1')
   })
   it('rejects an unknown element and a malformed ref', () => {

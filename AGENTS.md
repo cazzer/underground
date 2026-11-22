@@ -760,7 +760,7 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
 - `connectors` (stair, escalator, elevator, ramp, walkway) have `lower`/`upper` endpoints `{x, z, level}` and a
   `width`. An authored `at` end may carry `area`, the id of the platform or slab it stands on (checked against that
   area alone; never on a street end). A walkway (authored only) joins two different areas on one non-street level:
-  both ends `at` with an `area`, a plan run of 1 m or more, and no lower-below-upper rule. A walkway draws as two flat sides (`drawWalkway`). Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
+  both ends `at` with an `area`, a plan run of 1 m or more, and no lower-below-upper rule. A walkway draws as two flat sides (`drawWalkway`). An authored connector may carry `osmRef` ("way/N" or "node/N"; the merge checks an authored end within 1 m of that pinned element and adds `osm` to its sources; the client ignores it). Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
   outages. Elevators, and escalators from the E&E inventory, have identical x/z at both ends (the renderer
   gives such an escalator a 30 degree run; when an entrance lists it and it sits there, its street end is pinned
   at the entrance: the upper end below ground, the lower end at an elevated station). An escalator override's

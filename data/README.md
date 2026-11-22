@@ -66,7 +66,7 @@ the plain query and its sources unchanged.
 
 An authored connector or an `equipment` override may carry `osmRef` (`"way/N"` or `"node/N"`). The merge looks it up
 among the pinned ways, lines and nodes, requires at least one authored `at` end (an entrance end does not count; for a
-machine its `at`, or an escalator's `ends`) within 1 m of the element (a closed way counts as its area), adds `osm` to
+machine its `at`, or an escalator's `ends`) within 1 m of the element (a node's point; an open way's nearest vertex, since a stair's vertices are its landings; a closed way counts as its area), adds `osm` to
 the connector's `sources` and writes `osmRef`. The client ignores it. An unknown ref, or an end too far, fails the build.
 
 An E&E row can have no notes, so no serving text. It needs a `levels` override or the merge fails. With `levels`, a

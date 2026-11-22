@@ -1,15 +1,11 @@
 /** Pure trimming and validation of the raw data.ny.gov (SODA) responses for the station catalog.
  *  Everything fetched is untrusted: each field is checked here and failures name the row. */
-import { list, oneOf, record, text } from './check.ts'
+import { list, oneOf, optText, record, text } from './check.ts'
 import type { CatalogEntrance, CatalogEquipment, CatalogStation } from './catalogTypes.ts'
 import { STRUCTURES } from './catalogTypes.ts'
 import { entranceRow, epochToIso, num } from './stationSources.ts'
 
 const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
-
-function optText(v: unknown, path: string): string | null {
-  return v === undefined ? null : text(v, path)
-}
 
 function routes(v: unknown, path: string): string[] {
   const out = text(v, path).trim().split(/\s+/)

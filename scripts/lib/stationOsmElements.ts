@@ -9,10 +9,21 @@ const KEPT_ELEMENT_TAGS = ['level', 'highway', 'incline', 'step_count']
 
 const HEADER = '[out:json][timeout:60];'
 
+/** Ids go into the query text, so each must be a positive safe integer (a hand-edited file could carry anything). */
+function checkIds(ids: readonly number[], field: string): void {
+  ids.forEach((id, i) => {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`fetch.${field}[${i}]: expected a positive integer OSM id, got ${JSON.stringify(id)}`)
+  })
+}
+
 /** The Overpass query for a station's pinned elements. A station with only `osmWays` gets the one query it always had. */
 export function overpassQuery(wanted: Pick<AuthoredStation['fetch'], 'osmWays' | 'osmLines' | 'osmNodes'>): string {
   const lines = wanted.osmLines ?? []
   const nodes = wanted.osmNodes ?? []
+  if (wanted.osmWays.length === 0) throw new Error('fetch.osmWays: expected at least one OSM way id')
+  checkIds(wanted.osmWays, 'osmWays')
+  checkIds(lines, 'osmLines')
+  checkIds(nodes, 'osmNodes')
   if (lines.length === 0 && nodes.length === 0) return `${HEADER}way(id:${wanted.osmWays.join(',')});out geom meta;`
   const parts = [`way(id:${[...wanted.osmWays, ...lines].join(',')});`, ...(nodes.length > 0 ? [`node(id:${nodes.join(',')});`] : [])]
   return `${HEADER}(${parts.join('')});out geom meta;`

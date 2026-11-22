@@ -61,6 +61,16 @@ describe('overpassQuery', () => {
   })
 })
 
+describe('overpassQuery ids', () => {
+  it('rejects an id that is not a positive safe integer, or no ways, naming the field', () => {
+    expect(() => overpassQuery({ osmWays: [1], osmLines: ['1);node(around:5' as unknown as number] })).toThrow(/fetch\.osmLines\[0\]: expected a positive integer/)
+    expect(() => overpassQuery({ osmWays: [1.5] })).toThrow(/fetch\.osmWays\[0\]/)
+    expect(() => overpassQuery({ osmWays: [1], osmNodes: [5, -2] })).toThrow(/fetch\.osmNodes\[1\]/)
+    expect(() => overpassQuery({ osmWays: [Number.MAX_SAFE_INTEGER + 2] })).toThrow(/fetch\.osmWays\[0\]/)
+    expect(() => overpassQuery({ osmWays: [] })).toThrow(/fetch\.osmWays: expected at least one/)
+  })
+})
+
 describe('trimEquipment notes', () => {
   const row = { equipment_code: 'EL217', elevator_or_escalator: 'Elevator', x_coordinate: '40.7', y_coordinate: '-74' }
   it('reads missing notes as a null serving, but still rejects empty or non-string ones', () => {
