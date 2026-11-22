@@ -141,6 +141,24 @@ now, a `missing` entry for a station the feed dropped), `npm run data` only prin
 the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `npm run data:access` and
 `stationAccess.test.ts` still fail until the entry is removed.
 
+## Timetables
+
+`public/data/timetable/<serviceId>.json` (one file per service: Weekday, Saturday, Sunday) has no inputs in
+this directory. `npm run data` builds it from the regular GTFS zip along with the other GTFS files (the
+contract is `src/data/timetableSchema.ts`). Each file loads on demand, outside the 60 KB startup budget,
+under its own gzip cap (`TIMETABLE_FILE_GZIP_CAP_BYTES` in `scripts/lib/budget.ts`); the build fails above it,
+and removes a file for a service the feed no longer has. Never commit the zip. The supplemented feed (dated
+service) comes with 2q7.7. `scripts/lib/timetableOutputs.test.ts` checks the committed files against the rest
+of the data.
+
+The build throws, and writes nothing, when a timetable can't be built safely: a time that isn't a multiple of
+30 s, a departure before its arrival, an arrival before the previous departure, a stop that isn't a child stop
+(or isn't in `stops.txt`), a service id that isn't a plain file name (letters, digits, `_`, `-`) or collides
+with another by case, a blank or repeated same-station transfer, or a file over its cap. This is deliberate
+(a bad file never ships), but it also stops the unattended daily refresh. The error names the trip and stop.
+Look at the feed first: if the MTA really changed its format, change the encoding (`timetableSchema.ts`,
+bump `TIMETABLE_FORMAT`) or the cap in one reviewed PR; don't loosen a check to get a refresh through.
+
 ## Licenses
 
 - The `osm` section of `*.sources.json` is © OpenStreetMap contributors, available under the
