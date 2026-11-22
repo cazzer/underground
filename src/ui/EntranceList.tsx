@@ -2,9 +2,9 @@ import { useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { EntranceText } from '../lib/entranceText'
 import { entranceRows, entranceTotal, type EntranceRow } from '../lib/entranceList'
 import { useListScroll } from './useListScroll'
-import { usePhoneViewport } from './usePhoneViewport'
+import { useStackedPanel } from './useStackedPanel'
 
-/** Rows shown before "Show all N entrances" (on a phone none: the section starts as a closed disclosure). */
+/** Rows shown before "Show all N entrances" (none while the panel is stacked over the map: the section starts as a closed disclosure). */
 const COLLAPSED_ROWS = 3
 
 interface RowProps {
@@ -75,24 +75,24 @@ function Toggle({ expanded, controls, onToggle, onFocusLost, className, children
 interface EntranceListProps {
   /** The focused station's labelled entrances (the street file's), null until they load or when it has none. */
   entrances: readonly EntranceText[] | null
-  /** Takes focus when the button that has it goes away (a resize across the phone breakpoint, another station). */
+  /** Takes focus when the button that has it goes away (a resize across the stacked-panel breakpoint, another station). */
   onFocusLost: () => void
 }
 
 /**
  * Where the focused station's entrances open onto the street, in the map labels' words, for everyone and for screen
  * readers (the labels are aria-hidden; each row has a spoken form). Wider screens show three rows and "Show all N
- * entrances"; a phone shows a closed "Entrances (N)" disclosure, so the panel stays short over the map. Not a live
+ * entrances"; a panel stacked over the map (phones in portrait) shows a closed "Entrances (N)" disclosure, so the panel stays short over the map. Not a live
  * region, and nothing while the street file loads or when the station has no labelled entrance. Key it by station
  * so a new station starts collapsed.
  */
 export function EntranceList({ entrances, onFocusLost }: EntranceListProps) {
-  const phone = usePhoneViewport()
+  const stacked = useStackedPanel()
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
   const headingId = useId()
   const all = useMemo(() => (entrances ? entranceRows(entrances) : []), [entrances])
-  const rows = expanded ? all : phone ? [] : all.slice(0, COLLAPSED_ROWS)
+  const rows = expanded ? all : stacked ? [] : all.slice(0, COLLAPSED_ROWS)
   const { scroller, list, capPx, overflows, atEnd, onScroll } = useListScroll<HTMLUListElement>(rows.length)
   if (all.length === 0) return null
   const total = entranceTotal(all)
@@ -100,7 +100,7 @@ export function EntranceList({ entrances, onFocusLost }: EntranceListProps) {
   return (
     <section className="mt-3">
       <h3 id={headingId} className="text-xs uppercase tracking-widest text-ink-dim">
-        {phone ? (
+        {stacked ? (
           <Toggle
             expanded={expanded}
             controls={rows.length > 0 ? listId : undefined}
@@ -117,7 +117,7 @@ export function EntranceList({ entrances, onFocusLost }: EntranceListProps) {
       </h3>
       {rows.length > 0 && (
         <div className="relative mt-1">
-          {/* Capped at whole rows on a phone like the train's stop list; a focusable region only while it scrolls. */}
+          {/* Capped at whole rows while stacked, like the train's stop list; a focusable region only while it scrolls. */}
           <div
             ref={scroller}
             onScroll={onScroll}
@@ -136,7 +136,7 @@ export function EntranceList({ entrances, onFocusLost }: EntranceListProps) {
           )}
         </div>
       )}
-      {!phone && all.length > COLLAPSED_ROWS && (
+      {!stacked && all.length > COLLAPSED_ROWS && (
         <Toggle
           expanded={expanded}
           controls={listId}

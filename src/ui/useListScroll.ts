@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { isPhoneViewport } from '../lib/streetLabelReveal'
+import { isStackedPanel } from './useStackedPanel'
 
 /** Most rows the list shows at once on a phone, and the most of the screen it may take (a share of the height). */
 const MAX_ROWS = 5
@@ -20,9 +20,9 @@ export interface ListScroll<L extends HTMLElement = HTMLOListElement> {
 }
 
 /**
- * On a narrow screen, caps the list at whole rows (at most five, and at most a quarter of the screen, but
+ * While the panel is stacked over the map (`isStackedPanel`), caps the list at whole rows (at most five, and at most a quarter of the screen, but
  * never fewer than the collapsed three), so the panel stays short enough to leave the map in view
- * (the train's stop list, the station's entrance list). Wider screens get no cap. `rowCount` re-measures when rows come and go; resizes and wrapping are
+ * (the train's stop list, the station's entrance list). A side-column panel gets no cap. `rowCount` re-measures when rows come and go; resizes and wrapping are
  * observed.
  */
 export function useListScroll<L extends HTMLElement = HTMLOListElement>(rowCount: number): ListScroll<L> {
@@ -42,7 +42,7 @@ export function useListScroll<L extends HTMLElement = HTMLOListElement>(rowCount
     if (!ol) return
     const rows = [...ol.children]
     let cap: number | null = null
-    if (isPhoneViewport({ width: window.innerWidth, height: window.innerHeight }) && rows.length > MIN_ROWS) {
+    if (isStackedPanel() && rows.length > MIN_ROWS) {
       const top = ol.getBoundingClientRect().top
       const limit = window.innerHeight * MAX_SHARE
       let fit = MIN_ROWS
