@@ -407,6 +407,28 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `RT_URL` is set), `useRealtimeFeed` (one request at a time; a hidden tab aborts and stops polling, becoming
   visible polls at once), `prepareTrips` once per snapshot, and `deriveLiveStatus`. `realtimeFetch.ts` fetches and
   validates one snapshot (the Worker doesn't expose `Retry-After`/`X-Rt-Cache` cross-origin yet; the client copes)
+- `src/data/basemapTiles.ts` the basemap tile store (no React; `createBasemapTiles`, types in `basemapTypes.ts`; the
+  worker is injected, so `basemapTiles.test.ts` drives it with a fake): reselects tiles on a meaningful view change or
+  once the footprint leaves the last chosen one plus its margin (`lib/basemap/reselect.ts`), at most 6 in flight
+  nearest the view center first, unwanted ones cancelled, each load's sequence number echoed so a stale reply is
+  dropped, an LRU (24 MB / 128), what to draw meanwhile (`drawn`, `version`), the location zoom cap (`capZoom`), one
+  log line per failure reason per session; no worker or a crashed one turns the basemap off (logged).
+  `basemapWorker.ts` fetches, inflates a gzip body (`lib/basemap/inflate.ts`) and decodes (`basemapProtocol.ts` the
+  messages); `basemapConfig.ts` `BASEMAP` (the build-time `__BASEMAP__`: bbox, maxzoom, layers, the tile pin's
+  release as version; null for a legacy or absent pin; under `vite serve`, `VITE_BASEMAP_DEV=1` in `.env.local` loads
+  the local `public/basemap/tiles` with version "dev") and `tileUrl` (`basemap/tiles/{z}/{x}/{y}.mvt?v=<release>`).
+  `src/scene/useBasemapTiles.ts` runs it (starts after the first frame and an idle callback; feeds the location cap,
+  see Data); `BasemapProbe.tsx` mounts it only under `?debug` in dev until ost.9.3 draws, with
+  `__underground.basemap()` for its counters, decode times and the request log
+- `src/lib/basemap/`: pure basemap helpers, tests colocated: `tileMath.ts` (Web Mercator tiles, numeric `tileKey`,
+  `zoomFor` with 512 px tiles clamped to [`MIN_Z` 9, maxzoom]), `footprint.ts` (`groundFootprint` from the frustum's
+  corner rays, misses stopped at 4 camera distances; `selectTiles`, a 0.1 × distance margin, at most 24, stepping the
+  zoom down; `footprintInside`), `reselect.ts`, `tileCover.ts` (`drawnTiles`: ready, else previous children that
+  cover it, else nearest ready ancestor, else partial previous children), `tileLru.ts`, `locationCap.ts` (the
+  location zoom cap's state machine), `clip.ts` (Liang–Barsky; a ring's cut along a tile edge dropped), `featureClass.ts`
+  (`classOf`: highway, major, minor, path, water, park; tunnels, rail, ferry, earth and points dropped),
+  `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip),
+  `mvtFixture.ts` (tests' MVT writer). `projection.ts` exports `groundX`/`groundZ` for per-vertex use
 - `src/data/useStationHash.ts` keeps `#station=<id>` and the focused station in step with `history.replaceState`
   (no history entries): reads on mount and `hashchange`, writes on every focus change; an unknown id clears the
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
@@ -587,7 +609,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   positive `useFrame` priority (it takes over rendering). The frame order: -3 LiveTrains steps every slot and writes
   the follow anchor (with the last frame's band view); -2 CameraRig (the follow's `beforeFlight`, the flight step,
   focus, the polar lock) and the orbit's bounds; -1 drei's `update()`; -0.75 the train follow; -0.5 the orbit's pivot
-  and pan clamp; -0.25 the band view; 0 the draws.
+  and pan clamp; -0.25 the band view; 0 the draws (and `useBasemapTiles` reading the camera, read-only).
 - Selecting a train follows it (`useTrainFollow.ts`): a flight retargeted each frame to the moving train, at the
   distance where its consist spans 80% of the free width, held to 400..600 m (`followDistanceFor`; a desktop stays at
   400), never started over another flight. Then at -0.75 `stepFollow` moves target and camera by one step so its dot
@@ -802,7 +824,13 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
   of a fix); no request carries the fix or the destination, and routing runs on the device.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
-  `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it.
+  `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it. Basemap tiles
+  follow the camera, never the fix. After a location fly-to, tiles load no finer than z12 (several km a tile) until
+  the user moves the view (a drag past the 6 px mouse / 10 px touch slop, a wheel step, a second finger) or picks a
+  station (tap, panel, search); a tap that doesn't move, or the controls' `start` alone, keeps the cap
+  (`lib/basemap/locationCap.ts`, fed by `useBasemapTiles.ts`, which sets the cap in a layout effect, so it is in force
+  before any frame of the flight, even a reduced-motion one). Following a train or keyboard input doesn't lift it.
+  Tiles already loaded still draw.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
@@ -829,6 +857,9 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   The licensing gate (`basemapGate.ts`) fails the workflow on any credit beyond "© OpenStreetMap" (so never the landcover
   layer, which is CC BY 4.0, nor places or pois); a failure goes to a person as a licensing card. The pin changes only by a
   normal PR. Details and sizes: `docs/research/data-sources.md` §5.3. The client never fetches Protomaps' servers.
+  Tiles load on demand (the view's tiles only, after the first frame and an idle callback) and decode in a worker,
+  never on the main thread. `__BASEMAP__` (vite.config.ts, from basemap.json) is null while the pin names no tile
+  directory, and then nothing loads.
 - **Station interiors are hand-authored or generated.** Bedford Av (L08) is hand-authored and wins over a generated
   one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".
   Both are merged with OSM platform polygons, NY Open Data entrances, and E&E elevator/escalator data.

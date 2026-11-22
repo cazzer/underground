@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { BasemapStats } from '../data/basemapTypes'
 import { nextFocus, NO_FOCUS_GROUP, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'
@@ -52,6 +53,8 @@ export interface UndergroundDevHooks {
   trainKeys?: () => string[]
   /** Viewport px of a live train's dot and, with cars unfolded, its rear and front ends; null if not drawn. */
   trainAt?: (key: string) => { x: number; y: number; rear: { x: number; y: number } | null; front: { x: number; y: number } | null } | null
+  /** The basemap tile store's counters (useBasemapTiles). */
+  basemap?: () => BasemapStats
 }
 
 declare global {

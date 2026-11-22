@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
+import { BASEMAP } from '../data/basemapConfig'
 import { hiddenSiblingIds, interiorStationIds, type IndexLoad } from '../data/interiorLoad'
 import type { LiveLayer } from '../data/useLive'
 import { createBandView } from '../lib/bandOffset'
@@ -13,6 +14,7 @@ import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
+import { BasemapProbe } from './BasemapProbe'
 import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
@@ -24,6 +26,9 @@ import { StationTies } from './StationTies'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
 import { YouAreHere } from './YouAreHere'
+
+/** Until the basemap draws (ost.9.3), its tiles load only under `?debug` in dev, to check the tile source. */
+const basemapProbe = import.meta.env.DEV && new URLSearchParams(window.location.search).has('debug') ? BASEMAP : null
 
 interface SceneProps {
   network: Network
@@ -86,6 +91,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, fo
       <StationStreets />
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
+      {basemapProbe && <BasemapProbe config={basemapProbe} />}
     </Canvas>
   )
 }
