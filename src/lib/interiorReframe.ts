@@ -3,9 +3,9 @@ import { interiorCovers, interiorIdOf, type IndexLoad } from '../data/interiorLo
  * The "landed, awaiting interior" rule: a station flight that set off before its interior was known, and couldn't
  * frame it in flight (it arrived after LATE_TURN_PROGRESS, or after landing), reframes onto it once it is known and
  * the flight has landed. A bare station's flight awaits its streets the same way: their entrances join the framing
- * (freeFrame.ts). With the trip panel open an interior's flight then keeps awaiting the trip's way out there
- * (pathFrame.ts), and reframes onto it when it arrives or the panel moves, until a gesture. Pure; useInteriorReframe
- * applies it.
+ * (freeFrame.ts). An interior's flight then keeps awaiting its priority frame (pathFrame.ts: the trip's path there
+ * while the trip panel is open, and the machines out of service), and reframes onto it when it arrives, changes or the
+ * panel moves, until a gesture or a focus change. Pure; useInteriorReframe applies it.
  */
 
 /** A station flight that set off before its interior (or a bare station's streets) was known. A gesture, a new flight or a follow clears it. */
@@ -13,10 +13,10 @@ export interface AwaitingInterior {
   stationId: string
   /**
    * interior: the station has (or may have) an interior. streets: it has none, and its entrances are not loaded yet.
-   * path: its interior is framed and the trip panel is open: the trip's path there (its way out or a change of trains)
-   * is framed whenever it, or the panel, changes.
+   * frame: its interior is framed: its priority frame (the trip's path there, the machines out of service) is framed
+   * whenever it, or the panel, changes, while there is one.
    */
-  kind: 'interior' | 'streets' | 'path'
+  kind: 'interior' | 'streets' | 'frame'
   /** Under reduced motion the reframe snaps, without a landing turn. */
   reduced: boolean
 }
@@ -29,19 +29,19 @@ export function interiorReadyFor(
   return awaiting?.kind === 'interior' && interiorCovers(interior, awaiting.stationId)
 }
 
-/** Whether a station awaiting the trip's way out has it: the loaded interior covers the station and the exit frame is that interior's. */
-export function pathReadyFor(
+/** Whether a station awaiting its priority frame has one: the loaded interior covers the station and the frame is that interior's. */
+export function frameReadyFor(
   awaiting: AwaitingInterior | null,
-  exit: { interiorId: string } | null,
+  frame: { interiorId: string } | null,
   interior: { stationId: string; memberStationIds?: readonly string[] } | null,
 ): boolean {
-  return awaiting?.kind === 'path' && exit !== null && interior !== null && exit.interiorId === interior.stationId && interiorCovers(interior, awaiting.stationId)
+  return awaiting?.kind === 'frame' && frame !== null && interior !== null && frame.interiorId === interior.stationId && interiorCovers(interior, awaiting.stationId)
 }
 
-/** What an await becomes once its interior is framed: the trip's way out while the trip panel is open, else nothing. */
-export function nextAwaiting(awaiting: AwaitingInterior | null, tripOpen: boolean): AwaitingInterior | null {
-  if (!awaiting || awaiting.kind === 'streets' || !tripOpen) return null
-  return awaiting.kind === 'path' ? awaiting : { ...awaiting, kind: 'path' }
+/** What an await becomes once its interior is framed: its priority frame; a bare station's streets are done. */
+export function nextAwaiting(awaiting: AwaitingInterior | null): AwaitingInterior | null {
+  if (!awaiting || awaiting.kind === 'streets') return null
+  return awaiting.kind === 'frame' ? awaiting : { ...awaiting, kind: 'frame' }
 }
 
 /** Whether the station is known to have no interior: the index has loaded and doesn't list it. */
@@ -74,9 +74,9 @@ export interface ReframeInput {
   /** The camera follows a train. */
   following: boolean
   focusedId: string | null
-  /** What the flight awaits has loaded: interiorReadyFor, streetsReadyFor or pathReadyFor, by its kind. */
+  /** What the flight awaits has loaded: interiorReadyFor, streetsReadyFor or frameReadyFor, by its kind. */
   ready: boolean
-  /** It never will: a bare station with no streets file (streetsMissingFor), or a way out once the trip panel closed. */
+  /** It never will: a bare station with no streets file (streetsMissingFor). */
   missing: boolean
 }
 

@@ -4,7 +4,7 @@ import type { ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import type { IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
-import { pathLanding, type PathFrame } from '../lib/pathFrame'
+import { priorityLanding, priorityTurn, type PriorityFrame } from '../lib/pathFrame'
 import { bareStationFrame } from '../lib/freeFrame'
 import { flightDuration } from '../lib/flight'
 import type { FlyRequest } from '../lib/focus'
@@ -93,9 +93,10 @@ export function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void
  * `azimuth`. With `turn`, a portrait free area first picks a landing azimuth that runs the platforms
  * nearly up the screen (landingAzimuth); the result's `azimuth` is that turn, or null for none. `stationId` is the
  * focused station, which for a complex member is not the model's own (file) id: the flight's focus hold follows it.
- * With the trip's way out at this interior (`exit`, the trip panel open) it frames that instead, as much of it as
- * fits from the landing distance out, the target near one of the interior's stations, unless the usual interior
- * framing shows as much of it (pathLanding).
+ * With a priority frame at this interior (`frame`: the trip's path there, the machines out of service) it frames that
+ * instead, as much of it as fits from the landing distance out, the target near one of the interior's stations, unless
+ * the usual interior framing shows as much of it (priorityLanding); with `turn` the landing may also turn half way
+ * round when that shows more of it (priorityTurn).
  */
 export function interiorFlight(
   stationId: string,
@@ -106,18 +107,20 @@ export function interiorFlight(
   fovDeg: number,
   azimuth: number,
   turn: boolean,
-  path: PathFrame | null = null,
+  frame: PriorityFrame | null = null,
 ): Destination {
   const free = interiorFreeRect(viewport, insets, panel)
   const land = turn ? landingAzimuth(model.axis, azimuth, free) : azimuth
   const view = { azimuth: land, viewport, free, fovDeg }
-  const plain = frameInterior({ ...model.focusAnchor, ...view })
-  const { distance, target } = path?.interiorId === model.stationId ? pathLanding(path, view, plain) : plain
+  const plainOf = (v: typeof view) => frameInterior({ ...model.focusAnchor, ...v })
+  const applies = frame?.interiorId === model.stationId
+  const chosen = applies && turn ? priorityTurn(frame, view, plainOf) : { azimuth: land, landing: applies ? priorityLanding(frame, view, plainOf(view)) : plainOf(view) }
+  const { distance, target } = chosen.landing
   return {
     stationId,
     target: new Vector3(target.x, 0, target.z),
     distance,
-    azimuth: land === azimuth ? null : land,
+    azimuth: chosen.azimuth === azimuth ? null : chosen.azimuth,
     follows: false,
   }
 }

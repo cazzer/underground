@@ -10,7 +10,8 @@ import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { createLabelBlockers } from '../lib/labelBlockers'
-import { stationPathFrameOf } from '../lib/pathFrame'
+import { outageFramePoints } from '../lib/outageFrame'
+import { priorityFrameOf } from '../lib/pathFrame'
 import { RAIL_DROP_M, STEP_RISE_M } from '../lib/interiorGeometry'
 import type { ExitLabel } from '../lib/exitView'
 import { BOARD_HALF_M, type StationPathDraw } from '../lib/interiorPath'
@@ -67,11 +68,9 @@ interface SceneProps {
   stationPaths: readonly StationPathDraw[]
   /** The trip's drawn exit's label, which the street labels place first; null for none. */
   exitLabel: ExitLabel | null
-  /** The trip panel is open: a flight to the trip's To station frames its way out above the panel. */
-  tripOpen: boolean
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, stationPaths, exitLabel, tripOpen }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, stationPaths, exitLabel }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -93,12 +92,15 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const hiddenSiblings = useMemo(() => hiddenSiblingIds(siblings, interior), [siblings, interior])
   /** The trip's path the focused interior draws (the first listed for it): its way out or a change of trains. */
   const path = interior ? (stationPaths.find((p) => p.interiorId === interior.stationId)?.choice ?? null) : null
-  /** What a flight there frames while the trip panel is open; a complex's members anchor its target. */
-  const pathFrame = useMemo(() => {
-    if (!interior || !path) return null
+  // `outOfService` is a new array every render: its ids say when the machines out really change.
+  const outKey = outOfService.join(',')
+  const outages = useMemo(() => (interior ? outageFramePoints(interior, outOfService, interior.yScale) : []), [interior, outKey])
+  /** What a flight there frames first (the path, then the machines out); a complex's members anchor its target. */
+  const priorityFrame = useMemo(() => {
+    if (!interior) return null
     const anchors = interiorStationIds(interior).flatMap((id) => network.stationById.get(id)?.pos ?? [])
-    return stationPathFrameOf(interior, path, anchors, { stepRise: STEP_RISE_M, railDrop: RAIL_DROP_M, boardHalfM: BOARD_HALF_M })
-  }, [interior, path, network])
+    return priorityFrameOf(interior, path, outages, anchors, { stepRise: STEP_RISE_M, railDrop: RAIL_DROP_M, boardHalfM: BOARD_HALF_M })
+  }, [interior, path, outages, network])
   /** Written by the level labels each frame, read by the street labels: their screen rects. */
   const labelBlockers = useMemo(() => createLabelBlockers(), [])
   return (
@@ -150,8 +152,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         interior={interior}
         index={index}
         anchor={anchor}
-        path={pathFrame}
-        tripOpen={tripOpen}
+        frame={priorityFrame}
       />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.

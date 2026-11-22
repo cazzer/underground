@@ -11,7 +11,7 @@ import { NO_FOCUS_GROUP, nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
-import type { PathFrame } from '../lib/pathFrame'
+import type { PriorityFrame } from '../lib/pathFrame'
 import type { AwaitingInterior } from '../lib/interiorReframe'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
@@ -42,12 +42,11 @@ interface CameraRigProps {
   panel: ScreenRect | null
   /** The selected train's drawn point (LiveTrains writes it at -3): the camera follows it. */
   anchor: FollowAnchor
-  /** The trip's way out at the loaded interior: a flight there frames it while the trip panel is open. */
-  path: PathFrame | null
-  tripOpen: boolean
+  /** The loaded interior's priority frame (the trip's path there, the machines out of service): a flight there frames it. */
+  frame: PriorityFrame | null
 }
 
-export function CameraRig({ network, insets, interior, index, panel, anchor, path, tripOpen }: CameraRigProps) {
+export function CameraRig({ network, insets, interior, index, panel, anchor, frame }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -94,13 +93,13 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, pat
   // Read by the fly effect through a ref: depending on these would re-fire a stale fly request.
   // onStart reads `network` here too, so it stays referentially stable (underground-by0).
   const streets = useStationStreets(focusedId)
-  const latest = useRef({ interior, panel, size, insets, maxDistance, network, streets, index, path, tripOpen })
+  const latest = useRef({ interior, panel, size, insets, maxDistance, network, streets, index, frame })
   useLayoutEffect(() => {
-    latest.current = { interior, panel, size, insets, maxDistance, network, streets, index, path, tripOpen }
-  }, [interior, panel, size, insets, maxDistance, network, streets, index, path, tripOpen])
+    latest.current = { interior, panel, size, insets, maxDistance, network, streets, index, frame }
+  }, [interior, panel, size, insets, maxDistance, network, streets, index, frame])
 
-  usePathProbe(path, insets, panel)
-  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets, index, path })
+  usePathProbe(frame, insets, panel)
+  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets, index, frame })
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
@@ -141,7 +140,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, pat
     streets,
     index,
     panel,
-    path,
+    frame,
     focusedId,
     following: follow.active,
   })
