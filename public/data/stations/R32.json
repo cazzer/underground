@@ -6,7 +6,7 @@
     "lon": -73.98314193404605
   },
   "license": "ODbL-1.0",
-  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Elements whose sources include nyopendata, and level heights whose depthSource is ee-rise, contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
   "generated": {
     "archetype": "shallow-per-direction",
     "confidence": 0.9

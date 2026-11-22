@@ -3,7 +3,7 @@ import type { DepthSource, StationInterior } from '../../src/data/stationSchema.
 import { INTERIOR_MIN_CONFIDENCE } from './archetype.ts'
 import { fixture } from './stationFixture.ts'
 import type { GeneratedMeta } from './stationInputs.ts'
-import { buildStationInterior } from './stationMerge.ts'
+import { buildStationInterior, MTA_CREDIT, OPEN_NY_NOTE } from './stationMerge.ts'
 import { markGenerated } from './stationProvenance.ts'
 
 const built = (): StationInterior => {
@@ -20,6 +20,12 @@ const metaFor = (i: StationInterior, over: Partial<GeneratedMeta> = {}): Generat
 const elements = (i: StationInterior) => [...i.platforms, ...i.slabs, ...i.connectors, ...i.entrances, ...i.fareLines]
 
 describe('markGenerated', () => {
+  it('adds the MTA credit and OPEN-NY note, in order, when a level height is an ee-rise but no element is nyopendata', () => {
+    const base = { ...built(), attribution: ['© OpenStreetMap contributors'] }
+    const rise = metaFor(base, { levelDepths: { ...metaFor(base).levelDepths, [nonStreet(base)[0]!.id]: 'ee-rise' } })
+    expect(markGenerated(base, rise).attribution).toEqual(['© OpenStreetMap contributors', MTA_CREDIT, OPEN_NY_NOTE])
+    expect(markGenerated(base, metaFor(base)).attribution).toEqual(['© OpenStreetMap contributors'])
+  })
   it('replaces authored with generated in every element, sorted and deduped, keeping osm and nyopendata', () => {
     const base = built()
     const out = markGenerated(base, metaFor(base))
