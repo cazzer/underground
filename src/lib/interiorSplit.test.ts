@@ -68,24 +68,24 @@ describe('trainLevelIndex', () => {
     expect(trainLevelIndex(twoDecks)).toBe(1)
     expect(trainLevelIndex(twoDecks)).toBe(1)
     expect(warn).toHaveBeenCalledTimes(1)
-    expect(warn.mock.calls[0]![0]).toContain('shallowest deck')
+    expect(warn.mock.calls[0]![0]).toContain('both decks')
     warn.mockRestore()
   })
 
-  it('leaves every shipped single-deck interior on its deepest platform level (only two-deck ones differ)', () => {
+  it('gives every shipped interior its shallowest platform track level (its only one when single-deck)', () => {
     const dir = new URL('../../public/data/stations/', import.meta.url)
-    const multi: string[] = []
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    let checked = 0
     for (const f of readdirSync(dir)) {
       if (f === 'index.json' || !f.endsWith('.json')) continue
-      const it2 = JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as Interior
-      const trackLevels = it2.levels.flatMap((l, i) =>
-        it2.platforms.some((p) => p.level === l.id && p.tracks.length > 0) ? [i] : [])
-      if (trackLevels.length > 1) multi.push(it2.stationId)
-      else expect(trainLevelIndex(it2)).toBe(trackLevels[0])
+      const shipped = JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as Interior
+      const trackLevels = shipped.levels.flatMap((l, i) =>
+        shipped.platforms.some((p) => p.level === l.id && p.tracks.length > 0) ? [i] : [])
+      expect(trainLevelIndex(shipped), shipped.stationId).toBe(trackLevels[0])
+      checked++
     }
     warn.mockRestore()
-    expect(multi).toEqual(['635'])
+    expect(checked).toBeGreaterThan(200)
   })
 
   it('is undefined when no platform has a track', () => {
