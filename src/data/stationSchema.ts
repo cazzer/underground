@@ -46,6 +46,11 @@ export interface StationInterior {
   attribution: string[]
   /** Present only on generated interiors; absent = hand-authored. */
   generated?: GeneratedInfo
+  /**
+   * Authored interiors only: the layout is traced from OSM and prose, not surveyed, so the panel says "Estimated
+   * layout" (as for a generated one). Absent = surveyed. Never set together with `generated`.
+   */
+  approximate?: true
   /** Sorted by y, highest first. Exactly one 'street' level, at y = 0. */
   levels: Level[]
   platforms: Platform[] // all arrays below sorted by id
@@ -61,7 +66,10 @@ export interface Level {
   kind: LevelKind
   /** Walking-surface elevation, meters relative to the street (0); negative is below. */
   y: number
-  /** Generated, non-street levels only. 'ee-rise' is measured; anything else is an estimate (label "≈"). */
+  /**
+   * Non-street levels of a generated interior, or of an authored one that states it. 'ee-rise' is measured;
+   * anything else is an estimate (label "≈"). Absent on an authored level = surveyed, labelled as a plain depth.
+   */
   depthSource?: DepthSource
 }
 
@@ -90,6 +98,8 @@ export interface Slab {
   outline: LocalPoint[]
   /** True = inside fare control. Absent = not stated. */
   paid?: boolean
+  /** Authored only: the outline is a rough trace; it draws dashed like a generated one (platforms stay solid). */
+  approximate?: true
   sources: InteriorSource[]
 }
 

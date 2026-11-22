@@ -816,6 +816,11 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
 - Every element has `sources` (`osm`, `nyopendata`, `authored`, `generated`). The file is marked ODbL 1.0 and
   carries `attribution`. Licensing is split: OSM-derived parts are ODbL, `nyopendata` elements are MTA data under
   the OPEN-NY Terms of Use, and `attribution` says so (`OPEN_NY_NOTE` in `stationMerge.ts`).
+- An authored interior may set `approximate: true` (whole file) and `approximate: true` on slabs (a rough trace): the
+  panel says "Estimated layout" for the file flag, and an approximate slab's outline and guides draw dashed (platforms
+  stay solid; the layer material is dashed when any slab is). An authored non-street level may carry `depthSource`,
+  which gives its label the generated rule ("-4.3 m" for `ee-rise`, "≈ -9 m" otherwise). The merge rejects a non-`true`
+  flag, an unknown source and one on the street.
 - `generated` (`{ archetype, confidence }`) exists only on template-generated interiors (absent = hand-authored);
   generated interiors use `generated` in place of `authored` in `sources`. Their non-street levels carry
   `depthSource`: only `ee-rise` is measured, the rest are estimates (label "≈", see `levelHeightText`). The panel

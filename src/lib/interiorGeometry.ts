@@ -39,6 +39,7 @@ export interface InteriorBufferOptions {
   /**
    * Generated interiors: mark platform and slab outlines, the slab guides and their street-level copy, and a
    * walkway's sides, as dashed in `distances` (tracks stay solid). Positions and colors are the same either way.
+   * A slab with `approximate` always dashes its outline and guides, with or without this (platforms stay solid).
    */
   dashStructure?: boolean
   /**
@@ -166,7 +167,7 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
       strong.loop(p.outline, y, colorOf('outline', li), dash)
       for (const t of p.tracks) strong.polyline(t.path, (level.y - opts.railDrop) * yScale, colorOf('track', li))
     }
-    for (const s of slabs) strong.loop(s.outline, y, colorOf('outline', li), dash)
+    for (const s of slabs) strong.loop(s.outline, y, colorOf('outline', li), dash || s.approximate === true)
     for (const f of interior.fareLines) {
       if (indexOf(f.level, f.id) === li) fine.polyline(f.path, y, colorOf('fare', li))
     }
@@ -192,8 +193,9 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
       const cBottom = colorOf('guide', li)
       const cTop = colorOf('guide', streetIndex)
       for (const s of slabs) {
-        for (const [x, z] of s.outline) fine.segment([x, y, z], [x, 0, z], cBottom, cTop, dash)
-        fine.loop(s.outline, 0, cTop, dash)
+        const slabDash = dash || s.approximate === true
+        for (const [x, z] of s.outline) fine.segment([x, y, z], [x, 0, z], cBottom, cTop, slabDash)
+        fine.loop(s.outline, 0, cTop, slabDash)
       }
     }
 

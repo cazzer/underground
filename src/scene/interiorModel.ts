@@ -25,9 +25,9 @@ export interface InteriorModel {
   /** The levels above the platform the lifted trains ride, drawn over those trains (empty in look C). */
   overStrong: Buffers
   overFine: Buffers
-  /** Draw every layer with a dashed material, cutting the segments `distances` marks (generated interiors). */
+  /** Draw every layer with a dashed material, cutting the segments `distances` marks (generated interiors, approximate slabs). */
   dashed: boolean
-  /** Generated from an archetype template rather than surveyed: the panel says it is approximate. */
+  /** Generated from an archetype template, or authored and marked approximate: the panel says it is estimated. */
   approximate: boolean
   labels: LevelLabel[]
   /** Plan center and the toward-camera shift that puts it at mid-height mid-screen, seen isometrically. */
@@ -150,7 +150,8 @@ export function interiorLayers(model: InteriorModel, outKey: string): Layers {
 /** Builds the drawable model; throws (naming the element) on inconsistent interior data or nothing to draw. */
 export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const { yScale } = interiorLook
-  const approximate = interior.generated !== undefined
+  const generated = interior.generated !== undefined
+  const approximate = generated || interior.approximate === true
   const origin = toGround(interior.anchor)
   const hull =
     interiorLook.veil === 'footprint'
@@ -162,7 +163,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     ...(interior.memberStationIds ? { memberStationIds: interior.memberStationIds } : {}),
     origin,
     ...buildLayers(interior, hull, new Set()),
-    dashed: approximate,
+    dashed: generated || interior.slabs.some((s) => s.approximate === true),
     approximate,
     labels: levelLabels(interior, yScale),
     focusAnchor: interiorFocusAnchor(origin, interior, yScale, Math.tan(ISO_POLAR)),

@@ -93,6 +93,12 @@ describe('levelHeightText', () => {
     expect(levelHeightText(level(6.2), false)).toBe('6.2 m')
   })
 
+  it('applies the depthSource rule to an authored level that states one', () => {
+    expect(levelHeightText(level(-3.82, 'ee-rise'), false)).toBe('−3.8 m')
+    expect(levelHeightText(level(-6.9, 'osm-level'), false)).toBe('≈ −7 m')
+    expect(levelHeightText(level(-6.9), false)).toBe('−6.9 m')
+  })
+
   it('signs a measured (ee-rise) depth to one decimal', () => {
     expect(levelHeightText(level(-9.06, 'ee-rise'), true)).toBe('−9.1 m')
     expect(levelHeightText(level(6.2, 'ee-rise'), true)).toBe('+6.2 m')

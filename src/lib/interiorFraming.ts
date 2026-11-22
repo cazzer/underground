@@ -76,12 +76,13 @@ function signed(y: number, v: string): string {
 }
 
 /**
- * A level's height for its label. Authored levels keep `formatDepth`. On a generated interior a measured
+ * A level's height for its label. A surveyed level (authored, no `depthSource`) keeps `formatDepth`. On a generated
+ * interior, or on an authored level that states a `depthSource`, a measured
  * depth (`ee-rise`) is signed to one decimal ("−4.3 m", "+6.1 m" above the street); every other source is an
  * estimate, signed whole meters after "≈" ("≈ −9 m").
  */
 export function levelHeightText(level: Level, generated: boolean): string {
-  if (!generated) return formatDepth(level.y)
+  if (!generated && level.depthSource === undefined) return formatDepth(level.y)
   if (level.depthSource === 'ee-rise') return `${signed(level.y, Math.abs(level.y).toFixed(1))} m`
   return `≈ ${signed(level.y, String(Math.round(Math.abs(level.y))))} m`
 }
