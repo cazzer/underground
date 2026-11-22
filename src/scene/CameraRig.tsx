@@ -79,7 +79,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
   const gestureEnded = useRef(false)
   /** A station flight that set off before its interior (or bare streets) was known: reframed after landing (useInteriorReframe). */
   const awaiting = useRef<AwaitingInterior | null>(null)
-  /** A user collapse or expand of the panel settling before it reframes (useCollapseReframe). */
+  /** A user collapse or expand of the panel, or a landed bare station's panel resize, settling before it reframes (useCollapseReframe). */
   const collapse = useRef<CollapsePending | null>(null)
   /** A gesture since the last landing: a panel toggle then leaves the view alone. */
   const tookOver = useRef(false)

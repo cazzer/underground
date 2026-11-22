@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { PerspectiveCamera } from 'three'
 import { interiorCovers } from '../data/interiorLoad'
-import { collapseAction, collapseDueIn, COLLAPSE_QUIET_MS, reframeGains, type CollapsePending } from '../lib/collapseReframe'
+import { collapseAction, collapseDueIn, COLLAPSE_QUIET_MS, moveGains, panelMoveArms, type CollapsePending } from '../lib/collapseReframe'
 import type { FlyRequest } from '../lib/focus'
 import { framedCount, type FramePoint } from '../lib/freeFrame'
 import { interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
@@ -9,6 +9,8 @@ import { reframeDuration, stationIsBare, type AwaitingInterior } from '../lib/in
 import { usePanelCollapse } from '../lib/panelCollapse'
 import { priorityTiers } from '../lib/pathFrame'
 import { prefersReducedMotion } from '../lib/reducedMotion'
+import { useTrainSelection } from '../lib/trainSelection'
+import { useTrip } from '../lib/trip'
 import { bareStationPoints, flushMotion, interiorFlight, newFlight, stationFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { ReframeLayout } from './useInteriorReframe'
 
@@ -23,7 +25,7 @@ interface CollapseReframeOptions {
   /** CameraRig sets it on a gesture and clears it on a landing: the user took the view over. */
   tookOver: RefObject<boolean>
   layout: RefObject<ReframeLayout>
-  /** The panel's measured rect: each move restarts the settle wait. */
+  /** The panel's measured rect: each move restarts the settle wait, and on a landed bare station arms a resize reframe. */
   panel: ScreenRect | null
   focusedId: string | null
   flyRequest: FlyRequest | null
@@ -60,7 +62,13 @@ function collapseTarget(l: ReframeLayout, stationId: string, azimuth: number, fo
  * last landing, and while a late interior or streets reframe is pending (that one moves once, with its turn). A gesture,
  * another flight, a follow or a focus change cancels it. When it declines or has nothing to move, it asks
  * useInteriorReframe again: with the trip panel open its 'frame' await (#113) may still frame the trip's path onto the
- * new panel. Runs per event, never per frame.
+ * new panel.
+ *
+ * A landed bare station's panel that changes height on a phone (the Entrances row arriving with its streets, a "Show
+ * all" opened) arms the same settle and reframe onto its entrance marks, only while the station panel has stayed in
+ * front since the station's own flight and the user hasn't taken over, and only when that shows strictly more
+ * (collapseReframe.ts, ost.18). A pending late streets reframe reads the final panel itself; a mid-flight change is the
+ * flight's retarget. Runs per event, never per frame.
  */
 export function useCollapseReframe({
   controls,
@@ -83,14 +91,26 @@ export function useCollapseReframe({
   useLayoutEffect(() => {
     focused.current = focusedId
   }, [focusedId])
+  /** The station of the last station flight, while the station panel has stayed in front since. */
+  const flown = useRef<string | null>(null)
+  /** The free rect's bottom and the viewport at the panel's last measure. */
+  const measured = useRef<{ panel: ScreenRect | null; bottom: number | null; width: number; height: number } | null>(null)
+  const { selectedSummary, notice } = useTrainSelection()
+  const { open: tripOpen } = useTrip()
+  const stationFront = selectedSummary === null && notice === null && !tripOpen
+  const front = useRef(stationFront)
+  useLayoutEffect(() => {
+    front.current = stationFront
+  }, [stationFront])
 
   const reframe = useCallback(
     (p: CollapsePending): boolean => {
       const c = controls.current
       const kind = awaiting.current?.kind
-      const s = { flying: flight.current !== null, following: following(), focusedId: focused.current, tookOver: tookOver.current, lateArrival: kind === 'interior' || kind === 'streets' }
-      if (!c || collapseAction(p, s) === 'drop') return false
       const l = layout.current
+      const late = kind === 'interior' || kind === 'streets'
+      const s = { flying: flight.current !== null, following: following(), focusedId: focused.current, tookOver: tookOver.current, lateArrival: late, bare: stationIsBare(p.stationId, l.index) }
+      if (!c || collapseAction(p, s) === 'drop') return false
       const azimuth = c.getAzimuthalAngle()
       const target = collapseTarget(l, p.stationId, azimuth, camera.fov)
       if (!target) return false
@@ -100,7 +120,7 @@ export function useCollapseReframe({
         const view = { azimuth, viewport: l.size, free: interiorFreeRect(l.size, l.insets, l.panel), fovDeg: camera.fov }
         const here = tiers.map((t) => framedCount(view, { distance, target: c.target }, t))
         const there = tiers.map((t) => framedCount(view, dest, t))
-        if (!reframeGains(here, there, tiers.map((t) => t.length))) return false
+        if (!moveGains(p.kind, here, there, tiers.map((t) => t.length))) return false
       }
       const duration = reframeDuration(Math.max(c.target.distanceTo(dest.target), Math.abs(dest.distance - distance)), 0)
       if (duration === null) return false
@@ -141,19 +161,52 @@ export function useCollapseReframe({
       return
     }
     const now = performance.now()
-    collapse.current = { stationId: id, bumpedAt: now, panelAt: now, reduced: prefersReducedMotion() }
+    collapse.current = { kind: 'toggle', stationId: id, bumpedAt: now, panelAt: now, reduced: prefersReducedMotion() }
     timer.current = window.setTimeout(settle, COLLAPSE_QUIET_MS)
   }, [seq, collapse, flight, following, settle])
 
-  // Each measured move of the panel restarts the quiet wait (up to the cap).
+  // Each measured move of the panel restarts the quiet wait (up to the cap); with none pending, a landed bare station's
+  // panel that changed height arms a resize.
   useEffect(() => {
-    if (collapse.current) collapse.current = { ...collapse.current, panelAt: performance.now() }
-  }, [panel, collapse])
+    const prev = measured.current
+    if (prev && prev.panel === panel) return
+    const l = layout.current
+    const after = panel ? interiorFreeRect(l.size, l.insets, panel).bottom : null
+    measured.current = { panel, bottom: after, width: l.size.width, height: l.size.height }
+    if (collapse.current) {
+      collapse.current = { ...collapse.current, panelAt: performance.now() }
+      return
+    }
+    const id = focused.current
+    const kind = awaiting.current?.kind
+    const arms = panelMoveArms({
+      flying: flight.current !== null,
+      following: following(),
+      tookOver: tookOver.current,
+      lateArrival: kind === 'interior' || kind === 'streets',
+      focusedId: id,
+      flownId: front.current ? flown.current : null,
+      bare: id !== null && stationIsBare(id, l.index),
+      before: prev?.bottom ?? null,
+      after,
+      sameViewport: prev !== null && prev.width === l.size.width && prev.height === l.size.height,
+    })
+    if (!arms || !id) return
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    const now = performance.now()
+    collapse.current = { kind: 'resize', stationId: id, bumpedAt: now, panelAt: now, reduced: prefersReducedMotion() }
+    timer.current = window.setTimeout(settle, COLLAPSE_QUIET_MS)
+  }, [panel, collapse, layout, awaiting, flight, tookOver, following, settle])
 
-  // Another flight request, or the focus moving on, cancels a toggle still settling.
+  // Another flight request, or the focus moving on, cancels a toggle still settling. Only a station flight, with the
+  // station panel in front from then on, lets that station's panel resize reframe it.
   useEffect(() => {
     collapse.current = null
+    flown.current = flyRequest?.kind === 'station' && front.current ? flyRequest.stationId : null
   }, [flyRequest, collapse])
+  useEffect(() => {
+    if (!stationFront) flown.current = null
+  }, [stationFront])
   useEffect(() => {
     const p = collapse.current
     if (!p || p.stationId === focusedId) return
