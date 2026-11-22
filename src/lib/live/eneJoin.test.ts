@@ -28,6 +28,44 @@ describe('joinStationOutages', () => {
     expect(j.panel).toMatchObject({ outages: [{ id: 'EL359', levels: 'Street to mezzanine' }] })
   })
 
+  describe('escalator direction', () => {
+    // EL359 runs between the mezzanine (lower) and the street (upper).
+    const base = l08.connectors.find((c) => c.id === 'EL359')!
+    const withEscalators = (travels: Record<string, 'up' | 'down' | undefined>): StationInterior => ({
+      ...l08,
+      connectors: [
+        ...l08.connectors,
+        ...Object.entries(travels).map(([id, travel]) => ({ ...base, id, kind: 'escalator' as const, travel })),
+      ],
+    })
+    const levelsOf = (interior: StationInterior, id: string): string | undefined => {
+      const j = joinStationOutages(interior, feed([outage(id)]), NOW)
+      return j.panel.kind === 'out' ? j.panel.outages[0]?.levels : undefined
+    }
+
+    it('names an up escalator from its lower level', () => {
+      expect(levelsOf(withEscalators({ ES1: 'up' }), 'ES1')).toBe('Mezzanine up to street')
+    })
+
+    it('names a down escalator from its upper level', () => {
+      expect(levelsOf(withEscalators({ ES1: 'down' }), 'ES1')).toBe('Street down to mezzanine')
+    })
+
+    it('reads two opposite escalators between the same levels differently', () => {
+      const i = withEscalators({ ES257X: 'up', ES258X: 'down' })
+      expect(levelsOf(i, 'ES257X')).not.toBe(levelsOf(i, 'ES258X'))
+    })
+
+    it('keeps the street-first wording for an escalator with no travel', () => {
+      expect(levelsOf(withEscalators({ ES1: undefined }), 'ES1')).toBe('Street to mezzanine')
+    })
+
+    it('keeps elevators as they were, whatever travel says', () => {
+      const i: StationInterior = { ...l08, connectors: l08.connectors.map((c) => (c.id === 'EL359' ? { ...c, travel: 'up' as const } : c)) }
+      expect(levelsOf(i, 'EL359')).toBe('Street to mezzanine')
+    })
+  })
+
   it('lists several, sorted, and ignores codes the interior does not have', () => {
     const j = joinStationOutages(l08, feed([outage('EL359'), outage('EL358'), outage('EL999'), outage('ES1')]), NOW)
     expect(j.outIds).toEqual(['EL358', 'EL359'])

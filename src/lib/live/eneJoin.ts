@@ -14,7 +14,10 @@ export interface MachineOutage {
   /** The equipment code, the connector's id. */
   id: string
   kind: 'elevator' | 'escalator'
-  /** "Mezzanine to platform": the end nearest the street first. */
+  /**
+   * "Mezzanine to platform": the end nearest the street first. An escalator with a known direction of travel names it
+   * instead: "Mezzanine up to street", "Street down to mezzanine" (the end it starts at first).
+   */
   levels: string
   /** Epoch seconds; null when the MTA gave none. May be past: overdue. */
   returnAt: number | null
@@ -67,7 +70,11 @@ export function eneFresh(snapshot: EneSnapshot | null, nowS: number): boolean {
 type Machine = Connector & { kind: 'elevator' | 'escalator' }
 const isMachine = (c: Connector): c is Machine => c.kind === 'elevator' || c.kind === 'escalator'
 
-/** "Mezzanine to platform": the end nearest the street (in levels) leads. */
+/**
+ * "Mezzanine to platform": the end nearest the street (in levels) leads. An escalator with `travel` leads with the end
+ * it starts at and says the way it goes ("Mezzanine up to street", "Street down to mezzanine"); elevators and
+ * escalators without `travel` keep the street-first wording.
+ */
 function levelsText(interior: StationInterior, c: Connector): string {
   const street = interior.levels.findIndex((l) => l.kind === 'street')
   const find = (id: string): { level: Level; away: number } => {
@@ -77,6 +84,10 @@ function levelsText(interior: StationInterior, c: Connector): string {
     return { level, away: Math.abs(i - street) }
   }
   const [a, b] = [find(c.upper.level), find(c.lower.level)]
+  if (c.kind === 'escalator' && c.travel) {
+    const [from, to] = c.travel === 'up' ? [b, a] : [a, b]
+    return `${from.level.name} ${c.travel} to ${to.level.name.toLowerCase()}`
+  }
   const [near, far] = a.away <= b.away ? [a, b] : [b, a]
   return `${near.level.name} to ${far.level.name.toLowerCase()}`
 }
