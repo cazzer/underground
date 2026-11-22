@@ -28,7 +28,10 @@ export interface CarFrame {
   outlineM?: number
 }
 
-/** How far a shell reaches past the middle of a joint, so a curve leaves no notch at the outer corner. */
+/**
+ * How far a shell reaches past the middle of a joint, at least, so a curve leaves no notch at the outer corner; it
+ * also reaches the outline's own width past it, which covers a tight curve.
+ */
 const JOIN_OVERLAP_M = 0.25
 
 /** Where a train's cars sit along its shape: car c spans [rear + c * step, rear + (c + 1) * step]. */
@@ -112,7 +115,7 @@ export function writeConsist(
     const haloWidth = cross * frame.widthM + 2 * u * frame.rimM
     const haloLength = step + 2 * u * frame.rimM
     const grow = u * (frame.outlineM ?? 0)
-    const halfGap = (step - bodyLength) / 2 + JOIN_OVERLAP_M
+    const halfGap = (step - bodyLength) / 2 + Math.max(JOIN_OVERLAP_M, grow)
     let a = scratch.a
     let b = scratch.b
     trackPointInto(track, rear, view, a)
@@ -141,6 +144,25 @@ export function writeConsist(
     }
   }
   clearCars(bodies, halos, slot, n)
+}
+
+/**
+ * The two end faces of one train's outline shells (`shells`, slot 0, as writeConsist wrote them with `outlineM`):
+ * instance 0 closes the rear car's rear end, instance 1 the front car's front end (its shell turned half a turn about
+ * its up axis, which the section's symmetry allows and which keeps the face's winding). Zeroed for no cars. No allocation.
+ */
+export function writeEndCaps(shells: Float32Array, caps: Float32Array): void {
+  let last = -1
+  for (let c = 0; c < MAX_CARS; c++) if (shells[c * 16 + 15] !== 0) last = c
+  if (last < 0) {
+    caps.fill(0, 0, 32)
+    return
+  }
+  const f = last * 16
+  for (let j = 0; j < 16; j++) {
+    caps[j] = shells[j]!
+    caps[16 + j] = (j < 3 || (j >= 8 && j < 11) ? -1 : 1) * shells[f + j]!
+  }
 }
 
 /** Zeroes the slot's instances from car `from` on (all of them by default). */

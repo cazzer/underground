@@ -107,8 +107,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `TrainPickSource.mixOf`); wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
     their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body (its dimension constants live in `src/lib/carDims.ts`)
-    and the open outline tube. The selected outline is two shells per car (`CarFrame.outlineM`: grown by the gap, then gap
-    plus rim, joined across the joints), drawn as back faces, so only a band around the train's silhouette shows at any tilt or turn);
+    and the open outline tube plus its end face. The selected outline is two shells per car (`CarFrame.outlineM`: grown by the gap,
+    then gap plus rim, joined across the joints), drawn as back faces, so only a band around the train's silhouette shows at any
+    tilt or turn; the tubes are open so no end face crosses a joint, and two 2-instance cap meshes (`writeEndCaps`) close the train's two ends);
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
@@ -458,7 +459,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim shell), 9.42 (gap shell), 9.45 (footprints) and 9.5 (bodies),
+  you-are-here reticle 6.55, above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom) draws no marker and no
   station tie: its panel and interior mark it, and it stays pickable.

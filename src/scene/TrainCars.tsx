@@ -1,4 +1,5 @@
-import { BackSide, FrontSide } from 'three'
+import type { RefObject } from 'react'
+import { BackSide, type BufferGeometry, FrontSide, type InstancedMesh } from 'three'
 import { theme } from '../theme'
 import { MAX_CARS } from '../lib/live/consist'
 import { RENDER_ORDER } from './renderOrder'
@@ -35,23 +36,28 @@ export function TrainCars({ layer }: TrainCarsProps) {
         {/* White material: vertex shading times the per-instance route color. */}
         <meshBasicMaterial vertexColors transparent depthTest depthWrite side={FrontSide} />
       </instancedMesh>
-      {/* The selected outline; useTrainCars.commit sets both counts and orders. */}
-      <instancedMesh
-        ref={layer.rims}
-        args={[layer.geometry.outline, undefined, MAX_CARS]}
-        frustumCulled={false}
-        renderOrder={RENDER_ORDER.carRim}
-      >
-        <meshBasicMaterial color={theme.trainSelectedRim} transparent depthTest depthWrite={false} side={BackSide} />
-      </instancedMesh>
-      <instancedMesh
-        ref={layer.gaps}
-        args={[layer.geometry.outline, undefined, MAX_CARS]}
-        frustumCulled={false}
-        renderOrder={RENDER_ORDER.carGap}
-      >
-        <meshBasicMaterial color={theme.background} transparent depthTest depthWrite={false} side={BackSide} />
-      </instancedMesh>
+      {/* The selected outline; useTrainCars.commit sets the counts and orders. */}
+      <Shell mesh={layer.rims} geometry={layer.geometry.outline} count={MAX_CARS} color={theme.trainSelectedRim} order={RENDER_ORDER.carRim} />
+      <Shell mesh={layer.rimCaps} geometry={layer.geometry.cap} count={2} color={theme.trainSelectedRim} order={RENDER_ORDER.carRim} />
+      <Shell mesh={layer.gaps} geometry={layer.geometry.outline} count={MAX_CARS} color={theme.background} order={RENDER_ORDER.carGap} />
+      <Shell mesh={layer.gapCaps} geometry={layer.geometry.cap} count={2} color={theme.background} order={RENDER_ORDER.carGap} />
     </>
+  )
+}
+
+interface ShellProps {
+  mesh: RefObject<InstancedMesh | null>
+  geometry: BufferGeometry
+  count: number
+  color: string
+  order: number
+}
+
+/** One part of the selected outline: back faces only, depth-tested against the bodies, never writing depth. */
+function Shell({ mesh, geometry, count, color, order }: ShellProps) {
+  return (
+    <instancedMesh ref={mesh} args={[geometry, undefined, count]} frustumCulled={false} renderOrder={order}>
+      <meshBasicMaterial color={color} transparent depthTest depthWrite={false} side={BackSide} />
+    </instancedMesh>
   )
 }

@@ -42,12 +42,12 @@ export const RENDER_ORDER = {
   interiorVeil: 7,
   interiorFine: 8,
   interior: 9,
-  // Trains on a revealed station's platforms, redrawn above the veil and those strokes: the selected outline's rim
-  // and gap shells, footprints, bodies (all but the footprints depth-tested against the street cars they copy).
-  spanCarRim: 9.4,
-  spanCarGap: 9.42,
+  // Trains on a revealed station's platforms, redrawn above the veil and those strokes: footprints, bodies
+  // (depth-tested against the street cars they copy), then the selected outline's rim and gap shells, as on the street.
   spanCarHalo: 9.45,
   spanCars: 9.5,
+  spanCarRim: 9.51,
+  spanCarGap: 9.52,
   // The interior's levels above that platform (mezzanines, their stairs, escalators and shafts, the street), fine
   // then strong, over the lifted trains: they stand in front of them.
   interiorOverFine: 9.6,

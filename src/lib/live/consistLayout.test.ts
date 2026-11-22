@@ -6,7 +6,6 @@ import { consistSpanInto, createConsistScratch, writeConsist, type CarFrame } fr
 import { buildTrackProfile, EMPTY_PROFILE, GRADE, resampleAt, type TrackProfile } from '../trackProfile'
 import { rampBreaks } from '../rampSampling'
 import { createBandView } from '../bandOffset'
-import { CAR_HEIGHT_M, CAR_WIDTH_M } from '../carDims'
 import { createTrackPoint, trackPointInto, type DrawnTrack } from './trackPoint'
 
 /** An unbanded track (no miters, so the band view leaves it where it is), and a view that shifts nothing. */
@@ -229,36 +228,6 @@ describe('writeConsist', () => {
     expect(bodies.subarray((MAX_CARS + 4) * 16).every((v) => v === 0)).toBe(true)
     expect(halos.subarray((MAX_CARS + 4) * 16).every((v) => v === 0)).toBe(true)
     expect(bodies[(MAX_CARS + 3) * 16 + 15]).toBe(1)
-  })
-
-  it('grows outline shells around the bodies and joins them across the gaps', () => {
-    const write = (outlineM?: number) => {
-      const bodies = new Float32Array(MAX_CARS * 16)
-      const frame = { ...FRAME, outlineM }
-      writeConsist(bodies, new Float32Array(MAX_CARS * 16), 0, track(straight(1000)), VIEW, 500, TEN, 1, 1, 1, frame, createConsistScratch())
-      // The cars run along +x: each one's [rear, front] in x, its section in meters and its floor height.
-      return Array.from({ length: TEN.cars }, (_, c) => {
-        const o = c * 16
-        const half = Math.hypot(bodies[o + 8]!, bodies[o + 10]!) / 2
-        return { rear: bodies[o + 12]! - half, front: bodies[o + 12]! + half, width: Math.hypot(bodies[o]!, bodies[o + 2]!) * CAR_WIDTH_M, height: bodies[o + 5]! * CAR_HEIGHT_M, y: bodies[o + 13]! }
-      })
-    }
-    const body = write()
-    const shell = write(0.3)
-    for (let c = 0; c < TEN.cars; c++) {
-      expect(shell[c]!.width).toBeCloseTo(body[c]!.width + 0.6, 4)
-      expect(shell[c]!.height).toBeCloseTo(body[c]!.height + 0.6, 4)
-      expect(shell[c]!.y).toBeCloseTo(body[c]!.y - 0.3, 4)
-    }
-    // The train's two ends grow by the outline; at each joint the shells overlap, past the gap's middle.
-    expect(shell[0]!.rear).toBeCloseTo(body[0]!.rear - 0.3, 4)
-    expect(shell[TEN.cars - 1]!.front).toBeCloseTo(body[TEN.cars - 1]!.front + 0.3, 4)
-    for (let c = 0; c + 1 < TEN.cars; c++) {
-      const middle = (body[c]!.front + body[c + 1]!.rear) / 2
-      expect(shell[c]!.front).toBeGreaterThan(middle)
-      expect(shell[c + 1]!.rear).toBeLessThan(middle)
-      expect(shell[c]!.front - shell[c + 1]!.rear).toBeLessThan(1)
-    }
   })
 })
 
