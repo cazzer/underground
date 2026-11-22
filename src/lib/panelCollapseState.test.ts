@@ -57,6 +57,14 @@ describe('collapseReducer', () => {
     expect(collapseReducer(closed, { type: 'tripClosed' })).toBe(closed)
   })
 
+  it('expands a collapsed trip panel on a directions pick without counting, and leaves the station flag', () => {
+    let s = collapseReducer(INITIAL_COLLAPSE, { type: 'set', panel: 'station', collapsed: true, front: 'station' })
+    s = collapseReducer(s, { type: 'set', panel: 'trip', collapsed: true, front: 'trip' })
+    const requested = collapseReducer(s, { type: 'tripRequested' })
+    expect(requested).toEqual({ station: true, trip: false, seq: 2 })
+    expect(collapseReducer(requested, { type: 'tripRequested' })).toBe(requested)
+  })
+
   it('expands a collapsed station panel on an explicit pick without counting', () => {
     const s = collapseReducer(INITIAL_COLLAPSE, { type: 'set', panel: 'station', collapsed: true, front: 'station' })
     const picked = collapseReducer(s, { type: 'picked' })

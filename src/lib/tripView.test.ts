@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Placement } from './locate'
 import type { TripJourney, TripLeg } from './route/plan'
 import {
-  defaultEnds,
   journeySource,
   journeyView,
   orderJourneys,
@@ -267,27 +265,6 @@ describe('tripAnnouncement and shouldAnnounceTrip', () => {
     expect(shouldAnnounceTrip(ready('retry', 2), 'A>B#1')).toBe(true)
     const failed: TripPlanState = { status: 'error', message: 'x', key: 'A>B', attempt: 2, trigger: 'retry' }
     expect(shouldAnnounceTrip(failed, 'A>B#1')).toBe(true)
-  })
-})
-
-describe('defaultEnds', () => {
-  const nearest = { id: 'L08', name: 'Bedford Av', pos: { x: 0, z: 0 }, distanceM: 100 }
-  const marked = (kind: 'near' | 'far'): Placement =>
-    ({ kind, ground: { x: 0, z: 0 }, accuracyM: 10, approximate: false, nearest, viewCenter: { x: 0, z: 0 }, viewRadiusM: 300 }) as Placement
-  it('uses the nearest station as From and a different focused station as To', () => {
-    expect(defaultEnds('635', marked('near'))).toEqual({ from: 'L08', to: '635' })
-    expect(defaultEnds('635', marked('far'))).toEqual({ from: 'L08', to: '635' })
-  })
-  it('leaves To empty when the focused station is the nearest one, or none is focused', () => {
-    expect(defaultEnds('L08', marked('near'))).toEqual({ from: 'L08', to: null })
-    expect(defaultEnds(null, marked('far'))).toEqual({ from: 'L08', to: null })
-  })
-  it('ignores an outside fix', () => {
-    expect(defaultEnds('635', { kind: 'outside', nearest })).toEqual({ from: '635', to: null })
-  })
-  it('makes the focused station From when there is no fix', () => {
-    expect(defaultEnds('635', null)).toEqual({ from: '635', to: null })
-    expect(defaultEnds(null, null)).toEqual({ from: null, to: null })
   })
 })
 

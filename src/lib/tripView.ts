@@ -4,7 +4,6 @@ import { routeSpokenName } from './labels'
 import { stationOfStop } from './live/arrivals'
 import { clockNow } from './live/clock'
 import { nyClockTime, stopEta, stopEtaSpoken } from './live/trainStops'
-import type { Placement } from './locate'
 import type { OverlayCounts } from './route/overlay'
 import type { TripJourney, TripRideLeg } from './route/plan'
 import { isChangeWalk, transferLegKey } from './transferView'
@@ -38,18 +37,6 @@ export const tripKey = (from: StationId, to: StationId): string => `${from}>${to
 /** A station pair worth planning: both set and different. */
 export function plannable(ends: TripEnds): ends is { from: StationId; to: StationId } {
   return ends.from !== null && ends.to !== null && ends.from !== ends.to
-}
-
-/**
- * The ends to start from. A marked fix (near or far) makes the nearest station From, and the focused station To
- * when it differs; with no fix the focused station is From. An outside fix is ignored: it names no marker.
- */
-export function defaultEnds(focusedId: string | null, placement: Placement | null): TripEnds {
-  if (placement && placement.kind !== 'outside') {
-    const from = placement.nearest.id
-    return { from, to: focusedId !== null && focusedId !== from ? focusedId : null }
-  }
-  return { from: focusedId, to: null }
 }
 
 /** Epoch seconds now: the live clock once a snapshot has set it, else the device clock (schedule only). */

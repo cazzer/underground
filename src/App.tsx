@@ -76,6 +76,7 @@ function MapView({ network, bands, live }: MapViewProps) {
     [exitDraw, exitInterior, tripTransfers.drawn],
   )
   const focusSiblings = useMemo(() => siblingIdsOf(focusedId, interior.index), [focusedId, interior.index])
+  const siblingsOf = useCallback((id: string) => siblingIdsOf(id, interior.index), [interior.index])
   const accessible = focusedId !== null && (network.stationById.get(focusedId)?.access.status ?? 'none') !== 'none'
   const outKey = outages.outIds.join(',')
   const unknownStatus = outages.closed === null
@@ -122,6 +123,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           tripExits={tripExit?.lines ?? null}
           tripTransfers={tripTransfers.lines}
           focusSiblings={focusSiblings}
+          siblingsOf={siblingsOf}
         />
       </ErrorBoundary>
       <LiveDebug debug={live.debug} technical={live.technical} />

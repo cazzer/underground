@@ -1,4 +1,4 @@
-import { useRef, type Ref } from 'react'
+import type { Ref, RefObject } from 'react'
 import type { TripEnd, TripPlaces } from '../lib/trip'
 import type { TripEnds as Ends } from '../lib/tripView'
 import type { Network } from '../lib/network'
@@ -15,6 +15,8 @@ interface TripEndsProps {
   focusSiblings: readonly string[]
   /** The station nearest a marked fix, offered as From while it is neither end. In memory only. */
   nearestId: string | null
+  /** The two rows: TripPanel focuses one after a directions pick. */
+  rows: { from: RefObject<HTMLButtonElement | null>; to: RefObject<HTMLButtonElement | null> }
   /** Opens that end's search. The row has already taken focus, so the dialog hands it back there. */
   onPick: (end: TripEnd) => void
   onSet: (end: TripEnd, stationId: string) => void
@@ -66,8 +68,7 @@ function EndRow({ label, name, near, onPress, ref }: EndRowProps) {
  * doesn't focus a tapped button, and the dialog hands focus back to what had it). A shortcut disappears when it
  * is used, so focus moves to the row it filled, one frame later (after the row's new name has rendered).
  */
-export function TripEnds({ network, ends, places, focusedId, focusSiblings, nearestId, onPick, onSet, onSwap }: TripEndsProps) {
-  const rows = { from: useRef<HTMLButtonElement>(null), to: useRef<HTMLButtonElement>(null) }
+export function TripEnds({ network, ends, places, focusedId, focusSiblings, nearestId, rows, onPick, onSet, onSwap }: TripEndsProps) {
   const nameOf = (id: string | null) => (id ? (network.stationById.get(id)?.name ?? null) : null)
   const press = (end: TripEnd) => (button: HTMLButtonElement) => {
     button.focus({ preventScroll: true })

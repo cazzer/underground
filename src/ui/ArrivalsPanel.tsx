@@ -6,6 +6,7 @@ import { useStationStreets } from '../data/useStationStreets'
 import { listsStationFn } from '../lib/entranceList'
 import { accessLabel } from '../lib/labels'
 import type { Network } from '../lib/network'
+import type { TripEnd } from '../lib/trip'
 import { PartialAccessNote, StationName } from './AccessIcon'
 import { ArrivalsList } from './ArrivalsList'
 import { EntranceList } from './EntranceList'
@@ -22,12 +23,17 @@ interface ArrivalsPanelProps {
   interior: InteriorStatusInfo
   /** Elevators and escalators out of service at the focused station. */
   outages: OutagePanelView
+  /** "Directions from here" and "Directions to here": open the trip panel with this station as that end. */
+  onDirections: (end: TripEnd) => void
   ref: Ref<HTMLElement>
   /** The heading, or the bar while collapsed: takes focus when a panel that covered this one closes, or after the visitor picks this station from search. */
   headingRef: RefObject<HTMLElement | null>
 }
 
-export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, ref, headingRef }: ArrivalsPanelProps) {
+const LINK =
+  'flex min-h-11 cursor-pointer items-center px-2 text-ink-dim underline hover:text-ink focus-visible:outline-2 focus-visible:outline-focus'
+
+export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, onDirections, ref, headingRef }: ArrivalsPanelProps) {
   // The street file loads on focus only (the scene's streets share it through the cache); nothing shows until it is in.
   const streets = useStationStreets(stationId)
   const listsStation = useMemo(() => (streets ? listsStationFn(streets.file.entrances, stationId) : undefined), [streets, stationId])
@@ -60,6 +66,14 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
       )}
       <div id={bodyId} hidden={collapsed}>
         <PartialAccessNote access={station.access} />
+        <p className="-ml-2 mt-1 flex flex-wrap text-sm">
+          <button type="button" onClick={() => onDirections('from')} className={LINK}>
+            Directions from here
+          </button>
+          <button type="button" onClick={() => onDirections('to')} className={LINK}>
+            Directions to here
+          </button>
+        </p>
         <InteriorStatus info={interior} />
         <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
         <ArrivalsList key={`arrivals-${stationId}`} network={network} station={station} source={arrivals} status={live} onFocusLost={() => headingRef.current?.focus()} />

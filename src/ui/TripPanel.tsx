@@ -17,6 +17,7 @@ import { TripEnds } from './TripEnds'
 import { TripJourneys } from './TripJourneys'
 import { usePanelToggle } from './usePanelToggle'
 import { useScrollHint } from './useScrollHint'
+import type { TripFocusRequest } from './useTripPanel'
 
 const PANEL =
   'pointer-events-auto min-h-0 w-full max-w-full max-h-[55dvh] overflow-auto border border-edge bg-panel text-ink backdrop-blur-sm sm:max-h-full sm:w-80 sm:shrink-0'
@@ -27,8 +28,12 @@ interface TripPanelProps {
   locate: LocateControls
   /** A train panel or notice is in front: the panel stays mounted but hidden and inert. */
   covered: boolean
-  /** The heading, or the bar while collapsed: takes focus when the panel opens, and when a train panel or notice over it is closed on purpose. */
+  /** The heading, or the bar while collapsed: takes focus on a directions pick that fills both ends, and when a train panel or notice over it is closed on purpose. */
   headingRef: RefObject<HTMLElement | null>
+  /** The latest directions pick's focus target: the heading, or the row of the end it left empty. */
+  focusRequest: TripFocusRequest | null
+  /** "Close trip". */
+  onClose: () => void
   /** The exit line of each journey ending on a train, by its last ride's trip id. */
   exits: ReadonlyMap<string, ExitLineView> | null
   /** The transfer line of each change through a hand-authored complex, by its `transferKey`. */
@@ -39,11 +44,12 @@ interface TripPanelProps {
 }
 
 /**
- * Plan a trip: From and To by search, then the journeys leaving now, each marked Live, Live and scheduled, or Scheduled. It sits where the
+ * Plan a trip: From and To by search, then the journeys leaving now, each marked Live, Live and scheduled, or Scheduled. A directions
+ * pick opens it (a search row's From or To, the station panel's); "Close trip" or Esc closes it. It sits where the
  * station panel does, in front of it and behind a train panel or notice. What a screen reader hears is the HUD's
  * `TripAnnouncer`; the visible message under the ends is hidden from assistive tech to match.
  */
-export function TripPanel({ network, arrivals, locate, covered, headingRef, exits, transfers, focusSiblings, ref }: TripPanelProps) {
+export function TripPanel({ network, arrivals, locate, covered, headingRef, focusRequest, onClose, exits, transfers, focusSiblings, ref }: TripPanelProps) {
   const { ends, places, plan, showLoading, setEnd, swap, retry } = useTrip()
   const { focusedId, select } = useFocus()
   const { selectTrain } = useTrainSelection()
@@ -52,6 +58,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, exit
   const own = useRef<HTMLElement | null>(null)
   const content = useRef<HTMLDivElement>(null)
   const retryButton = useRef<HTMLButtonElement>(null)
+  const rows = { from: useRef<HTMLButtonElement>(null), to: useRef<HTMLButtonElement>(null) }
   const { collapsed, collapse, expand } = usePanelToggle('trip', headingRef)
   const bodyId = useId()
   const setHeading = useCallback((el: HTMLElement | null) => { headingRef.current = el }, [headingRef])
@@ -67,10 +74,16 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, exit
     [ref],
   )
 
+  // Every directions pick (the panel only ever mounts through one) says where focus goes: the heading, or the empty end's row.
+  const { from: fromRow, to: toRow } = rows
   useEffect(() => {
-    const frame = requestAnimationFrame(() => headingRef.current?.focus({ preventScroll: true }))
+    if (!focusRequest) return
+    const frame = requestAnimationFrame(() => {
+      const el = focusRequest.target === 'heading' ? headingRef.current : (focusRequest.target === 'from' ? fromRow : toRow).current
+      el?.focus({ preventScroll: true })
+    })
     return () => cancelAnimationFrame(frame)
-  }, [headingRef])
+  }, [focusRequest, headingRef, fromRow, toRow])
 
   // Retry stays mounted from the press until its run settles, so focus is never on a button that vanishes: if the
   // run ends without an error the button goes, and focus moves to the heading first.
@@ -102,7 +115,16 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, exit
             <h2 ref={setHeading} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
               Trip
             </h2>
-            <CollapseButton label="Collapse trip panel" controls={bodyId} onCollapse={collapse} />
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="-my-2 flex min-h-11 cursor-pointer items-center px-2 text-sm text-ink-dim underline hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+              >
+                Close trip
+              </button>
+              <CollapseButton label="Collapse trip panel" controls={bodyId} onCollapse={collapse} />
+            </div>
           </div>
         )}
         <div id={bodyId} hidden={collapsed}>
@@ -114,6 +136,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, exit
             focusedId={focusedId}
             focusSiblings={focusSiblings}
             nearestId={placement?.nearest.id ?? null}
+            rows={rows}
             onPick={(end) => (end === 'from' ? fromSearch : toSearch).current?.open()}
             onSet={setEnd}
             onSwap={swap}

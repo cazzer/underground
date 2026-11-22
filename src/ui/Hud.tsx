@@ -27,7 +27,6 @@ import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
 import { TripAnnouncer } from './TripAnnouncer'
-import { TripButton } from './TripButton'
 import { TripPanel } from './TripPanel'
 import { usePlaceLine } from './usePlaceLine'
 import { useTripPanel } from './useTripPanel'
@@ -56,9 +55,11 @@ interface HudProps {
   tripTransfers: ReadonlyMap<string, TransferLineView> | null
   /** The focused station's complex siblings (siblingIdsOf): the trip panel treats them as the focused station. */
   focusSiblings: readonly string[]
+  /** Any station's complex siblings (siblingIdsOf): a directions pick never pairs a station with its own complex. */
+  siblingsOf: (stationId: string) => readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers, focusSiblings }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
@@ -71,8 +72,8 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const locateButton = useRef<HTMLButtonElement>(null)
   const stationHeading = useRef<HTMLElement>(null)
   const tripHeading = useRef<HTMLElement>(null)
-  const tripButton = useRef<HTMLButtonElement>(null)
-  const { tripOpen, tripShown, toggleTrip, closeTrip } = useTripPanel({ locate, panel, stationHeading, tripHeading, tripButton })
+  const searchButton = useRef<HTMLButtonElement>(null)
+  const { tripOpen, openTrip, closeTrip, focusRequest } = useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf })
   // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
   // heading, else the station panel's, else the Search button; the auto-dismissed notice leaves focus alone. It waits one
   // frame so a station panel that auto-focus mounts as the train closes is found and wins; it is read once,
@@ -91,7 +92,6 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     dismissNotice()
     setFocusReturns((n) => n + 1)
   }, [dismissNotice])
-  const searchButton = useRef<HTMLButtonElement>(null)
   // Closing the station panel (Esc) removes the element that had focus; it goes to Search, the way back in.
   const closeStation = useCallback(() => {
     const hadFocus = panel.current?.contains(document.activeElement) ?? false
@@ -104,7 +104,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const [searchOpen, setSearchOpen] = useState(false)
   // Cancel and Esc leave focus to the dialog, which hands it back to the button that was focused when it
   // opened. A station choice instead moves it to the new station's panel heading, a place choice to the place
-  // line, once the dialog has closed.
+  // line, once the dialog has closed; a directions pick hands focus to the trip panel (its own request), not this close event.
   const focusOnClose = useRef<'station' | 'place' | null>(null)
   const openSearch = () => {
     // A tap doesn't focus a button on iOS; the dialog restores focus to whatever had it when it opened.
@@ -226,7 +226,6 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
         </div>
         <div className="flex shrink-0 gap-2">
           <SearchButton ref={searchButton} onOpen={openSearch} />
-          <TripButton ref={tripButton} open={tripShown} onToggle={toggleTrip} />
           <LocateButton
             ref={locateButton}
             onLocate={locate.locate}
@@ -263,6 +262,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             arrivals={arrivals}
             interior={interior}
             outages={outages}
+            onDirections={(end) => openTrip(end, { stationId: focusedId, place: null })}
             ref={panel}
             headingRef={stationHeading}
           />
@@ -274,6 +274,8 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             arrivals={arrivals}
             locate={locate}
             headingRef={tripHeading}
+            focusRequest={focusRequest}
+            onClose={closeTrip}
             covered={trainOpen || noticeOpen}
             exits={tripExits}
             transfers={tripTransfers}
@@ -282,7 +284,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
           />
         )}
       </div>
-      <StationSearch ref={search} network={network} fix={markedPlacement(locate.state)} onChoose={onSearchChoose} onChoosePlace={onSearchChoosePlace} onClose={onSearchClosed} />
+      <StationSearch ref={search} network={network} fix={markedPlacement(locate.state)} onChoose={onSearchChoose} onChoosePlace={onSearchChoosePlace} onDirections={openTrip} onClose={onSearchClosed} />
     </div>
   )
 }

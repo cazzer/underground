@@ -15,6 +15,8 @@ export const INITIAL_COLLAPSE: CollapseState = { station: false, trip: false, se
 export type CollapseAction =
   | { type: 'set'; panel: CollapsiblePanel; collapsed: boolean; front: FrontPanel }
   | { type: 'tripClosed' }
+  /** A directions pick: the trip panel opens or stays expanded. Not a toggle, so no `seq`. */
+  | { type: 'tripRequested' }
   /** An explicit station pick (search, tap, "Go to", a link): the station panel opens expanded. Not a toggle, so no `seq`. */
   | { type: 'picked' }
 
@@ -32,10 +34,10 @@ export function frontPanel(input: { trainShown: boolean; noticeShown: boolean; t
 
 /**
  * A user toggle counts only on the panel in front and only when it changes the flag (so `seq` never moves for a
- * no-op); a closed trip panel resets its flag silently, since opening Trip is a request to plan.
+ * no-op); a closed trip panel resets its flag silently, since a directions pick is a request to plan.
  */
 export function collapseReducer(state: CollapseState, action: CollapseAction): CollapseState {
-  if (action.type === 'tripClosed') return state.trip ? { ...state, trip: false } : state
+  if (action.type === 'tripClosed' || action.type === 'tripRequested') return state.trip ? { ...state, trip: false } : state
   if (action.type === 'picked') return state.station ? { ...state, station: false } : state
   if (action.front !== action.panel || state[action.panel] === action.collapsed) return state
   return { ...state, [action.panel]: action.collapsed, seq: state.seq + 1 }

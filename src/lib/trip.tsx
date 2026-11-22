@@ -19,8 +19,10 @@ interface TripValue {
   places: TripPlaces
   plan: TripPlanState
   showLoading: boolean
-  /** Opens or closes the panel. Opening fills only the ends that are still unset from `defaults`. */
-  setOpen: (open: boolean, defaults?: TripEnds) => void
+  /** Opens or closes the panel; `start` opens it on new ends. */
+  setOpen: (open: boolean) => void
+  /** Sets both ends and their notes and opens the panel (a directions pick, `directionsTrip`). Equal ends keep the state's identity, so nothing replans. */
+  start: (ends: TripEnds, places: TripPlaces) => void
   /** Sets an end to a station; `place` names the searched place it is the nearest station to (any station pick clears it). */
   setEnd: (end: TripEnd, stationId: string, place?: string | null) => void
   swap: () => void
@@ -52,15 +54,11 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   const { selectedSummary, notice } = useTrainSelection()
   const { plan, showLoading, retry } = useTripPlan(stations, ends, open, selectedSummary !== null || notice !== null, sourceRef, arrivals?.snapshot ?? null)
 
-  const setOpen = useCallback((next: boolean, defaults?: TripEnds) => {
-    setOpenState(next)
-    if (!next || !defaults) return
-    // Ends already chosen stay; a default never makes the two ends the same station.
-    setEnds((e) => {
-      const from = e.from ?? (defaults.from !== e.to ? defaults.from : null)
-      const to = e.to ?? (defaults.to !== from ? defaults.to : null)
-      return from === e.from && to === e.to ? e : { from, to }
-    })
+  const setOpen = useCallback((next: boolean) => setOpenState(next), [])
+  const start = useCallback((next: TripEnds, notes: TripPlaces) => {
+    setEnds((e) => (e.from === next.from && e.to === next.to ? e : next))
+    setPlaces((p) => (p.from === notes.from && p.to === notes.to ? p : notes))
+    setOpenState(true)
   }, [])
   const setEnd = useCallback((end: TripEnd, stationId: string, place: string | null = null) => {
     setEnds((e) => (e[end] === stationId ? e : { ...e, [end]: stationId }))
@@ -72,8 +70,8 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   }, [])
 
   const value = useMemo<TripValue>(
-    () => ({ open, ends, places, plan, showLoading, setOpen, setEnd, swap, retry }),
-    [open, ends, places, plan, showLoading, setOpen, setEnd, swap, retry],
+    () => ({ open, ends, places, plan, showLoading, setOpen, start, setEnd, swap, retry }),
+    [open, ends, places, plan, showLoading, setOpen, start, setEnd, swap, retry],
   )
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>
 }
