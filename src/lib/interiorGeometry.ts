@@ -2,7 +2,7 @@
  * Station interior (public/data/stations/<id>.json) to LineSegments2 buffers.
  * `.ts` import paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
  */
-import type { LocalPoint, StationInterior } from '../data/stationSchema.ts'
+import type { Connector, LocalPoint, StationInterior } from '../data/stationSchema.ts'
 import { CAR_FLOOR_M, CAR_HEIGHT_M } from './carDims.ts'
 import { spreadBanks } from './escalatorBanks.ts'
 import { stationAxis } from './interiorAxis.ts'
@@ -39,7 +39,8 @@ export interface InteriorBufferOptions {
   /**
    * Generated interiors: mark platform and slab outlines, the slab guides and their street-level copy, and a
    * walkway's sides, as dashed in `distances` (tracks stay solid). Positions and colors are the same either way.
-   * A slab with `approximate` always dashes its outline and guides, with or without this (platforms stay solid).
+   * A slab with `approximate` always dashes its outline and guides, with or without this (platforms stay solid), and a
+   * walkway between two such slabs dashes its sides.
    */
   dashStructure?: boolean
   /**
@@ -126,6 +127,9 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
   // A level above the split draws over the trains.
   const isOver = (i: number) => split !== undefined && i < split
   const dash = opts.dashStructure === true
+  // A walkway's sides dash like the slabs it joins: on an estimated layout, or when both its ends are approximate slabs.
+  const approximateSlabs = new Set(interior.slabs.filter((s) => s.approximate === true).map((s) => s.id))
+  const walkwayDash = (c: Connector) => dash || [c.lower.area, c.upper.area].every((a) => a !== undefined && approximateSlabs.has(a))
 
   // Also throws for an interior with nothing to draw, so it becomes an error load.
   const bounds = interiorBounds(interior)
@@ -136,7 +140,6 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
     yScale,
     stepRise: opts.stepRise,
     colorOf,
-    dash,
     outOfService: opts.outOfService ?? (() => false),
     axis: stationAxis(interior),
     center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
@@ -184,7 +187,7 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
       } else if (lower === li) {
         const ctx = connectorCtx(lower, upper)
         if (c.kind === 'escalator') drawEscalator(ctx, c, lower, upper)
-        else if (c.kind === 'walkway') drawWalkway(ctx, c, lower)
+        else if (c.kind === 'walkway') drawWalkway(ctx, c, lower, walkwayDash(c))
         else drawRamp(ctx, c, lower, upper)
       }
     }

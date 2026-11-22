@@ -1,7 +1,7 @@
 /**
  * The committed generated interiors (public/data/stations/) against the generator: enough of them, all at the
- * interior bar, fresh (regenerating from the pinned catalog and the committed shapes reproduces every file), the
- * hand-authored L08 untouched, and nearly every generated track on a map shape (so trains meet the platforms).
+ * interior bar, fresh (regenerating from the pinned catalog and the committed shapes reproduces every file), every
+ * hand-authored interior (L08, the Union Sq complex) fresh from its authored file and sources, and nearly every generated track on a map shape (so trains meet the platforms).
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -49,10 +49,13 @@ describe('generated station interiors', () => {
     }
   })
 
-  it('leaves L08 exactly as its authored build', () => {
-    const authored = json(new URL('L08.authored.json', IN)) as AuthoredStation
-    const sources = json(new URL('L08.sources.json', IN)) as StationSources
-    expect(toStableJson(buildStationInterior(authored, sources), 2)).toBe(text(new URL('L08.json', OUT)))
+  it('leaves every hand-authored interior exactly as its authored build', () => {
+    expect(authoredIds).toContain('L08')
+    for (const id of authoredIds) {
+      const authored = json(new URL(`${id}.authored.json`, IN)) as AuthoredStation
+      const sources = json(new URL(`${id}.sources.json`, IN)) as StationSources
+      expect(toStableJson(buildStationInterior(authored, sources), 2), id).toBe(text(new URL(`${id}.json`, OUT)))
+    }
   })
 
   it('is fresh: regenerating from the catalog reproduces every generated file byte for byte', () => {

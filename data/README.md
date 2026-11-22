@@ -85,12 +85,13 @@ add these keys, all optional and all written to the output only when authored:
 - `fetch.entrancesGtfsStopId` and `fetch.equipmentStationMrn` become arrays, one value per member. `data:stations:fetch` then
   asks with one `$where` filter (`in(...)` for equipment; a `like` per member for entrances, whose `gtfs_stop_id` can list
   several stops, "A12; D13", and the rows are then kept by exact stop), and drops exact duplicate entrance rows and
-  identical repeated equipment codes (two equipment rows that disagree fail the fetch). Values are letters and digits only.
+  identical repeated equipment codes (two equipment rows that disagree fail the fetch). Values are letters and digits only. `equipmentStationMrn` is
+  the dataset's `station_mrn` as written, leading zeros kept (Broadway's R20 is `"015"`; the catalog's `stationId` drops them).
 - `slabs[].paid`: `true` inside fare control; leave it out when not stated.
 - A connector end's `area`: the id of the platform or slab it stands on (an `at` end only, on that end's level). The
   containment check then tests that area alone, within 0.5 m. Optional on stairs and ramps; never inferred.
 - `kind: "walkway"` connectors join two areas on one non-street level: both ends `at` with an `area`, the two areas
-  different, a plan run of at least 1 m. The lower-below-upper rule does not apply. (Drawing them is not built yet.)
+  different, a plan run of at least 1 m. The lower-below-upper rule does not apply. They draw as two flat sides, dashed when both ends are approximate slabs or the interior is generated.
 
 ## Generated stations
 

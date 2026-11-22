@@ -21,8 +21,6 @@ export interface ConnectorContext {
   axis: LocalPoint
   /** Plan center of the interior: elevator doors face it, zero-run escalators descend toward it. */
   center: LocalPoint
-  /** Whether the interior's structural strokes are dashed (an estimated layout): a walkway's sides are, like its slabs' outlines. */
-  dash: boolean
   /** Whether the elevator or escalator with this id is out of service: drawn in the `outage` role, with an X. */
   outOfService: (connectorId: string) => boolean
   /** Where a zero-run escalator's run sits (`spreadBanks`); undefined for every other connector. */
@@ -142,14 +140,14 @@ export function drawRamp(ctx: ConnectorContext, c: Connector, li: number, ui: nu
 
 /**
  * Walkways: a flat connector between two areas of one level (two mezzanines of a complex), drawn as the two strong
- * side edges only, in the outline color: no end caps, since it opens onto both areas. Dashed on an estimated layout.
- * Needs a plan run (a data error, thrown by `inclineEnds`, without one).
+ * side edges only, in the outline color: no end caps, since it opens onto both areas. `dashed` on an estimated layout
+ * or between two approximate slabs (the caller decides). Needs a plan run (a data error, thrown by `inclineEnds`, without one).
  */
-export function drawWalkway(ctx: ConnectorContext, c: Connector, li: number): void {
+export function drawWalkway(ctx: ConnectorContext, c: Connector, li: number, dashed: boolean): void {
   const g = incline(ctx, c, li, li)
   const [c0, c1] = [g.color('outline', 0), g.color('outline', 1)]
-  ctx.strong.segment(g.at(0, 1), g.at(1, 1), c0, c1, ctx.dash)
-  ctx.strong.segment(g.at(0, -1), g.at(1, -1), c0, c1, ctx.dash)
+  ctx.strong.segment(g.at(0, 1), g.at(1, 1), c0, c1, dashed)
+  ctx.strong.segment(g.at(0, -1), g.at(1, -1), c0, c1, dashed)
 }
 
 /** A two-stroke chevron with its apex at `apex` (fraction of the run), opening back by `depth`. */

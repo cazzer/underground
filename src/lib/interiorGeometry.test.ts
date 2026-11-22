@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Connector, StationInterior } from '../data/stationSchema'
 import { buildInteriorBuffers } from './interiorGeometry'
 import { color, count, firstWith, fixture, opts, ROLES, seg, STAIR } from './interiorFixture'
 
@@ -143,6 +144,24 @@ describe('buildInteriorBuffers', () => {
       // The platform outline is at y -16, the mezzanine slab at -8.
       expect(b.strong.distances[k * 2 + 1]! > 0).toBe(seg(b.strong, k)[1]! === -8)
     }
+  })
+
+  it('dashes a walkway between two approximate slabs, and keeps it solid when one end is not one', () => {
+    const base = fixture()
+    const s2 = { ...base.slabs[0]!, id: 'S2', outline: base.slabs[0]!.outline.map(([x, z]): [number, number] => [x + 20, z]) }
+    const walkway: Connector = {
+      id: 'WK1', kind: 'walkway', width: 2, sources: ['authored'],
+      lower: { x: 4, z: 10, level: 'mezz', area: 'S1' }, upper: { x: 16, z: 10, level: 'mezz', area: 'S2' },
+    }
+    const sides = (slabs: StationInterior['slabs']) => {
+      const b = buildInteriorBuffers({ ...base, slabs, connectors: [walkway] }, opts({ guides: false })).strong
+      const ks = Array.from({ length: count(b) }, (_, k) => k).filter((k) => seg(b, k)[0] === 4 && seg(b, k)[3] === 16)
+      expect(ks).toHaveLength(2)
+      return ks.map((k) => b.distances[k * 2 + 1])
+    }
+    const approx = (s: StationInterior['slabs'][number]) => ({ ...s, approximate: true as const })
+    expect(sides([approx(base.slabs[0]!), approx(s2)])).toEqual([12, 12])
+    expect(sides([approx(base.slabs[0]!), s2])).toEqual([0, 0])
   })
 
   it('throws naming the element for an unknown level', () => {

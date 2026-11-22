@@ -9,7 +9,8 @@ shows the station's levels, stairways, and upcoming arrivals.
 
 Status: the real static network (every route shape and station from `public/data/`) renders, and
 trains are live: the client polls the deployed realtime Worker (`worker/`) and draws dots from the
-pure realtime library. The station panel shows real arrivals. Bedford Av (L08) has a hand-authored interior, and
+pure realtime library. The station panel shows real arrivals. Bedford Av (L08) has a hand-authored interior, the 14 St-Union Sq complex
+(`data/stations/635.authored.json`, members 635, L03, R20) an authored approximate one from OSM stairs and elevators, and
 about 250 more stations have generated ones (labelled "Estimated layout"), shown to everyone since 9wc.5.
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
@@ -284,7 +285,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
   - `interiorGeometry.ts` interior to strong/fine line buffers (levels, outlines, entrances);
-    `interiorConnectors.ts` stairs, ramps, walkways (`drawWalkway`: a flat connector between two areas of one level, two strong outline-colored sides, no end caps, dashed on a generated interior via `ConnectorContext.dash`), escalators (a zero-run one gets a 30 degree run along the
+    `interiorConnectors.ts` stairs, ramps, walkways (`drawWalkway`: a flat connector between two areas of one level, two strong outline-colored sides, no end caps, dashed on a generated interior or between two approximate slabs), escalators (a zero-run one gets a 30 degree run along the
     station axis; on its listing entrance its street end sits there and the run heads toward the plan center,
     down below ground and up at an elevated station; else it is centered, descending toward the center) and elevators (shaft squared to the axis, a stop at each end in that level's pass; machines take
     half the depth fade). An escalator is a band with fine handrails and travel chevrons; an elevator is four
@@ -801,7 +802,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   at the trains' roof (`trainRoofY`: rail ×yScale plus the car's floor and body height from `src/lib/carDims.ts`,
   not exaggerated; `SplitAtY` in `interiorSegments.ts`), so a car in front of a stair foot hides it and the
   stair above the roof draws over the car (an elevator's stop stays with its level). The cut is by height alone, so a
-  foot behind a car is hidden too. One platform level is assumed: a two-deck interior logs a warning (none ships). At most four interior line layers; look C doesn't split. Every car within
+  foot behind a car is hidden too. One platform level is assumed: a two-deck interior logs a warning (Union Sq, 635, ships with it: its Lexington and Broadway strokes draw over their own trains; 2q7.28). At most four interior line layers; look C doesn't split. Every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
   toward the background after shading by `veilTint` (veil opacity × veilWeight × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal
@@ -959,8 +960,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   Tiles load on demand (the view's tiles only, after the first frame and an idle callback) and decode in a worker,
   never on the main thread. `__BASEMAP__` (vite.config.ts, from basemap.json) is null while the pin names no tile
   directory, and then nothing loads.
-- **Station interiors are hand-authored or generated.** Bedford Av (L08) is hand-authored and wins over a generated
-  one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".
+- **Station interiors are hand-authored or generated.** Bedford Av (L08) and the 14 St-Union Sq complex (635, approximate:
+  dashed mezzanines, "Estimated layout") are hand-authored and win over a generated one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".
   Both are merged with OSM platform polygons, NY Open Data entrances, and E&E elevator/escalator data.
 - **Attribution.** Credit MTA and show "© OpenStreetMap contributors". Include a
   "may not be real time" notice. Don't use the MTA logo, route bullets, or the map.
