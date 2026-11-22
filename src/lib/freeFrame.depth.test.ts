@@ -70,6 +70,22 @@ describe('freeFrame with depth', () => {
 })
 
 describe('freeFrame with several anchors', () => {
+  it('prefers the anchor that keeps a higher-priority point over one that keeps more lower-priority points', () => {
+    const far = { x: STATION.x + 400, z: STATION.z }
+    // First in priority: one point by the station. Then two by the far anchor, which no frame near the station reaches.
+    const first: FramePoint = { x: STATION.x - 10, y: 0, z: STATION.z - 30 }
+    const later: FramePoint[] = [
+      { x: far.x - 10, y: 0, z: far.z - 30 },
+      { x: far.x + 10, y: 0, z: far.z - 40 },
+    ]
+    const i = input({ wanted: [first, ...later], anchors: [far, STATION], centerRadius: 1e4 })
+    expect(freeFrame({ ...i, anchors: [far] }).kept).toEqual(later)
+    expect(freeFrame({ ...i, anchors: [STATION] }).kept).toEqual([first])
+    const f = freeFrame(i)
+    expect(f.kept).toEqual([first])
+    expect(Math.hypot(f.target.x - STATION.x, f.target.z - STATION.z)).toBeLessThanOrEqual(TARGET_RADIUS_M + 1e-6)
+  })
+
   it('holds the target near the anchor that lets it keep the most points', () => {
     const near = { x: STATION.x + 400, z: STATION.z }
     const pts: FramePoint[] = [

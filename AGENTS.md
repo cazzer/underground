@@ -148,7 +148,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `interiorFlight` takes the focused station id, which for a complex member is not the file's `stationId`, so the focus hold follows the member; `follows` marks a flight to the selected
     train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; with the trip panel open `interiorFlight` frames the trip's path there, `pathLanding`), `newFlight`, `flushMotion` and the landing turn;
-    `useStationFlights.ts` the fly-request effect and the mid-flight retarget (interior, bare streets, panel size);
+    `useStationFlights.ts` the fly-request effect and the mid-flight retarget (interior, bare streets, the trip's path frame, panel size);
     `useEntranceProbe.ts` dev-only `__underground.entrancesAt()` (entrance marks and station in viewport px, free rect);
     `usePathProbe.ts` dev-only `__underground.stationPathAt()` (the framed trip path's marker ends and centerline in viewport px, free rect);
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);

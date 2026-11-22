@@ -15,7 +15,7 @@ import { PAN_RADIUS_BARE } from './orbitLimits'
 import type { Ground } from './projection'
 import { depthFactor, tiltForDistance } from './tilt'
 
-/** The farthest a framed landing pulls back (as a follow does, followDistanceFor). */
+/** The farthest a framed landing pulls back (as a follow does, followDistanceFor); BARE_MAX_DISTANCE for a bare station. */
 export const FRAME_MAX_DISTANCE = 600
 export const BARE_MAX_DISTANCE = FRAME_MAX_DISTANCE
 /** The target stays this close to an anchor, so focus can't be lost to a short drag. */
@@ -185,8 +185,8 @@ function fit(f: Framer, anchor: Ground, pts: readonly FramePoint[], radius: numb
 
 const gap = (a: Ground, b: Ground) => Math.hypot(a.x - b.x, a.z - b.z)
 
+/** `fallback`: the required points didn't fit within TARGET_RADIUS_M. */
 interface AnchorFrame extends FreeFrame {
-  /** The required points didn't fit within TARGET_RADIUS_M. */
   fallback: boolean
 }
 
@@ -212,10 +212,14 @@ function frameFor(f: Framer, anchor: Ground): AnchorFrame {
   return { ...best, kept, fallback: false }
 }
 
-/** Whether `a` is the better of two anchors' frames: the required points fit, then more kept, then nearer, then nearer the centred target. */
+/**
+ * Whether `a` is the better of two anchors' frames: the required points fit; then, in the wanted order (their priority),
+ * the first point one keeps and the other drops; then nearer; then nearer the centred target.
+ */
 function framePrefer(f: Framer, a: AnchorFrame, b: AnchorFrame): boolean {
   if (a.fallback !== b.fallback) return !a.fallback
-  if (a.kept.length !== b.kept.length) return a.kept.length > b.kept.length
+  const [ka, kb] = [new Set(a.kept), new Set(b.kept)]
+  for (const p of f.input.wanted) if (ka.has(p) !== kb.has(p)) return ka.has(p)
   if (a.distance !== b.distance) return a.distance < b.distance
   return gap(a.target, centeredTarget(f, a.distance)) < gap(b.target, centeredTarget(f, b.distance))
 }

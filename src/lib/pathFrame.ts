@@ -8,7 +8,7 @@ import type { LocalPoint, StationInterior } from '../data/stationSchema'
 import { convexHull } from './basemap/networkHull'
 import { framedCount, freeFrame, type FramePoint, type FreeFrame, type FreeFrameInput } from './freeFrame'
 import { interiorBounds } from './interiorFraming'
-import { exitPathCenterline, stationPathMarkerEnds, type StationPathChoice } from './interiorPath'
+import { stationPathPoints, type StationPathChoice } from './interiorPath'
 import type { Vec3 } from './interiorSegments'
 import { panRadius } from './orbitLimits'
 import type { Ground } from './projection'
@@ -59,15 +59,14 @@ export interface PathFrame {
  */
 export function stationPathFrameOf(model: PathFrameModel, choice: StationPathChoice, anchors: readonly Ground[], o: PathFrameOptions): PathFrame | null {
   const { interior, origin, yScale } = model
-  let markers: Vec3[]
-  let line: Vec3[]
+  let points: { markers: Vec3[]; line: Vec3[] }
   try {
-    markers = stationPathMarkerEnds(interior, choice, { yScale, stepRise: o.stepRise, railDrop: o.railDrop, boardHalfM: o.boardHalfM })
-    line = exitPathCenterline(interior, choice, { yScale, stepRise: o.stepRise }).map((q) => q.p)
+    points = stationPathPoints(interior, choice, { yScale, stepRise: o.stepRise, railDrop: o.railDrop, boardHalfM: o.boardHalfM })
   } catch (e) {
     console.error(`Path frame at ${model.stationId}: framing the interior instead`, e)
     return null
   }
+  const { markers, line } = points
   const at = (p: Vec3): FramePoint => ({ x: origin.x + p[0], y: p[1], z: origin.z + p[2] })
   const mid = { x: (markers[0]![0] + markers[1]![0]) / 2, z: (markers[0]![2] + markers[1]![2]) / 2 }
 

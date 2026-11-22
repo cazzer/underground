@@ -13,8 +13,8 @@ export interface AwaitingInterior {
   stationId: string
   /**
    * interior: the station has (or may have) an interior. streets: it has none, and its entrances are not loaded yet.
-   * exit: its interior is framed and the trip panel is open: the trip's way out there is framed whenever it (or the
-   * panel) changes.
+   * path: its interior is framed and the trip panel is open: the trip's path there (its way out or a change of trains)
+   * is framed whenever it, or the panel, changes.
    */
   kind: 'interior' | 'streets' | 'path'
   /** Under reduced motion the reframe snaps, without a landing turn. */

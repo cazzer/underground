@@ -14,7 +14,7 @@ import { framedCount, FRAME_MAX_DISTANCE, FRAME_PAD_PX, TARGET_RADIUS_M, type Fr
 import type { Viewport } from './framing'
 import { stationAxis } from './interiorAxis'
 import { frameInterior, landingAzimuth, LANDING_DISTANCE, type ScreenRect } from './interiorCamera'
-import { RAIL_DROP_M } from './interiorGeometry'
+import { RAIL_DROP_M, STEP_RISE_M } from './interiorGeometry'
 import { interiorFocusAnchor } from './interiorFraming'
 import { BOARD_HALF_M } from './interiorPath'
 import { toGround, type Ground } from './projection'
@@ -44,7 +44,7 @@ function pathAt(id: string, stopId: string, toStop?: string): { frame: PathFrame
   const choice = toStop ? chooseTransfer({ interior, fromStop: stopId, toStop }) : quickestExit({ interior, stopId })
   if (choice.kind === 'none') throw new Error(`${stopId}: no path`)
   const anchors = (interior.memberStationIds ?? [interior.stationId]).map((m) => pos.get(m)!)
-  const frame = stationPathFrameOf(model, choice, anchors, { stepRise: 0.18, railDrop: RAIL_DROP_M, boardHalfM: BOARD_HALF_M })
+  const frame = stationPathFrameOf(model, choice, anchors, { stepRise: STEP_RISE_M, railDrop: RAIL_DROP_M, boardHalfM: BOARD_HALF_M })
   if (!frame) throw new Error(`${stopId}: no frame`)
   return { frame, interior, plain: (view) => frameInterior({ ...model.focusAnchor, ...view }) }
 }
@@ -84,11 +84,14 @@ describe('the way out above a phone trip panel', () => {
       it(`lands with the whole path from ${stopId}${toStop ? ` to ${toStop}` : ''} at ${id} above the panel on ${name}`, () => {
         const { frame, interior, plain } = pathAt(id, stopId, toStop)
         const view = { azimuth: landingAzimuth(stationAxis(interior), 0, free), viewport, free, fovDeg: FOV }
-        const f = pathLanding(frame, view, plain(view))
+        const usual = plain(view)
+        const f = pathLanding(frame, view, usual)
+        // The Broadway platforms' way out: the usual landing clips its top, so the path frame is what lands.
+        if (id === '635' && !toStop) expect(f).not.toBe(usual)
         expect(f.distance).toBeGreaterThanOrEqual(LANDING_DISTANCE)
         expect(f.distance).toBeLessThanOrEqual(FRAME_MAX_DISTANCE)
         // Either the usual landing (it already shows the path) or one held near a member.
-        if (f !== plain(view) && JSON.stringify(f) !== JSON.stringify(plain(view))) {
+        if (f !== usual) {
           expect(Math.min(...frame.anchors.map((a) => gap(a, f.target)))).toBeLessThanOrEqual(TARGET_RADIUS_M + 1e-6)
         }
         const path = frame.wanted.slice(0, frame.pathCount)

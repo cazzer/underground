@@ -5,7 +5,7 @@ import { levelFadeShares } from '../lib/interiorFade'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { outlineSamples, type OutlineSamples } from '../lib/interiorOutline'
 import { interiorDecks, strokeBandOf, trackDecks } from '../lib/interiorDecks'
-import { buildInteriorBuffers, RAIL_DROP_M, type BandBuffers, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
+import { buildInteriorBuffers, RAIL_DROP_M, STEP_RISE_M, type BandBuffers, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
 import { toGround, type Ground } from '../lib/projection'
 import { mixHex } from '../lib/routeColor'
 import { ISO_POLAR } from '../lib/tilt'
@@ -70,8 +70,6 @@ const ROLE_TOKEN: Record<InteriorRole, string> = {
 }
 
 const HULL_PAD = 6
-/** Real rise per drawn stair step, meters. */
-export const STEP_RISE_M = 0.18
 /** Side of the square drawn at each street entrance, meters; the street layer's own entrance marks match it. */
 export const ENTRANCE_SIZE_M = 2.5
 
