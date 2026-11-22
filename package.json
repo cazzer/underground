@@ -16,6 +16,11 @@
     "data:stations": "node scripts/build-stations.ts",
     "data:stations:fetch": "node scripts/fetch-station-sources.ts",
     "data:catalog:fetch": "node scripts/fetch-station-catalog.ts",
+    "data:streets": "node scripts/build-streets.ts",
+    "data:streets:fetch": "node scripts/fetch-streets.ts",
+    "basemap:fetch": "node scripts/fetch-basemap.ts",
+    "basemap:gate": "node scripts/gate-basemap.ts",
+    "basemap:verify": "node scripts/verify-basemap.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts"
   },
   "dependencies": {

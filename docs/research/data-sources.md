@@ -201,6 +201,103 @@ platforms stay identifiable.
   each of four datasets) plus one Overpass request, send a descriptive `User-Agent`, and never run in
   CI or from the site.
 
+### 5.2 Street ways
+
+The street layer (epic ost) needs the streets and walking ways around each station: names for the entrance join,
+node ids for a later walk graph (underground-2q7). Three sources were compared.
+
+| Source | Terms | Node ids | Names | Verdict |
+|---|---|---|---|---|
+| OpenStreetMap via Overpass | ODbL 1.0, credit "© OpenStreetMap contributors" | yes (way nodes) | as mapped ("North 9th Street") | **chosen** |
+| NYC CSCL centerline ([`inkn-q76z`](https://data.cityofnewyork.us/api/views/inkn-q76z.json)) | NYC.gov Terms of Use, not OPEN-NY | no (segments only) | abbreviated ("N  7 ST") | rejected |
+| NYC LION ([`2v4z-66xt`](https://data.cityofnewyork.us/api/views/2v4z-66xt.json)) | as CSCL | segment from/to node ids and a node layer, roadway only (no sidewalks, crossings or steps) | as CSCL | rejected: file geodatabase only, needs GDAL |
+
+OSM is already a source (§5, platforms and tracks), its licence is already handled, and it is the only one of the
+three that has sidewalks, crossings and steps with shared node ids, which a walk graph needs (LION's node ids cover
+the roadway only). CSCL has no node ids and its names would need expanding before they match what a rider sees on a sign.
+
+`npm run data:streets:fetch` pins the result in `data/streets/`. One Overpass request (`out geom`, no meta, so no
+contributor names) takes every way within 300 m of any `public/data/stations.json` point: named roads
+(trunk to service, living_street, pedestrian) and, named or not, pedestrian, footway (sidewalks and crossings),
+steps and path. No motorway, no `*_link`. A way is kept whole when any segment of it passes within the radius;
+the per-station build (ost.3) clips. The pin is tiled by station coordinates only, never by a location fix, and the
+request carries only public station points. Each shard holds its own node table, so a way is a list of OSM node ids.
+Measured before the pin: around Bedford Av (300 m) 30 named ways were 3.3 KB gzipped and 252 walking ways 8.2 KB.
+The pin (fetched 2026-11-22, OSM base 2026-11-22T04:33:58Z, one request that succeeded on the first try): 96,808 ways
+(75,465 footway, 8,360 residential, 3,672 secondary, 3,060 primary, 2,186 steps, 1,686 tertiary, 1,358 pedestrian,
+365 service, 349 unclassified, 128 path, 110 trunk, 69 living_street), 276,489 distinct nodes (285,761 rows, since
+border nodes repeat across shards), 132 shards, 25.1 MB raw and 4.7 MB gzipped, the largest shard 1.5 MB (Lower Manhattan,
+cell-40.70_-74.025). Every one of the 496 stations has a named way within 300 m. The caps are 2 MB a file and 30 MB in
+all (8 MB with `--no-walk`, which keeps the named roads only); GitHub Pages serves none of it, since the per-station
+files (ost.3) are what ship.
+
+### 5.3 Basemap tiles
+
+The citywide basemap (epic ost.9: streets, water and parks from a same-origin PMTiles file) is vector tiles cut from a
+Protomaps daily build ([build.protomaps.com](https://build.protomaps.com), planetiler, basemap schema 4.15.2 at the time
+of writing). The file is on demand only: no startup file mentions it, and the client reads it in HTTP Range requests (ost.9.2).
+It is never in git (`.gitignore`: `public/basemap/`, `*.pmtiles`).
+
+**Pipeline.** `.github/workflows/basemap.yml` (manual) runs `pmtiles extract` (go-pmtiles v1.31.2, sha256-checked) for the five
+boroughs' bbox (`-74.2591,40.4774,-73.7004,40.9176`) up to z15 (`data/basemap/basemap.json` `spec`), checks the source
+metadata against the terms below (`scripts/gate-basemap.ts`), drops the unused layers with tippecanoe's `tile-join` (tag
+2.79.0, built from source in that workflow only), verifies the result with `pmtiles verify`, checks the output metadata
+again, and publishes it as a GitHub Release (`basemap-<build>-<sha8>`, asset `nyc.pmtiles`, with the licence notes in the
+release text). The release is our own copy because Protomaps asks not to hotlink builds and keeps them only about a week.
+A normal PR then sets the `pin` in `data/basemap/basemap.json` (build, release, sha256, bytes); `deploy.yml` downloads that
+asset into `dist/basemap/nyc.pmtiles` (sha256-checked, skipped with a warning while the pin is null), and its
+`verify-basemap` job measures Range on the live site. `npm run basemap:fetch` fetches the same file into the gitignored
+`public/basemap/` for dev (offline after the first fetch).
+
+**Layers.** Kept: `earth`, `water`, `landuse`, `roads`. Dropped: `buildings`, `landcover`, `places`, `pois`, `boundaries`
+(`tile-join -l` for each kept layer; note `-x` is *attribute* exclusion, not layer exclusion). The gate fails the workflow if
+the source metadata's attribution is anything but "© OpenStreetMap", its description changes from "Basemap layers derived from
+OpenStreetMap and Natural Earth", the major version is not 4, a layer or metadata key is new, or the output still holds a
+dropped layer. It was run against build 20261121's real metadata (kept as `data/basemap/source-metadata.20261121.json`, the
+test fixture).
+
+| Source (per Protomaps' [LICENSE_DATA.md](https://github.com/protomaps/basemaps/blob/main/LICENSE_DATA.md)) | Terms | Feeds | Shipped |
+|---|---|---|---|
+| OpenStreetMap | ODbL 1.0, credit "© OpenStreetMap" | roads, landuse, earth, water | yes, covered by the footer's OSM credit |
+| osmdata.openstreetmap.de (OSM-derived water and earth polygons) | ODbL | water, earth | yes, same credit |
+| Natural Earth | public domain, credit not required | `earth` land and `water` ocean and lakes at z0 to z5 (ne_50m, ne_10m), and `places` minzoom values | yes, in earth and water (public domain, so no credit is needed) |
+| Tilezen | not stated | `places` minzoom for countries | no (`places` is dropped) |
+| ESA WorldCover (Daylight landcover) | CC BY 4.0, needs its own credit | `landcover` (z0 to z7) | **no: dropped.** Shipping it would need a licensing card |
+| Tangrams (Mapzen) icons | MIT | `pois` icons for the default styles only | no |
+
+The archive's own `attribution` is the OSM link and nothing else, so `Attribution.tsx` needs no change. The release file is an
+ODbL derivative database; its notes carry the notice.
+
+**Sizes** (build 20261121, tile bytes as stored, gzip; the same bbox and z15):
+
+| Zoom | Tiles | Full extract | Subset |
+|---|---|---|---|
+| 0 | 1 | 66,953 | 20,263 |
+| 1 | 1 | 72,269 | 17,492 |
+| 2 | 1 | 62,964 | 17,715 |
+| 3 | 1 | 55,424 | 21,003 |
+| 4 | 1 | 50,114 | 20,642 |
+| 5 | 1 | 29,825 | 17,351 |
+| 6 | 1 | 86,391 | 74,800 |
+| 7 | 1 | 185,758 | 174,423 |
+| 8 | 1 | 170,248 | 162,254 |
+| 9 | 2 | 358,708 | 346,711 |
+| 10 | 6 | 713,839 | 675,150 |
+| 11 | 16 | 1,033,300 | 911,761 |
+| 12 | 56 | 2,702,442 | 2,241,109 |
+| 13 | 195 | 6,081,584 | 4,486,831 |
+| 14 | 728 | 17,895,047 | 9,117,171 |
+| 15 | 2,808 | 66,617,712 | 14,703,181 |
+| file | | 95,736,212 | 32,962,204 |
+
+The subset is about 33 MB, a third of the full extract, and z15 is under half of it, so z15 stays. The workflow prints the same
+table to its job summary and fails above 200 MB. The Pages artifact limit is 1 GB (the deploy fails above 900 MB).
+
+**tile-join side effects** (checked on the real output): it rewrites the metadata `version` to "2" and `type` to "overlay",
+adds `format`, `generator` and `generator_options`, and resets `bounds` to the whole world (the tiles are only the bbox's);
+the layer fields, attribution and description are kept. A client must not rely on `version` or `bounds`. It adds a tilestats
+table unless run with `-pg`, which the workflow does.
+
 ## 6. Static-hosting fit and pipeline
 
 **The MTA terms require a proxy; CORS doesn't.** The plan is a Cloudflare Worker at `/rt` that:
@@ -224,6 +321,33 @@ GitHub Actions cron runs at most every 5 minutes, so it can't provide realtime. 
 | `stations/<id>.json` ×5 | Hand-authored levels merged with OSM, entrances, and E&E data | est. 5–20 KB each |
 
 That totals about 170 KB raw, or about 35 KB gzipped. Refresh it with a scheduled Action whenever the zip's `Last-Modified` changes.
+
+**Range requests on Pages (the basemap, ost.9.1).** The PMTiles client reads `nyc.pmtiles` in ranges, so GitHub Pages must
+answer a correct uncompressed 206. Measured on the live site with curl (2026-11-22) on a JSON file of the same size class
+(`data/shapes.json`, 211,122 bytes), since `.pmtiles` is not deployed yet:
+
+- `Range: bytes=0-126`, `Accept-Encoding: identity`: `206`, `content-range: bytes 0-126/211122`, `content-length: 127`, no
+  `content-encoding`, `etag: "6b027b5f-338b2"`, `accept-ranges: bytes`, `cache-control: max-age=600`,
+  `vary: Accept-Encoding`, `content-type: application/json; charset=utf-8`.
+- The same with `Accept-Encoding: gzip, deflate, br, zstd` (what a browser sends): `206` but `content-encoding: gzip`,
+  `content-range: bytes 0-126/22952` (the real file is 211,122 bytes; 22,952 is its gzipped size), a weak `etag: W/"..."`.
+  `bytes=0-16383` the same (`content-range: bytes 0-16383/22952`, `content-length: 16384`), and a range at the real end
+  (`bytes=211122-`) gets `416` with `content-range: bytes */22952`. So Pages applies a range to the gzipped body and reports
+  the gzipped total.
+- Who sends which header: a page's JavaScript cannot set `Accept-Encoding` (it is a forbidden header), and spec-following
+  browsers send `identity` on a Range request, so the client normally gets the correct answer. Firefox before 148 reportedly
+  sends gzip on a Range request (UNVERIFIED here); that cannot be fixed client-side. The only lever is the server's choice of
+  compression by `content-type`: the deploy's `verify-basemap` records the `.pmtiles` content-type and prints "BLOCKS ost.9.2
+  if the .pmtiles is compressed on the wire" (a warning, not a job failure) when the gzip probe differs from the identity one.
+  Because a gzipped answer reports a total other than the file's, **ost.9.2 should treat a `content-range` total different
+  from `pin.bytes` as a hard error**, never read the archive from it.
+- Cache: `cache-control: max-age=600`, so a cached range can go stale for up to 10 minutes after a deploy; the `etag` changes
+  with each deploy. The CDN varies on `Accept-Encoding`.
+- Vite dev (sirv) answered `bytes=0-126` on the real file with a correct uncompressed 206 (checked with
+  `verify-basemap`); `vite preview` compresses only text and JSON. Neither is Pages.
+
+The headers for `.pmtiles` itself are recorded here after the first deploy with a pin (`verify-basemap` writes them to the
+job summary): TODO fill in from that run.
 
 ## Gaps / UNVERIFIED
 - The exact feed publish interval; polling aliased it, and 5–10 s is what was observed.

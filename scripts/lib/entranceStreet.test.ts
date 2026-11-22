@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalPoint } from '../../src/data/stationSchema.ts'
 import type { StreetEntrance } from '../../src/data/streetSchema.ts'
-import { joinEntrance, streetKey, type JoinWay } from './entranceStreet.ts'
+import { joinEntrance, MEDIAN_MAX_M, streetKey, type JoinWay } from './entranceStreet.ts'
 
 const NO_STREET = { street: null, wayId: null, cross: null, crossWayId: null, side: null, plaza: null }
 
@@ -83,6 +83,12 @@ describe('joinEntrance', () => {
     expect(joinEntrance([0, 0], ways).side).toBe('median')
     expect(joinEntrance([-14, 0], ways)).toEqual({ ...NO_STREET, street: 'Park Av', wayId: 1, side: 'west' })
     expect(joinEntrance([14, 0], ways)).toEqual({ ...NO_STREET, street: 'Park Av', wayId: 2, side: 'east' })
+  })
+
+  it('takes carriageways up to MEDIAN_MAX_M from the entrance for a median, and not beyond', () => {
+    const at = (gap: number) => joinEntrance([0, 0], [vertical(1, 'Queens Blvd', -gap), vertical(2, 'Queens Blvd', gap, 100, -100)]).side
+    expect(at(MEDIAN_MAX_M - 1)).toBe('median')
+    expect(at(MEDIAN_MAX_M + 1)).toBe('east')
   })
 
   it('keeps the cross street of a median entrance at an intersection', () => {

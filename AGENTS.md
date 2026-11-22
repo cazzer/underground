@@ -44,6 +44,21 @@ so dev and preview serve under that path.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
   `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
+- `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
+  within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
+  `streetsData.test.ts` checks it. Rerun `data:streets` after it.
+- `npm run data:streets`: offline; builds `public/data/streets/<stationId>.json` for every `stations.json` station from
+  the street pin and the catalog entrances (clip to 300 m, simplify, project to decimeters, join each entrance to its street).
+  Rerun it after `data`, `data:streets:fetch`, `data:catalog:fetch` or a change to the `searchText.ts` synonyms (street join
+  keys use them); `streetsOutputs.test.ts` fails while the files are stale. It builds and cap-checks every file before
+  writing, prints the largest files, the totals and the join log (no street, near misses, bridge/tunnel ways, far entrances),
+  and checks the startup budget total did not move. If a file passes its cap, lower the one global `WALK_RADIUS_M` in
+  `scripts/lib/streetsBuild.ts` (footways only), never per file.
+- `npm run basemap:fetch [-- --out path]`: downloads the pinned NYC basemap (`data/basemap/basemap.json` `pin`, a GitHub Release
+  asset) to the gitignored `public/basemap/nyc.pmtiles`, sha256-checked, no network once it matches; fails while the pin is
+  null. `npm run basemap:gate -- <source|output> <metadata.json>` is the workflow's licensing gate (offline) and
+  `npm run basemap:verify -- <url> <bytes>` its Range check (network; the deploy's `verify-basemap` job runs it). The basemap is
+  built by hand-dispatching `.github/workflows/basemap.yml` (see Data below), then pinned in a normal PR.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -74,6 +89,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
+  Street tokens `streetStroke` (faint by color, not alpha) and `streetWidth` draw the focused station's streets.
+  TEMPORARY: `?streets=under|over` (under the route lines at 0.35, or above the veil at 7.5; default under) until
+  the ost.7 card is decided; the removal list is in `src/scene/streetsLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -121,6 +139,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `StationInterior.tsx` the focused station's interior (two line layers on each side of the lifted-train split; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, level
     labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
+  - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
+    group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
+    with the reveal and goes with the focus); keyed by station; `streetsLook.ts` TEMPORARY draw-order switch
 - `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
@@ -329,6 +350,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   evicted; `interiorLoad.ts` the load types (interior and index) and their pure derivation; `useStationInterior.ts` the
   focused station's interior load (the index is fetched once on mount; stations it doesn't list never fetch); `useLocate.ts` the location button's one-shot
   geolocation (on press only, never watched; the fix lives in React state and nowhere else)
+- `src/data/loadStationStreets.ts` fetches `public/data/streets/<id>.json` (contract `src/data/streetSchema.ts`) and
+  checks its outer shape; a 404 is null with one warning (cached for the session), other failures reject (evicted,
+  retried on the next focus). `useStationStreets.ts` loads the focused station's file on focus only (never at
+  startup) into a cached `StreetLayer`: `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways
+  (`src/lib/streetClass.ts`), decimeters to meters, mixing to the background over the last 70 m of `radiusM` (`edgeFade`;
+  segments are split at the ramp's ends). `fetchJson` throws `HttpError` (with `status`) on a non-OK response
 - `src/data/schema.ts`: types of the six `public/data/*.json` files (`Station` carries `borough`, `ada`,
   and `adaPartial` on the 8 partial stations, from 39hk-dx4f via `scripts/lib/stationAccess.ts`); `src/data/codec.ts`: shared
   pure helpers (trip-id parsing, trip/segment keys, delta codec, shape decode). Scripts and client both import these
@@ -336,6 +363,16 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`,
   `PackedDepthsFile` for `public/data/station-depths.json`, and `StationDepthsFile`, its per-track decoded form
 - `public/data/`: preprocessed static JSON (generated; `npm run data`, `npm run data:stations`)
+- `public/data/streets/<stationId>.json`: one file per station (`StationStreets`, `src/data/streetSchema.ts`), built by
+  `scripts/build-streets.ts` (IO only) from the pin and `catalog/entrances.json`. Pure: `scripts/lib/streetsPin.ts`
+  (`loadPin`, `waysNear`), `streetsBuild.ts` (`buildStationStreets`: `clipSpan`, `simplifySpans`, `onewayOf`, packing),
+  `streetsEntrances.ts` (the station's entrances, `joinEntrance` from `entranceStreet.ts` and the join log), with
+  `streetsFixture.ts` the tests' mini pin. Outside the startup budget; own caps in `scripts/lib/budget.ts`
+- `data/basemap/`: `basemap.json` (the NYC basemap's `spec`: bbox, z15, layers kept and dropped; and its `pin`, null until the
+  first publish) and `source-metadata.20261121.json` (the Protomaps metadata the terms were reviewed against, the gate's test
+  fixture). `scripts/lib/basemapSpec.ts` (parse, release tag and URL), `basemapGate.ts` (licensing gate over `pmtiles show
+  --metadata`), `basemapFetch.ts` (`ensureBasemap`), `rangeProbe.ts` (what a correct Range answer is); IO in
+  `scripts/fetch-basemap.ts`, `gate-basemap.ts` and `verify-basemap.ts`. The file itself is never in git
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
@@ -346,6 +383,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `data/stations/layout-oracle.json` (tuning, 62 layouts and 13 to decline) and `layout-holdout.json` (30, never tune
     on it): platform type, platforms, tracks, mezzanine per station, agent-checked against English Wikipedia
     (CC BY-SA 4.0, facts only, revision ids); scoring only, not shipped
+- `data/streets/`: the street pin (OSM named roads, plus sidewalks, crossings, steps and paths, within 300 m of any
+  station), written only by `scripts/fetch-streets.ts`; `manifest.json` (license, query, the station ids fetched for, shard list) and `cell-<lat>_<lon>.json`
+  shards, each with its own node table (ways index OSM node ids; coordinates 1e-6 deg). Pure trim and shard layout in
+  `scripts/lib/streetsOsm.ts` and `streetsShard.ts`; `fetchJson.ts` is the retrying fetch both pin scripts share
 - `scripts/`: `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge; `lib/stationProvenance.ts` (`markGenerated`: authored to generated, depth sources, archetype and
@@ -462,7 +503,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   back to north-up). Esc, ×, a station pick or search choice (they clear the train), the panel's Stop and the
   location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
-  an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
+  an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, focused station's streets 0.35 (7.5 under
+  the TEMPORARY `?streets=over`), lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
@@ -654,11 +696,23 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
-  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
+  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors and street files don't count (street files have their own caps: 16 KB gzipped each, and a total, in `budget.ts`).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
-  generated interiors follow the new shapes and stations), change `public/data`. The workflow runs typecheck, tests, and build before pushing, but the
+  generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow
+  the stations), change `public/data`. A station new to the feed gets a street file from whatever pinned ways lie
+  near it, with a `WARNING:` line in the log (`data:streets` prints it for any station the pin manifest's `stationIds`
+  lacks); it does not block the refresh, and the next `data:streets:fetch` covers it. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).
+- **The NYC basemap (vector tiles for streets, water and parks) is never in git and loads on demand only.** It is a
+  PMTiles file: the five boroughs at z0 to z15 (about 33 MB), only the earth, water, landuse and roads layers of a Protomaps
+  daily build, cut by `.github/workflows/basemap.yml` (manual; go-pmtiles `extract`, then tippecanoe `tile-join -l` to drop
+  layers) and published as a GitHub Release. `deploy.yml` copies the pinned release into `dist/basemap/nyc.pmtiles`
+  (sha256-checked; skipped with a warning while the pin is null) and fails above 900 MB; its `verify-basemap` job checks
+  uncompressed 206 Range answers on the live site. Nothing in the startup files names it, and it is not the walk graph.
+  The licensing gate (`basemapGate.ts`) fails the workflow on any credit beyond "© OpenStreetMap" (so never the landcover
+  layer, which is CC BY 4.0, nor places or pois); a failure goes to a person as a licensing card. The pin changes only by a
+  normal PR. Details and sizes: `docs/research/data-sources.md` §5.3. The client never fetches Protomaps' servers.
 - **Station interiors are hand-authored or generated.** Bedford Av (L08) is hand-authored and wins over a generated
   one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".
   Both are merged with OSM platform polygons, NY Open Data entrances, and E&E elevator/escalator data.

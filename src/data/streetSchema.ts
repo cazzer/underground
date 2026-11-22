@@ -83,6 +83,11 @@ export interface StationStreets {
   attribution: string[]
   /** The pin's OSM timestamp (ISO 8601). */
   osmTimestamp: string
+  /** How far from the anchor named roadways (`highway` trunk to pedestrian with a `name`) are kept, meters. */
+  radiusM: number
+  /** How far from the anchor everything else is kept (footway, steps, path and unnamed ways), meters; at most
+   *  `radiusM`. Past it a way is cut or absent, so a walk graph over these ways is complete only inside it. */
+  walkRadiusM: number
   /** The node table: OSM node ids, ascending, delta-coded (`deltaEncode` in src/data/codec.ts). Ids stay below 2^53. */
   nodeId: number[]
   /** Parallel to `nodeId`: integer decimeters from the anchor (x east, z south). */

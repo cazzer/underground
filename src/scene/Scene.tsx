@@ -17,6 +17,7 @@ import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
 import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
+import { StationStreets } from './StationStreets'
 import { StationTies } from './StationTies'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
@@ -70,6 +71,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, fo
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
+      <StationStreets />
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} anchor={anchor} />
     </Canvas>

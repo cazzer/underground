@@ -91,6 +91,29 @@ two mezzanines), which need hand authoring. Every position the template places i
    are stale) and review what it prints as skipped or dropped.
 6. Commit. `catalogData.test.ts` checks the files against each other.
 
+## Street pin
+
+`streets/` holds the OSM streets and walking ways within 300 m of every station point of `public/data/stations.json`:
+`manifest.json` (license, query, shard list with way and node counts, the stations feed version it was cut for) and
+`cell-<lat>_<lon>.json` shards on a 0.02 x 0.025 degree grid (a way sits in the shard of its first vertex). Each shard
+has its node table (`[id, lat, lon]`, sorted, 1e-6 degrees) and its ways (`id`, tags, node ids), one per line. Today:
+132 shards, 96,808 ways, 25 MB (4.7 MB gzipped), largest shard 1.5 MB. Nothing ships from it; `npm run data:streets:fetch`
+is the only writer and the only reader of the network (Overpass, by hand: one request, or eight latitude batches if
+Overpass refuses it; the script retries as the catalog fetch does). It writes nothing unless every station has a named
+way nearby, no shard passes 2 MB and the total stays under 30 MB (`-- --no-walk` keeps only the named roads, under 8 MB).
+Review the diff, then commit; `scripts/lib/streetsData.test.ts` checks the files against each other and against
+`stations.json` (a station added since the fetch fails it until the fetch is rerun, or the station is listed in
+`UNCOVERED_STATIONS` in `scripts/lib/streetsOsm.ts` with a reason). The source choice is in
+`../docs/research/data-sources.md` §5.2.
+
+`npm run data:streets` (offline) turns the pin and `stations/catalog/entrances.json` into `public/data/streets/<id>.json`, one
+per station. Rerun it after `data`, `data:streets:fetch` or `data:catalog:fetch`; `streetsOutputs.test.ts` fails while the files
+are stale. Each file clips the pinned ways to 300 m (footways, steps and paths to `WALK_RADIUS_M`, 100 m: 200 m left two
+dense downtown stations over the 16 KB cap, 150 m one), simplifies to 0.5 m, rounds to decimeters around the station point, and
+joins every entrance row that lists the station to the street it opens onto. The pin's manifest lists the `stationIds` it was fetched for: a station added to `stations.json` since gets a file from whatever
+pinned ways lie near it and a `WARNING:` line from the build (not a failure) until `data:streets:fetch` is rerun. The build prints where the join is doubtful
+(no street within 40 m, near misses for a median, bridge and tunnel ways, entrances near the 300 m edge); read it after a refresh.
+
 ## Access exceptions
 
 `stations/access-exceptions.json` is hand-written and empty today:
@@ -116,6 +139,9 @@ the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `n
   see `../docs/research/data-sources.md` §5.1 (licensing decisions included).
 - `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors,
   available under the ODbL 1.0.
+- `streets/` is © OpenStreetMap contributors, available under the ODbL 1.0 (see `../public/data/LICENSE-ODbL.md`).
+  The street files built from it (`public/data/streets/`) are ODbL derivatives; their entrance points are MTA data (i9wp-a4ja)
+  under the OPEN-NY Terms of Use, which each file's `attribution` says.
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.

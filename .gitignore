@@ -19,3 +19,9 @@ coverage
 
 # Half-written catalog files from an interrupted data:catalog:fetch
 data/stations/catalog/*.tmp
+# Half-written street pin files from an interrupted data:streets:fetch
+data/streets/*.tmp
+
+# The NYC basemap is built by basemap.yml and fetched by npm run basemap:fetch, never committed
+public/basemap/
+*.pmtiles

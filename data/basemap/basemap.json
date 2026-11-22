@@ -1,0 +1,15 @@
+{
+  "spec": {
+    "bbox": [-74.2591, 40.4774, -73.7004, 40.9176],
+    "maxzoom": 15,
+    "layers": ["earth", "water", "landuse", "roads"],
+    "dropLayers": ["buildings", "landcover", "places", "pois", "boundaries"]
+  },
+  "pin": {
+    "build": "20261121",
+    "basemapVersion": "4.15.2",
+    "release": "basemap-20261121-ed912214",
+    "sha256": "ed912214705ab93014bab5a5670aef4824d9a4a3498a79aae58ca47faf02ea7b",
+    "bytes": 32962122
+  }
+}
