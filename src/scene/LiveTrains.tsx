@@ -6,8 +6,9 @@ import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix, carsReach } from '../lib/live/consist'
 import type { BandView } from '../lib/bandOffset'
+import type { FollowAnchor } from '../lib/live/followAnchor'
 import { forgetSlot, selectedMixActive, slotMix, stepSelectedMix } from '../lib/live/selectedMix'
-import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
+import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, TRAIN_CAPACITY } from '../lib/live/slots'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import { addCarry } from '../lib/live/shapeCarry'
 import { createTrackPoint, trackPointInto } from '../lib/live/trackPoint'
@@ -15,7 +16,6 @@ import { trainRouteId } from '../lib/live/trainRoute'
 import { interiorOpacity, veilWeight } from '../lib/interiorReveal'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
-import { hopDistance } from '../lib/realtime/position'
 import { routeLineColor } from '../lib/routeColor'
 import { tiltT } from '../lib/tilt'
 import { theme } from '../theme'
@@ -24,6 +24,7 @@ import { RENDER_ORDER } from './renderOrder'
 import { SpanCars } from './SpanCars'
 import { TrainCars } from './TrainCars'
 import { trainRadiusPx } from './trainSize'
+import { useFollowAnchor } from './useFollowAnchor'
 import { useSelectedSlot } from './useSelectedSlot'
 import { useSpanCars } from './useSpanCars'
 import { useTrainCars } from './useTrainCars'
@@ -45,6 +46,8 @@ interface LiveTrainsProps extends LiveLayer {
   interiorStationId: StationId | null
   /** This frame's band view, written by SubwayLines before this frame runs: dots, cars and picks sit on the drawn bands. */
   view: BandView
+  /** Filled at priority -3 with the selected train's drawn point, for the camera follow. */
+  anchor: FollowAnchor
 }
 
 /**
@@ -53,7 +56,7 @@ interface LiveTrainsProps extends LiveLayer {
  * poll's hop plan at the live clock and writes matrices without allocating. Zoomed in, each dot
  * unfolds into its train's cars (carMix): the dot shrinks by 1 - mix as the train lengthens by mix.
  */
-export function LiveTrains({ trips, offsetS, patterns, network, trainPick, interiorStationId, view }: LiveTrainsProps) {
+export function LiveTrains({ trips, offsetS, patterns, network, trainPick, interiorStationId, view, anchor }: LiveTrainsProps) {
   const dots = useRef<InstancedMesh>(null)
   const halo = useRef<InstancedMesh>(null)
   // The selected train's dot is drawn on its own, above every other dot: rim, background gap, then the dot.
@@ -67,6 +70,8 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
   const selection = useSelectedSlot(table, cars)
   const sm = selection.mix
+  // Steps every slot before the camera moves (-3); the draw loop below reads the stepped distances.
+  const clock = useFollowAnchor(table, selection.slot, anchor, view, offsetS, DOT_Y)
   /** Each slot's dot color (shared Color objects), so the selected dot can take it without allocating. */
   const slotColors = useMemo(() => new Array<Color | null>(TRAIN_CAPACITY).fill(null), [])
   const point = useMemo(createTrackPoint, [])
@@ -162,9 +167,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     const sh = selectedHalo.current
     const sd = selectedDot.current
     if (!d || !h || !r || !g || !sh || !sd) return
-    const perfMs = performance.now()
-    const now = clockNow(offsetS, perfMs)
-    const localS = perfMs / 1000
+    const localS = clock.localS
     const camera = cameraDistance(state)
     const mix = carMix(camera)
     stepSelectedMix(sm, camera, dt, selection.reducedMotion.matches)
@@ -181,7 +184,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     for (let i = 0; i < table.high; i++) {
       const trip = table.trips[i]
       if (!trip) continue
-      const shown = stepSlot(table, i, hopDistance(trip.plan, trip.geometry, now), now, localS, dt)
+      const shown = table.displayed[i]!
       const drawn = table.drawGeometry[i]!
       // On its band, at the track's height: below the street where the line descends to a station.
       trackPointInto(drawn, shown, view, point)

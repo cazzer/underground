@@ -2,6 +2,7 @@
 import type { MapControls } from '@react-three/drei'
 import type { ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
+import { flightDuration } from '../lib/flight'
 import type { FlyRequest } from '../lib/focus'
 import { ENTER_DISTANCE } from '../lib/focusMachine'
 import { framePoint, type Insets, type Viewport } from '../lib/framing'
@@ -20,6 +21,8 @@ export interface Destination {
   distance: number
   /** Azimuth to land at (radians), or null to keep the camera's own. */
   azimuth: number | null
+  /** A flight to the selected train: the follow retargets it every frame to where the train has moved. */
+  follows: boolean
 }
 
 /** A destination plus where the flight started; progress is eased by expoInOut (src/lib/flight.ts). */
@@ -37,6 +40,24 @@ export interface Flight extends Destination {
   duration: number
   /** Eased progress when `from` was last rebased (a mid-flight retarget); 0 at the start. */
   e0: number
+}
+
+/**
+ * A flight from the camera's current pose to `dest`, snapping (duration 0) under reduced motion. `turnDecided` is
+ * false only for a station flight whose interior isn't known yet (its landing turn is decided when it arrives).
+ */
+export function newFlight(dest: Destination, c: MapControlsImpl, camera: PerspectiveCamera, reduced: boolean, turnDecided = true): Flight {
+  const fromDistance = camera.position.distanceTo(c.target)
+  return {
+    ...dest,
+    from: c.target.clone(),
+    fromDistance,
+    fromAzimuth: c.getAzimuthalAngle(),
+    turnDecided,
+    elapsed: 0,
+    duration: reduced ? 0 : flightDuration(fromDistance, dest.distance),
+    e0: 0,
+  }
 }
 
 const keepTarget = new Vector3()
@@ -83,7 +104,13 @@ export function interiorFlight(
   const free = interiorFreeRect(viewport, insets, panel)
   const land = turn ? landingAzimuth(model.axis, azimuth, free) : azimuth
   const { distance, target } = frameInterior({ ...model.focusAnchor, azimuth: land, viewport, free, fovDeg })
-  return { stationId: model.stationId, target: new Vector3(target.x, 0, target.z), distance, azimuth: land === azimuth ? null : land }
+  return {
+    stationId: model.stationId,
+    target: new Vector3(target.x, 0, target.z),
+    distance,
+    azimuth: land === azimuth ? null : land,
+    follows: false,
+  }
 }
 
 /** Fly-to for a station with no interior: its point in the middle of the free area (above a stacked panel), at the landing distance. */
@@ -98,13 +125,13 @@ export function stationFlight(
 ): Destination {
   const free = interiorFreeRect(viewport, insets, panel)
   const { target } = frameInterior({ center: pos, towardCamera: 0, azimuth, viewport, free, fovDeg })
-  return { stationId, target: new Vector3(target.x, 0, target.z), distance: LANDING_DISTANCE, azimuth: null }
+  return { stationId, target: new Vector3(target.x, 0, target.z), distance: LANDING_DISTANCE, azimuth: null, follows: false }
 }
 
 /** Fly-to for a ground point (a location fix): `radiusM` in view, landing a little outside the focus range. */
 export function pointFlight(req: PointRequest, viewport: Viewport, insets: Insets, fovDeg: number, maxDistance: number): Destination {
   const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, ENTER_DISTANCE * 1.1, maxDistance)
-  return { stationId: null, target: new Vector3(target.x, 0, target.z), distance, azimuth: null }
+  return { stationId: null, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false }
 }
 
 /**

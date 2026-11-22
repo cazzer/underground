@@ -46,6 +46,10 @@ interface StationOrbitOptions {
   flying: () => boolean
   /** True during a fly-to or an interrupted-flight focus hold: the pan clamp stays off. */
   busy: () => boolean
+  /** True while the camera follows a train: the view may turn as when focused (the follow pivots it on the train). */
+  following: () => boolean
+  /** True while a train is selected: its azimuth holds as when focused, followed or not. */
+  holdAzimuth: () => boolean
 }
 
 /** Gesture hooks for the controls' start and end events; both stay referentially stable. */
@@ -74,7 +78,18 @@ interface OrbitFocus {
  * hint. All frames write the controls imperatively: passing these as props or changing on* handlers would
  * re-run drei's connect effect and could lock the controls (underground-by0). Nothing here allocates per frame.
  */
-export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, flying, busy }: StationOrbitOptions): StationOrbitGestures {
+export function useStationOrbit({
+  controls,
+  camera,
+  focusPos,
+  interior,
+  viewport,
+  free,
+  flying,
+  busy,
+  following,
+  holdAzimuth,
+}: StationOrbitOptions): StationOrbitGestures {
   const input = useRef<AzimuthInput>({ theta: 0, focused: false, tilt: 0, dt: 0, reducedMotion: false })
   const bounds = useRef<AzimuthBounds>({ min: 0, max: 0 })
   const lastTheta = useRef(0)
@@ -89,6 +104,8 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
   const turnedFor = useRef<Ground | null>(null)
   const wasFlying = useRef(false)
   const rotating = useRef(false)
+  /** Turn summed over armed gestures while following a train (reset when the follow ends). */
+  const followTurn = useRef(0)
   const focusRef = useRef(focusPos)
   useLayoutEffect(() => {
     focusRef.current = focusPos
@@ -96,8 +113,8 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
 
   const onGestureStart = useCallback(() => {
     const c = controls.current
-    rotating.current = c !== null && rotateArmed(focusRef.current !== null, tiltT(camera.position.distanceTo(c.target)))
-  }, [controls, camera])
+    rotating.current = c !== null && rotateArmed(focusRef.current !== null || following(), tiltT(camera.position.distanceTo(c.target)))
+  }, [controls, camera, following])
   const onGestureEnd = useCallback(() => {
     rotating.current = false
   }, [])
@@ -115,7 +132,8 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     if (!c) return
     const inp = input.current
     inp.theta = c.getAzimuthalAngle()
-    inp.focused = focusPos !== null
+    // A selected train holds the azimuth; clearing it with no station focused springs back to north-up.
+    inp.focused = focusPos !== null || holdAzimuth() || following()
     inp.tilt = tiltT(camera.position.distanceTo(c.target))
     inp.dt = delta
     inp.reducedMotion = reduceMotion.matches
@@ -138,6 +156,13 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const theta = c.getAzimuthalAngle()
     const theta0 = lastTheta.current
     lastTheta.current = theta
+    if (following()) {
+      // The follow pivots the turn on the train; an armed turn still counts as the visitor's first.
+      if (rotating.current && theta !== theta0) {
+        followTurn.current += Math.abs(wrapAngle(theta - theta0))
+        if (followTurn.current > TURN_SEEN) markTurned()
+      }
+    } else followTurn.current = 0
     const f = focus
     if (!f) {
       armed.current = false

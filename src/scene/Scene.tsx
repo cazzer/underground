@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react'
 import type { LiveLayer } from '../data/useLive'
 import { createBandView } from '../lib/bandOffset'
 import type { Insets } from '../lib/framing'
+import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
@@ -44,6 +45,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, fo
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
+  /** Written by LiveTrains at -3, read by CameraRig: the selected train the camera follows. */
+  const anchor = useMemo(createFollowAnchor, [])
   const interiorStationId = interior?.stationId ?? null
   return (
     <Canvas
@@ -63,12 +66,12 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, fo
       <ScenePicker stations={network.stations} trainPick={trainPick} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
-          <LiveTrains {...live} network={network} trainPick={trainPick} interiorStationId={interiorStationId} view={bandView} />
+          <LiveTrains {...live} network={network} trainPick={trainPick} interiorStationId={interiorStationId} view={bandView} anchor={anchor} />
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} />}
-      <CameraRig network={network} insets={insets} panel={panel} interior={interior} />
+      <CameraRig network={network} insets={insets} panel={panel} interior={interior} anchor={anchor} />
     </Canvas>
   )
 }

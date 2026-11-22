@@ -18,26 +18,31 @@ export interface TrainSelectionState<T extends { key: string }, S> {
   notice: { summary: S | null } | null
   /** Counts explicit selections, so the panel can take focus on each one. */
   selections: number
+  /** The camera follows the selected train: on with every selection and the Follow button, off after a pan or a clear. */
+  following: boolean
 }
 
 export type TrainSelectionEvent<T extends { key: string }, S> =
   | { type: 'select'; key: string; summarize: (trip: T) => S }
   | { type: 'clear' }
   | { type: 'dismissNotice' }
+  | { type: 'follow' }
+  | { type: 'unfollow' }
   | { type: 'observe'; trips: readonly T[] | null; summarize: (trip: T) => S }
 
 export function initialTrainSelection<T extends { key: string }, S>(): TrainSelectionState<T, S> {
-  return { key: null, missed: 0, lastTrip: null, lastSummary: null, observed: null, notice: null, selections: 0 }
+  return { key: null, missed: 0, lastTrip: null, lastSummary: null, observed: null, notice: null, selections: 0, following: false }
 }
 
 function lost<T extends { key: string }, S>(s: TrainSelectionState<T, S>, observed: readonly T[] | null): TrainSelectionState<T, S> {
-  return { ...s, key: null, missed: 0, lastTrip: null, lastSummary: null, observed, notice: { summary: s.lastSummary } }
+  return { ...s, key: null, missed: 0, lastTrip: null, lastSummary: null, observed, notice: { summary: s.lastSummary }, following: false }
 }
 
 /**
  * Selection across polls: a present trip resets the miss count, MISSES_TO_CLEAR misses in a row clear the
  * selection with a notice. Losing the live layer altogether (null trips) keeps the selection and resets the
- * count, so an outage never blames the train. A user clear is silent.
+ * count, so an outage never blames the train. A user clear is silent. Every selection follows the train with the
+ * camera; `unfollow` (a pan, a location flight) stops that and keeps the train, `follow` resumes it.
  */
 export function trainSelectionReducer<T extends { key: string }, S>(
   s: TrainSelectionState<T, S>,
@@ -54,10 +59,17 @@ export function trainSelectionReducer<T extends { key: string }, S>(
         lastSummary: trip ? e.summarize(trip) : null,
         notice: null,
         selections: s.selections + 1,
+        following: true,
       }
     }
     case 'clear':
-      return s.key === null && s.notice === null ? s : { ...s, key: null, missed: 0, lastTrip: null, lastSummary: null, notice: null }
+      return s.key === null && s.notice === null
+        ? s
+        : { ...s, key: null, missed: 0, lastTrip: null, lastSummary: null, notice: null, following: false }
+    case 'follow':
+      return s.key === null || s.following ? s : { ...s, following: true }
+    case 'unfollow':
+      return s.following ? { ...s, following: false } : s
     case 'dismissNotice':
       return s.notice === null ? s : { ...s, notice: null }
     case 'observe': {

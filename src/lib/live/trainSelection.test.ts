@@ -100,4 +100,37 @@ describe('trainSelectionReducer', () => {
     expect(lostThenNew.selections).toBe(2)
     expect(run([{ type: 'dismissNotice' }], lostThenNew)).toBe(lostThenNew)
   })
+
+  describe('following', () => {
+    const unfollow: Event = { type: 'unfollow' }
+    const follow: Event = { type: 'follow' }
+
+    it('follows on every select', () => {
+      expect(run([poll('b'), select('b')]).following).toBe(true)
+    })
+
+    it('stops following on unfollow and keeps the train', () => {
+      const s = run([poll('b'), select('b'), unfollow])
+      expect(s.following).toBe(false)
+      expect(s.key).toBe('b')
+      expect(run([unfollow], s)).toBe(s)
+    })
+
+    it('follows again on follow, which is a no-op without a train', () => {
+      expect(run([poll('b'), select('b'), unfollow, follow]).following).toBe(true)
+      const none = run([poll('b')])
+      expect(run([follow], none)).toBe(none)
+    })
+
+    it('stops on a clear and when the train is lost', () => {
+      expect(run([poll('b'), select('b'), { type: 'clear' }]).following).toBe(false)
+      expect(run([poll('b'), select('b'), poll(), poll()]).following).toBe(false)
+    })
+
+    it('follows again on a re-select', () => {
+      const s = run([poll('b'), select('b'), unfollow, select('b')])
+      expect(s.following).toBe(true)
+      expect(s.selections).toBe(2)
+    })
+  })
 })

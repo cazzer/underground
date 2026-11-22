@@ -79,8 +79,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
-    `cameraFlight.ts` its fly-to destinations (interior, bare station, point), `flushMotion` and the landing turn;
-    `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal)
+    `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `follows` marks a flight to the selected
+    train), `newFlight`, `flushMotion` and the landing turn;
+    `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);
+    `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
+    LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
     shapes arrive, then eases them in over 300 ms (`BandView.ease`: offset and split blend linearly from unbanded, so no fold); writes the shared `BandView` (Scene owns it; LiveTrains reads
     it) and the band uniforms per frame at priority -0.25); `usePlatformFade.ts` writes the loaded interior's
@@ -116,7 +119,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
   a dim aria-hidden `PartialAccessNote` line, then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only), nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
-  each pick (its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
+  each pick (one row under the heading: "Following" with a Stop button while the camera follows the train, else a "Follow
+  train" button; the same button node, so toggling keeps focus and the panel's size; its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useStopListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
   notice, then the station, and closing either of the first two returns focus to the station heading or else
   the location button); `LoadStatus.tsx` loading/error panel
@@ -136,7 +140,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
   location message
   `OrbitHint.tsx` the header's muted turn hint under the status lines (right- or Shift-drag; two fingers on a
-  coarse pointer), shown while a station is focused until the session's first user turn (about 17° of an armed gesture on one focused station; flights, springs and the cap don't count; `src/lib/orbitTurned.ts`)
+  coarse pointer), shown while a station is focused and no train is followed, until the session's first user turn (about 17° of an armed gesture on one focused station; flights, springs and the cap don't count; `src/lib/orbitTurned.ts`)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths without bands, bounds,
@@ -173,7 +177,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     per point, the direction tracks merge under 6.5 px apart and split by 8.5 px, plus the bundle's width, so they
     split only once both bundles fit); `trackOffset.ts` also exports `miterNormals`;
     `focusMachine.ts` camera-driven focus transitions; `focusDwell.ts` `settled`, the 400 ms stillness auto-focus
-    waits for; `focusHold.ts` interrupted-flight release rule
+    waits for; `focusHold.ts` interrupted-flight release rule; `follow.ts` the train follow's math (`followTargetInto`:
+    the ground target that puts a world point on a screen point, exact under perspective at any height; the catch-up
+    ease, the 8 px pan break (16 px on touch), the 100 px jump re-fly, `followDistanceFor`); `followStep.ts` `stepFollow`,
+    one follow frame (pan break, the 0.35 s lag `stepLag`, catch-up), tested on its own
   - `lineBuffers.ts` (positions, colors, `bands`: each segment end's band inputs from `vertexBandInputs` (miter
     vector normal / cosHalf, slot, corridor half-width), and `firstSegment` per shape), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
@@ -211,7 +218,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     state transitions (the last good fix stays drawn through a re-locate or a failure); `locateMessage.ts` its HUD text (never
     coordinates); `framing.ts` `framePoint` frames a radius around a point between the HUD insets
   - `trainSelection.tsx` selected-train context keyed by trip key (the station focus and interior stay; a
-    station pick clears it). Dev only: `__underground.selectTrain(key)`, `trainKeys()`, and `trainAt(key)`
+    station pick clears it), plus `following`, `follow` and `unfollow` (a point flight, the location button, unfollows). Dev only: `__underground.selectTrain(key)`, `trainKeys()`, and `trainAt(key)`
     (viewport px of the dot and car ends, added by `ScenePicker`)
 - `src/lib/live/`: pure helpers for the live layer (no React or three.js; tests colocated)
   - `clock.ts` the live clock: `now = offsetS + performance.now()/1000`, where `offsetS` is the maximum over
@@ -238,7 +245,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     projects a point onto that drawn line (per poll, a shape change). Dots, cars (and so
     the platform copies), picks and `trainAt` all go through it, with the frame's `BandView` (SubwayLines writes it);
   - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends, track points);
-    `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice; no live layer, an outage, keeps it);
+    `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice; no live layer, an outage, keeps it;
+    `following` is set by every select and `follow`, cleared by `unfollow`, a clear and a loss);
+    `followAnchor.ts` the selected train's drawn point per frame (as the dot draws it, carry included) and its `cut`
+    flag (just valid, a new slot or shape, or a 60 m jump);
     `trainSummary.ts` route and headsign for the train panel and the notice;
     `trainStops.ts` the train's next stops (feed arrivals not yet passed, the dwell stop kept), `nyClockTime`
     (New York 12 h without AM/PM), `stopEta` (clock plus "Now"/"3 min"), `tripTimesDelayed`, `deriveTrainStopsView` (states). Minutes away
@@ -386,7 +396,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1100 to 800 m the interior fades in as a flat plan (depth 0.05 to 0.40); 800 to 400 m the levels
   separate and the veil and labels come in; at 400 m everything is full 3D.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
-  focused (focus engages inside 1100 m within 140 m of a station once the view has held still for 400 ms
+  focused or a train is followed (focus engages inside 1100 m within 140 m of a station once the view has held still for 400 ms
   (`ENTER_DWELL_S`: target and distance within 0.2% of the distance, no gesture active, and a gesture's end
   restarts the wait), so a pan across the city opens no panels; it drops at once past 1400 m or 350 m away;
   taps and flights focus immediately; `focusMachine.ts`): |azimuth| is capped by tilt, rising from 0 top-down to π at tiltT 0.67 and a full spin
@@ -410,7 +420,26 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
   which can lock them mid-drag. Set control limits imperatively in `useFrame` (priority -2, before
   drei's `update()` at -1; the pivot and pan clamp at -0.5; the band view at -0.25), not as changing props. Never use a
-  positive `useFrame` priority (it takes over rendering).
+  positive `useFrame` priority (it takes over rendering). The frame order: -3 LiveTrains steps every slot and writes
+  the follow anchor (with the last frame's band view); -2 CameraRig (the follow's `beforeFlight`, the flight step,
+  focus, the polar lock) and the orbit's bounds; -1 drei's `update()`; -0.75 the train follow; -0.5 the orbit's pivot
+  and pan clamp; -0.25 the band view; 0 the draws.
+- Selecting a train follows it (`useTrainFollow.ts`): a flight retargeted each frame to the moving train, at the
+  distance where its consist spans 80% of the free width, held to 400..600 m (`followDistanceFor`; a desktop stays at
+  400), never started over another flight. Then at -0.75 `stepFollow` moves target and camera by one step so its dot
+  sits mid-free-area (`followTargetInto`, exact under perspective) through a critically damped 0.35 s lag that tracks
+  the train's velocity too: steady travel and stops settle exact, a departure or a catch-up glide is rounded off (a few
+  px at most). It never passes the train along its last direction of travel (no overshoot at a stop), reads at most
+  `FOLLOW_MAX_GOAL_MPS` (a glide's peak plus a train's top speed; a faster frame-to-frame move is eased as position
+  error), and after a flight starts at the speed the train was seen moving during it. Wheel zoom (zoom-to-cursor is off while following) and turns keep it there, and a turn pivots on it
+  (the orbit's pivot and pan clamp stand down; turning is armed as if focused, and counts as the first turn).
+  Discontinuities (a flight cut short, a panel resize, a cut in the anchor) become a catch-up offset easing out at 5/s
+  (snapped under reduced motion); a cut over 100 px on screen re-flies at the current zoom. A pan of 8 px in one
+  gesture (16 px on touch, so a pinch's staggered release doesn't count; the pointer type is read on the element the
+  controls listen on) ends the follow; the train stays selected and
+  keeps the azimuth (a selected train holds it like a focused station; clearing it with no station focused springs
+  back to north-up). Esc, ×, a station pick or search choice (they clear the train), the panel's Stop and the
+  location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,

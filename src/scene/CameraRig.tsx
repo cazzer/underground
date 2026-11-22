@@ -6,23 +6,27 @@ import { useFocus } from '../lib/focus'
 import { newDwell, settled } from '../lib/focusDwell'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { nextFocus, type FocusInput } from '../lib/focusMachine'
-import { flightDistance, flightDuration, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
+import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
+import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
 import {
   flushMotion,
   interiorFlight,
+  newFlight,
   pointFlight,
   prefersReducedMotion,
   stationFlight,
   turnOffset,
+  type Destination,
   type Flight,
   type MapControlsImpl,
 } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
 import { useStationOrbit } from './useStationOrbit'
+import { useTrainFollow } from './useTrainFollow'
 
 const MIN_DISTANCE = 40
 /** How far past the fitted city overview the user may zoom out. */
@@ -36,9 +40,11 @@ interface CameraRigProps {
   interior: InteriorModel | null
   /** The station panel's screen rect, kept clear when framing an interior. */
   panel: ScreenRect | null
+  /** The selected train's drawn point (LiveTrains writes it at -3): the camera follows it. */
+  anchor: FollowAnchor
 }
 
-export function CameraRig({ network, insets, interior, panel }: CameraRigProps) {
+export function CameraRig({ network, insets, interior, panel, anchor }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -98,18 +104,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       snapped.current = null
       const l = latest.current
       const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
-      const fromDistance = camera.position.distanceTo(c.target)
-      const reduced = prefersReducedMotion()
-      flight.current = {
-        ...dest,
-        from: c.target.clone(),
-        fromDistance,
-        fromAzimuth: c.getAzimuthalAngle(),
-        turnDecided: true,
-        elapsed: 0,
-        duration: reduced ? 0 : flightDuration(fromDistance, dest.distance),
-        e0: 0,
-      }
+      flight.current = newFlight(dest, c, camera, prefersReducedMotion())
       return
     }
     const station = network.stationById.get(flyRequest.stationId)
@@ -125,17 +120,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     const dest = known
       ? interiorFlight(known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
       : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
-    const fromDistance = camera.position.distanceTo(c.target)
-    flight.current = {
-      ...dest,
-      from: c.target.clone(),
-      fromDistance,
-      fromAzimuth: c.getAzimuthalAngle(),
-      turnDecided: known !== null || reduced,
-      elapsed: 0,
-      duration: reduced ? 0 : flightDuration(fromDistance, dest.distance),
-      e0: 0,
-    }
+    flight.current = newFlight(dest, c, camera, reduced, known !== null || reduced)
   }, [flyRequest, network, camera])
 
   // The interior (first visit) or the panel's measurement (it grows as arrivals fill in) can land
@@ -148,11 +133,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     if (c && !f && interior && snapped.current === interior.stationId) {
       // A reduced-motion flight already snapped to the bare station: snap once more onto the interior, no turn.
       snapped.current = null
-      const az = c.getAzimuthalAngle()
-      const dest = interiorFlight(interior, size, insets, panel, camera.fov, az, false)
-      const fromDistance = camera.position.distanceTo(c.target)
-      const from = c.target.clone()
-      flight.current = { ...dest, from, fromDistance, fromAzimuth: az, turnDecided: true, elapsed: 0, duration: 0, e0: 0 }
+      flight.current = newFlight(interiorFlight(interior, size, insets, panel, camera.fov, c.getAzimuthalAngle(), false), c, camera, true)
       return
     }
     if (!c || !f || f.stationId === null) return
@@ -180,9 +161,22 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   }, [interior, panel, size, insets, camera, network])
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
-  const flying = useCallback(() => flight.current !== null, [])
-  const busy = useCallback(() => flight.current !== null || hold.current !== null, [])
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
+  const startFlight = useCallback(
+    (dest: Destination) => {
+      const c = controls.current
+      if (!c) return
+      hold.current = null
+      snapped.current = null
+      flushMotion(c, camera)
+      flight.current = newFlight(dest, c, camera, prefersReducedMotion())
+    },
+    [camera],
+  )
+  const follow = useTrainFollow({ controls, camera, flight, startFlight, anchor, free, viewport: size })
+  // While following, the follow owns the target: the orbit neither pivots nor clamps the pan.
+  const flying = useCallback(() => flight.current !== null || follow.active(), [follow.active])
+  const busy = useCallback(() => flight.current !== null || hold.current !== null || follow.active(), [follow.active])
   const { onGestureStart, onGestureEnd } = useStationOrbit({
     controls,
     camera,
@@ -192,12 +186,15 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     free,
     flying,
     busy,
+    following: follow.active,
+    holdAzimuth: follow.holdAzimuth,
   })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((state, delta) => {
     const c = controls.current
     if (!c) return
+    follow.beforeFlight()
     let distance = camera.position.distanceTo(c.target)
     const still = settled(dwell.current, state.clock.elapsedTime, c.target, distance, gesture.current || gestureEnded.current)
     gestureEnded.current = false
@@ -231,11 +228,12 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       cur.distance = distance
       cur.target = c.target
       cur.stations = network.stations
-      cur.settled = still
+      // Following a train past stations never pops their panels; exits still apply.
+      cur.settled = still && !follow.active()
       // Cheap pre-check on the reused input; only a real change pays for a copied target and
       // a functional update, which re-runs the rules against the latest state.
       if (nextFocus(cur) !== cur) {
-        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, still)
+        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, cur.settled)
       }
     }
 
@@ -264,7 +262,8 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     snapped.current = null
     gesture.current = true
     onGestureStart()
-  }, [camera, onGestureStart])
+    follow.onGestureStart()
+  }, [camera, onGestureStart, follow.onGestureStart])
   const onEnd = useCallback(() => {
     gesture.current = false
     gestureEnded.current = true
@@ -276,7 +275,6 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       ref={controls}
       makeDefault
       enableDamping
-      zoomToCursor
       minDistance={MIN_DISTANCE}
       maxDistance={maxDistance}
       onStart={onStart}
