@@ -30,6 +30,8 @@ export function finalRideStops(journeys: readonly TripJourney[]): FinalRideStop[
 }
 
 export interface ExitLineView {
+  /** The map's label for the exit, which the street labels place first; null when the line names none. */
+  mapLabel: ExitLabel | null
   text: string
   /** The dim line under it, parts joined " · "; null when there is nothing to add. */
   note: string | null
@@ -45,23 +47,40 @@ function compassOf(interior: StationInterior, point: readonly [number, number]):
   return `the ${COMPASS8[((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8]!}`
 }
 
-/** The street file's label for the exit: its own entrance's, else (merged into a same-text twin, or matched by no file
- *  entrance) the nearest label of the same kind within MERGE_M. */
-function labelOf(choice: ExitChoice, interior: StationInterior, labels: readonly EntranceText[], file: StationStreets): EntranceText | null {
+/** One street file and its entrance labels (entranceText.ts). */
+export interface StreetSource {
+  file: StationStreets
+  labels: readonly EntranceText[]
+}
+
+/** Which map label names the exit: the street file's station and the label's entrance index (`EntranceText.index`). */
+export interface ExitLabel {
+  stationId: string
+  index: number
+}
+
+/**
+ * The street label for the exit, from the first source with a file entrance at the exit (its own label, or, merged into
+ * a same-text twin, the nearest label of the same kind within MERGE_M), else the nearest such label in any source.
+ * A complex passes its file's streets and the alighting member's.
+ */
+function labelOf(choice: ExitChoice, interior: StationInterior, sources: readonly StreetSource[]): { label: EntranceText; stationId: string } | null {
   if (choice.exit.entranceId === null) return null
   const origin = toGround(interior.anchor)
   const scene = { x: origin.x + choice.exit.point[0], z: origin.z + choice.exit.point[1] }
-  const i = streetEntranceIndex(scene, choice.exit.type, file)
-  const own = i === null ? undefined : labels.find((l) => l.index === i)
-  if (own) return own
-  const fileOrigin = toGround(file.anchor)
-  const [x, z] = [scene.x - fileOrigin.x, scene.z - fileOrigin.z]
   const elevator = choice.exit.type === 'Elevator'
-  let best: EntranceText | null = null
+  let best: { label: EntranceText; stationId: string } | null = null
   let bestD = MERGE_M + STREET_MATCH_M
-  for (const l of labels) {
-    const d = Math.hypot(l.x - x, l.z - z)
-    if (l.elevator === elevator && d <= bestD) [best, bestD] = [l, d]
+  for (const { file, labels } of sources) {
+    const i = streetEntranceIndex(scene, choice.exit.type, file)
+    const own = i === null ? undefined : labels.find((l) => l.index === i)
+    if (own) return { label: own, stationId: file.stationId }
+    const fileOrigin = toGround(file.anchor)
+    const [x, z] = [scene.x - fileOrigin.x, scene.z - fileOrigin.z]
+    for (const l of labels) {
+      const d = Math.hypot(l.x - x, l.z - z)
+      if (l.elevator === elevator && d <= bestD) [best, bestD] = [{ label: l, stationId: file.stationId }, d]
+    }
   }
   return best
 }
@@ -76,16 +95,16 @@ function machinesUsed(choice: ExitChoice, interior: StationInterior): ('elevator
  * The trip panel's exit line. "Quickest way out: Bedford Av & N 7 St" for the quickest way out (no destination), "Exit
  * at …" toward a point; with no street label, the way from the station's middle ("toward the northeast"). The note
  * holds the label's tail, "probably" on an estimated layout, the walk on, and "elevator status unknown" (or
- * escalator) when the route rides one and outage data can't say it works (`closedKnown` false).
+ * escalator) when the route rides one and the station panel would call machine status unknown (`closedKnown` false).
  */
 export function exitLineView(
   choice: ExitChoice,
   interior: StationInterior,
-  labels: readonly EntranceText[] | null,
-  file: StationStreets | null,
+  sources: readonly StreetSource[],
   closedKnown: boolean,
 ): ExitLineView {
-  const label = labels && file ? labelOf(choice, interior, labels, file) : null
+  const found = labelOf(choice, interior, sources)
+  const label = found?.label ?? null
   const head = label ? label.head : `toward ${compassOf(interior, choice.exit.point)}`
   const lead = choice.destination === null ? 'Quickest way out:' : label ? 'Exit at' : 'Exit'
   const unknown = closedKnown ? [] : machinesUsed(choice, interior)
@@ -99,7 +118,8 @@ export function exitLineView(
   if (walk) sentences.push(`${walk.kind === 'route' ? 'Then a' : 'About a'} ${minutes} minute walk.`)
   if (status) sentences.push(`${capitalize(status)}.`)
   if (choice.probable) sentences.push('Probably: the station layout is estimated.')
-  return { text: `${lead} ${head}`, note: note.length > 0 ? note.join(' · ') : null, spoken: sentences.join(' ') }
+  const mapLabel = found && { stationId: found.stationId, index: found.label.index }
+  return { mapLabel, text: `${lead} ${head}`, note: note.length > 0 ? note.join(' · ') : null, spoken: sentences.join(' ') }
 }
 
 const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
@@ -127,7 +147,7 @@ const NAME_WORD = /^([0-9]|[A-Z])/
 /**
  * A sign-style street label as a screen reader should say it: type words in full ("W 96 St" → "West 96 Street",
  * "St" as "Saint" when it opens a name), a compass letter before a number or name ("N 7 St" → "North 7 Street") or
- * closing one after a type word ("Park Av S"), corners in full ("NE" → "northeast") and "&" as "and".
+ * closing one ("Park Av S", "Central Park W"; not a lettered avenue, "Av S"), corners in full ("NE" → "northeast") and "&" as "and".
  */
 export function streetSpoken(text: string): string {
   const words = text.split(' ')
@@ -143,7 +163,10 @@ export function streetSpoken(text: string): string {
       if (TYPE_SPOKEN[w]) return TYPE_SPOKEN[w]
       if (COMPASS_SPOKEN[w]) {
         if (opens && next !== undefined && NAME_WORD.test(next)) return COMPASS_SPOKEN[w]
-        const closesName = prev !== undefined && TYPE_SPOKEN[prev] !== undefined && i >= 2 && NAME_WORD.test(words[i - 2]!)
+        // Closing a name ("Park Av S", "Central Park W"), but not the letter of a lettered avenue ("Av S").
+        const prevOpens = i < 2 || !NAME_WORD.test(words[i - 2]!)
+        const lettered = prev !== undefined && TYPE_SPOKEN[prev] !== undefined && prevOpens
+        const closesName = prev !== undefined && NAME_WORD.test(prev) && !lettered
         if (closesName && (next === undefined || !NAME_WORD.test(next))) return COMPASS_SPOKEN[w]
       }
       return w

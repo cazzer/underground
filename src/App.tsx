@@ -81,6 +81,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             index={interior.index}
             here={here}
             exitPath={tripExit?.drawn ? { interiorId: tripExit.interiorId, choice: tripExit.drawn } : null}
+            exitLabel={tripExit?.mapLabel ?? null}
           />
         )}
       </ErrorBoundary>

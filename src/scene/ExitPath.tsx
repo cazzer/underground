@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { Color } from 'three'
 import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import type { ExitChoice } from '../lib/exitChoice'
@@ -21,6 +21,8 @@ const RGB = [COLOR.r, COLOR.g, COLOR.b] as const
 interface ExitPathProps {
   model: InteriorModel
   choice: ExitChoice
+  /** Where the path's start goes for the level labels to keep clear of (StationInterior's); emptied on unmount. */
+  keepOut: RefObject<Float32Array>
 }
 
 /**
@@ -28,7 +30,7 @@ interface ExitPathProps {
  * visibility): one layer with the interior's base strokes, under the lifted trains, and one over them. It fades in
  * with the interior (`interiorOpacity`); dashed on an estimated layout or for an estimated walk.
  */
-export function ExitPath({ model, choice }: ExitPathProps) {
+export function ExitPath({ model, choice, keepOut }: ExitPathProps) {
   const layers = useMemo(
     () =>
       exitPathBuffers(model.interior, choice, {
@@ -44,6 +46,13 @@ export function ExitPath({ model, choice }: ExitPathProps) {
       }),
     [model, choice],
   )
+  useEffect(() => {
+    const ref = keepOut
+    ref.current = layers.keepOut
+    return () => {
+      ref.current = new Float32Array(0)
+    }
+  }, [layers, keepOut])
   const dash = layers.dashed ? DASH : undefined
   const under = useLineLayer(layers.under, RENDER_ORDER.exitPath, theme.exitPathWidth, dash)
   const over = useLineLayer(layers.over, RENDER_ORDER.exitPathOver, theme.exitPathWidth, dash)

@@ -11,6 +11,7 @@ import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { createLabelBlockers } from '../lib/labelBlockers'
 import type { ExitChoice } from '../lib/exitChoice'
+import type { ExitLabel } from '../lib/exitView'
 import type { Network } from '../lib/network'
 import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
@@ -20,7 +21,6 @@ import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { Basemap } from './Basemap'
 import { basemapLook } from './basemapLook'
 import { CameraRig } from './CameraRig'
-import { ExitPath } from './ExitPath'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
@@ -62,9 +62,11 @@ interface SceneProps {
   here: { ground: Ground; accuracyM: number } | null
   /** The trip's way out at its To station; drawn only while that station's interior is the focused one. */
   exitPath: { interiorId: string; choice: ExitChoice } | null
+  /** The trip's exit label, which the street labels place first. */
+  exitLabel: ExitLabel | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, exitPath }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, exitPath, exitLabel }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -116,15 +118,17 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         labelBlockers={labelBlockers}
         network={network}
         mask={streetMask}
+        exitLabel={exitPath ? exitLabel : null}
       />
       {interior && (
-        <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} labelBlockers={labelBlockers}>
-          {exitPath?.interiorId === interior.stationId && (
-            <ErrorBoundary key={`${exitPath.choice.stopId}>${exitPath.choice.exit.entranceId ?? ''}`} fallback={null}>
-              <ExitPath model={interior} choice={exitPath.choice} />
-            </ErrorBoundary>
-          )}
-        </StationInterior>
+        <StationInterior
+          key={interior.stationId}
+          model={interior}
+          network={network}
+          outOfService={outOfService}
+          labelBlockers={labelBlockers}
+          exit={exitPath?.interiorId === interior.stationId ? exitPath.choice : null}
+        />
       )}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
       {basemapConfig && (

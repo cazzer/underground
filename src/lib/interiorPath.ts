@@ -51,6 +51,9 @@ export interface ExitPathLayers {
   over: Buffers
   /** Some segment is dashed (in `distances`), so the material must be. */
   dashed: boolean
+  /** Group-local x, y, z triples of the path's start (its first point, first connector foot and the board marker): the
+   *  level labels keep clear of them on screen. */
+  keepOut: Float32Array
 }
 
 export interface PathPoint {
@@ -167,6 +170,12 @@ class PathWriter extends SegmentWriter {
     this.run.m = m + dist3(a, b)
     this.distances.push(m, this.run.m)
   }
+
+  /** A dashed segment with its own phase (0 to its length), outside the path's running one: a restroked walkway side. */
+  ownDash(a: Vec3, b: Vec3, c: Rgb): void {
+    this.segment(a, b, c, c)
+    this.distances.splice(-1, 1, dist3(a, b))
+  }
 }
 
 /**
@@ -190,16 +199,25 @@ export function cutYsBetween(interior: StationInterior, lower: number, upper: nu
 
 const NO_SINK: SegmentSink = { segment: () => {}, loop: () => {} }
 
-/** Restrokes the connector a path piece takes, in the path color, into the sink(s) its levels draw in. */
-function restroke(ctx: PlanCtx, piece: Extract<Piece, { kind: 'connector' }>, sinkFor: (l: number, u: number) => SegmentSink, levelSink: (i: number) => SegmentSink): void {
+/**
+ * Restrokes the connector a path piece takes, in the path color, into the sink(s) its levels draw in. A walkway's sides
+ * dash as the interior's do (`walkwayDashed`), each on its own phase; returns whether any stroke dashed.
+ */
+function restroke(ctx: PlanCtx, piece: Extract<Piece, { kind: 'connector' }>, sinkFor: (l: number, u: number) => SegmentSink, writerOf: (i: number) => PathWriter, walkwayDashed: boolean): boolean {
   const { c, lower, upper } = piece
+  const levelSink = writerOf
   const run: ConnectorContext = { ...ctx, strong: sinkFor(lower, upper), fine: NO_SINK }
   if (c.kind === 'elevator') {
     drawElevatorShaft(run, c, lower, upper)
     for (const i of [lower, upper]) drawElevatorStop({ ...ctx, strong: levelSink(i), fine: NO_SINK }, c, i)
   } else if (c.kind === 'escalator') drawEscalator(run, c, lower, upper)
-  else if (c.kind === 'walkway') drawWalkway(run, c, lower, false)
-  else drawRamp(run, c, lower, upper)
+  else if (c.kind === 'walkway') {
+    const w = writerOf(lower)
+    const sides: SegmentSink = { segment: (a, b, ca, _cb, dashed) => (dashed ? w.ownDash(a, b, ca) : w.segment(a, b, ca)), loop: () => {} }
+    drawWalkway({ ...run, strong: sides }, c, lower, walkwayDashed)
+    return walkwayDashed
+  } else drawRamp(run, c, lower, upper)
+  return false
 }
 
 /**
@@ -215,10 +233,12 @@ export function exitPathBuffers(interior: StationInterior, choice: ExitChoice, o
   const run = { m: 0 }
   const base = new PathWriter(run)
   const layers = split === undefined ? [base] : [base, new PathWriter(run)]
-  const levelSink = (i: number): SegmentSink => layers[layerOfLevel(i, split)]!
+  const writerOf = (i: number): PathWriter => layers[layerOfLevel(i, split)]!
+  const levelSink: (i: number) => SegmentSink = writerOf
   const sinkFor = (lower: number, upper: number): SegmentSink => {
     const cuts = cutYsBetween(interior, lower, upper, opts)
     if (cuts.length === 0) return levelSink(upper)
+    // Unreachable with one split; kept for the per-deck bands (2q7.28), which may cut a tall connector twice.
     if (cuts.length > 1) throw new Error(`Exit path at ${interior.stationId}: a connector crosses ${cuts.length} layer cuts`)
     return new SplitAtY(layers[layerOfLevel(lower, split)]!, layers[layerOfLevel(upper, split)]!, cuts[0]!)
   }
@@ -252,7 +272,14 @@ export function exitPathBuffers(interior: StationInterior, choice: ExitChoice, o
   }
 
   if (opts.restroke) {
-    for (const piece of walk.pieces) if (piece.kind === 'connector') restroke(ctx, piece, sinkFor, levelSink)
+    // A walkway dashes like the interior's: on an estimated layout, or between two approximate slabs.
+    const rough = new Set(interior.slabs.filter((k) => k.approximate === true).map((k) => k.id))
+    for (const piece of walk.pieces) {
+      if (piece.kind !== 'connector') continue
+      const ends = [piece.c.lower.area, piece.c.upper.area]
+      const walkwayDashed = interior.generated !== undefined || ends.every((a) => a !== undefined && rough.has(a))
+      if (restroke(ctx, piece, sinkFor, writerOf, walkwayDashed)) dashed = true
+    }
     const e = choice.exit.entranceId === null ? undefined : interior.entrances.find((k) => k.id === choice.exit.entranceId)
     if (e) {
       const h = (opts.entranceSize + 1) / 2
@@ -261,5 +288,9 @@ export function exitPathBuffers(interior: StationInterior, choice: ExitChoice, o
     }
   }
 
-  return { under: base.build(), over: (layers[1] ?? new SegmentWriter()).build(), dashed }
+  // The start the level labels keep clear of: the path's first point, the first connector's foot and the marker.
+  const firstConnector = walk.pieces.find((p) => p.kind === 'connector')
+  const mid = marker[Math.floor(marker.length / 2)]!
+  const keep: Vec3[] = [walk.pieces[0]!.a, ...(firstConnector ? [firstConnector.a] : []), ...[marker[0]!, mid, marker.at(-1)!].map((p): Vec3 => [p[0], railY, p[1]])]
+  return { under: base.build(), over: (layers[1] ?? new SegmentWriter()).build(), dashed, keepOut: new Float32Array(keep.flat()) }
 }

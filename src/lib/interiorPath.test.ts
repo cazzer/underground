@@ -120,6 +120,15 @@ describe('exitPathCenterline', () => {
       [8, -8, 10],
     ])
     expect(pts.at(-1)).toEqual([14, 0, 10])
+    // Restroked, a walkway's sides dash as the interior's do (on an estimated layout), each from 0.
+    const sides = (j: StationInterior) => {
+      const l = exitPathBuffers(j, exitOf(j), opts({ restroke: true }))
+      return { dashed: l.dashed, own: segs(l.under).filter((q) => q.d[0] === 0 && q.d[1] > 0 && q.a[1] === -8 && q.b[1] === -8) }
+    }
+    expect(sides(i)).toEqual({ dashed: false, own: [] })
+    const estimated = sides({ ...i, generated: { archetype: 'cut-cover-mezzanine', confidence: 0.9 } })
+    expect(estimated.dashed).toBe(true)
+    expect(estimated.own.length).toBe(2)
   })
 })
 
@@ -146,6 +155,13 @@ describe('exitPathBuffers', () => {
     expect(over.some((s) => s.b[0] === 9 && s.b[1] === 0)).toBe(true)
     expect(total(under) + total(over)).toBeCloseTo(centerLength + 2 * BOARD_HALF_M, 6)
     expect(layers.dashed).toBe(false)
+  })
+
+  it('gives the level labels the path start to keep clear of: first point, first connector foot, board marker', () => {
+    const k = Array.from(exitPathBuffers(interior, choice, opts()).keepOut)
+    expect(k.slice(0, 6)).toEqual([-10, -16, -5, -10, -16, 2])
+    expect(k.length).toBe(15)
+    expect(k[7]).toBeCloseTo(RAIL_Y, 4)
   })
 
   it('draws everything under at an elevated station', () => {

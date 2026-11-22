@@ -6,6 +6,7 @@ import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
 import type { StreetMask } from '../lib/basemap/streetMask'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
+import type { ExitLabel } from '../lib/exitView'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { interiorOpacity } from '../lib/interiorReveal'
@@ -43,6 +44,8 @@ interface StationStreetsProps {
   network: Network
   /** Set while a layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
   mask: StreetMask
+  /** The trip's exit label (useTripExit), placed first and tinted when it is this layer's; null for none. */
+  exitLabel: ExitLabel | null
 }
 
 /**
@@ -89,11 +92,11 @@ function streetMode(interior: InteriorModel | null): 'under' | 'over' | 'veiled'
  * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
  * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
  */
-function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask }: StreetLinesProps) {
+function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask, exitLabel }: StreetLinesProps) {
   const group = useRef<Group>(null)
   const shown = useRef(-1)
   const labelShown = useRef(0)
-  const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1, markerRadiusM: 0, ringRadiusM: 0 })
+  const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1, markerRadiusM: 0, ringRadiusM: 0, priorityEntrance: -1 })
   // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring.
   const stations = useMemo(() => nearbyStations(network, layer, interior), [network, layer, interior])
   // Which street candidates a subway line runs along, so their labels step clear of its bundle.
@@ -143,6 +146,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     ctx.interior = interior
     ctx.focusRing = interior || interiorPending ? null : focused
     ctx.depthScale = depthScaleY(depth)
+    ctx.priorityEntrance = exitLabel?.stationId === layer.stationId ? exitLabel.index : -1
     // As Stations.tsx and FocusRing.tsx size them at this distance.
     ctx.markerRadiusM = screenScale(distance, markerRadiusPx(distance), MARKER_MIN_METERS)
     ctx.ringRadiusM = ctx.markerRadiusM * focusScaleFactor(distance, ctx.markerRadiusM)

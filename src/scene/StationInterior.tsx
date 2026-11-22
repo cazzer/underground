@@ -1,13 +1,16 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef, type ReactNode } from 'react'
+import { useMemo, useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
 import { interiorStationIds } from '../data/interiorLoad'
+import type { ExitChoice } from '../lib/exitChoice'
 import type { LabelBlockers } from '../lib/labelBlockers'
 import type { Network } from '../lib/network'
 import { interiorOpacity, labelOpacity, veilWeight } from '../lib/interiorReveal'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
+import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { cameraDistance } from './cameraDistance'
+import { ExitPath } from './ExitPath'
 import { interiorLook } from './interiorLook'
 import { interiorLayers, type InteriorModel } from './interiorModel'
 import { InteriorVeil } from './InteriorVeil'
@@ -24,9 +27,12 @@ interface StationInteriorProps {
   outOfService: readonly string[]
   /** Where the level labels write their screen rects, for the street labels to keep clear of. */
   labelBlockers: LabelBlockers
-  /** Drawn inside the interior's group (its anchor, depth factor and visibility): the trip's exit path. */
-  children?: ReactNode
+  /** The trip's way out here (ExitPath.tsx), drawn inside the group (its anchor, depth factor and visibility); the
+   *  level labels keep clear of its start. Null for none. */
+  exit: ExitChoice | null
 }
+
+const NO_KEEP_OUT = new Float32Array(0)
 
 /**
  * The focused station's interior as merged line layers in a group at its anchor: fine, then strong, for each stroke
@@ -35,7 +41,7 @@ interface StationInteriorProps {
  * veil and DOM level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
-export function StationInterior({ model, network, outOfService, labelBlockers, children }: StationInteriorProps) {
+export function StationInterior({ model, network, outOfService, labelBlockers, exit }: StationInteriorProps) {
   // Every station the interior covers must be on the map: its spans, markers and camera all look them up.
   for (const id of interiorStationIds(model)) {
     if (!network.stationById.has(id)) throw new Error(`Interior ${model.stationId} covers unknown station "${id}"`)
@@ -103,7 +109,9 @@ export function StationInterior({ model, network, outOfService, labelBlockers, c
     labelShown.current = labelOpacity(o, depth)
   })
 
-  useLevelLabels(model.labels, group, labelShown, labelBlockers)
+  /** Written by ExitPath: the path's start, which the level labels keep clear of. */
+  const keepOut = useRef<Float32Array>(NO_KEEP_OUT)
+  useLevelLabels(model.labels, group, labelShown, labelBlockers, keepOut)
 
   return (
     <>
@@ -117,7 +125,11 @@ export function StationInterior({ model, network, outOfService, labelBlockers, c
       {mid1Strong && <primitive object={mid1Strong} />}
       {overFine && <primitive object={overFine} />}
       {overStrong && <primitive object={overStrong} />}
-      {children}
+      {exit && (
+        <ErrorBoundary key={`${exit.stopId}>${exit.exit.entranceId ?? ''}`} fallback={null}>
+          <ExitPath model={model} choice={exit} keepOut={keepOut} />
+        </ErrorBoundary>
+      )}
       </group>
     </>
   )

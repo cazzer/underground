@@ -186,7 +186,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `ExitPath.tsx` the trip's way out at its To station, a child of `StationInterior` (only while that interior is the
     focused one, in an `ErrorBoundary`): `exitPathBuffers` in two LineMaterial layers, 9.3 (with the base layers, under
     the lifted trains) and 9.8 (over the levels above them), `theme.exitPathWidth`, dashed (`exitPathDash`/`exitPathGap`)
-    when the layout is estimated or the walk outside is; opacity `interiorOpacity`; `exitPathLook.ts` TEMPORARY look flags
+    when the layout is estimated or the walk outside is; opacity `interiorOpacity`; `exitPathLook.ts` TEMPORARY look flags.
+    It hands its start (`ExitPathLayers.keepOut`) to the level labels, which drop just below it on screen
+    (`src/lib/labelKeepOut.ts`). The exit's street label (`TripExit.mapLabel`, a street-file entrance index) goes to
+    `StationStreets` as `exitLabel`: `rankEntrances` (entranceLabelBoxes.ts) ranks it above every other entrance (an 8e9
+    tier over the elevators' 4e9) and `useStreetLabels` tints it `theme.exitPath`
   - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
     with the reveal and goes with the focus); keyed by station. Its draw order is auto: above the veil (7.5), built from
@@ -366,7 +370,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     walkway) and same-area walks, to each exit: an `exit: true` entrance, or the street end of a connector no entrance lists,
     `entranceId` null); `exitChoice.ts` (`chooseExit`: the exit minimizing in-station plus outside time, the outside walk
     over the shard when the destination is within its radius, else a straight-line estimate at `WALK_DETOUR` 1.3;
-    `probable` for a generated interior; `street` joins the street-file entrance within 1.5 m of the same type;
+    `probable` for a generated or `approximate` interior; `street` joins the street-file entrance within 1.5 m of the same type;
     `walkMinutes`; `quickestExit`: no destination, the least in-station time, `walk` and `destination` null;
     `streetEntranceIndex`); `interiorPath.ts` (`exitPathBuffers`: an `ExitChoice` as group-local buffers: from platform
     height over the track point below the first connector, each connector's centerline between its drawn ends
@@ -1001,9 +1005,11 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
   of a fix); no request carries the fix or the destination, and routing runs on the device.
 - **Trip exit.** Once a plan for the trip panel's ends is ready, `src/data/useTripExit.ts` loads the To station's interior
-  (`useInteriorModel`, the focused interior's cache) and street file (both chosen by the user) and finds each journey's
-  quickest way out (`quickestExit`, avoiding machines out of service; with no fresh outage data none are closed and the line
-  says the status is unknown). The map draws the first journey's (ending on a train) at the To station while the trip panel
+  (`useInteriorModel`, the focused interior's cache) and street files (the interior file id's and, for a complex, the
+  alighting member's; `useStationStreetsLoad` tells loading from missing, and the line waits for both). Both trip ends are
+  chosen by the user (a swap counts: the new To was chosen as From), so this fetch reveals nothing they did not pick. It
+  finds each journey's quickest way out (`quickestExit`, avoiding machines out of service; with no fresh outage data none
+  are closed, and the line says the status is unknown only when the station panel would: never while still connecting). The map draws the first journey's (ending on a train) at the To station while the trip panel
   is open, even under a train panel; only once that station is focused. It fetches no walk graph: only the DEV
   `__underground.exitTo(x, z | null)` seam aims it at a point (and loads that station's walk graph) until 2q7.14.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no

@@ -106,3 +106,29 @@ export function useStationStreets(stationId: string | null): StreetLayer | null 
 
   return (stationId && cache.peek(stationId)) || null
 }
+
+/** A station's street layer and whether its load has settled (loaded, no file, or failed), for a caller that must
+ *  tell loading apart from missing. Fetches as `useStationStreets` does, from the same cache. */
+export function useStationStreetsLoad(stationId: string | null): { layer: StreetLayer | null; settled: boolean } {
+  // The last settled load: set to re-render once the cache holds it, and to remember a failure.
+  const [settledAs, setSettledAs] = useState<{ id: string; failed: boolean } | null>(null)
+  useEffect(() => {
+    if (!stationId || cache.peek(stationId) !== undefined) return
+    let cancelled = false
+    cache.get(stationId).then(
+      () => {
+        if (!cancelled) setSettledAs({ id: stationId, failed: false })
+      },
+      (err: unknown) => {
+        console.error(`Failed to load the streets of station ${stationId}`, err)
+        if (!cancelled) setSettledAs({ id: stationId, failed: true })
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [stationId])
+  if (!stationId) return { layer: null, settled: true }
+  const layer = cache.peek(stationId)
+  return { layer: layer ?? null, settled: layer !== undefined || (settledAs?.id === stationId && settledAs.failed) }
+}

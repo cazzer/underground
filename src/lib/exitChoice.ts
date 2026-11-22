@@ -41,7 +41,8 @@ export interface ExitChoice extends Omit<InStationRoute, 'seconds'> {
   kind: 'exit'
   stationId: StationId
   stopId: StopId
-  /** The interior is a generated estimate, so the exit and its path are probable rather than known. */
+  /** The interior is an estimate (generated, or authored and marked `approximate`), so the exit and its path are
+   *  probable rather than known. */
   probable: boolean
   stepFree: boolean
   /** The street and side of the exit, from the street file's entrance at the same place; null when none matches. */
@@ -168,7 +169,7 @@ function choiceOf(input: QuickestInput, chosen: InStationRoute, outside: Pick<Ex
     kind: 'exit',
     stationId: stationOf(interior, stopId),
     stopId,
-    probable: interior.generated !== undefined,
+    probable: interior.generated !== undefined || interior.approximate === true,
     stepFree: input.stepFree === true,
     street: input.streets ? streetJoinOf(at, route.exit.type, input.streets) : null,
     inStationS: seconds,

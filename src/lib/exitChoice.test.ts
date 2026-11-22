@@ -139,10 +139,12 @@ describe('quickestExit', () => {
     expect(r.probable).toBe(false)
   })
 
-  it('marks a generated interior probable and avoids a closed way out', () => {
+  it('marks a generated or approximate interior probable and avoids a closed way out', () => {
     const generated = twoExits({ generated: { archetype: 'cut-cover-mezzanine', confidence: 0.9 } })
     const g = quickestExit({ interior: generated, stopId: 'X01N' })
     expect(g.kind === 'exit' && g.probable).toBe(true)
+    const approximate = quickestExit({ interior: twoExits({ approximate: true }), stopId: 'X01N' })
+    expect(approximate.kind === 'exit' && approximate.probable).toBe(true)
     const r = quickestExit({ interior, stopId: 'X01N', closed: new Set(['ST1']) })
     expect(r.kind === 'exit' && r.exit.entranceId).toBe('E3')
   })

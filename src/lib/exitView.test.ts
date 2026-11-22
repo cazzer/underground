@@ -78,10 +78,19 @@ describe('exitLineView', () => {
 
   it('names the exit by its street label, the tail in the note', () => {
     const file = streets(interior, [[9, 10, {}]])
-    const view = exitLineView(choice, interior, entranceTexts(file), file, true)
+    const view = exitLineView(choice, interior, [{ file, labels: entranceTexts(file) }], true)
     expect(view.text).toBe('Quickest way out: Bedford Av & N 7 St')
     expect(view.note).toBe('NE corner')
     expect(view.spoken).toBe('Quickest way out: Bedford Avenue and North 7 Street, northeast corner.')
+    expect(view.mapLabel).toEqual({ stationId: 'X01', index: 0 })
+  })
+
+  it('takes a complex member’s label when the first source has no entrance at the exit', () => {
+    const empty = streets(interior, [])
+    const member = { ...streets(interior, [[9, 10, {}]]), stationId: 'X02' }
+    const view = exitLineView(choice, interior, [{ file: empty, labels: [] }, { file: member, labels: entranceTexts(member) }], true)
+    expect(view.text).toBe('Quickest way out: Bedford Av & N 7 St')
+    expect(view.mapLabel).toEqual({ stationId: 'X02', index: 0 })
   })
 
   it('takes a merged twin’s label, and words a point target as Exit at', () => {
@@ -90,18 +99,20 @@ describe('exitLineView', () => {
     expect(labels.map((l) => l.index)).toEqual([0])
     const o = toGround(interior.anchor)
     const toward: ExitChoice = { ...choice, destination: { x: o.x + 60, z: o.z }, walk: { kind: 'route', points: [], meters: 150, seconds: 130 } }
-    const view = exitLineView(toward, interior, labels, file, true)
+    const view = exitLineView(toward, interior, [{ file, labels }], true)
     expect(view.text).toBe('Exit at Bedford Av & N 7 St')
+    expect(view.mapLabel).toEqual({ stationId: 'X01', index: 0 })
     expect(view.note).toBe('NE corner · then 3 min walk')
     expect(view.spoken).toContain('Then a 3 minute walk.')
   })
 
   it('falls back to a compass way from the station without labels', () => {
-    const view = exitLineView(choice, interior, null, null, true)
+    const view = exitLineView(choice, interior, [], true)
     expect(view.text).toMatch(/^Quickest way out: toward the (east|southeast|northeast)$/)
     expect(view.note).toBeNull()
+    expect(view.mapLabel).toBeNull()
     const estimate: ExitChoice = { ...choice, destination: { x: 0, z: 0 }, walk: { kind: 'estimate', meters: 900, seconds: 700 } }
-    const point = exitLineView(estimate, interior, null, null, true)
+    const point = exitLineView(estimate, interior, [], true)
     expect(point.text).toMatch(/^Exit toward the /)
     expect(point.note).toBe('about 12 min walk')
   })
@@ -109,7 +120,7 @@ describe('exitLineView', () => {
   it('says probably on an estimated layout', () => {
     const generated = station([PS1, ST1], { generated: { archetype: 'cut-cover-mezzanine', confidence: 0.9 } })
     const file = streets(generated, [[9, 10, {}]])
-    const view = exitLineView(exitOf(generated), generated, entranceTexts(file), file, true)
+    const view = exitLineView(exitOf(generated), generated, [{ file, labels: entranceTexts(file) }], true)
     expect(view.note).toBe('NE corner · probably')
     expect(view.spoken.endsWith('Probably: the station layout is estimated.')).toBe(true)
   })
@@ -118,10 +129,10 @@ describe('exitLineView', () => {
     const lift = station([EL1, ST1])
     const c = exitOf(lift)
     expect(c.connectorIds).toEqual(['EL1', 'ST1'])
-    expect(exitLineView(c, lift, null, null, false).note).toBe('elevator status unknown')
-    expect(exitLineView(c, lift, null, null, false).spoken).toContain('Elevator status unknown.')
-    expect(exitLineView(c, lift, null, null, true).note).toBeNull()
-    expect(exitLineView(choice, interior, null, null, false).note).toBeNull()
+    expect(exitLineView(c, lift, [], false).note).toBe('elevator status unknown')
+    expect(exitLineView(c, lift, [], false).spoken).toContain('Elevator status unknown.')
+    expect(exitLineView(c, lift, [], true).note).toBeNull()
+    expect(exitLineView(choice, interior, [], false).note).toBeNull()
   })
 })
 
@@ -133,6 +144,8 @@ describe('streetSpoken', () => {
     ['St Nicholas Av', 'Saint Nicholas Avenue'],
     ['Park Av S', 'Park Avenue South'],
     ['Av S', 'Avenue S'],
+    ['Central Park W', 'Central Park West'],
+    ['Broadway & W 96 St', 'Broadway and West 96 Street'],
     ['west side at W 94 St', 'west side at West 94 Street'],
     ['NE corner', 'northeast corner'],
   ])('%s → %s', (text, spoken) => {
