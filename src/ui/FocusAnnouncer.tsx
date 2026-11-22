@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react'
 import { useFocus } from '../lib/focus'
-import { ANNOUNCE_DELAY_MS, focusAnnouncement, shouldAnnounce } from '../lib/focusCause'
+import { ANNOUNCE_DELAY_MS, focusAnnouncement, shouldAnnounce } from '../lib/focusAnnounce'
 import type { Network } from '../lib/network'
 
 interface FocusAnnouncerProps {
@@ -12,26 +12,27 @@ interface FocusAnnouncerProps {
 }
 
 /**
- * Tells a screen-reader user, once, that a station panel opened by the camera's auto-focus (zoom, pan, or after a
- * follow ends). Visitor picks are not announced: search moves focus to the heading itself. Polite, name only, and
- * only for a station still focused ANNOUNCE_DELAY_MS after it was entered, so a pass across several stations says
- * just the last one. Never moves focus. One always-mounted live region, so the text change is what is spoken.
+ * Tells a screen-reader user, once, that a station panel opened: by the camera's auto-focus, a map tap, a link or
+ * the "Go to" button, none of which move focus. A search pick does, so its heading speaks and this stays silent.
+ * Polite, name only, and only for a station still focused ANNOUNCE_DELAY_MS after it was entered, so a quick pass
+ * across several stations says just the last one. Never moves focus. One always-mounted live region, so the text
+ * change is what is spoken.
  */
 export function FocusAnnouncer({ network, covered, panel }: FocusAnnouncerProps) {
-  const { focusedId, cause } = useFocus()
+  const { focusedId } = useFocus()
   const [text, setText] = useState('')
   useEffect(() => {
     setText('')
-    if (!shouldAnnounce({ cause, focusedId, covered, focusInPanel: false })) return
+    if (!shouldAnnounce({ focusedId, covered, focusInPanel: false })) return
     const timer = setTimeout(() => {
       const station = focusedId ? network.stationById.get(focusedId) : undefined
       const focusInPanel = panel.current?.contains(document.activeElement) ?? false
-      if (station && shouldAnnounce({ cause, focusedId, covered, focusInPanel })) setText(focusAnnouncement(station.name))
+      if (station && shouldAnnounce({ focusedId, covered, focusInPanel })) setText(focusAnnouncement(station.name))
     }, ANNOUNCE_DELAY_MS)
     return () => clearTimeout(timer)
-  }, [focusedId, cause, covered, network, panel])
+  }, [focusedId, covered, network, panel])
   return (
-    <p role="status" aria-live="polite" className="sr-only" data-testid="focus-announcer">
+    <p role="status" aria-live="polite" className="sr-only">
       {text}
     </p>
   )
