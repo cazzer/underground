@@ -3,7 +3,7 @@ import type { Arrival, VehicleStatus } from '../../data/realtime'
 import type { StopId } from '../../data/schema'
 import type { Ground } from '../projection'
 import { pointAtDistance } from './polyline'
-import { easeRun } from './runEase'
+import { easeRun, rampShareFor } from './runEase'
 import type { ShapeGeometry } from './shapeGeometry'
 import { capArrival, type StopVisit } from './stopVisit'
 
@@ -80,7 +80,7 @@ export interface HopPlan {
   dwellS: number
   /** Progress along the hop when it doesn't depend on time (dwelling, overdue at the next stop); else null. */
   fixedFraction: number | null
-  /** Floor on the progress (INCOMING_AT trains are never shown early in the hop). */
+  /** Floor on the progress (INCOMING_AT trains are never shown early in the hop); an eased run covers the rest. */
   minFraction: number
   /** Seconds until the origin stop's predicted time when the train hasn't left it (not STOPPED_AT); else null. */
   departsInS: number | null
@@ -88,6 +88,8 @@ export interface HopPlan {
   capped: boolean
   /** The run after the dwell follows `easeRun` (accelerate, cruise, brake); false: constant speed. TEMPORARY (`?runs=`). */
   eased: boolean
+  /** The eased run's ramp share (`rampShareFor`): 0.2, less on a hop fast enough to cruise above 25 m/s. */
+  rampShare: number
 }
 
 export interface PlanFailure {
@@ -175,6 +177,7 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
     departsInS: hop.departsInS,
     capped: arriveAt !== hop.arriveAt,
     eased: input.easedRuns ?? true,
+    rampShare: rampShareFor(D[hop.to]! - D[hop.from]!, runS - dwellS),
   }
 }
 
@@ -183,7 +186,11 @@ export function hopFraction(plan: HopPlan, now: number): number {
   if (plan.fixedFraction !== null) return plan.fixedFraction
   // The train holds at `from` until `runS - dwellS` before arriving, then runs for the rest of the hop.
   const u = clamp01(1 - (plan.arriveAt! - now) / (plan.runS - plan.dwellS))
-  return Math.max(plan.minFraction, plan.eased ? easeRun(u) : u)
+  if (!plan.eased) return Math.max(plan.minFraction, u)
+  // An INCOMING_AT floor eases over the rest of the hop, so the floored train still pulls away and brakes. It is
+  // never behind the plain ease (a status flip only moves the target forward) and still arrives at u = 1.
+  const m = plan.minFraction
+  return m + (1 - m) * easeRun(u, plan.rampShare)
 }
 
 /** Meters along the shape at `now`. No allocation: runs per frame. */
@@ -198,7 +205,7 @@ export function hopDistance(plan: HopPlan, geometry: ShapeGeometry, now: number)
  * at the origin stop (segment times include it), so the train holds there, then runs and still
  * arrives on the predicted time; the same rule for every status, so a status flip never moves
  * the target. The run pulls away, cruises and brakes (`easeRun`: a trapezoid, 1.25x the average speed at
- * cruise). The shorter, eased run means a mid-hop revision of the predicted arrival moves the target up to
+ * cruise, capped at 25 m/s by shorter ramps). The shorter, eased run means a mid-hop revision of the predicted arrival moves the target up to
  * 1.25/0.65 (about 1.9x) as far as a constant-speed run over the whole hop would; the correction layer absorbs it. Overdue trains wait at
  * the next platform, delayed or dwelling ones hold at the previous stop. STOPPED_AT still interpolates toward the next stop,
  * because B-division feeds leave STOPPED_AT set after the train departs.

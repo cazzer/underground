@@ -96,7 +96,7 @@ describe('a trip moving between two shapes of the same route', () => {
         key: 't',
         shapeId,
         geometry: geometries.get(shapeId)!,
-        plan: { from: 0, to: 1, arriveAt: null, runS: 100, dwellS: 0, fixedFraction: 0, minFraction: 0, departsInS: null, capped: false, eased: false },
+        plan: { from: 0, to: 1, arriveAt: null, runS: 100, dwellS: 0, fixedFraction: 0, minFraction: 0, departsInS: null, capped: false, eased: false, rampShare: 0 },
       }) as unknown as LiveTrip
     let pairs = 0
     let carried = 0

@@ -83,8 +83,8 @@ describe('positionAlongShape in transit', () => {
   })
   it('floors INCOMING_AT at 75% of the hop', () => {
     expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 80]])).distance).toBeCloseTo(1750)
-    // 7 s left: 90% of the time gone, braking: 1 - 1.25 * 0.1² / 0.4 of the way.
-    expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 7]])).distance).toBeCloseTo(1968.75)
+    // 7 s left: 90% of the time gone, braking: the floor plus the rest of the hop eased, 0.75 + 0.25 * 0.96875.
+    expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 7]])).distance).toBeCloseTo(1992.1875)
   })
   it('falls back to a run time from distance when the segment is unknown', () => {
     // 1000 m at 8 m/s = 125 s, 30 s of it dwell, so it moves for 95 s; 47.5 s left is halfway.

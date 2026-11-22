@@ -39,6 +39,7 @@ function trip(key: string, over: { shapeId?: string; arriveAt?: number; fixed?: 
     departsInS: null,
     capped: false,
     eased: false,
+    rampShare: 0,
   }
   const shapeId = over.shapeId ?? 'S1'
   return { key, shapeId, plan, geometry: SHAPES[shapeId]! } as unknown as LiveTrip

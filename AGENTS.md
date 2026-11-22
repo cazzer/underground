@@ -288,7 +288,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     first `dwellFor(runS)` (30 s, at most 35% of the hop) of every hop is held at its origin stop: the train
     leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status. The run itself is eased
     (`runEase.ts` `easeRun`: a trapezoid, 20% accelerating, cruise at 1.25x the average, 20% braking; monotone, at
-    rest at both ends). The predicted arrival is
+    rest at both ends; `rampShareFor` shortens the ramps so no run cruises above 25 m/s; an INCOMING_AT floor
+    eases over the rest of the hop). The predicted arrival is
     capped by the schedule from the trip's last stop (`capArrival` in `stopVisit.ts`): MTA final-approach
     predictions run about 40 s late
   - `stopVisit.ts` `nextVisit`: the last stop a train was seen at (STOPPED_AT time; `here` and `leftAfter` on the

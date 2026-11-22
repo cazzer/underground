@@ -135,14 +135,15 @@ function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, before: LiveTrip
   } else if (c.kind === 'continue') {
     // Continue the running glide on its own curve, rescaled so it starts from the new gap: no restart from rest.
     // `shown` is last frame's: on the same shape it is first moved along the old glide to now, so the frame the poll
-    // lands on keeps the glide's speed instead of standing still.
+    // lands on keeps the glide's speed instead of standing still. When the new target is short of where the old glide
+    // had got to, the glide starts from `shown` instead (decideCorrection only continues a gap ahead of it), so the dot
+    // keeps tracking the moving target rather than dropping to the ease's crawl over a small gap.
     const left = 1 - smoothstep((o.dataNow - t.glideAt[slot]!) / runningT)
-    const from =
+    const along =
       before.geometry === geometry ? Math.max(shown, hopDistance(before.plan, geometry, o.dataNow) - t.glideE0[slot]! * left) : shown
-    if (from < target) {
-      t.glideT[slot] = runningT
-      t.glideE0[slot] = (target - from) / left
-    }
+    const from = along < target ? along : shown
+    t.glideT[slot] = runningT
+    t.glideE0[slot] = (target - from) / left
   } else if (c.kind === 'glide') {
     t.glideE0[slot] = target - shown
     t.glideAt[slot] = o.dataNow

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildPolyline } from './polyline'
 import { hopDistance, planHop } from './position'
+import { MAX_CRUISE_MPS } from './runEase'
 import type { ShapeGeometry } from './shapeGeometry'
 import { EMPTY_PROFILE } from '../trackProfile'
 
@@ -55,5 +56,38 @@ describe('the run after the dwell', () => {
     for (const [t, d] of [[30, 0], [37, 100], [65, 500], [93, 900], [100, 1000]]) {
       expect(hopDistance(p, northbound, NOW + t!), `+${t}`).toBeCloseTo(d!)
     }
+  })
+
+  it('cruises no faster than 25 m/s on a fast hop, with shorter ramps, and still arrives on time', () => {
+    // 70 s with a 24.5 s dwell: 1000 m in 45.5 s, 22 m/s average, which full ramps would cruise at 27.5 m/s.
+    const p = planHop({ geometry: northbound, status: 'IN_TRANSIT_TO', stopId: '102N', arrivals: [['102N', NOW + 70]], segments: { '101N>102N': 70 }, now: NOW })
+    if ('ok' in p) throw new Error(`unexpected ${p.reason}`)
+    let prev = 0
+    let peak = 0
+    for (let k = 1; k <= 45.5 / DT; k++) {
+      const d = hopDistance(p, northbound, NOW + 24.5 + k * DT)
+      expect(d).toBeGreaterThanOrEqual(prev)
+      peak = Math.max(peak, (d - prev) / DT)
+      prev = d
+    }
+    expect(peak).toBeLessThanOrEqual(MAX_CRUISE_MPS * (1 + 1e-4))
+    expect(peak).toBeGreaterThan(MAX_CRUISE_MPS * 0.99)
+    expect(hopDistance(p, northbound, NOW + 70)).toBe(1000)
+  })
+
+  it('eases an INCOMING_AT floor over the rest of the hop: pulls away from it at rest, arrives on time', () => {
+    const p = planHop({ geometry: northbound, status: 'INCOMING_AT', stopId: '103N', arrivals: [['103N', NOW + 80]], segments: SEGMENTS, now: NOW })
+    if ('ok' in p) throw new Error(`unexpected ${p.reason}`)
+    expect(hopDistance(p, northbound, NOW + 10)).toBe(1750) // still in the dwell, held at the floor
+    const speed = (t: number) => (hopDistance(p, northbound, NOW + t + DT) - hopDistance(p, northbound, NOW + t)) / DT
+    expect(speed(10)).toBeLessThan(0.05)
+    expect(speed(80 - DT)).toBeLessThan(0.05)
+    let prev = 1750
+    for (let k = 1; k <= 70 / DT; k++) {
+      const d = hopDistance(p, northbound, NOW + 10 + k * DT)
+      expect(d).toBeGreaterThanOrEqual(prev)
+      prev = d
+    }
+    expect(hopDistance(p, northbound, NOW + 80)).toBe(2000)
   })
 })
