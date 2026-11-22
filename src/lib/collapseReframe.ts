@@ -5,7 +5,11 @@
  * panel now leaves. It waits for the panel's measurement to settle, so one toggle is one move, and moves only when the
  * view doesn't already frame all of it and the new framing shows no less than the view does. It declines once the user
  * has taken over the view (a gesture since the last landing) and while a late interior or streets reframe is pending
- * (useInteriorReframe's own, which decides the landing turn). Pure; useCollapseReframe applies it.
+ * (useInteriorReframe's own, which decides the landing turn).
+ *
+ * A bare station's phone panel that changes height just after its landing (resizeReframe.ts, ost.18) settles the same
+ * way and reframes onto its entrance marks only when the new framing shows strictly more. An interior's panel size
+ * alone never moves the camera. Pure; useCollapseReframe applies it.
  */
 import { showsMore } from './pathFrame'
 
@@ -16,6 +20,8 @@ export const COLLAPSE_MAX_WAIT_MS = 600
 
 /** A toggle waiting for the panel to settle. A gesture, another flight or a follow clears it; while set, the late-interior reframe waits. */
 export interface CollapsePending {
+  /** toggle: a user collapse or expand. resize: a bare station's panel that changed height just after its landing (resizeReframe.ts). */
+  kind: 'toggle' | 'resize'
   /** The station focused at the toggle. */
   stationId: string
   /** performance.now() at the toggle, ms. */
@@ -42,6 +48,11 @@ export function reframeGains(current: readonly number[], next: readonly number[]
   return !showsMore(current, next)
 }
 
+/** Whether a move is worth it: a toggle by reframeGains; a resize only when the new framing shows strictly more (the station first, then marks). */
+export function moveGains(kind: CollapsePending['kind'], current: readonly number[], next: readonly number[], totals: readonly number[]): boolean {
+  return kind === 'toggle' ? reframeGains(current, next, totals) : showsMore(next, current)
+}
+
 export interface CollapseInput {
   flying: boolean
   following: boolean
@@ -50,15 +61,18 @@ export interface CollapseInput {
   tookOver: boolean
   /** The landing awaits a late interior or a bare station's streets (AwaitingInterior kind 'interior' or 'streets'): that reframe moves once, with its turn. */
   lateArrival: boolean
+  /** The index lists no interior for the pending station: a resize reframes only a bare station. */
+  bare: boolean
 }
 
 /**
  * drop: forget it (another flight, a follow, the focus moved on, the user took over, or a late-arrival reframe is
- * pending). reframe: an eased flight, no turn. snap: the same at once.
+ * pending; for a resize, a station with an interior). reframe: an eased flight, no turn. snap: the same at once.
  */
 export type CollapseAction = 'drop' | 'reframe' | 'snap'
 
 export function collapseAction(p: CollapsePending, s: CollapseInput): CollapseAction {
   if (s.flying || s.following || s.tookOver || s.lateArrival || s.focusedId !== p.stationId) return 'drop'
+  if (p.kind === 'resize' && !s.bare) return 'drop'
   return p.reduced ? 'snap' : 'reframe'
 }
