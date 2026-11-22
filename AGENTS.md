@@ -161,6 +161,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `useEntranceProbe.ts` dev-only `__underground.entrancesAt()` (entrance marks and station in viewport px, free rect);
     `usePathProbe.ts` dev-only `__underground.stationPathAt()` (the priority frame's path marker ends and centerline, and its out-of-service machines' ends, in viewport px, free rect);
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);
+    `useTouchOrbit.ts` its two-finger twist on touch (see Rendering conventions; dev-only `__underground.orbit(at?)`: azimuth,
+    distance, target, lock, zoomSpeed, rotateSpeed, and a ground point's viewport px);
     `useInteriorReframe.ts` frames an interior that loaded too late for its station flight (after LATE_TURN_PROGRESS
     or after landing): once landed, a 0.6-1 s eased flight onto it with the landing turn decided then (reduced motion
     snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `ready` is `interiorReadyFor`, `interiorCovers(interior, awaited station)`, so a complex's other member reframes too, or for a bare station awaiting its streets (`kind: 'streets'`) `streetsReadyFor`: the same reframe onto its entrances, no turn; with the trip panel open a framed interior goes on
@@ -395,7 +397,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     on a portrait free area (`landingAzimuth`, ground height ≥ 1.5× width: phones) turned just enough that the
     platforms (`stationAxis`, `InteriorModel.axis`) run within 25° of screen-vertical, decided once per flight;
     `orbitLimits.ts` azimuth cap by tilt, short-way spring to north-up, soft pan radius, focus-point pivot;
-    `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`); `turnMeter.ts` the
+    `touchOrbit.ts` the two-finger gesture lock and turn (pure, allocation-free); `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`); `turnMeter.ts` the
     hint's max net turn (signed, wrapped steps); `reducedMotion.ts` `prefersReducedMotion()`, one live query shared by
     the camera, live and line code
   - Exit choice (pure; 2q7.11): `minHeap.ts` (`MinHeap`, typed-array binary heap, no decrease-key); `planGeometry.ts`
@@ -864,7 +866,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`rotateArmed`: focused and tiltT ≥ 0.5, set by `onStart`, cleared by `onEnd`); otherwise `rotateSpeed` is 0
   for all of it, so an unarmed gesture never turns the view: a pinch that starts unfocused or nearly top-down
   doesn't, whatever its fingers do. Each new contact (a second finger down fires `onStart` again) re-checks the
-  arming. A bare station pivots on its own point while that point is within its 100 m pan radius of the free
+  arming. On touch the controls never turn a two-finger gesture (`rotateSpeed` 0 for touch); `useTouchOrbit.ts` follows the two
+  live touches and `src/lib/touchOrbit.ts` locks each gesture once: to zoom when the spread changes by 15% (checked first), else,
+  armed only, to rotate on a 12° twist or a midpoint slide of 40 px plus the spread's change. Under the rotate lock the view
+  turns by the twist (a clockwise twist turns the content clockwise) plus the slide as before (-2π · dx / height), the whole
+  turn since the gesture started, through `setAzimuthalAngle` on an unwrapped goal clamped to the azimuth window (so the
+  controls' damped lag and glide stay), and `zoomSpeed` is 0 until the gesture ends. A third finger, any lift or a cancel
+  ends it; only a later touch making exactly two fingers down starts the next. A pinch with modest drift turns nothing.
+  A bare station pivots on its own point while that point is within its 100 m pan radius of the free
   area's middle, else on that middle, so a far-off or held station can't swing the view away. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
 - Every `on*` handler passed to `MapControls` (today `onStart` and `onEnd`) stays referentially

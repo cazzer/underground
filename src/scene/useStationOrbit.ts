@@ -22,6 +22,7 @@ import { prefersReducedMotion } from '../lib/reducedMotion'
 import { depthFactor, ISO_POLAR, tiltT } from '../lib/tilt'
 import { addTurn, createTurnMeter, resetTurn } from '../lib/turnMeter'
 import type { InteriorModel } from './interiorModel'
+import { useTouchOrbit } from './useTouchOrbit'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
@@ -111,10 +112,18 @@ export function useStationOrbit({
     focusRef.current = focusPos
   }, [focusPos])
 
+  // A two-finger touch turns by twist (useTouchOrbit), never by the controls' own rotate.
+  const canTurn = useCallback(
+    () => rotating.current && (focusRef.current !== null || following() || holdAzimuth()),
+    [following, holdAzimuth],
+  )
+  const touch = useTouchOrbit({ controls, canTurn })
   const onGestureStart = useCallback(() => {
     const c = controls.current
     rotating.current = c !== null && rotateArmed(focusRef.current !== null || following(), tiltT(camera.position.distanceTo(c.target)))
-  }, [controls, camera, following])
+    // Before this gesture's first move, which may come before the next frame's rule below.
+    if (c && touch.isTouch()) c.rotateSpeed = 0
+  }, [controls, camera, following, touch])
   const onGestureEnd = useCallback(() => {
     rotating.current = false
   }, [])
@@ -143,8 +152,9 @@ export function useStationOrbit({
     // window holds the angle when unfocused (min = max) and top-down (0); focused it opens with the
     // tilt, to ±Infinity (a full spin, which the controls leave unclamped) from FULL_SPIN_TILT.
     // rotateSpeed scales every move's delta, so a gesture not armed at its start (onGestureStart)
-    // turns nothing however its fingers drift, even after focus opens the window part-way through.
-    c.rotateSpeed = inp.focused && rotating.current ? 1 : 0
+    // turns nothing however its fingers drift, even after focus opens the window part-way through. A touch
+    // never turns through it: its fingers' twist does (useTouchOrbit), so a pinch's drift turns nothing.
+    c.rotateSpeed = inp.focused && rotating.current && !touch.isTouch() ? 1 : 0
     c.minAzimuthAngle = b.min
     c.maxAzimuthAngle = b.max
   }, -2)

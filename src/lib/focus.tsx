@@ -3,6 +3,7 @@ import type { BasemapStats } from '../data/basemapTypes'
 import { nextFocus, NO_FOCUS_GROUP, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'
+import type { TouchLock } from './touchOrbit'
 
 /** A camera flight: to a station (focusing it), or to a ground point with `radiusM` in view (drops focus). */
 export type FlyRequest =
@@ -67,12 +68,25 @@ export interface StationPathProbe {
   free: { left: number; top: number; right: number; bottom: number }
 }
 
+/** The orbit's controls and two-finger lock (useTouchOrbit), with a ground point's viewport px when one is asked for. */
+export interface OrbitProbe {
+  azimuth: number
+  distance: number
+  target: { x: number; z: number }
+  lock: TouchLock
+  zoomSpeed: number
+  rotateSpeed: number
+  px: { x: number; y: number } | null
+}
+
 /** Dev-only console and Playwright hooks; each provider adds and removes only its own. */
 export interface UndergroundDevHooks {
   /** The focused station's street layer probe (useEntranceProbe), while it has a streets file. */
   entrancesAt?: () => EntranceProbe
   /** The priority frame the camera frames (usePathProbe): its path and machine points in viewport px, while there is one. */
   stationPathAt?: () => StationPathProbe
+  /** The orbit's state (useTouchOrbit); `at` a ground point to project. */
+  orbit?: (at?: { x: number; z: number }) => OrbitProbe
   select?: (stationId: string) => void
   selectTrain?: (key: string) => void
   trainKeys?: () => string[]
