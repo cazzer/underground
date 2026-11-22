@@ -444,7 +444,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`realtimeFetch.ts`'s timeout, errors and `parseRetryAfter` are reused). Pure joins in `lib/live/`: `eneJoin.ts`
   (`joinStationOutages`: outage codes to the focused interior's `Connector.id`; a snapshot over `ENE_MAX_AGE_S` 480 s old
   by the /rt live clock, else the device clock, is unknown, never "in service"; also `MachineStatus`, the step-free routing's
-  input), `eneText.ts` (panel text, New York return times). `App` passes `outages.outIds` to `Scene` > `StationInterior`, which
+  input: `chooseExit({ closed: new Set(join.outIds) })`, checked on L08 in `exitOutage.test.ts`; no UI calls it yet), `eneText.ts` (panel text, New York return times). `App` passes `outages.outIds` to `Scene` > `StationInterior`, which
   rebuilds its four line layers only when that set changes (`interiorLayers`; `InteriorModel` itself never changes)
 - `src/data/useStationHash.ts` keeps `#station=<id>` and the focused station in step with `history.replaceState`
   (no history entries): reads on mount and `hashchange`, writes on every focus change; an unknown id clears the
