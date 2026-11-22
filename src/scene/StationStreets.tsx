@@ -4,6 +4,7 @@ import { Color, type Group } from 'three'
 import { interiorCovers, interiorStationIds } from '../data/interiorLoad'
 import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
 import type { StreetMask } from '../lib/basemap/streetMask'
+import { clipLineBuffers } from '../lib/clipLineBuffers'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
@@ -13,7 +14,9 @@ import type { LabelBlockers } from '../lib/labelBlockers'
 import type { Rgb } from '../lib/lineBuffers'
 import { DESKTOP_LABEL_RADIUS_M, streetLabelOpacity } from '../lib/streetLabelReveal'
 import type { Network } from '../lib/network'
-import { routeBundles } from '../lib/routeBundles'
+import { ROUTE_NEAR_M, routeBundles } from '../lib/routeBundles'
+import { buildRouteClip } from '../lib/routeClip'
+import { localTracks } from '../lib/routeTracks'
 import type { Ground } from '../lib/projection'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
@@ -106,9 +109,12 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     insetsRef.current = insets
     panelRef.current = panel
   }, [insets, panel])
+  // The street pieces that run under a route line are left out, so none reads as one more track in its bundle.
+  const clip = useMemo(() => buildRouteClip(localTracks(network.shapes, layer.anchor, layer.file.radiusM + ROUTE_NEAR_M)), [network, layer])
   const mode = streetMode(interior)
+  const buffers = useMemo(() => clipLineBuffers(mode === 'veiled' ? layer.veiledBuffers : layer.buffers, clip), [mode, layer, clip])
   const lines = useLineLayer(
-    mode === 'veiled' ? layer.veiledBuffers : layer.buffers,
+    buffers,
     mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,
     theme.streetWidth,
   )

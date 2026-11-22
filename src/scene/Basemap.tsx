@@ -12,12 +12,13 @@ import { Color } from 'three'
 import type { BasemapConfig } from '../data/basemapConfig'
 import { classVisibility } from '../lib/basemap/classFade'
 import { edgeFadeFor, NETWORK_FADE_M, NETWORK_PAD_M, sceneBox } from '../lib/basemap/edgeFade'
-import { BASEMAP_CLASSES, type BasemapClass } from '../lib/basemap/featureClass'
+import { BASEMAP_CLASSES, isRoadClass, type BasemapClass } from '../lib/basemap/featureClass'
 import { isNoOutline, networkHull } from '../lib/basemap/networkHull'
 import { maskInner, type StreetMask } from '../lib/basemap/streetMask'
 import { planPool } from '../lib/basemap/tilePool'
 import type { Station } from '../lib/network'
 import { interiorOpacity } from '../lib/interiorReveal'
+import type { PackedTracks } from '../lib/routeTracks'
 import { theme } from '../theme'
 import { createExtentUniforms, createMaskUniforms } from './basemapLineMaterial'
 import { createClassLayer, type ClassLayer } from './basemapLayer'
@@ -33,9 +34,6 @@ const LAYER_ORDER: Readonly<Record<BasemapClass, number>> = {
   major: RENDER_ORDER.basemapMajor,
   highway: RENDER_ORDER.basemapHighway,
 }
-
-/** Water and parks are areas the station's streets don't redraw, so only roads are masked. */
-const MASKED: ReadonlySet<BasemapClass> = new Set(['highway', 'major', 'minor', 'path'])
 
 interface ClassEntry {
   cls: BasemapClass
@@ -57,10 +55,12 @@ interface BasemapProps {
   stations: readonly Station[]
   /** Written by StationStreets while a station street layer is mounted. */
   mask: StreetMask
+  /** The drawn route lines (packTracks of network.shapes): roads running under them are left out. */
+  tracks: PackedTracks
 }
 
-export function Basemap({ config, stations, mask }: BasemapProps) {
-  const store = useBasemapTiles(config)
+export function Basemap({ config, stations, mask, tracks }: BasemapProps) {
+  const store = useBasemapTiles(config, tracks)
   const maskUniforms = useMemo(createMaskUniforms, [])
   const background = useMemo(() => new Color(theme.background), [])
   const { entries, extent, drawn } = useMemo(() => {
@@ -74,7 +74,8 @@ export function Basemap({ config, stations, mask }: BasemapProps) {
       layer: createClassLayer({
         width: theme.basemap[cls].width,
         renderOrder: LAYER_ORDER[cls],
-        mask: MASKED.has(cls) ? maskUniforms : unmasked,
+        // Water and parks are areas the station's streets don't redraw, so only roads are masked.
+        mask: isRoadClass(cls) ? maskUniforms : unmasked,
         extent,
       }),
       stroke: new Color(theme.basemap[cls].stroke),

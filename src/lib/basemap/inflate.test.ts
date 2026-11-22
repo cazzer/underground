@@ -14,7 +14,7 @@ describe('inflateIfGzip', () => {
     const out = await inflateIfGzip(gz)
     expect([...out]).toEqual([...raw])
     expect(isMvtBytes(out)).toBe(true)
-    expect(decodeTile(out, 15, 9647, 12320, ['roads']).path).toHaveLength(6)
+    expect(decodeTile(out, 15, 9647, 12320, ['roads'], null).path).toHaveLength(6)
   })
 
   it('passes raw MVT and empty bodies through as they are', async () => {
