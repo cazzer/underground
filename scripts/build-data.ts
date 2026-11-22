@@ -19,6 +19,8 @@
  *  The router's transfers go to public/data/route/transfers.json: loaded when the trip panel plans, outside the budget,
  *  under TRANSFERS_GZIP_CAP_BYTES.
  *
+ *  stations.json also carries `complexes`, the catalog's complex_id groups (lead first; see lib/stationComplexes.ts).
+ *
  *  Also writes public/data/timetable/<serviceId>.json, one per service: loaded on demand, outside the budget, each
  *  under TIMETABLE_FILE_GZIP_CAP_BYTES. A file there for a service the feed no longer has is removed. Likewise
  *  timetable/dated/<YYYYMMDD>.json plus index.json (each under that cap, the directory under
@@ -38,6 +40,7 @@ import { readFeed, type GtfsFeed } from './lib/gtfs.ts'
 import { buildRoutes, buildStations, buildTransfers } from './lib/network.ts'
 import { addAccess } from './lib/stationAccess.ts'
 import { readAccessExceptions, readCatalogStations } from './lib/accessInputs.ts'
+import { buildComplexes } from './lib/stationComplexes.ts'
 import {
   GZIP_BUDGET_BYTES,
   TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES,
@@ -102,11 +105,14 @@ async function buildRegular(zip: Uint8Array) {
 
   const { segments, skipped: skippedSegments } = buildSegments(feed.stopTimes)
   const { file: tripIndex, skippedNoShape } = buildTripIndex(feed)
-  const access = addAccess(buildStations(feed), readCatalogStations(), readAccessExceptions())
+  const catalogStations = readCatalogStations()
+  const access = addAccess(buildStations(feed), catalogStations, readAccessExceptions())
   for (const warning of access.warnings) console.warn(`WARNING: ${warning}`)
+  const complexes = buildComplexes(access.stations, catalogStations)
+  for (const warning of complexes.warnings) console.warn(`WARNING: ${warning}`)
   const timetables = buildTimetables(feed)
   const outputs: [string, unknown, number][] = [
-    ['stations.json', { feedVersion, stations: access.stations }, 2],
+    ['stations.json', { feedVersion, stations: access.stations, complexes: complexes.complexes }, 2],
     ['routes.json', { feedVersion, routes: buildRoutes(feed) }, 2],
     ['shapes.json', { feedVersion, shapes: buildShapes(feed, SIMPLIFY_TOLERANCE_M) }, 2],
     ['segments.json', { feedVersion, segments }, 2],
