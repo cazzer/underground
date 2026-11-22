@@ -66,7 +66,7 @@ describe('buildStopIndex', () => {
 })
 
 describe('committed transfers', () => {
-  const transfers = (JSON.parse(readFileSync('public/data/transfers.json', 'utf8')) as TransfersFile).transfers
+  const transfers = (JSON.parse(readFileSync('public/data/route/transfers.json', 'utf8')) as TransfersFile).transfers
   const linked = new Map<string, Set<string>>()
   for (const t of transfers) linked.set(t.from, (linked.get(t.from) ?? new Set()).add(t.to))
 

@@ -74,7 +74,7 @@ const datedFileCache = createInteriorCache((date) => {
 
 const CONSTANT_KEY = 'file'
 const transfersCache = createInteriorCache(() => {
-  const url = `${BASE_URL}data/transfers.json`
+  const url = `${BASE_URL}data/route/transfers.json`
   return fetchJson(url).then((raw) => expectDataFile<TransfersFile>(raw, 'transfers', url))
 })
 const datedIndexCache = createInteriorCache(() => {
@@ -91,7 +91,7 @@ export function timetableFile(serviceId: string): Promise<TimetableFile> {
   return timetableCache.get(serviceId)
 }
 
-/** `data/transfers.json`, fetched once per page load. */
+/** `data/route/transfers.json`, fetched once per page load. */
 export function transfersFile(): Promise<TransfersFile> {
   return transfersCache.get(CONSTANT_KEY)
 }
