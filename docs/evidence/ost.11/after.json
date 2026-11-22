@@ -1,0 +1,128 @@
+[
+  {
+    "view": "phone",
+    "reduced": false,
+    "station": "127",
+    "distance": 400,
+    "offset": 98.7,
+    "inside": "9/11",
+    "minMarginPx": -83.3,
+    "stationPx": {
+      "x": 118,
+      "y": 269
+    },
+    "stationMarginPx": 68.9,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 337.5
+    },
+    "focusedAfter": "127"
+  },
+  {
+    "view": "phone",
+    "reduced": false,
+    "station": "120",
+    "distance": 400,
+    "offset": 98.1,
+    "inside": "2/6",
+    "minMarginPx": -107.5,
+    "stationPx": {
+      "x": 195,
+      "y": 264
+    },
+    "stationMarginPx": 73.4,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 337.5
+    },
+    "focusedAfter": "120"
+  },
+  {
+    "view": "phone",
+    "reduced": true,
+    "station": "127",
+    "distance": 400,
+    "offset": 98.1,
+    "inside": "8/11",
+    "minMarginPx": -67.7,
+    "stationPx": {
+      "x": 203,
+      "y": 264
+    },
+    "stationMarginPx": 73.4,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 337.5
+    },
+    "focusedAfter": "127"
+  },
+  {
+    "view": "desktop",
+    "reduced": false,
+    "station": "127",
+    "distance": 400,
+    "offset": 45,
+    "inside": "11/11",
+    "minMarginPx": 192.1,
+    "stationPx": {
+      "x": 560,
+      "y": 446
+    },
+    "stationMarginPx": 386.5,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 1120,
+      "bottom": 833
+    },
+    "focusedAfter": "127"
+  },
+  {
+    "view": "desktop",
+    "reduced": false,
+    "station": "120",
+    "distance": 400,
+    "offset": 45,
+    "inside": "6/6",
+    "minMarginPx": 97.6,
+    "stationPx": {
+      "x": 560,
+      "y": 446
+    },
+    "stationMarginPx": 386.5,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 1120,
+      "bottom": 833
+    },
+    "focusedAfter": "120"
+  },
+  {
+    "view": "phone",
+    "reduced": false,
+    "deepLink": true,
+    "station": "127",
+    "distance": 400,
+    "offset": 98.7,
+    "inside": "9/11",
+    "minMarginPx": -83.3,
+    "stationPx": {
+      "x": 118,
+      "y": 269
+    },
+    "stationMarginPx": 68.9,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 337.5
+    }
+  }
+]

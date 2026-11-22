@@ -89,10 +89,10 @@ function getLayer(id: string): Promise<StreetLayer | null> {
 }
 
 /**
- * The focused station's streets, once loaded; null while loading, with no focus, with no street file, or after a
- * failure (logged). Nothing is fetched until a station is focused.
+ * The focused station's streets, once loaded; null with no focus or no street file; undefined while loading or after
+ * a failure (logged; the next focus retries). Nothing is fetched until a station is focused.
  */
-export function useStationStreets(stationId: string | null): StreetLayer | null {
+export function useStationStreets(stationId: string | null): StreetLayer | null | undefined {
   // The last station whose load settled: set only to re-render once the cache holds it.
   const [, setLoadedId] = useState<string | null>(null)
 
@@ -113,7 +113,7 @@ export function useStationStreets(stationId: string | null): StreetLayer | null 
     }
   }, [stationId])
 
-  return (stationId && cache.peek(stationId)) || null
+  return stationId ? cache.peek(stationId) : null
 }
 
 /**

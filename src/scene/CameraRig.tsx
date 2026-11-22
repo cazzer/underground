@@ -1,34 +1,26 @@
 import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { interiorCovers, type IndexLoad } from '../data/interiorLoad'
+import { useStationStreets } from '../data/useStationStreets'
 import { useFocus } from '../lib/focus'
 import { newDwell, settled } from '../lib/focusDwell'
 import { groupPositions, shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { NO_FOCUS_GROUP, nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
-import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
+import { interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { AwaitingInterior } from '../lib/interiorReframe'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { tiltForDistance } from '../lib/tilt'
-import {
-  flushMotion,
-  interiorFlight,
-  newFlight,
-  pointFlight,
-  stationFlight,
-  turnOffset,
-  type Destination,
-  type Flight,
-  type MapControlsImpl,
-} from './cameraFlight'
+import { flushMotion, newFlight, turnOffset, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
 import { useFocusGroups } from './useFocusGroups'
 import { useInteriorReframe } from './useInteriorReframe'
+import { useStationFlights } from './useStationFlights'
 import { useStationOrbit } from './useStationOrbit'
 import { useTrainFollow } from './useTrainFollow'
 
@@ -77,7 +69,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor }: C
   const gesture = useRef(false)
   /** A gesture ended since the last frame: that frame restarts the wait too, however long frames take. */
   const gestureEnded = useRef(false)
-  /** A station flight that set off before its interior was known: reframed onto it after landing (useInteriorReframe). */
+  /** A station flight that set off before its interior (or bare streets) was known: reframed after landing (useInteriorReframe). */
   const awaiting = useRef<AwaitingInterior | null>(null)
 
   // Fit the whole city once; resizing later keeps the user's view.
@@ -96,75 +88,13 @@ export function CameraRig({ network, insets, interior, index, panel, anchor }: C
 
   // Read by the fly effect through a ref: depending on these would re-fire a stale fly request.
   // onStart reads `network` here too, so it stays referentially stable (underground-by0).
-  const latest = useRef({ interior, panel, size, insets, maxDistance, network })
+  const streets = useStationStreets(focusedId)
+  const latest = useRef({ interior, panel, size, insets, maxDistance, network, streets, index })
   useLayoutEffect(() => {
-    latest.current = { interior, panel, size, insets, maxDistance, network }
-  }, [interior, panel, size, insets, maxDistance, network])
+    latest.current = { interior, panel, size, insets, maxDistance, network, streets, index }
+  }, [interior, panel, size, insets, maxDistance, network, streets, index])
 
-  // Layout effect, not a passive one: a frame between the select and a passive effect would see
-  // the new focus with no flight and drop it again (the camera is still far out).
-  useLayoutEffect(() => {
-    if (!flyRequest) return
-    if (flyRequest.kind === 'point') {
-      const c = controls.current
-      if (!c) throw new Error('Fly request before the map controls mounted')
-      hold.current = null
-      flushMotion(c, camera)
-      awaiting.current = null
-      const l = latest.current
-      const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
-      flight.current = newFlight(dest, c, camera, prefersReducedMotion())
-      return
-    }
-    const station = network.stationById.get(flyRequest.stationId)
-    if (!station) throw new Error(`Fly request for unknown station "${flyRequest.stationId}"`)
-    hold.current = null
-    const l = latest.current
-    const c = controls.current
-    if (!c) throw new Error('Fly request before the map controls mounted')
-    flushMotion(c, camera)
-    const reduced = prefersReducedMotion()
-    const known = interiorCovers(l.interior, station.id) ? l.interior : null
-    awaiting.current = known ? null : { stationId: station.id, reduced }
-    const dest = known
-      ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
-      : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
-    flight.current = newFlight(dest, c, camera, reduced, known !== null || reduced)
-  }, [flyRequest, network, camera])
-
-  // The interior (first visit) or the panel's measurement (it grows as arrivals fill in) can land
-  // mid-flight: retarget that flight's destination. It rebases on the camera's current pose and keeps
-  // the timing, so the camera doesn't jump. An interior that arrives late in the flight, or after it,
-  // is framed after landing (useInteriorReframe). Focus reached by zooming has no flight.
-  useEffect(() => {
-    const f = flight.current
-    const c = controls.current
-    if (!c || !f || f.stationId === null) return
-    const station = network.stationById.get(f.stationId)
-    if (!station) return
-    const az = c.getAzimuthalAngle()
-    const e0 = flightProgress(f.elapsed, f.duration)
-    let dest
-    if (!interior || !interiorCovers(interior, f.stationId)) {
-      dest = stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
-    } else {
-      const turn = retargetTurn(f.turnDecided, e0)
-      // Later: too late to fold in without a lurch; the flight lands as it is and the reframe takes over.
-      if (turn === 'later') return
-      // Keep: frame for the azimuth already chosen (the landing turn, or the current one when there is none).
-      dest = interiorFlight(f.stationId, interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide')
-      if (turn === 'keep') dest.azimuth = f.azimuth
-      f.turnDecided = true
-      awaiting.current = null
-    }
-    f.from.copy(c.target)
-    f.fromDistance = camera.position.distanceTo(c.target)
-    f.fromAzimuth = az
-    f.e0 = e0
-    f.target = dest.target
-    f.distance = dest.distance
-    f.azimuth = dest.azimuth
-  }, [interior, panel, size, insets, camera, network])
+  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets, index })
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
@@ -195,7 +125,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor }: C
     following: follow.active,
     holdAzimuth: follow.holdAzimuth,
   })
-  const landed = useInteriorReframe({ controls, camera, flight, awaiting, layout: latest, interior, focusedId, following: follow.active })
+  const landed = useInteriorReframe({ controls, camera, flight, awaiting, layout: latest, interior, streets, index, focusedId, following: follow.active })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((state, delta) => {
