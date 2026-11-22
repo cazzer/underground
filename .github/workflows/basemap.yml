@@ -1,0 +1,232 @@
+name: Build the NYC basemap
+
+# Cuts the NYC basemap out of a Protomaps daily build and publishes it as a GitHub Release asset, which
+# deploy.yml then copies into the Pages artifact (the daily builds expire after about a week, and Protomaps asks
+# not to hotlink them). Manual only: run it when the basemap should change, then pin the release in a normal PR.
+#
+#   generate  read-only; extracts the bbox and zoom range with go-pmtiles, checks the source metadata against the
+#             reviewed licence terms (scripts/gate-basemap.ts), drops the layers the site doesn't use with
+#             tippecanoe's tile-join, verifies the result and its size, uploads it as an artifact
+#   publish   write token; never runs npm or repo code; creates the release (tag basemap-<build>-<sha8>) and prints
+#             the pin to put in data/basemap/basemap.json
+#
+# The pin is updated by a normal PR, so CI runs on it; this workflow never opens one.
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Protomaps daily build, YYYYMMDD (blank: yesterday UTC). Builds are kept for about a week.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Explicit bash so every run step gets -eo pipefail.
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: basemap
+  cancel-in-progress: false
+
+env:
+  GO_PMTILES_VERSION: 1.31.2
+  GO_PMTILES_SHA256: 3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f
+  TIPPECANOE_TAG: 2.79.0
+  TIPPECANOE_COMMIT: 68ab8dcc229f95b8b25877697d5e8d66783af503
+  # The artifact must stay far below the 1 GB Pages limit; the NYC subset measured about 33 MB at z15.
+  BASEMAP_MAX_BYTES: 200000000
+
+jobs:
+  generate:
+    timeout-minutes: 60
+    # Only on the default branch (a dispatch from another branch does nothing).
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      build: ${{ steps.build.outputs.build }}
+      basemap_version: ${{ steps.gate.outputs.basemap_version }}
+      sha256: ${{ steps.result.outputs.sha256 }}
+      bytes: ${{ steps.result.outputs.bytes }}
+      layers: ${{ steps.build.outputs.layers }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Node only runs the repo's own dependency-free scripts (the gate); there is no npm install here.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Choose the build
+        id: build
+        env:
+          INPUT_BUILD: ${{ inputs.build }}
+        run: |
+          build="${INPUT_BUILD:-$(date -u -d yesterday +%Y%m%d)}"
+          if ! [[ "$build" =~ ^[0-9]{8}$ ]]; then
+            echo "::error::build must be YYYYMMDD, got '$build'"
+            exit 1
+          fi
+          status=$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' -I "https://build.protomaps.com/${build}.pmtiles")
+          if [ "$status" != 200 ]; then
+            echo "::error::https://build.protomaps.com/${build}.pmtiles answered HTTP ${status}; daily builds are kept for about a week, pick a recent one"
+            exit 1
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "layers=$(jq -r '.spec.layers | join(", ")' data/basemap/basemap.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Install go-pmtiles ${{ env.GO_PMTILES_VERSION }}
+        run: |
+          curl -fsSL -o go-pmtiles.tar.gz "https://github.com/protomaps/go-pmtiles/releases/download/v${GO_PMTILES_VERSION}/go-pmtiles_${GO_PMTILES_VERSION}_Linux_x86_64.tar.gz"
+          echo "${GO_PMTILES_SHA256}  go-pmtiles.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/bin"
+          tar -xzf go-pmtiles.tar.gz -C "$HOME/bin" pmtiles
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      # tile-join is the one tool that drops whole layers from a .pmtiles without a writer of our own. Pinned to a
+      # tag and its commit (a moved tag fails the build), built here only, never in the deploy.
+      - name: Build tippecanoe's tile-join ${{ env.TIPPECANOE_TAG }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsqlite3-dev zlib1g-dev
+          git clone --quiet --depth 1 --branch "$TIPPECANOE_TAG" https://github.com/felt/tippecanoe "$RUNNER_TEMP/tippecanoe"
+          test "$(git -C "$RUNNER_TEMP/tippecanoe" rev-parse HEAD)" = "$TIPPECANOE_COMMIT"
+          make -C "$RUNNER_TEMP/tippecanoe" -j"$(nproc)" tile-join
+          echo "$RUNNER_TEMP/tippecanoe" >> "$GITHUB_PATH"
+
+      - name: Extract the bbox from the daily build
+        env:
+          BUILD: ${{ steps.build.outputs.build }}
+        run: |
+          bbox=$(jq -r '.spec.bbox | map(tostring) | join(",")' data/basemap/basemap.json)
+          maxzoom=$(jq -r '.spec.maxzoom' data/basemap/basemap.json)
+          pmtiles extract "https://build.protomaps.com/${BUILD}.pmtiles" full.pmtiles --bbox="$bbox" --maxzoom="$maxzoom"
+          pmtiles show full.pmtiles
+          ls -l full.pmtiles
+
+      # Fails the run when the metadata names anything the footer's OpenStreetMap credit doesn't cover; the finding
+      # then goes to a person as a licensing card.
+      - name: Check the source's credits and layers
+        id: gate
+        run: |
+          pmtiles show full.pmtiles --metadata > source-metadata.json
+          node scripts/gate-basemap.ts source source-metadata.json
+          echo "basemap_version=$(jq -r .version source-metadata.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Drop the layers the site doesn't use
+        run: |
+          args=()
+          for layer in $(jq -r '.spec.layers[]' data/basemap/basemap.json); do args+=(-l "$layer"); done
+          # -pk: keep tiles over 500 KB; -pg: no tilestats (not needed, and it would grow the metadata).
+          tile-join -f -pk -pg -o nyc.pmtiles "${args[@]}" full.pmtiles
+          pmtiles verify nyc.pmtiles
+          pmtiles show nyc.pmtiles
+          pmtiles show nyc.pmtiles --metadata > output-metadata.json
+          node scripts/gate-basemap.ts output output-metadata.json
+
+      - name: Check the size and report it per zoom
+        id: result
+        env:
+          BUILD: ${{ steps.build.outputs.build }}
+          BASEMAP_VERSION: ${{ steps.gate.outputs.basemap_version }}
+        run: |
+          bytes=$(stat -c %s nyc.pmtiles)
+          if [ "$bytes" -gt "$BASEMAP_MAX_BYTES" ]; then
+            echo "::error::nyc.pmtiles is $bytes bytes, over the $BASEMAP_MAX_BYTES cap"
+            exit 1
+          fi
+          # The tile bytes per zoom, read back through mbtiles (sqlite3 is on the runner).
+          for name in full nyc; do
+            tile-join -f -pk -pg -o "$name.mbtiles" "$name.pmtiles" > /dev/null
+          done
+          {
+            echo "### Basemap size"
+            echo "Source build ${BUILD}, basemap ${BASEMAP_VERSION}. Subset: $bytes bytes (full extract $(stat -c %s full.pmtiles))."
+            echo
+            echo '| Zoom | Tiles | Full extract bytes | Subset bytes |'
+            echo '|---|---|---|---|'
+            sqlite3 :memory: "attach 'full.mbtiles' as f; attach 'nyc.mbtiles' as n;
+              select a.z, a.c, a.b, s.b
+              from (select zoom_level z, count(*) c, sum(length(tile_data)) b from f.tiles group by 1) a
+              join (select zoom_level z, sum(length(tile_data)) b from n.tiles group by 1) s on s.z = a.z
+              order by a.z;" | awk -F'|' '{ printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4 }'
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "sha256=$(sha256sum nyc.pmtiles | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: basemap
+          path: |
+            nyc.pmtiles
+            source-metadata.json
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: generate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      BUILD: ${{ needs.generate.outputs.build }}
+      BASEMAP_VERSION: ${{ needs.generate.outputs.basemap_version }}
+      SHA256: ${{ needs.generate.outputs.sha256 }}
+      BYTES: ${{ needs.generate.outputs.bytes }}
+      LAYERS: ${{ needs.generate.outputs.layers }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: basemap
+
+      - name: Check what was uploaded
+        run: |
+          test "$(sha256sum nyc.pmtiles | cut -d' ' -f1)" = "$SHA256"
+          test "$(stat -c %s nyc.pmtiles)" = "$BYTES"
+
+      - name: Create the release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="basemap-${BUILD}-${SHA256:0:8}"
+          cat > notes.md <<EOF
+          NYC basemap tiles for the underground map: the Protomaps basemap build ${BUILD} (basemap ${BASEMAP_VERSION}),
+          cut to the five boroughs, zoom 0 to 15, with only the ${LAYERS} layers.
+
+          - Source: https://build.protomaps.com/${BUILD}.pmtiles (https://docs.protomaps.com/basemaps/downloads)
+          - sha256: \`${SHA256}\`, ${BYTES} bytes
+          - Pin: \`data/basemap/basemap.json\`; built by the \`basemap\` workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+          Licence and credits: © OpenStreetMap contributors, available under the Open Database License 1.0
+          (https://opendatacommons.org/licenses/odbl/1-0/); this file is a derivative database under the ODbL.
+          The earth and water layers also hold Natural Earth data at low zooms (public domain) and OSM-derived polygons
+          (osmdata.openstreetmap.de, ODbL). The landcover layer (ESA WorldCover, CC BY 4.0), the places layer (minzoom values
+          derived from Tilezen and Natural Earth) and the pois, buildings and boundaries layers are removed. The metadata's
+          own attribution reads "© OpenStreetMap". Protomaps' terms: https://github.com/protomaps/basemaps/blob/main/LICENSE_DATA.md.
+          EOF
+          gh release create "$tag" nyc.pmtiles \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "NYC basemap ${BUILD}" --notes-file notes.md
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Print the pin
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          pin=$(jq -n --arg build "$BUILD" --arg v "$BASEMAP_VERSION" --arg release "$TAG" --arg sha "$SHA256" --argjson bytes "$BYTES" \
+            '{build: $build, basemapVersion: $v, release: $release, sha256: $sha, bytes: $bytes}')
+          {
+            echo "### Pin"
+            echo "Release \`$TAG\` is published. Set \`pin\` in \`data/basemap/basemap.json\` to this, in a normal PR:"
+            echo
+            echo '```json'
+            echo "$pin"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

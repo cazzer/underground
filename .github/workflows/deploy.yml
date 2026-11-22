@@ -91,6 +91,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      # Size of the basemap in the artifact; empty while data/basemap/basemap.json has no pin.
+      basemap_bytes: ${{ steps.basemap.outputs.bytes }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -104,6 +107,28 @@ jobs:
         env:
           # Repo variable: the deployed Worker's /rt URL. Unset builds the "Live trains off" site.
           VITE_RT_URL: ${{ vars.VITE_RT_URL }}
+      # The NYC basemap is never in git: basemap.yml publishes it as a release asset, and the pin in
+      # data/basemap/basemap.json names it. Copied in after the build (vite empties dist), sha256-checked, and
+      # fetched by the browser only on demand.
+      - name: Add the basemap
+        id: basemap
+        run: |
+          if [ "$(jq '.pin' data/basemap/basemap.json)" = null ]; then
+            echo "::warning::data/basemap/basemap.json has no pin; deploying without the basemap."
+            echo "bytes=" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/fetch-basemap.ts --out dist/basemap/nyc.pmtiles
+            echo "bytes=$(jq '.pin.bytes' data/basemap/basemap.json)" >> "$GITHUB_OUTPUT"
+          fi
+      # GitHub Pages sites are limited to 1 GB.
+      - name: Check the artifact size
+        run: |
+          size=$(du -sb dist | cut -f1)
+          echo "The Pages artifact is $size bytes." | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$size" -gt 900000000 ]; then
+            echo "::error::dist is $size bytes, over the 900 MB cap"
+            exit 1
+          fi
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
@@ -117,6 +142,29 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # Measures Range on the live site once the basemap is deployed (skipped while there is no pin): the
+  # PMTiles client reads the archive in ranges, so the site must answer a correct uncompressed 206.
+  verify-basemap:
+    needs: [build, deploy]
+    if: needs.build.outputs.basemap_bytes != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          BYTES: ${{ needs.build.outputs.basemap_bytes }}
+        run: node scripts/verify-basemap.ts "${PAGE_URL%/}/basemap/nyc.pmtiles" "$BYTES"

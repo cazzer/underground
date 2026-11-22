@@ -1,0 +1,9 @@
+{
+  "spec": {
+    "bbox": [-74.2591, 40.4774, -73.7004, 40.9176],
+    "maxzoom": 15,
+    "layers": ["earth", "water", "landuse", "roads"],
+    "dropLayers": ["buildings", "landcover", "places", "pois", "boundaries"]
+  },
+  "pin": null
+}
