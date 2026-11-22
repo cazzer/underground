@@ -4,14 +4,14 @@
  * moved, and grows the buffer (copying the kept prefix) only when the segments outgrow it. A buffer that stays under a
  * quarter full for SHRINK_AFTER_S shrinks (copying the live range), so the city view's large pools don't stay
  * allocated at a station. The stroke fades by mixing its color toward the background, never by opacity, so a line
- * is opaque wherever it is not masked or near the bbox edge. Transparent with depthTest and depthWrite off, like
+ * is opaque wherever it is not masked or fading out at the basemap's extent. Transparent with depthTest and depthWrite off, like
  * every overlay: the depth-tested car bodies rely on nothing before them writing depth (cars on a station ramp run
  * below the street).
  */
 import { DynamicDrawUsage, type Color, type InterleavedBuffer, type InterleavedBufferAttribute } from 'three'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
-import { BasemapLineMaterial, type EdgeUniforms, type MaskUniforms } from './basemapLineMaterial'
+import { BasemapLineMaterial, type ExtentUniforms, type MaskUniforms } from './basemapLineMaterial'
 
 /** The first buffer's capacity, in segments, and the smallest it shrinks to. */
 export const INITIAL_SEGMENTS = 1024
@@ -26,7 +26,7 @@ export interface ClassLayerOptions {
   renderOrder: number
   /** Shared by the road classes; water and parks pass their own, never written (strength 0). */
   mask: MaskUniforms
-  edge: EdgeUniforms
+  extent: ExtentUniforms
 }
 
 export interface ClassLayer {
@@ -62,8 +62,8 @@ const nextPow2 = (n: number) => 2 ** Math.ceil(Math.log2(Math.max(n, 1)))
 /** The capacity for `need` segments: room to grow by a quarter, never under the start. */
 const capacityFor = (need: number) => Math.max(INITIAL_SEGMENTS, nextPow2(Math.ceil(need * 1.25)))
 
-export function createClassLayer({ width, renderOrder, mask, edge }: ClassLayerOptions): ClassLayer {
-  const material = new BasemapLineMaterial(mask, edge, { linewidth: width, transparent: true, depthTest: false, depthWrite: false })
+export function createClassLayer({ width, renderOrder, mask, extent }: ClassLayerOptions): ClassLayer {
+  const material = new BasemapLineMaterial(mask, extent, { linewidth: width, transparent: true, depthTest: false, depthWrite: false })
   let capacity = INITIAL_SEGMENTS
   const line = new LineSegments2(pooledGeometry(capacity), material)
   line.renderOrder = renderOrder

@@ -17,6 +17,9 @@ const routes = (JSON.parse(readFileSync('public/data/routes.json', 'utf8')) as R
 const ROADS = ['highway', 'major', 'minor', 'path'] as const
 /** The faintest road still reads on the background. */
 const PATH_CONTRAST_MIN = 1.3
+/** The road steps: major at least this, minor at most this. */
+const MAJOR_CONTRAST_MIN = 1.95
+const MINOR_CONTRAST_MAX = 1.5
 /** Water and park outlines read, yet stay under the route lines. */
 const AREA_CONTRAST_MIN = 1.5
 const AREA_CONTRAST_MAX = 2.5
@@ -40,6 +43,20 @@ describe('basemap tokens', () => {
         expect(c(t.basemap[ROADS[i - 1]!].stroke), `${ROADS[i - 1]} over ${ROADS[i]}`).toBeGreaterThan(c(t.basemap[ROADS[i]!].stroke))
       }
       expect(c(t.basemap.path.stroke)).toBeGreaterThanOrEqual(PATH_CONTRAST_MIN)
+      // Steps wide enough to read apart: major about 2:1, minor about 1.45:1.
+      expect(c(t.basemap.major.stroke)).toBeGreaterThanOrEqual(MAJOR_CONTRAST_MIN)
+      expect(c(t.basemap.minor.stroke)).toBeLessThanOrEqual(MINOR_CONTRAST_MAX)
+      // Highways read apart from major roads by tone as well as lightness.
+      expect(oklabDistance(t.basemap.highway.stroke, t.basemap.major.stroke)).toBeGreaterThanOrEqual(MIN_OKLAB)
+    }
+  })
+
+  it('draw every class at 1 px: a wider stroke marks only the subway', async () => {
+    for (const t of Object.values(await themes())) {
+      for (const [cls, { width }] of Object.entries(t.basemap)) {
+        expect(width, cls).toBe(1)
+        expect(width, cls).toBeLessThan(t.lineWidth)
+      }
     }
   })
 

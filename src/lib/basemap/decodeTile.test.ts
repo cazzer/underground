@@ -53,6 +53,20 @@ describe('decodeTile', () => {
     ])
   })
 
+  it('drops a ring under 1 ha before z14, unless it reaches the tile edge', () => {
+    // At z12 a tile is about 7.4 km across, so 4096 units are about 1.8 m each: a 40-unit square is about 0.5 ha.
+    const [z, x, y] = [12, X >> 3, Y >> 3]
+    const small: [number, number][] = [[100, 100], [140, 100], [140, 140], [100, 140], [100, 100]]
+    const atEdge: [number, number][] = [[0, 100], [40, 100], [40, 140], [0, 140]]
+    const big: [number, number][] = [[1000, 1000], [1300, 1000], [1300, 1300], [1000, 1300], [1000, 1000]]
+    const tile = (parts: [number, number][][]) => writeMvt([{ name: 'landuse', features: [{ type: 3, props: { kind: 'park' }, parts }] }])
+    expect(decodeTile(tile([small]), z, x, y, LAYERS).park).toBeUndefined()
+    expect(decodeTile(tile([atEdge]), z, x, y, LAYERS).park).toBeDefined()
+    expect(decodeTile(tile([big]), z, x, y, LAYERS).park!.length).toBe(4 * 6)
+    // The same small square at z15 (about 0.22 m a unit, so far under 1 ha) is drawn.
+    expect(decodeTile(tile([small]), Z, X, Y, LAYERS).park!.length).toBe(4 * 6)
+  })
+
   it('drops earth, points, tunnels and layers outside the spec', () => {
     const bytes = writeMvt([
       { name: 'earth', features: [{ type: 3, props: { kind: 'earth' }, parts: [[[0, 0], [10, 0], [10, 10]]] }] },

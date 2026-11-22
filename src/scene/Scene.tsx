@@ -108,7 +108,12 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       />
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} labelBlockers={labelBlockers} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
-      {basemapConfig && <Basemap config={basemapConfig} mask={streetMask} />}
+      {basemapConfig && (
+        // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
+        <ErrorBoundary fallback={null}>
+          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} />
+        </ErrorBoundary>
+      )}
     </Canvas>
   )
 }

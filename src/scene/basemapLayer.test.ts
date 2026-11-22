@@ -1,11 +1,18 @@
 import { Color, type InterleavedBufferAttribute } from 'three'
 import { describe, expect, it } from 'vitest'
+import { networkHull } from '../lib/basemap/networkHull'
 import { planPool } from '../lib/basemap/tilePool'
 import { createClassLayer, INITIAL_SEGMENTS, SHRINK_AFTER_S, type ClassLayer } from './basemapLayer'
-import { createEdgeUniforms, createMaskUniforms } from './basemapLineMaterial'
+import { createExtentUniforms, createMaskUniforms } from './basemapLineMaterial'
 
-const EDGE = createEdgeUniforms({ minX: -1e5, maxX: 1e5, minZ: -1e5, maxZ: 1e5 }, 3000)
-const layerOf = () => createClassLayer({ width: 1, renderOrder: 0, mask: createMaskUniforms(), edge: EDGE })
+const EXTENT = createExtentUniforms(
+  { minX: -1e5, maxX: 1e5, minZ: -1e5, maxZ: 1e5 },
+  3000,
+  networkHull([{ x: 0, z: 0 }, { x: 1000, z: 0 }, { x: 0, z: 1000 }]),
+  5000,
+  7000,
+)
+const layerOf = () => createClassLayer({ width: 1, renderOrder: 0, mask: createMaskUniforms(), extent: EXTENT })
 
 /** `n` segments whose every float is `tag`, so the buffer shows which tile wrote where. */
 const segs = (n: number, tag: number) => new Float32Array(n * 6).fill(tag)
@@ -23,7 +30,7 @@ function step(layer: ClassLayer, prev: number[], drawn: number[], tiles: Map<num
 
 describe('createClassLayer', () => {
   it('is a transparent overlay that neither tests nor writes depth', () => {
-    const { line } = createClassLayer({ width: 1, renderOrder: 0.4, mask: createMaskUniforms(), edge: EDGE })
+    const { line } = createClassLayer({ width: 1, renderOrder: 0.4, mask: createMaskUniforms(), extent: EXTENT })
     expect(line.material.transparent).toBe(true)
     expect(line.material.depthTest).toBe(false)
     expect(line.material.depthWrite).toBe(false)

@@ -118,8 +118,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?streets=under|over` forces one order until the ost.7 card is decided; the removal list is in
   `src/scene/streetsLook.ts`
   `basemap` holds one `{ stroke, width }` per basemap class (highway, major, minor, path, water, park), faint by color;
-  `src/themeBasemap.test.ts` holds its contrasts (roads under `streetStroke` and every line, highway > major > minor >
-  path ≥ 1.3:1, water and park 1.5 to 2.5:1) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
+  `src/themeBasemap.test.ts` holds its contrasts (roads under `streetStroke` and every line, highway over major
+  (≥ 1.95:1) over minor (≤ 1.5:1) over path (≥ 1.3:1), highway apart from major by tone too, water and park 1.5 to 2.5:1; every class
+  1 px, so width marks only the subway) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
   TEMPORARY: `?basemap=off` draws no basemap and loads no tiles until ost.9.3's look is signed off; the removal list is
   in `src/scene/basemapLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
@@ -207,12 +208,18 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     never below 1024 segments; DynamicDrawUsage, frustumCulled off, hidden at strength 0 or with no segments). Each
     class fades by mixing its stroke toward the background with camera distance (`lib/basemap/classFade.ts`: water to
     0.6 by 20 km, parks and highways down to half by 60 km, major roads out by 25 km, minor by 8 km, paths by 2400 m);
-    never by opacity. Every class draws with `basemapLineMaterial.ts` (LineMaterial with two factors on its fragment
-    alpha, a fragment at 0 discarded; anchors throw if three moves them; not in `BAND_UNIFORMS`): the bbox edge fade
-    (`EDGE_GLSL`, twin of `lib/basemap/edgeFade.ts` `edgeAlpha`: smoothstep over the last 3 km inside the spec bbox, so
-    no tile edge shows), and for roads the street mask (`MASK_GLSL`, twin of `lib/basemap/streetMask.ts` `maskAlpha`):
-    inside the focused station's street radius they fade out as its streets fade in, the exact complement of that
-    layer's 70 m edge fade, at the station layer's `interiorOpacity`. Dev only:
+    never by opacity. `CLASS_FADE`'s distances are named constants of their own, the one exception to taking camera
+    distances only from the tilt and reveal helpers (paths reuse `DEFAULT_TILT.farDistance` and `DOTS_FROM_M`). Every
+    class draws with `basemapLineMaterial.ts` (LineMaterial with three factors on its fragment alpha, a fragment at 0
+    discarded; anchors throw, naming the file, if three moves them; not in `BAND_UNIFORMS`), all twins of
+    `lib/basemap/edgeFade.ts` or `streetMask.ts`: the network fade (`NETWORK_GLSL` / `networkAlpha`: 1 within 5 km of
+    the stations' convex hull, `lib/basemap/networkHull.ts`, as at most 32 half-planes in a uniform array, then smoothstep
+    to 0 over 7 km more; the network's bounding box would sit outside the bbox once padded), the bbox edge (`EDGE_GLSL` /
+    `edgeAlpha`: 0 at the spec bbox, in over `edgeFadeFor(distance)`, 4% of the camera distance held to 100 m..3 km and
+    written per frame, so a station near the edge keeps its streets close in), and for roads the street mask
+    (`MASK_GLSL` / `maskAlpha`): inside the focused station's street radius they fade out as its streets fade in, the
+    exact complement of that layer's 70 m edge fade, at the station layer's `interiorOpacity`. Scene wraps it in an
+    `ErrorBoundary` with a null fallback: a crash there logs once and draws no basemap. Dev only:
     `__underground.basemapSegments()` (camera distance, per-class used/capacity/visible) and a `basemap:apply`
     performance measure per tile-set change
 - `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
@@ -497,7 +504,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   cover it, else nearest ready ancestor, else partial previous children), `tileLru.ts`, `locationCap.ts` (the
   location zoom cap's state machine), `clip.ts` (Liang–Barsky; a ring's cut along a tile edge dropped), `featureClass.ts`
   (`classOf`: highway, major, minor, path, water, park; tunnels, sidewalks and crossings (a path's `kind_detail`), rail,
-  ferry, earth and points dropped),
+  ferry, earth and points dropped), `areaFilter.ts` (`keepRing`: park and water rings under 1 ha only in z14+ tiles,
+  about 7 km in; under 5 ha only in z13+, about 14 km in; a ring reaching the tile edge always stays),
   `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip),
   `mvtFixture.ts` (tests' MVT writer). `projection.ts` exports `groundX`/`groundZ` for per-vertex use
 - `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,

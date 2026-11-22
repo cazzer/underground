@@ -61,11 +61,19 @@ vec3 bandShift( vec3 p, vec4 b ) {
 }
 `
 
-/** `src` with its one `anchor` replaced by `by`; throws if the anchor is missing or repeated (three moved it). */
-export function replaceOnce(src: string, anchor: string, by: string): string {
+/** Names a shader patch in replaceOnce's error: what it is, and the file to update. */
+export interface PatchOwner {
+  label: string
+  file: string
+}
+
+const BAND_PATCH: PatchOwner = { label: 'Band shader', file: 'bandLineMaterial.ts' }
+
+/** `src` with its one `anchor` replaced by `by`; throws, naming `owner`, if the anchor is missing or repeated (three moved it). */
+export function replaceOnce(src: string, anchor: string, by: string, owner: PatchOwner = BAND_PATCH): string {
   const at = src.indexOf(anchor)
   if (at < 0 || src.indexOf(anchor, at + anchor.length) >= 0) {
-    throw new Error(`Band shader: LineMaterial's shader no longer has exactly one "${anchor}"; update bandLineMaterial.ts`)
+    throw new Error(`${owner.label}: LineMaterial's shader no longer has exactly one "${anchor}"; update ${owner.file}`)
   }
   return src.slice(0, at) + by + src.slice(at + anchor.length)
 }
