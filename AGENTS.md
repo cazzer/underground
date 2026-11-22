@@ -547,7 +547,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     platform-edge tracks by the map's direction lines; paths are the OSM way clipped to the platform and 6 m of the
     map line), `slabs.ts` (one rectangle per entrance cluster, within the platforms plus 15 m along and 10 m
     across), `stairs.ts` (street stairs capped at 20 m of plan run, one per landing; slab-to-platform stairs sized
-    for the drawn rise), `machines.ts` (E&E rows the merge can take, entrance links), `machineSites.ts` (`at`
+    for the drawn rise; every platform gets a street stair or machine (no mezzanine: from the nearest entrance that
+    doesn't cross another platform, else the station is skipped)), `machines.ts` (E&E rows the merge can take, entrance links), `machineSites.ts` (`at`
     overrides; machines of one level pair at one site bank width + 0.3 m apart), `build.ts` (assembly; entrances
     whose stair can't land within the cap are dropped; dropped rows in notes and the log), `subway.ts`
     (`cutCover`, `shallow`), `elevated.ts`; `templateFixture.ts` synthetic one-station catalogs for

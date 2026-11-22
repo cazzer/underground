@@ -11,6 +11,8 @@ import type { FramePoint } from '../stationInputs.ts'
 
 /** A landing counts as on a polygon this close to it (the merge allows 0.5 m; its output is rounded to 1 cm). */
 export const INSIDE_M = 0.4
+/** How far `nearestOnPlatform` moves an edge point in toward the centerline. */
+const NEAR_EDGE_INSET_M = 0.5
 
 export interface PlatformGeom {
   /** Index, in v order, of the physical platform (one PlatformLayout, maybe several OSM ways). */
@@ -136,3 +138,27 @@ export function searchCenterline(p: PlatformGeom, u: number, accept: (at: FrameP
 }
 
 export const dist = (a: FramePoint, b: FramePoint): number => Math.hypot(a[0] - b[0], a[1] - b[1])
+
+/** `p` when it is on the platform; else the nearest polygon edge point moved 0.5 m in toward the centerline;
+ *  else a centerline search from p's u. */
+export function nearestOnPlatform(platform: PlatformGeom, p: FramePoint): FramePoint | null {
+  if (onPlatform(platform, p)) return p
+  let best: FramePoint | null = null
+  for (const w of platform.ways) {
+    for (let i = 0; i < w.ring.length; i++) {
+      const a = w.ring[i]!
+      const b = w.ring[(i + 1) % w.ring.length]!
+      const [du, dv] = [b[0] - a[0], b[1] - a[1]]
+      const len2 = du * du + dv * dv
+      const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * du + (p[1] - a[1]) * dv) / len2))
+      const q: FramePoint = [a[0] + t * du, a[1] + t * dv]
+      if (!best || dist(q, p) < dist(best, p)) best = q
+    }
+  }
+  const mid = best ? centerAt(platform, best[0]) : null
+  if (best && mid !== null) {
+    const inward: FramePoint = [best[0], best[1] + Math.sign(mid - best[1]) * NEAR_EDGE_INSET_M]
+    if (onPlatform(platform, inward)) return inward
+  }
+  return searchCenterline(platform, p[0])
+}
