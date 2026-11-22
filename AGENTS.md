@@ -169,7 +169,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `bandOffset.ts` the band offset formula (`bandShift`, `BandView`, `writeBandView`; pitch fades out 25 to 80 km;
     per point, the direction tracks merge under 6.5 px apart and split by 8.5 px, plus the bundle's width, so they
     split only once both bundles fit); `trackOffset.ts` also exports `miterNormals`;
-    `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
+    `focusMachine.ts` camera-driven focus transitions; `focusDwell.ts` `settled`, the 400 ms stillness auto-focus
+    waits for; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts` (positions, colors, `bands`: each segment end's band inputs from `vertexBandInputs` (miter
     vector normal / cosHalf, slot, corridor half-width), and `firstSegment` per shape), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
@@ -375,8 +376,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1100 to 800 m the interior fades in as a flat plan (depth 0.05 to 0.40); 800 to 400 m the levels
   separate and the veil and labels come in; at 400 m everything is full 3D.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
-  focused (focus engages inside 1100 m within 140 m of a station and drops past 1400 m or 350 m away,
-  `focusMachine.ts`): |azimuth| is capped by tilt, rising from 0 top-down to π at tiltT 0.67 and a full spin
+  focused (focus engages inside 1100 m within 140 m of a station once the view has held still for 400 ms
+  (`ENTER_DWELL_S`: target and distance within 0.2% of the distance, no gesture active, and a gesture's end
+  restarts the wait), so a pan across the city opens no panels; it drops at once past 1400 m or 350 m away;
+  taps and flights focus immediately; `focusMachine.ts`): |azimuth| is capped by tilt, rising from 0 top-down to π at tiltT 0.67 and a full spin
   (azimuth bounds ±Infinity) from there, and the turn pivots on the focus point
   (the interior's mid-depth center, or a bare station's point, at the middle of the free area).
   The focus point pans within the interior's reach (farthest outline vertex or entrance from its plan

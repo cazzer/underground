@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { useFocus } from '../lib/focus'
+import { newDwell, settled } from '../lib/focusDwell'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightDuration, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
@@ -56,7 +57,13 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     distance: 0,
     target: { x: 0, z: 0 },
     stations: network.stations,
+    settled: false,
   })
+  // Auto-focus enters only once the view has held still (focusDwell.ts); a gesture in progress never has.
+  const dwell = useRef(newDwell())
+  const gesture = useRef(false)
+  /** A gesture ended since the last frame: that frame restarts the wait too, however long frames take. */
+  const gestureEnded = useRef(false)
 
   // Fit the whole city once; resizing later keeps the user's view.
   useLayoutEffect(() => {
@@ -178,10 +185,12 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const c = controls.current
     if (!c) return
     let distance = camera.position.distanceTo(c.target)
+    const still = settled(dwell.current, state.clock.elapsedTime, c.target, distance, gesture.current || gestureEnded.current)
+    gestureEnded.current = false
 
     const f = flight.current
     if (f) {
@@ -212,10 +221,11 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       cur.distance = distance
       cur.target = c.target
       cur.stations = network.stations
+      cur.settled = still
       // Cheap pre-check on the reused input; only a real change pays for a copied target and
       // a functional update, which re-runs the rules against the latest state.
       if (nextFocus(cur) !== cur) {
-        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations)
+        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, still)
       }
     }
 
@@ -241,8 +251,14 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       }
     }
     flight.current = null
+    gesture.current = true
     onGestureStart()
   }, [camera, onGestureStart])
+  const onEnd = useCallback(() => {
+    gesture.current = false
+    gestureEnded.current = true
+    onGestureEnd()
+  }, [onGestureEnd])
 
   return (
     <MapControls
@@ -253,7 +269,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       minDistance={MIN_DISTANCE}
       maxDistance={maxDistance}
       onStart={onStart}
-      onEnd={onGestureEnd}
+      onEnd={onEnd}
     />
   )
 }

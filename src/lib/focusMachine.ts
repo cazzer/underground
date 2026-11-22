@@ -1,7 +1,10 @@
 import type { Station } from './network'
 import type { Ground } from './projection'
 
-/** Zooming inside ENTER_DISTANCE with a station within ENTER_RADIUS of the view center focuses it. */
+/**
+ * Zooming inside ENTER_DISTANCE with a station within ENTER_RADIUS of the view center focuses it, once the view
+ * has settled (focusDwell.ts), so a pan across the city doesn't flick panels open.
+ */
 export const ENTER_DISTANCE = 1100
 export const ENTER_RADIUS = 140
 /** Focus is dropped once zoomed out past EXIT_DISTANCE or panned EXIT_RADIUS from the focused station. */
@@ -20,6 +23,8 @@ export interface FocusInput extends FocusState {
   /** View center on the ground plane. */
   target: Ground
   stations: readonly Station[]
+  /** The view has held still long enough to enter a station (focusDwell's `settled`). Exits never wait. */
+  settled: boolean
 }
 
 /**
@@ -28,7 +33,7 @@ export interface FocusInput extends FocusState {
  * it does not allocate unless the state changes.
  */
 export function nextFocus(input: FocusInput): FocusState {
-  const { focusedId, dismissedId, distance, target, stations } = input
+  const { focusedId, dismissedId, distance, target, stations, settled } = input
   let nearest: string | null = null
   let nd = Infinity
   let fd = Infinity
@@ -50,7 +55,7 @@ export function nextFocus(input: FocusInput): FocusState {
     if (nearest === dismissed) {
       // Centered on a station the user closed: don't leave a neighbour's panel up either.
       focused = null
-    } else if (focused === null || fd > ENTER_RADIUS) {
+    } else if (settled && (focused === null || fd > ENTER_RADIUS)) {
       // Switch only once the current station is clearly behind, so neighbours don't flip-flop.
       focused = nearest
     }

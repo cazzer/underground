@@ -18,8 +18,9 @@ function run(
   x: number,
   z: number,
   stations: readonly Station[] = [A],
+  settled = true,
 ) {
-  const input = { ...state, distance, target: { x, z }, stations }
+  const input = { ...state, distance, target: { x, z }, stations, settled }
   return { input, next: nextFocus(input) }
 }
 
@@ -102,6 +103,23 @@ describe('nextFocus', () => {
     const held = run(entered, EXIT_DISTANCE, 0, 0)
     expect(held.next).toBe(held.input)
     expect(run(entered, EXIT_DISTANCE + 1, 0, 0).next).toEqual(NONE)
+  })
+
+  it('waits for the view to settle before entering, but drops focus at once', () => {
+    const moving = run(NONE, 200, 0, 0, [A], false)
+    expect(moving.next).toBe(moving.input)
+    expect(run(NONE, 200, 0, 0, [A], true).next).toEqual(focused('A'))
+    expect(run(focused('A'), EXIT_DISTANCE + 10, 0, 0, [A], false).next).toEqual(NONE)
+    expect(run(focused('A'), 200, EXIT_RADIUS + 10, 0, [A], false).next).toEqual(NONE)
+  })
+
+  it('keeps the focused station while moving, and switches only once settled', () => {
+    const held = run(focused('A'), 200, 0, 0, [A], false)
+    expect(held.next).toBe(held.input)
+    const stations = [A, station('B', 200, 0)]
+    const passing = run(focused('A'), 200, 150, 0, stations, false)
+    expect(passing.next).toBe(passing.input)
+    expect(run(focused('A'), 200, 150, 0, stations, true).next).toEqual(focused('B'))
   })
 
   it('does nothing without stations', () => {

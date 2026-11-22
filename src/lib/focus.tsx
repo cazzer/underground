@@ -31,7 +31,7 @@ interface FocusValue {
    * Re-evaluate focus for the camera's position; no fly. Applied against the latest state, so
    * it can't overwrite a select or dismiss that landed in between.
    */
-  updateFromCamera: (distance: number, target: Ground, stations: readonly Station[]) => void
+  updateFromCamera: (distance: number, target: Ground, stations: readonly Station[], settled: boolean) => void
 }
 
 interface FocusProviderProps {
@@ -75,9 +75,9 @@ export function FocusProvider({ children }: FocusProviderProps) {
     [],
   )
   const updateFromCamera = useCallback(
-    (distance: number, target: Ground, stations: readonly Station[]) =>
+    (distance: number, target: Ground, stations: readonly Station[], settled: boolean) =>
       setState((prev) => {
-        const next = nextFocus({ ...prev, distance, target, stations })
+        const next = nextFocus({ ...prev, distance, target, stations, settled })
         return next.focusedId === prev.focusedId && next.dismissedId === prev.dismissedId
           ? prev
           : { focusedId: next.focusedId, dismissedId: next.dismissedId }
