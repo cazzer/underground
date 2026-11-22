@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import type { Connector, StationInterior as Interior } from '../data/stationSchema'
 import { CAR_FLOOR_M, CAR_HEIGHT_M } from './carDims'
@@ -56,14 +56,36 @@ describe('SplitAtY', () => {
 })
 
 describe('trainLevelIndex', () => {
-  it('is the deepest level with a platform track', () => {
+  it('is the level of a single platform deck', () => {
     expect(trainLevelIndex(fixture())).toBe(2)
+  })
+
+  it('is the shallowest deck when platform tracks are on more than one level, warning once', () => {
     const twoDecks = fixture()
     twoDecks.platforms.push({ ...twoDecks.platforms[0]!, id: 'P2', level: 'mezz' })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(trainLevelIndex(twoDecks)).toBe(2)
+    expect(twoDecks.levels.findIndex((l) => l.id === 'mezz')).toBe(1)
+    expect(trainLevelIndex(twoDecks)).toBe(1)
+    expect(trainLevelIndex(twoDecks)).toBe(1)
     expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0]).toContain('shallowest deck')
     warn.mockRestore()
+  })
+
+  it('leaves every shipped single-deck interior on its deepest platform level (only two-deck ones differ)', () => {
+    const dir = new URL('../../public/data/stations/', import.meta.url)
+    const multi: string[] = []
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const f of readdirSync(dir)) {
+      if (f === 'index.json' || !f.endsWith('.json')) continue
+      const it2 = JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as Interior
+      const trackLevels = it2.levels.flatMap((l, i) =>
+        it2.platforms.some((p) => p.level === l.id && p.tracks.length > 0) ? [i] : [])
+      if (trackLevels.length > 1) multi.push(it2.stationId)
+      else expect(trainLevelIndex(it2)).toBe(trackLevels[0])
+    }
+    warn.mockRestore()
+    expect(multi).toEqual(['635'])
   })
 
   it('is undefined when no platform has a track', () => {

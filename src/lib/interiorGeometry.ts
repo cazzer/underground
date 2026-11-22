@@ -81,29 +81,30 @@ export function trainRoofY(level: { y: number }, railDrop: number, yScale: numbe
 }
 
 /**
- * Index of the deepest level with a platform track (levels run highest first, so the last such index): where the
- * deepest lifted platform trains ride. Undefined when no platform has a track.
- * Assumes one platform level: on a two-deck station the upper deck's own strokes would go over its trains, so that
- * case logs once (no such station ships today) rather than regressing silently.
+ * Index of the level the lifted platform trains ride (levels run highest first, so the first such index is the
+ * shallowest). Undefined when no platform has a track. With platform tracks on more than one level (a two-deck
+ * station) it is the SHALLOWEST deck, the one nearest the street, so that deck's trains draw above its own platform
+ * strokes; the deeper deck's trains then sit under the upper deck's strokes, which is physically in front of them.
+ * A stopgap until each deck's trains are lifted on their own (2q7.28); logs once per station.
  */
 export function trainLevelIndex(interior: StationInterior): number | undefined {
-  let deepest: number | undefined
+  let shallowest: number | undefined
   let decks = 0
   interior.levels.forEach((level, i) => {
     if (interior.platforms.some((p) => p.level === level.id && p.tracks.length > 0)) {
-      deepest = i
+      shallowest ??= i
       decks++
     }
   })
   if (decks > 1) warnTwoDecks(interior.stationId)
-  return deepest
+  return shallowest
 }
 
 const warnedDecks = new Set<string>()
 function warnTwoDecks(id: string): void {
   if (warnedDecks.has(id)) return
   warnedDecks.add(id)
-  console.warn(`Interior ${id} has platform tracks on more than one level; its upper deck draws over its own trains`)
+  console.warn(`Interior ${id} has platform tracks on more than one level; the train split uses the shallowest deck until per-deck lifting (2q7.28)`)
 }
 
 /**
