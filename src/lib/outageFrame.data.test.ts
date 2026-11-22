@@ -2,14 +2,14 @@
  * The machines out of service at Pelham Pkwy (211) framed above a phone's station panel. Its elevators and escalators
  * are all at the station house at the south end, 70 to 100 m from the plan center. Free rects measured on the app with
  * `?ene=EL136,EL137,EL138,ES122,ES123` and live arrivals: the panel as it lands (two outage rows and "Show 3 more"), and
- * with the list expanded, which leaves 32 px above it. By default the landing stays as usual and none of them shows: the
- * TEMPORARY `?landturn=half` (landingLook.ts) lands them all, south up.
+ * with the list expanded, which leaves 32 px above it. The landing stays as usual and none of them shows above the
+ * panel; collapsing the panel to its bar (2q7.34) shows them all.
  */
 import { readFileSync } from 'node:fs'
 import { PerspectiveCamera, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import type { StationInterior } from '../data/stationSchema'
-import { framedCount, FRAME_PAD_PX, TARGET_RADIUS_M, type FramePoint, type FreeFrame } from './freeFrame'
+import { framedCount, FRAME_PAD_PX, type FramePoint, type FreeFrame } from './freeFrame'
 import type { Viewport } from './framing'
 import { stationAxis } from './interiorAxis'
 import { frameInterior, landingAzimuth, type ScreenRect } from './interiorCamera'
@@ -17,7 +17,9 @@ import { RAIL_DROP_M, STEP_RISE_M } from './interiorGeometry'
 import { interiorFocusAnchor } from './interiorFraming'
 import { BOARD_HALF_M } from './interiorPath'
 import { outageFramePoints } from './outageFrame'
-import { priorityFrameOf, priorityLanding, priorityTurn } from './pathFrame'
+import { collapsedLanding, PHONE_COLLAPSED } from './collapseFixture'
+import { reframeGains } from './collapseReframe'
+import { priorityFrameOf, priorityLanding, priorityTiers } from './pathFrame'
 import { toGround } from './projection'
 import { depthFactor, ISO_POLAR, tiltForDistance } from './tilt'
 
@@ -64,46 +66,47 @@ describe('the machines out of service at Pelham Pkwy above a phone station panel
 
     it(`never frames fewer machines than the usual landing on ${name}`, () => {
       // Looking north the station house sits under the panel, and (with the measured panel) no target within reach of
-      // the station lifts it out, so this lands as usual; the half turn below is what frames it.
+      // the station lifts it out, so this lands as usual; collapsing the panel is what shows it.
       const plain = plainOf(view)
       expect(framedCount(view, priorityLanding(frame, view, plain), outages)).toBeGreaterThanOrEqual(framedCount(view, plain, outages))
     })
 
-    // TEMPORARY ?landturn=half (landingLook.ts).
-    it(`with ?landturn=half lands with every machine in the free area on ${name}`, () => {
-      const { azimuth, landing } = priorityTurn(frame, view, plainOf)
-      // Either the usual landing at that azimuth (it shows them all) or one held near the station.
-      const usual = plainOf({ ...view, azimuth })
-      if (landing.distance !== usual.distance || landing.target.x !== usual.target.x || landing.target.z !== usual.target.z) {
-        expect(Math.hypot(landing.target.x - station.x, landing.target.z - station.z)).toBeLessThanOrEqual(TARGET_RADIUS_M + 1e-6)
-      }
-      for (const p of outages) {
-        const s = project(p, landing, azimuth, viewport)
-        expect(s.x).toBeGreaterThanOrEqual(free.left + PAD)
-        expect(s.x).toBeLessThanOrEqual(free.right - PAD)
-        expect(s.y).toBeGreaterThanOrEqual(free.top + PAD)
-        expect(s.y).toBeLessThanOrEqual(free.bottom - PAD)
-      }
-    })
-
-    it(`shows no fewer machines once the list is expanded on ${name}, with or without ?landturn=half`, () => {
+    it(`shows no fewer machines once the list is expanded on ${name}`, () => {
       // 32 px above the panel: no landing shows them all, but the reframe (no turn) never shows fewer than the plain one.
-      for (const azimuth of [view.azimuth, priorityTurn(frame, view, plainOf).azimuth]) {
-        const tall = { ...view, azimuth, free: { ...free, bottom: expanded } }
-        const plain = plainOf(tall)
-        expect(framedCount(tall, priorityLanding(frame, tall, plain), outages)).toBeGreaterThanOrEqual(framedCount(tall, plain, outages))
-      }
+      const tall = { ...view, free: { ...free, bottom: expanded } }
+      const plain = plainOf(tall)
+      expect(framedCount(tall, priorityLanding(frame, tall, plain), outages)).toBeGreaterThanOrEqual(framedCount(tall, plain, outages))
     })
   }
 
-  it('keeps the usual landing on a desktop, where the whole interior fits beside the panel, even with ?landturn=half', () => {
+  it('frames every machine above the collapsed bar on 390x844, where the landing already shows them: no move', () => {
+    const viewport = PHONE_COLLAPSED.viewport
+    const open = { left: 0, top: 60, right: 390, bottom: PHONES[0]![2] }
+    const azimuth = landingAzimuth(stationAxis(interior), 0, open)
+    const openView = { azimuth, viewport, free: open, fovDeg: FOV }
+    const landed = priorityLanding(frame, openView, plainOf(openView))
+    const { view, next } = collapsedLanding(frame, plainOf, azimuth)
+    const tiers = priorityTiers(frame)
+    const counts = (v: typeof view, l: Landing) => tiers.map((t) => framedCount(v, l, t))
+    expect(reframeGains(counts(view, landed), counts(view, next), tiers.map((t) => t.length))).toBe(false)
+    for (const p of outages) {
+      const s = project(p, landed, azimuth, viewport)
+      expect(s.x).toBeGreaterThanOrEqual(PHONE_COLLAPSED.free.left + PAD)
+      expect(s.x).toBeLessThanOrEqual(PHONE_COLLAPSED.free.right - PAD)
+      expect(s.y).toBeGreaterThanOrEqual(PHONE_COLLAPSED.free.top + PAD)
+      expect(s.y).toBeLessThanOrEqual(PHONE_COLLAPSED.free.bottom - PAD)
+    }
+  })
+
+  it('keeps the usual landing on a desktop, where the whole interior fits beside the panel, and a collapse frees no room there', () => {
     const viewport = { width: 1440, height: 900 }
     const free = { left: 0, top: 60, right: 1120, bottom: 833 }
     const view = { azimuth: landingAzimuth(stationAxis(interior), 0, free), viewport, free, fovDeg: FOV }
     const plain = plainOf(view)
     expect(framedCount(view, plain, outages)).toBe(outages.length)
-    const turn = priorityTurn(frame, view, plainOf)
-    expect(turn.azimuth).toBe(view.azimuth)
-    expect(turn.landing).toEqual(plain)
+    expect(priorityLanding(frame, view, plain)).toBe(plain)
+    const tiers = priorityTiers(frame)
+    const counts = tiers.map((t) => framedCount(view, plain, t))
+    expect(reframeGains(counts, counts, tiers.map((t) => t.length))).toBe(false)
   })
 })

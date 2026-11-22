@@ -4,7 +4,7 @@ import type { ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import type { IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
-import { priorityLanding, priorityTurn, type PriorityFrame } from '../lib/pathFrame'
+import { priorityLanding, type PriorityFrame } from '../lib/pathFrame'
 import { bareStationFrame } from '../lib/freeFrame'
 import { flightDuration } from '../lib/flight'
 import type { FlyRequest } from '../lib/focus'
@@ -95,8 +95,7 @@ export function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void
  * focused station, which for a complex member is not the model's own (file) id: the flight's focus hold follows it.
  * With a priority frame at this interior (`frame`: the trip's path there, the machines out of service) it frames that
  * instead, as much of it as fits from the landing distance out, the target near one of the interior's stations, unless
- * the usual interior framing shows as much of it (priorityLanding); with `turn` and `halfTurn` (TEMPORARY
- * `?landturn=half`, landingLook.ts) the landing may also turn half way round when that shows more of it (priorityTurn).
+ * the usual interior framing shows as much of it (priorityLanding).
  */
 export function interiorFlight(
   stationId: string,
@@ -108,20 +107,17 @@ export function interiorFlight(
   azimuth: number,
   turn: boolean,
   frame: PriorityFrame | null = null,
-  halfTurn = false,
 ): Destination {
   const free = interiorFreeRect(viewport, insets, panel)
   const land = turn ? landingAzimuth(model.axis, azimuth, free) : azimuth
   const view = { azimuth: land, viewport, free, fovDeg }
-  const plainOf = (v: typeof view) => frameInterior({ ...model.focusAnchor, ...v })
-  const applies = frame?.interiorId === model.stationId
-  const chosen = applies && turn && halfTurn ? priorityTurn(frame, view, plainOf) : { azimuth: land, landing: applies ? priorityLanding(frame, view, plainOf(view)) : plainOf(view) }
-  const { distance, target } = chosen.landing
+  const plain = frameInterior({ ...model.focusAnchor, ...view })
+  const { distance, target } = frame?.interiorId === model.stationId ? priorityLanding(frame, view, plain) : plain
   return {
     stationId,
     target: new Vector3(target.x, 0, target.z),
     distance,
-    azimuth: chosen.azimuth === azimuth ? null : chosen.azimuth,
+    azimuth: land === azimuth ? null : land,
     follows: false,
   }
 }

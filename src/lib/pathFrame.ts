@@ -10,7 +10,7 @@ import { framedCount, freeFrame, type FramePoint, type FreeFrame, type FreeFrame
 import { interiorBounds } from './interiorFraming'
 import { stationPathPoints, type StationPathChoice } from './interiorPath'
 import type { Vec3 } from './interiorSegments'
-import { panRadius, wrapAngle } from './orbitLimits'
+import { panRadius } from './orbitLimits'
 import type { Ground } from './projection'
 
 /** The parts of an interior model the priority frame reads (InteriorModel has them). */
@@ -129,7 +129,7 @@ export function priorityTiers(frame: PriorityFrame): [FramePoint[], FramePoint[]
 }
 
 /** Whether `a` (path, machine counts) shows more than `b`: more of the path, or as much of it and more of the machines. */
-const showsMore = (a: readonly number[], b: readonly number[]) => a[0]! > b[0]! || (a[0] === b[0] && a[1]! > b[1]!)
+export const showsMore = (a: readonly number[], b: readonly number[]): boolean => a[0]! > b[0]! || (a[0] === b[0] && a[1]! > b[1]!)
 
 /**
  * The landing for `frame` in this view: `plain` (the interior framed as usual, frameInterior) when it already shows
@@ -150,26 +150,4 @@ export function priorityLanding(frame: PriorityFrame, view: FrameView, plain: La
   )
     ? f
     : plain
-}
-
-/**
- * The landing turn for `frame`: of the landings (priorityLanding, `plainOf` the usual one in a view) at `azimuth` and
- * half a turn from it, the one that shows more of the path, or as much of it and more of the machines; `azimuth` on a
- * tie. Half a turn keeps the platforms where the landing turn put them on screen, end for end, and puts what lies past
- * the interior's middle on the far side, where the free area above a phone's panel can reach it within TARGET_RADIUS_M.
- * Only under the TEMPORARY `?landturn=half` (scene/landingLook.ts). The flight's turn is clamped each frame to the orbit's
- * window for the previous frame's tilt (a full spin only from tiltT 0.67), so at a few frames per second the last
- * frame can jump from a low tilt to the landing and the half turn lands unturned; the reframe after landing never turns.
- */
-export function priorityTurn(frame: PriorityFrame, view: FrameView, plainOf: (view: FrameView) => Landing): { azimuth: number; landing: Landing } {
-  const tiers = priorityTiers(frame)
-  const at = (azimuth: number) => {
-    const v = { ...view, azimuth }
-    const landing = priorityLanding(frame, v, plainOf(v))
-    return { azimuth, landing, counts: tiers.map((t) => framedCount(v, landing, t)) }
-  }
-  const here = at(view.azimuth)
-  if (here.counts.every((n, i) => n === tiers[i]!.length)) return here
-  const flipped = at(wrapAngle(view.azimuth + Math.PI))
-  return showsMore(flipped.counts, here.counts) ? flipped : here
 }
