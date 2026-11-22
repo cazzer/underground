@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REFERENCE, toGround, toLatLon } from './projection'
+import { groundX, groundZ, REFERENCE, toGround, toLatLon } from './projection'
 
 describe('projection', () => {
   it('maps the reference point to the origin', () => {
@@ -34,5 +34,12 @@ describe('projection', () => {
     const back = toLatLon(toGround(p))
     expect(back.lat).toBeCloseTo(p.lat, 9)
     expect(back.lon).toBeCloseTo(p.lon, 9)
+  })
+
+  it('splits into groundX and groundZ', () => {
+    const p = { lat: 40.7359, lon: -73.9906 }
+    const g = toGround(p)
+    expect(groundX(p.lon)).toBe(g.x)
+    expect(groundZ(p.lat)).toBe(g.z)
   })
 })

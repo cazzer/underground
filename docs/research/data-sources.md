@@ -323,6 +323,24 @@ adds `format`, `generator` and `generator_options`, and resets `bounds` to the w
 the layer fields, attribution and description are kept. A client must not rely on `version` or `bounds`. It adds a tilestats
 table unless run with `-pg`, which the workflow does.
 
+**Client (ost.9.2).** `src/data/basemapTiles.ts` asks for `basemap/tiles/{z}/{x}/{y}.mvt?v=<release>` (same origin; the
+release tag busts caches) for the tiles the camera's ground footprint touches, inside the spec bbox and never above its
+maxzoom, z 9 at the coarsest, at most 24 at once (the zoom steps down past that), at most 6 in flight, nearest the view
+center first; a tile no longer wanted is aborted. Nothing is asked for before the first map frame and an idle callback. The
+basemap worker (`basemapWorker.ts`) fetches and decodes (`@mapbox/vector-tile` 3.0.0, `pbf` 5.2.0, worker chunk only); no
+tile is decoded on the main thread, and without a worker the basemap is off (logged). Empty-tile policy: a 404 is "not
+served" and a 200 that is not raw MVT (an HTML fallback, or gzip, which is rejected rather than inflated) "not MVT"; both
+draw nothing, are never asked for again in the session, and log one line each per session (the 404 at info level, with
+z/x/y only). Network failures and other statuses retry after 15 s. Privacy: tiles follow the camera, never the GPS fix,
+and after a location fly-to no new tile is requested until the user's own gesture or a station flight.
+
+Measured (dev tile directory from the 20261121 pin via `tile-join -e <dir> -pC`, Chrome on an Apple-silicon laptop, decode
+in the page with the same code, median of 10): the densest z15 tile, 15/9647/12320 (City Hall, 86,949 B raw, 3,300
+segments), 1.1 ms (1.6 ms cold in the worker); the densest Midtown one, 15/9650/12317 (45,518 B), 0.7 ms; a z10 overview
+tile (215 KB raw, 16,519 segments) 3.8 ms. Far under the 25 ms desktop target; a phone at 4 to 6 times slower stays under
+25 ms. The city view at load wants the six z10 tiles (about 930 KB raw, 675 KB gzipped as stored), a station view at 400 m
+two to four z15 tiles.
+
 ## 6. Static-hosting fit and pipeline
 
 **The MTA terms require a proxy; CORS doesn't.** The plan is a Cloudflare Worker at `/rt` that:

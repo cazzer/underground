@@ -15,11 +15,19 @@ export const REFERENCE: LatLon = { lat: 40.7128, lon: -74.006 }
 const EARTH_RADIUS_M = 6_371_008.8
 const DEG = Math.PI / 180
 
+/** Scene x (meters east of `origin`) of a longitude; allocation-free, for per-vertex use. */
+export function groundX(lon: number, origin: LatLon = REFERENCE): number {
+  return (lon - origin.lon) * DEG * Math.cos(origin.lat * DEG) * EARTH_RADIUS_M
+}
+
+/** Scene z (meters south of `origin`) of a latitude; allocation-free, for per-vertex use. */
+export function groundZ(lat: number, origin: LatLon = REFERENCE): number {
+  return -(lat - origin.lat) * DEG * EARTH_RADIUS_M
+}
+
 /** Equirectangular projection around `origin`. Accurate to well under 1% across NYC. */
 export function toGround(point: LatLon, origin: LatLon = REFERENCE): Ground {
-  const east = (point.lon - origin.lon) * DEG * Math.cos(origin.lat * DEG) * EARTH_RADIUS_M
-  const north = (point.lat - origin.lat) * DEG * EARTH_RADIUS_M
-  return { x: east, z: -north }
+  return { x: groundX(point.lon, origin), z: groundZ(point.lat, origin) }
 }
 
 export function toLatLon(ground: Ground, origin: LatLon = REFERENCE): LatLon {
