@@ -1,29 +1,26 @@
 import type { PlaceText } from '../lib/placeLabel'
+import type { RowAction } from '../lib/searchRowActions'
+import type { TripEnd } from '../lib/trip'
+import { ResultRow } from './ResultRow'
 
 interface PlaceResultProps {
-  id: string
+  row: number
+  highlighted: boolean
+  actions: readonly RowAction[]
   text: PlaceText
-  active: boolean
+  /** The label's name for the directions buttons (`rowName`). */
+  name: string
   onChoose: () => void
-  onActive: () => void
+  onDirections: (end: TripEnd) => void
 }
 
 /**
- * One listbox option for a searched address or place: the name, then the rest of the label and what it is. The
- * visible text is aria-hidden; the option's name is the one spoken sentence ("120 Broadway, Manhattan, address").
+ * One row for a searched address or place: the name, then the rest of the label and what it is. The visible text is
+ * aria-hidden; the button's name is the one spoken sentence ("120 Broadway, Manhattan, address").
  */
-export function PlaceResult({ id, text, active, onChoose, onActive }: PlaceResultProps) {
+export function PlaceResult({ row, highlighted, actions, text, name, onChoose, onDirections }: PlaceResultProps) {
   return (
-    <li
-      id={id}
-      role="option"
-      aria-selected={active}
-      onClick={onChoose}
-      onPointerMove={(e) => e.pointerType === 'mouse' && onActive()}
-      className={`flex min-h-11 cursor-pointer flex-col justify-center gap-1 border-l-4 px-3 py-2 ${
-        active ? 'border-focus bg-panel' : 'border-transparent'
-      }`}
-    >
+    <ResultRow row={row} highlighted={highlighted} actions={actions} name={name} onChoose={onChoose} onDirections={onDirections}>
       <span aria-hidden="true" className="text-base leading-tight">
         {text.name}
       </span>
@@ -31,6 +28,6 @@ export function PlaceResult({ id, text, active, onChoose, onActive }: PlaceResul
         {text.detail ? `${text.detail} · ${text.kindWord}` : text.kindWord}
       </span>
       <span className="sr-only">{text.spoken}</span>
-    </li>
+    </ResultRow>
   )
 }

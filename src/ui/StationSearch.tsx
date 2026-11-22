@@ -9,8 +9,12 @@ import { multiBoroughNames } from '../lib/labels'
 import type { MarkedPlacement } from '../lib/locate'
 import type { Network, Station } from '../lib/network'
 import { placePick, type PlacePick } from '../lib/placeLabel'
-import { activeIndex, searchItems, type SearchItem } from '../lib/searchItems'
+import { searchItems, type SearchItem } from '../lib/searchItems'
+import { rowActions } from '../lib/searchRowActions'
+import { searchNav, type NavSpot } from '../lib/searchNav'
 import { buildSearchIndex, SEARCH_LIMIT, searchStations } from '../lib/stationSearch'
+import type { TripEnd } from '../lib/trip'
+import type { DirectionsTarget } from '../lib/tripDirections'
 import { SearchResults } from './SearchResults'
 import { useKeyboardInset } from './useKeyboardInset'
 
@@ -30,6 +34,11 @@ interface StationSearchProps {
    * it (or without `VITE_RT_URL`) the dialog finds stations only and sends nothing anywhere.
    */
   onChoosePlace?: (pick: PlacePick) => void
+  /**
+   * Given (the HUD's search), every row also offers From and To, which call this and close the dialog; the trip
+   * panel's own searches leave it out and their rows have one button. A place's target is its nearest station and its name.
+   */
+  onDirections?: (end: TripEnd, target: DirectionsTarget) => void
   /** The marked location fix: read only to keep the search's bias away from it, never sent. */
   fix?: MarkedPlacement | null
   /** The dialog closed (Esc, the Android back gesture, Cancel, or a choice); mirrors the native close event. */
@@ -50,19 +59,20 @@ function statusText(typed: boolean, count: number): string {
 
 /**
  * Full-screen station search in a native modal dialog: the page behind is inert, Esc closes it and focus
- * is trapped. Always mounted (closed, hence hidden) so `open()` can focus the input inside the tap. The input
- * is an ARIA combobox over a listbox; focus stays in the input and `aria-activedescendant` points at the
- * highlighted result. Closing hands focus back to whatever had it when the dialog opened. Esc closes it and goes no
+ * is trapped. Always mounted (closed, hence hidden) so `open()` can focus the input inside the tap. A labelled
+ * input over lists of result rows, each a real button (not a combobox: a listbox option can't hold the From and To
+ * buttons). Every button is in Tab order; ArrowDown from the input, Up and Down between rows, Left and Right within
+ * one, and a printable key back to the input are shortcuts (`searchNav`). Enter in the input picks the highlighted
+ * first row. Closing hands focus back to whatever had it when the dialog opened. Esc closes it and goes no
  * further: the dialog stops the keydown, so a window-level Esc handler (the HUD's panels) never also acts on it.
  */
-export function StationSearch({ network, onChoose, onChoosePlace, fix = null, onClose, label, placeholder, ref }: StationSearchProps) {
+export function StationSearch({ network, onChoose, onChoosePlace, onDirections, fix = null, onClose, label, placeholder, ref }: StationSearchProps) {
   const placesOn = GEOCODE_URL !== null && onChoosePlace !== undefined
   label ??= placesOn ? 'Search stations and places' : 'Search stations'
   placeholder ??= placesOn ? 'Station, address or place' : 'Station name'
   const dialog = useRef<HTMLDialogElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const id = useId()
-  const listId = `${id}-list`
   const hintId = `${id}-hint`
   const disclosureId = `${id}-disclosure`
   const index = useMemo(() => buildSearchIndex(network.stations), [network])
@@ -70,7 +80,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
   const keyboardInset = useKeyboardInset()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
-  const [activeKey, setActiveKey] = useState<string | null>(null)
+  const [inputFocused, setInputFocused] = useState(false)
   const results = useMemo(() => searchStations(index, query), [index, query])
   // The bias is read when a request goes out, not per render.
   const { focusedId, viewCenter } = useFocus()
@@ -97,50 +107,62 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
     () => searchItems(results, geo.status === 'ready' || geo.status === 'pending' ? geo.places : []),
     [results, geo],
   )
-  const current = activeIndex(items, activeKey)
-  const optionId = (key: string) => `${listId}-${key}`
-  const activeOption = items[current]
   const typed = query.trim() !== ''
+  const actions = rowActions(onDirections !== undefined)
 
-  const reset = (text: string) => {
-    setQuery(text)
-    setActiveKey(null)
-  }
   useImperativeHandle(ref, () => ({
     open: () => {
-      reset('')
+      setQuery('')
       setOpen(true)
       dialog.current?.showModal()
       input.current?.focus()
     },
   }))
   const close = () => dialog.current?.close()
+  // A pick sets the caller's state before `close()`: the dialog hands focus back to the opener, then the caller's own focus move lands.
+  const placeOf = (item: Extract<SearchItem<Station>, { kind: 'address' | 'place' }>) => {
+    const pick = placePick(item.result, item.text, network.stations)
+    if (!pick || !onChoosePlace) throw new Error('A place was picked with no station to name or nobody to tell')
+    return pick
+  }
   const choose = (item: SearchItem<Station>) => {
     if (item.kind === 'station') onChoose(item.station.id)
+    else onChoosePlace?.(placeOf(item))
+    close()
+  }
+  const directions = (item: SearchItem<Station>, end: TripEnd) => {
+    if (!onDirections) throw new Error('Directions were picked in a search that offers none')
+    if (item.kind === 'station') onDirections(end, { stationId: item.station.id, place: null })
     else {
-      const pick = placePick(item.result, item.text, network.stations)
-      if (!pick || !onChoosePlace) throw new Error('A place was picked with no station to name or nobody to tell')
-      onChoosePlace(pick)
+      const pick = placeOf(item)
+      onDirections(end, { stationId: pick.nearest.id, place: pick.name })
     }
     close()
   }
-  const move = (next: number) => {
-    const item = items[next]
-    if (!item) return
-    setActiveKey(item.key)
-    document.getElementById(optionId(item.key))?.scrollIntoView({ block: 'nearest' })
+  const focusSpot = (spot: NavSpot) => {
+    if (spot === 'input') input.current?.focus()
+    else dialog.current?.querySelector<HTMLElement>(`[data-row="${spot.row}"][data-col="${spot.col}"]`)?.focus()
   }
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown') {
+    const first = items[0]
+    if (e.key === 'Enter' && first && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      move(Math.min(current + 1, items.length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      move(Math.max(current - 1, 0))
-    } else if (e.key === 'Enter' && activeOption && !e.nativeEvent.isComposing) {
-      e.preventDefault()
-      choose(activeOption)
+      choose(first)
+      return
     }
+    const nav = searchNav('input', e, items.length, actions.length)
+    if (!nav) return
+    e.preventDefault()
+    focusSpot(nav.to)
+  }
+  const onRowKey = (e: KeyboardEvent<HTMLElement>) => {
+    const row = Number(e.target instanceof HTMLElement ? e.target.dataset.row : undefined)
+    const col = Number(e.target instanceof HTMLElement ? e.target.dataset.col : undefined)
+    if (!Number.isInteger(row) || !Number.isInteger(col)) return
+    const nav = searchNav({ row, col }, e, items.length, actions.length)
+    if (!nav) return
+    if (!nav.keepDefault) e.preventDefault()
+    focusSpot(nav.to)
   }
 
   return (
@@ -166,11 +188,6 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
               ref={input}
               id={`${id}-q`}
               type="text"
-              role="combobox"
-              aria-expanded={items.length > 0}
-              aria-controls={items.length > 0 ? listId : undefined}
-              aria-autocomplete="list"
-              aria-activedescendant={activeOption ? optionId(activeOption.key) : undefined}
               aria-describedby={[placesOn && disclosureId, !typed && hintId].filter(Boolean).join(' ') || undefined}
               autoComplete="off"
               autoCorrect="off"
@@ -179,7 +196,9 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
               enterKeyHint="go"
               placeholder={placeholder}
               value={query}
-              onChange={(e) => reset(e.target.value)}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               onKeyDown={onKeyDown}
               className="min-h-11 w-full border border-edge bg-panel pr-11 pl-3 text-base text-ink placeholder:text-ink-dim focus-visible:outline-2 focus-visible:outline-focus"
             />
@@ -187,7 +206,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
               <button
                 type="button"
                 onClick={() => {
-                  reset('')
+                  setQuery('')
                   input.current?.focus()
                 }}
                 aria-label="Clear search text"
@@ -219,24 +238,21 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
         {!typed && (
           <p id={hintId} className="p-3 text-sm text-ink-dim">
             {placesOn ? 'Try 14 st, 120 broadway or empire state.' : 'Try a name like 14 st, bedford or times sq.'}
+            {onDirections && ' From or To on a result plans a trip.'}
           </p>
         )}
         <SearchResults
           network={network}
-          listId={listId}
           items={items}
-          current={current}
-          optionId={optionId}
+          highlightFirst={inputFocused && typed && items.length > 0}
+          actions={actions}
           multiBorough={multiBorough}
           view={geo}
-          grouped={placesOn}
           emptyText={searchEmptyText(typed, results.length, geo)}
           keyboardInset={keyboardInset}
           onChoose={choose}
-          onActive={(i) => {
-            const item = items[i]
-            if (item) setActiveKey(item.key)
-          }}
+          onDirections={directions}
+          onRowKey={onRowKey}
         />
       </div>
     </dialog>

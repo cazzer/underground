@@ -304,8 +304,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   train" button; the same button node, so toggling keeps focus and the panel's size; its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first (the train panel and the gone notice keep ×; the station and trip panels have none), then the
   notice, then the trip panel, then the station, and closing either of the first two returns focus to the trip heading, else the station heading, else
-  the Search button; `ArrivalsPanel.tsx` is the station panel (moved out of Hud.tsx), whose last section is `EntranceList.tsx`: a screen-reader-only "Entrances" heading and the street file's entrance labels via `useStationStreets` (`entranceRows`, `lib/entranceList.ts`: elevators first, then by street; the map labels' words, same-text stairs within 15 m one row with a count; each row is its `entranceSpoken` form, full names and corners spelled out). The list is screen-reader only (sr-only section, never shown: sighted users read the map's entrance labels, the user's call). Not a live region, nothing while the file loads or when there is none; `TripButton.tsx` the third header button (aria-expanded toggle) with
-  `useTripPanel.ts` (opens with `defaultEnds`, closes; Esc, when focus was in the panel, focuses the station heading else the Trip button one frame later) and `TripPanel.tsx`, the trip
+  the Search button; `ArrivalsPanel.tsx` is the station panel (moved out of Hud.tsx), whose last section is `EntranceList.tsx`: a screen-reader-only "Entrances" heading and the street file's entrance labels via `useStationStreets` (`entranceRows`, `lib/entranceList.ts`: elevators first, then by street; the map labels' words, same-text stairs within 15 m one row with a count; each row is its `entranceSpoken` form, full names and corners spelled out). The list is screen-reader only (sr-only section, never shown: sighted users read the map's entrance labels, the user's call). Not a live region, nothing while the file loads or when there is none; under its heading it has "Directions from here" / "Directions to here" (`openTrip`; the header has one Search button and no Trip button), with
+  `useTripPanel.ts` (`openTrip`: a directions pick from a search row or the station panel; it closes a train panel or notice in front, expands a collapsed trip (`tripRequested`, no seq), sets the ends by `directionsTrip` (`lib/tripDirections.ts`: the picked end, then the other from the fix's nearest station (From only), the focused station outside the picked one's complex, then the trip's earlier ends; a place sets its nearest station and note) and hands `TripPanel` a `focusRequest`: the end left empty, else the heading; it moves no camera; `closeTrip`: "Close trip" or Esc, when focus was in the panel, focuses the station heading else the Search button one frame later) and `TripPanel.tsx`, the trip
   panel (see Navigation UI below), which sits behind a train or notice and in front of the station panel and shares its `panel` ref); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
   `FocusAnnouncer.tsx` a polite sr-only live region ("Showing <station>", name only) for any newly focused station (auto-focus, tap, link,
@@ -325,12 +325,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   "Estimated layout"; the disclosure's focus goes to the station heading if it unmounts while focused), or a dim
   "status unavailable" line; one always-mounted polite sr-only region speaks only a change to the machines out at the station
   whose panel stays open and clears its text after 6 s (`outageAnnounce.ts`, pure; silent on open, station change or stale data)
-  `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a combobox over a
-  listbox of `SearchResult.tsx` rows (name and access icon, the borough on a dim line only for names whose stations span boroughs
-  (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart); choosing a result
+  `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a labelled input over lists of result rows (`ResultRow.tsx`: a primary button with `SearchResult.tsx` or `PlaceResult.tsx` content and, in the HUD's search, given `onDirections`, "From" and "To" buttons named "Directions from/to <name>", `lib/searchRowActions.ts`; a directions pick calls `openTrip`, with a place's nearest station and name). It is not a combobox, because a listbox option can't hold buttons. Every button is in Tab order; arrows move focus (`lib/searchNav.ts`: Down from the input, Up/Down between rows, Left/Right/Home/End within one, a printable key back to the input); Enter in the input picks the highlighted first row. A station row shows the name and access icon, the borough on a dim line only for names whose stations span boroughs
+  (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart; choosing a result
   calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). Optional `label`
   (dialog name and input label, default "Search stations and places", or "Search stations" with places off), `placeholder` and `onClose` props let the trip panel mount two more
-  instances (From, To). Places are on only when `GEOCODE_URL` (`realtime.ts`, from `VITE_RT_URL`) is set and the instance gets `onChoosePlace`:
+  instances (From, To), whose rows have the one button. Places are on only when `GEOCODE_URL` (`realtime.ts`, from `VITE_RT_URL`) is set and the instance gets `onChoosePlace`:
   then the stations still rank synchronously and unchanged, and `useGeocode.ts` (one per dialog, only while it is open) adds
   addresses and places under them through `/geocode`: `lib/geocodeSearch.ts` the pure debounce and abort machine (250 ms after the
   last keystroke, 3 to 100 code points of `normalizeQuery` text, a stale request aborted and its late answer ignored, `answerKey`
@@ -338,11 +337,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `parseGeocodeResponse` checking every row at the boundary, `fetchGeocode`: `cache: 'no-store'`, `credentials: 'omit'`, 8 s timeout,
   failures as `GeocodeAnswer` kinds, never an error's message), `lib/geocodeView.ts` (what shows and what the polite region says: one
   sentence per settled query, "Still searching" only after 2 s, the unavailable sentence once per dialog session (`nextErrorSpoken`); the Worker's `street` rows are dropped, 2q7.14 owns streets),
-  `lib/searchItems.ts` (stations then places as one keyed list; the active option is tracked by key, so a late answer never moves it),
+  `lib/searchItems.ts` (stations then places as one keyed list),
   `lib/placeLabel.ts` (`displayCase`: GeoSearch names are UPPERCASE, so an all-caps segment is re-cased; `placeText`, `distanceText`,
-  `placePick`: the place's ground point and nearest station). `SearchResults.tsx` renders them: stations alone as the old flat
-  listbox, with places searched the APG grouped listbox from the first row (a "Stations" group, an "Addresses and places" group, present only with rows, of `PlaceResult.tsx` options, each named
-  by one spoken sentence "120 Broadway, Manhattan, address"), the "Searching" and error notes (aria-hidden; the two status
+  `placePick`: the place's ground point and nearest station). `SearchResults.tsx` renders them: a "Stations" list and, with places, an "Addresses and places" heading over a second list of `PlaceResult.tsx` rows, each primary button named
+  by one spoken sentence "120 Broadway, Manhattan, address", the "Searching" and error notes (aria-hidden; the two status
   regions speak them), and the credit for the sources of the rows shown ("Address and place data: " and the contract's `GEOCODE_ATTRIBUTION` strings). A 503 or 429 answer reads as unavailable and is never retried (the next keystroke's request is the only retry). The dialog says "Addresses and places are looked up
   through our server; your location is never sent." (the input's description). Picking a place in the HUD's search is a point
   flight, not a station pick (`flyToPoint(…, 'place')`, 250 m radius, which lands at the 1450 m floor, top-down; it neither expands
@@ -488,8 +486,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     collapsed station or trip panel (false with none, and with a train panel or notice in front), and `seq` increments only on a user collapse or expand of
     the panel in front (never on a size change, a station change, a panel closing or a cover; `collapsed` can change without it, so key on `seq`;
     `useCollapseReframe` does);
-    `usePanelCollapseControls()` is the panels' (`usePanelToggle`). The trip flag resets silently when the trip panel closes (opening Trip
-    is a request to plan, so it opens expanded). `tripBar.ts` `tripBarText`: the trip bar's "A → B", "From A", "To B" or "Trip" and its spoken form
+    `usePanelCollapseControls()` is the panels' (`usePanelToggle`). The trip flag resets silently when the trip panel closes, and `tripRequested` (a directions pick, never a `seq`
+    bump) expands a collapsed trip panel. `tripBar.ts` `tripBarText`: the trip bar's "A → B", "From A", "To B" or "Trip" and its spoken form
   - `focus.tsx` focused/dismissed-station React context (not pure); it also carries point flights
     (`flyToPoint(center, radiusM, source)`, `source` `'locate'` or `'place'`, returns the request's nonce; used by the location button and a
     searched place; drops focus, so an orbited view springs back north-up during the flight; `select` and `flyToPoint` share one nonce counter,
@@ -701,22 +699,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   loaders are their own chunk, not the startup bundle. `planTripBetween` expands each end to its complex (`lib/route/ends.ts`
   `complexMembers`: same-named stations linked in transfers.json) so a trip never starts or ends with a walk to a same-named station;
   `journeySource` tags a journey Live (every ride leg live), Live and scheduled (a dim "scheduled" on the others) or Scheduled, in the summary ("Leaves in 4 min · Live") and as the spoken sentence's last words; a live ride leg the map draws (`ArrivalsSource.drawnKeys`) has a "Show train" button calling `selectTrain`, so the train panel covers the trip and its × returns focus to the trip heading. A journey's key is its legs' routes and stops, not trip ids, so a scheduled-to-live swap keeps its disclosure and focus; the "Show train" button, once offered, stays as an `aria-disabled` no-op while the train is off the map. A silent poll that first turns a journey's tag from Scheduled to Live (or mixed) stays silent, like any refresh. `journeyView` still words a mid-trip walk between same-named stations as a change.
-  `src/lib/tripView.ts` (pure, tested; `tripOnMap.ts` holds `shouldAnnounceOnMap`): `defaultEnds` (a marked fix's nearest station is From, the focused station To; no fix: focused
-  is From), `tripMessage`, `orderJourneys`, `journeyView` (a journey departs with its first train), the spoken text, and the
+  `src/lib/tripView.ts` (pure, tested; `tripOnMap.ts` holds `shouldAnnounceOnMap`): `tripMessage`, `orderJourneys`, `journeyView` (a journey departs with its first train), the spoken text, and the
   announce rules (`shouldAnnounceTrip`: a settled plan once, not a refresh). `TripAnnouncer.tsx` is the one polite live region for it,
   mounted in the HUD header (so it outlasts the panel being covered): it speaks a settled plan, the message for ends that can't be planned
   and "On the map: X" only when the focused station really changes while the panel is in front (`shouldAnnounceOnMap`: never on
   open, a swap, an end pick or an uncover, and not while a result loads or in the 1.5 s after one settles); it is emptied whenever its text could be stale and refilled after a gap so a
-  repeated sentence is spoken again. `TripPanel.tsx` (`aside` "Trip"; heading takes focus on mount; a down chevron instead of × collapses it to a bar, `tripBarText`'s From → To, in the same aside, body hidden and kept; tapping the bar expands it; the header Trip button closes a shown panel, collapsed or not, and reopening starts expanded; `useScrollHint.ts` a "more below" fade
+  repeated sentence is spoken again. `TripPanel.tsx` (`aside` "Trip"; the directions pick's focus target (heading or the empty end's row) takes focus; a down chevron instead of × collapses it to a bar, `tripBarText`'s From → To, in the same aside, body hidden and kept; tapping the bar expands it; a "Close trip" text button beside the chevron closes it (no ×, 2q7.34; the collapsed bar has none) and a directions pick reopens or expands it; closing keeps the ends; `useScrollHint.ts` a "more below" fade
   while the capped panel scrolls) with `TripEnds.tsx` (From/To rows take focus, then open their own `StationSearch`; a shortcut that fills an
   end returns focus to that row; "Nearest to you" never offers a From equal to To; "On the map" is not offered, nor announced, for
   a station sharing a complex with an end, `isTripEnd` in `lib/tripEnds.ts` over the App's `siblingIdsOf`) and `TripJourneys.tsx` (disclosures, first open; a
   station name calls `select`, the only camera move; a journey ending on a train ends with `TripExitLine.tsx`, its way out: the
   visible text and note aria-hidden, one sr-only sentence, never a live region; a change through a hand-authored complex has
-  `TripTransferLine.tsx` under its "Change at …" row, the same way). The header button's aria-expanded is true only while the panel is in front; pressing
-  it when a train or notice covers the panel (or the panel is closed) closes that cover first. Esc moves focus only from inside the
+  `TripTransferLine.tsx` under its "Change at …" row, the same way). A directions pick closes a train panel or notice in front of it first. No control carries the
+  panel's aria-expanded: the picks are actions that move focus in, and Close returns it. Esc moves focus only from inside the
   panel. The trip panel stays mounted (hidden, inert) under a train panel or notice, so its journeys, scroll and focus survive and a
-  notice's auto-dismiss never moves focus; only an explicit open, the button, or a deliberate train/notice close focuses its heading.
+  notice's auto-dismiss never moves focus; only a directions pick or a deliberate train/notice close focuses its heading.
   The HUD's window Esc handler skips while any `dialog:modal` is open. The trip's two searches are the same dialog as the HUD's (a place
   picked there sets the end to its nearest station, see `StationSearch`). Nothing located is sent anywhere. What is typed in a search
   dialog goes to the Worker's `/geocode` alone, and only with the Worker configured (see Data, "Address search"); the trip itself

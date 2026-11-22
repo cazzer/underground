@@ -21,6 +21,8 @@ export interface PanelCollapseControls {
   stationCollapsed: boolean
   tripCollapsed: boolean
   setCollapsed: (panel: CollapsiblePanel, collapsed: boolean) => void
+  /** A directions pick: expands a collapsed trip panel without counting as a toggle (no `seq`: the pick's own focus move is the signal). */
+  tripRequested: () => void
 }
 
 const ViewContext = createContext<PanelCollapse | null>(null)
@@ -51,9 +53,10 @@ export function PanelCollapseProvider({ children }: { children: ReactNode }) {
   const collapsed = collapsedFront(state, front)
   const view = useMemo(() => ({ collapsed, seq: state.seq }), [collapsed, state.seq])
   const setCollapsed = useCallback((panel: CollapsiblePanel, next: boolean) => dispatch({ type: 'set', panel, collapsed: next, front }), [front])
+  const tripRequested = useCallback(() => dispatch({ type: 'tripRequested' }), [])
   const controls = useMemo(
-    () => ({ stationCollapsed: state.station, tripCollapsed: state.trip, setCollapsed }),
-    [state.station, state.trip, setCollapsed],
+    () => ({ stationCollapsed: state.station, tripCollapsed: state.trip, setCollapsed, tripRequested }),
+    [state.station, state.trip, setCollapsed, tripRequested],
   )
   return (
     <ViewContext value={view}>

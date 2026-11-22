@@ -1,26 +1,28 @@
-import type { ReactNode } from 'react'
+import { useId, type KeyboardEvent, type ReactNode } from 'react'
 import { GEOCODE_ATTRIBUTION, type GeocodeSource } from '../data/realtime'
 import { GEOCODE_ERROR_TEXT, type GeocodeView } from '../lib/geocodeView'
 import type { Network, Station } from '../lib/network'
 import type { SearchItem } from '../lib/searchItems'
+import { rowName, type RowAction } from '../lib/searchRowActions'
+import type { TripEnd } from '../lib/trip'
 import { PlaceResult } from './PlaceResult'
 import { SearchResult } from './SearchResult'
 
 interface SearchResultsProps {
   network: Network
-  listId: string
   items: readonly SearchItem<Station>[]
-  /** Index of the active item in `items`, or -1. */
-  current: number
-  optionId: (key: string) => string
+  /** Enter in the input picks the first row: mark it while text is typed and the input has focus. */
+  highlightFirst: boolean
+  /** Each row's buttons (`rowActions`). */
+  actions: readonly RowAction[]
   multiBorough: ReadonlySet<string>
   view: GeocodeView
-  /** Places are searched: the listbox keeps its grouped structure from the first row, so no station option remounts when places arrive. */
-  grouped: boolean
   emptyText: string | null
   keyboardInset: number
   onChoose: (item: SearchItem<Station>) => void
-  onActive: (index: number) => void
+  onDirections: (item: SearchItem<Station>, end: TripEnd) => void
+  /** Arrow, Home, End and printable keys from a row's buttons. */
+  onRowKey: (e: KeyboardEvent<HTMLElement>) => void
 }
 
 const LINK_CLASS =
@@ -61,59 +63,41 @@ function SourceCredit({ sources }: { sources: readonly GeocodeSource[] }) {
 }
 
 /**
- * The dialog's scroll area: the listbox (stations alone as one flat list, as before; with places searched, always the
- * grouped listbox, a "Stations" group and, once there are rows, an "Addresses and places" group), the notes a status region already speaks, and the credit. Option ids come
- * from `optionId` so the input's `aria-activedescendant` can name any of them.
+ * The dialog's scroll area: a "Stations" list and, once places have rows, an "Addresses and places" heading over a
+ * second list, the notes a status region already speaks, and the credit. The lists are plain lists of buttons, not
+ * a listbox, because a row holds more than one button; `role="list"` is explicit because Safari drops list
+ * semantics from an unstyled list.
  */
-export function SearchResults({ network, listId, items, current, optionId, multiBorough, view, grouped, emptyText, keyboardInset, onChoose, onActive }: SearchResultsProps) {
+export function SearchResults({ network, items, highlightFirst, actions, multiBorough, view, emptyText, keyboardInset, onChoose, onDirections, onRowKey }: SearchResultsProps) {
+  const headingId = useId()
   const stationRows: ReactNode[] = []
   const placeRows: ReactNode[] = []
   items.forEach((item, i) => {
+    const common = { row: i, highlighted: highlightFirst && i === 0, actions, onChoose: () => onChoose(item), onDirections: (end: TripEnd) => onDirections(item, end) }
     if (item.kind === 'station') {
-      stationRows.push(
-        <SearchResult
-          key={item.key}
-          id={optionId(item.key)}
-          network={network}
-          station={item.station}
-          showBorough={multiBorough.has(item.station.name)}
-          active={i === current}
-          onChoose={() => onChoose(item)}
-          onActive={() => onActive(i)}
-        />,
-      )
+      stationRows.push(<SearchResult key={item.key} {...common} network={network} item={item} showBorough={multiBorough.has(item.station.name)} />)
     } else {
-      placeRows.push(
-        <PlaceResult key={item.key} id={optionId(item.key)} text={item.text} active={i === current} onChoose={() => onChoose(item)} onActive={() => onActive(i)} />,
-      )
+      placeRows.push(<PlaceResult key={item.key} {...common} text={item.text} name={rowName(item, null)} />)
     }
   })
-  const headingId = `${listId}-places`
   const searching = view.status === 'pending' && view.tier >= 1
   return (
-    <div style={{ paddingBottom: keyboardInset }} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      {items.length > 0 &&
-        (grouped ? (
-          <div id={listId} role="listbox" aria-label="Stations, addresses and places">
-            {stationRows.length > 0 && (
-              <ul role="group" aria-label="Stations">
-                {stationRows}
-              </ul>
-            )}
-            {placeRows.length > 0 && (
-              <ul role="group" aria-labelledby={headingId}>
-                <li role="presentation" id={headingId} className="px-3 pt-3 pb-1 text-xs text-ink-dim uppercase">
-                  Addresses and places
-                </li>
-                {placeRows}
-              </ul>
-            )}
-          </div>
-        ) : (
-          <ul id={listId} role="listbox" aria-label="Stations">
-            {stationRows}
+    <div style={{ paddingBottom: keyboardInset }} onKeyDown={onRowKey} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      {stationRows.length > 0 && (
+        <ul role="list" aria-label="Stations">
+          {stationRows}
+        </ul>
+      )}
+      {placeRows.length > 0 && (
+        <>
+          <h2 id={headingId} className="px-3 pt-3 pb-1 text-xs text-ink-dim uppercase">
+            Addresses and places
+          </h2>
+          <ul role="list" aria-labelledby={headingId}>
+            {placeRows}
           </ul>
-        ))}
+        </>
+      )}
       {emptyText && (
         <p className="p-3 text-sm text-ink-dim" aria-hidden="true">
           {emptyText}

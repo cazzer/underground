@@ -1,4 +1,4 @@
-/** The search dialog's rows as one flat list, so one active index and one key space cover stations and places (pure). */
+/** The search dialog's rows as one flat list, so one key space covers stations and places (pure). */
 import type { GeocodeKind, GeocodeResult } from '../data/realtime'
 import { placeText, type PlaceText } from './placeLabel'
 import type { SearchableStation } from './stationSearch'
@@ -26,11 +26,4 @@ export function searchItems<S extends SearchableStation>(stations: readonly S[],
     if (kind) items.push({ kind, key: placeKey(result, i), result, text: placeText(result) })
   })
   return items
-}
-
-/** The active row's index: its key's, else the first; -1 for an empty list. */
-export function activeIndex(items: readonly SearchItem<SearchableStation>[], activeKey: string | null): number {
-  if (items.length === 0) return -1
-  const at = activeKey === null ? -1 : items.findIndex((item) => item.key === activeKey)
-  return at === -1 ? 0 : at
 }

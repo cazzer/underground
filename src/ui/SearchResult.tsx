@@ -1,38 +1,35 @@
 import { boroughName } from '../lib/labels'
 import type { Network, Station } from '../lib/network'
+import type { SearchItem } from '../lib/searchItems'
+import { rowName, type RowAction } from '../lib/searchRowActions'
+import type { TripEnd } from '../lib/trip'
 import { StationName } from './AccessIcon'
+import { ResultRow } from './ResultRow'
 import { RouteChip } from './RouteChip'
 
 interface SearchResultProps {
-  id: string
+  row: number
+  highlighted: boolean
+  actions: readonly RowAction[]
   network: Network
-  station: Station
+  item: Extract<SearchItem<Station>, { kind: 'station' }>
   /** Stations with this name lie in more than one borough: show this one's under the name. */
   showBorough: boolean
-  active: boolean
   onChoose: () => void
-  onActive: () => void
+  onDirections: (end: TripEnd) => void
 }
 
 /**
- * One listbox option: the name and access icon, the borough when the name is used in more than one borough, then
+ * One station row: the name and access icon, the borough when the name is used in more than one borough, then
  * a chip per route (the chips are what tell same-borough duplicates apart). Hidden commas keep the spoken parts
  * apart; after the access label, which ends in a period, none is needed.
  */
-export function SearchResult({ id, network, station, showBorough, active, onChoose, onActive }: SearchResultProps) {
+export function SearchResult({ row, highlighted, actions, network, item, showBorough, onChoose, onDirections }: SearchResultProps) {
+  const { station } = item
   const borough = showBorough && station.borough ? boroughName(station.borough) : null
   const spokenPeriod = station.access.status !== 'none'
   return (
-    <li
-      id={id}
-      role="option"
-      aria-selected={active}
-      onClick={onChoose}
-      onPointerMove={(e) => e.pointerType === 'mouse' && onActive()}
-      className={`flex min-h-11 cursor-pointer flex-col justify-center gap-1 border-l-4 px-3 py-2 ${
-        active ? 'border-focus bg-panel' : 'border-transparent'
-      }`}
-    >
+    <ResultRow row={row} highlighted={highlighted} actions={actions} name={rowName(item, borough)} onChoose={onChoose} onDirections={onDirections}>
       <span className="text-base leading-tight">
         <StationName name={station.name} access={station.access} context="row" />
       </span>
@@ -57,6 +54,6 @@ export function SearchResult({ id, network, station, showBorough, active, onChoo
           )
         })}
       </span>
-    </li>
+    </ResultRow>
   )
 }

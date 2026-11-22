@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GeocodeResult } from '../data/realtime'
-import { activeIndex, placeKind, searchItems } from './searchItems'
+import { placeKind, searchItems } from './searchItems'
 
 const station = (id: string) => ({ id, name: id, routeIds: [] })
 const place = (label: string, kind: GeocodeResult['kind'], lat = 40.7, lon = -74): GeocodeResult => ({ label, kind, lat, lon, source: 'photon' })
@@ -23,16 +23,5 @@ describe('searchItems', () => {
     expect(placeKind('street')).toBeNull()
     expect(placeKind('area')).toBe('place')
     expect(placeKind('address')).toBe('address')
-  })
-})
-
-describe('activeIndex', () => {
-  const items = searchItems([station('A'), station('B')], [])
-
-  it('finds the key, else the first row, else -1', () => {
-    expect(activeIndex(items, 's-B')).toBe(1)
-    expect(activeIndex(items, 'gone')).toBe(0)
-    expect(activeIndex(items, null)).toBe(0)
-    expect(activeIndex([], 's-B')).toBe(-1)
   })
 })
