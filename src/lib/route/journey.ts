@@ -57,7 +57,7 @@ function rides(tt: Timetable, labels: Labels, k: number): Leg[] {
   for (;;) {
     const ride = rideLeg(tt, labels, r, p)
     legs.push(ride)
-    const board = tt.stops.stopOf.get(ride.boardStop)!
+    const board = tt.patterns[labels.arrPat[r * n + p]!]!.stops[labels.arrBoardPos[r * n + p]!]!
     const at = (r - 1) * n + board
     const from = labels.readyFrom[at]!
     if (from === -1) break
@@ -74,19 +74,24 @@ function rides(tt: Timetable, labels: Labels, k: number): Leg[] {
 const legStart = (leg: Leg): number => (leg.kind === 'ride' ? leg.departS : leg.startS)
 const legEnd = (leg: Leg): number => (leg.kind === 'ride' ? leg.arriveS : leg.endS)
 
-/** One journey per round that beat every earlier round: ascending transfers, descending arrival. */
+/** `a` is no worse than `b` on both axes and better on one. */
+const dominates = (a: Journey, b: Journey): boolean =>
+  a.arriveS <= b.arriveS && a.transfers <= b.transfers && (a.arriveS < b.arriveS || a.transfers < b.transfers)
+
+/** One journey per round that beat every earlier round, minus any that another dominates (a walk and a single
+ *  ride both count 0 transfers): ascending transfers, descending arrival. */
 export function journeys(tt: Timetable, labels: Labels): Journey[] {
-  const out: Journey[] = []
+  const all: Journey[] = []
   for (let k = 0; k <= labels.rounds; k++) {
     if (labels.targetS[k]! >= NO_TIME) continue
     const legs = k === 0 ? walkOnly(tt, labels) : rides(tt, labels, k)
     const rideCount = legs.filter((l) => l.kind === 'ride').length
-    out.push({
+    all.push({
       departS: legStart(legs[0]!),
       arriveS: legEnd(legs[legs.length - 1]!),
       transfers: Math.max(0, rideCount - 1),
       legs,
     })
   }
-  return out
+  return all.filter((j) => !all.some((other) => dominates(other, j)))
 }

@@ -82,6 +82,19 @@ describe('committed transfers', () => {
     }
   })
 
+  // Same reason: a two-step walk is never shorter than the direct transfer, so the one step per round is enough.
+  it('obey the triangle inequality on transfer times', () => {
+    const seconds = new Map(transfers.map((t) => [`${t.from}>${t.to}`, t.minTransferSec]))
+    for (const [a, bs] of linked) {
+      for (const b of bs) {
+        for (const c of linked.get(b) ?? []) {
+          if (c === a) continue
+          expect(seconds.get(`${a}>${c}`)!, `${a} to ${c} via ${b}`).toBeLessThanOrEqual(seconds.get(`${a}>${b}`)! + seconds.get(`${b}>${c}`)!)
+        }
+      }
+    }
+  })
+
   it('build into an index with the real stations', () => {
     const { stations } = JSON.parse(readFileSync('public/data/stations.json', 'utf8')) as StationsFile
     const index = buildStopIndex({ stopIds: stations.flatMap((s) => s.stops), changeS: new Map(), transfers })

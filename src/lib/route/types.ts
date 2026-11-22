@@ -73,6 +73,8 @@ export interface WalkLeg {
 export type Leg = RideLeg | WalkLeg
 
 export interface Journey {
+  /** Start of the first leg: a train's departure for a ride-first journey, the query time for a walk-first one
+   *  (any wait for the next train follows that walk). */
   departS: number
   arriveS: number
   transfers: number

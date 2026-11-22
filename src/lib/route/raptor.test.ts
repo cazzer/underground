@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { buildTimetable, makePatterns } from './patterns'
 import { route } from './raptor'
+import { buildStopIndex } from './stops'
 import { fixtureTimetable, m } from './timetableFixture'
 import type { Journey, RideLeg, WalkLeg } from './types'
 
@@ -173,12 +175,44 @@ describe('route', () => {
     expect(() => route(tt, ['nope'], ['101'], m(0))).toThrow(/unknown station/)
     expect(() => route(tt, ['101'], ['nope'], m(0))).toThrow(/unknown station/)
     expect(() => route(tt, ['101'], ['103'], m(0), { maxTransfers: -1 })).toThrow(/maxTransfers/)
-    expect(() => route(tt, ['101'], ['103'], Number.NaN)).toThrow(/not a number/)
+    expect(() => route(tt, ['101'], ['103'], Number.NaN)).toThrow(/departure time/)
+    expect(() => route(tt, ['101'], ['103'], 2 ** 30)).toThrow(/departure time/)
+    expect(() => route(tt, ['101'], ['103'], -(2 ** 30))).toThrow(/departure time/)
   })
 
   it('stops at maxTransfers', () => {
     expect(summary(route(tt, ['101'], ['S01'], m(0), { maxTransfers: 1 }))).toEqual([{ arriveS: m(34.5), transfers: 1 }])
     expect(route(tt, ['101'], ['S01'], m(0), { maxTransfers: 0 })).toEqual([])
     expect(walks(route(tt, ['101'], ['104'], m(0), { maxTransfers: 0 })[0]!)).toEqual([])
+  })
+})
+
+describe('route on a minimal timetable', () => {
+  // Stops of A, B and C; one trip A to B or A to C, and an optional walk between A and C.
+  function tiny(stops: [string, string], arr: number[], dep: number[], walkAC?: number) {
+    const index = buildStopIndex({
+      stopIds: ['AN', 'AS', 'BN', 'BS', 'CN', 'CS'],
+      changeS: new Map(),
+      transfers: walkAC === undefined ? [] : [
+        { from: 'A', to: 'C', minTransferSec: walkAC },
+        { from: 'C', to: 'A', minTransferSec: walkAC },
+      ],
+    })
+    return buildTimetable(index, makePatterns(index, { key: 'p', stops, trips: [{ id: 't', routeId: 'X', arr, dep }] }))
+  }
+
+  it('gives no journey to a station nothing reaches, at negative times', () => {
+    // the arrival at B is negative: t + "no egress" must not look like a real arrival
+    expect(route(tiny(['AN', 'BN'], [-500, -400], [-500, -400]), ['A'], ['C'], -600)).toEqual([])
+  })
+
+  it('drops a walk that a ride beats on arrival with the same transfers', () => {
+    const table = tiny(['AN', 'CN'], [0, 120], [0, 120], 300)
+    const js = route(table, ['A'], ['C'], 0)
+    expect(js).toHaveLength(1)
+    expect(js[0]).toMatchObject({ arriveS: 120, transfers: 0 })
+    expect(js[0]!.legs.map((l) => l.kind)).toEqual(['ride'])
+    // a walk alone is the answer when no train runs
+    expect(route(table, ['A'], ['C'], 1)[0]).toMatchObject({ arriveS: 301, transfers: 0, legs: [{ kind: 'walk' }] })
   })
 })
