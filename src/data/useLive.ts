@@ -100,8 +100,11 @@ export function useLive(
   )
 
   const arrivals = useMemo<ArrivalsSource | null>(
-    () => (data && snapshot && offsetS !== null ? { snapshot, offsetS, lookup: data.lookup, failures: feed.failures } : null),
-    [data, snapshot, offsetS, feed.failures],
+    () =>
+      data && snapshot && offsetS !== null
+        ? { snapshot, offsetS, lookup: data.lookup, failures: feed.failures, drawnKeys: new Set(layer?.trips.map((t) => t.key)) }
+        : null,
+    [data, snapshot, offsetS, feed.failures, layer],
   )
 
   const debug = useMemo<LiveDebugInfo | null>(() => {

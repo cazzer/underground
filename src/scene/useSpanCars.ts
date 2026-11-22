@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useMemo, useRef } from 'react'
-import { type BufferGeometry, Color, DynamicDrawUsage, type InstancedMesh, type MeshBasicMaterial } from 'three'
+import { BackSide, type BufferGeometry, Color, DynamicDrawUsage, type InstancedMesh, MeshBasicMaterial } from 'three'
 import { type Consist, MAX_CARS } from '../lib/live/consist'
 import { consistSpanInto, type ConsistSpan } from '../lib/live/consistLayout'
 import { slotScale, TRAIN_CAPACITY, type SlotTable } from '../lib/live/slots'
@@ -21,6 +21,11 @@ const VEIL_TINT = interiorLook.veil === 'screen' ? interiorLook.veilOpacity : 0
 export const SPAN_LIFT = !interiorLook.under
 
 const WHITE = new Color(1, 1, 1)
+/** Which end faces a lifted car brings (writeEndCaps' instances), as constants so the per-frame loop doesn't allocate. */
+const NO_END: readonly number[] = []
+const REAR_END: readonly number[] = [0]
+const FRONT_END: readonly number[] = [1]
+const BOTH_ENDS: readonly number[] = [0, 1]
 
 /** For the `?debug` overlay: the most trains ever left unlifted in one frame because the meshes were full. */
 export const spanCarStats = { peakOverflow: 0 }
@@ -28,10 +33,18 @@ export const spanCarStats = { peakOverflow: 0 }
 export interface SpanCarsLayer {
   bodies: RefObject<InstancedMesh | null>
   halos: RefObject<InstancedMesh | null>
+  /** The selected train's outline shells (useTrainCars' rims and gaps), copied for its lifted cars. */
   rims: RefObject<InstancedMesh | null>
-  /** The copies' geometry and materials: bodies and rims carry a per-instance veil tint (veilTint.ts). */
-  geometry: { body: BufferGeometry; halo: BufferGeometry; rim: BufferGeometry }
-  material: { body: MeshBasicMaterial; rim: MeshBasicMaterial }
+  gaps: RefObject<InstancedMesh | null>
+  /** Its end faces (useTrainCars' rimCaps and gapCaps), copied with the end cars. */
+  rimCaps: RefObject<InstancedMesh | null>
+  gapCaps: RefObject<InstancedMesh | null>
+  /**
+   * The copies' geometry and materials: bodies and rims carry a per-instance veil tint (veilTint.ts); the gap is the
+   * background, which the tint would mix toward itself.
+   */
+  geometry: { body: BufferGeometry; halo: BufferGeometry; rim: BufferGeometry; gap: BufferGeometry; rimCap: BufferGeometry; gapCap: BufferGeometry }
+  material: { body: MeshBasicMaterial; rim: MeshBasicMaterial; gap: MeshBasicMaterial }
   /** Before the first frame: dynamic usage, instance colors allocated, nothing drawn. */
   prepare(): void
   /**
@@ -70,16 +83,22 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
   const bodies = useRef<InstancedMesh>(null)
   const halos = useRef<InstancedMesh>(null)
   const rims = useRef<InstancedMesh>(null)
+  const gaps = useRef<InstancedMesh>(null)
+  const rimCaps = useRef<InstancedMesh>(null)
+  const gapCaps = useRef<InstancedMesh>(null)
   const parts = useMemo(() => {
     const body = withTintAttribute(cars.geometry.body, SPAN_CARS)
-    const rim = withTintAttribute(cars.geometry.halo, MAX_CARS)
+    const rim = withTintAttribute(cars.geometry.outline, MAX_CARS)
+    const rimCap = withTintAttribute(cars.geometry.cap, 2)
+    const shell = { transparent: true, depthTest: true, depthWrite: false, side: BackSide }
     return {
-      geometry: { body: body.geometry, halo: cars.geometry.halo, rim: rim.geometry },
-      tint: { body: body.tint, rim: rim.tint },
+      geometry: { body: body.geometry, halo: cars.geometry.halo, rim: rim.geometry, gap: cars.geometry.outline, rimCap: rimCap.geometry, gapCap: cars.geometry.cap },
+      tint: { body: body.tint, rim: rim.tint, rimCap: rimCap.tint },
       material: {
         // White: vertex shading times the per-instance route color, as the street cars.
         body: veilTintMaterial({ vertexColors: true, transparent: true, depthTest: true, depthWrite: true }),
-        rim: veilTintMaterial({ color: theme.trainSelectedRim, transparent: true, depthTest: false, depthWrite: false }),
+        rim: veilTintMaterial({ color: theme.trainSelectedRim, ...shell }),
+        gap: new MeshBasicMaterial({ color: theme.background, ...shell }),
       },
     }
   }, [cars])
@@ -88,8 +107,10 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
     () => () => {
       parts.geometry.body.dispose()
       parts.geometry.rim.dispose()
+      parts.geometry.rimCap.dispose()
       parts.material.body.dispose()
       parts.material.rim.dispose()
+      parts.material.gap.dispose()
     },
     [parts],
   )
@@ -106,7 +127,7 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
     const carWeight = (c: number, s: { d0: number; d1: number }): number => trainSpanWeight(span.rear + (c + 0.5) * span.step, s)
     return {
       prepare() {
-        for (const m of [bodies.current, halos.current, rims.current]) {
+        for (const m of [bodies.current, halos.current, rims.current, gaps.current, rimCaps.current, gapCaps.current]) {
           if (!m) continue
           m.instanceMatrix.setUsage(DynamicDrawUsage)
           m.count = 0
@@ -122,12 +143,20 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
         const b = bodies.current
         const h = halos.current
         const r = rims.current
+        const gp = gaps.current
         const srcB = cars.bodies.current
         const srcH = cars.halos.current
         const srcR = cars.rims.current
-        if (!b || !h || !r || !srcB || !srcH || !srcR || !b.instanceColor) return
+        const srcG = cars.gaps.current
+        const rc = rimCaps.current
+        const gc = gapCaps.current
+        const srcRc = cars.rimCaps.current
+        const srcGc = cars.gapCaps.current
+        if (!b || !h || !r || !gp || !srcB || !srcH || !srcR || !srcG || !b.instanceColor) return
+        if (!rc || !gc || !srcRc || !srcGc) return
         let n = 0
         let rimN = 0
+        let capN = 0
         if (SPAN_LIFT && spans && reveal > 0) {
           let found = 0
           for (let i = 0; i < table.high; i++) {
@@ -156,6 +185,9 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
           const outB = b.instanceMatrix.array as Float32Array
           const outH = h.instanceMatrix.array as Float32Array
           const outR = r.instanceMatrix.array as Float32Array
+          const outG = gp.instanceMatrix.array as Float32Array
+          const outRc = rc.instanceMatrix.array as Float32Array
+          const outGc = gc.instanceMatrix.array as Float32Array
           const bodyColors = b.instanceColor.array as Float32Array
           for (let t = 0; t < Math.min(found, SPAN_TRAINS); t++) {
             const i = candidates[t]!
@@ -175,12 +207,22 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
               n++
               if (i !== selected) continue
               copyMatrix(srcR.instanceMatrix.array, c, outR, rimN)
+              copyMatrix(srcG.instanceMatrix.array, c, outG, rimN)
               parts.tint.rim[rimN++] = tint
+              // The train's end cars bring their end faces: cap 0 closes the rear car, cap 1 the front one.
+              const ends = c === 0 ? (span.cars === 1 ? BOTH_ENDS : REAR_END) : c === span.cars - 1 ? FRONT_END : NO_END
+              for (let e = 0; e < ends.length; e++) {
+                const end = ends[e]!
+                copyMatrix(srcRc.instanceMatrix.array, end, outRc, capN)
+                copyMatrix(srcGc.instanceMatrix.array, end, outGc, capN)
+                parts.tint.rimCap[capN++] = tint
+              }
             }
           }
         }
         b.count = h.count = n
-        r.count = rimN
+        r.count = gp.count = rimN
+        rc.count = gc.count = capN
         if (n === 0) return
         // A few KB per frame, only while cars are lifted.
         b.instanceMatrix.needsUpdate = true
@@ -188,11 +230,14 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
         b.instanceColor.needsUpdate = true
         parts.geometry.body.getAttribute(VEIL_TINT_ATTRIBUTE).needsUpdate = true
         if (rimN === 0) return
-        r.instanceMatrix.needsUpdate = true
+        r.instanceMatrix.needsUpdate = gp.instanceMatrix.needsUpdate = true
         parts.geometry.rim.getAttribute(VEIL_TINT_ATTRIBUTE).needsUpdate = true
+        if (capN === 0) return
+        rc.instanceMatrix.needsUpdate = gc.instanceMatrix.needsUpdate = true
+        parts.geometry.rimCap.getAttribute(VEIL_TINT_ATTRIBUTE).needsUpdate = true
       },
     }
   }, [cars, parts])
 
-  return useMemo(() => ({ bodies, halos, rims, geometry: parts.geometry, material: parts.material, ...layer }), [parts, layer])
+  return useMemo(() => ({ bodies, halos, rims, gaps, rimCaps, gapCaps, geometry: parts.geometry, material: parts.material, ...layer }), [parts, layer])
 }
