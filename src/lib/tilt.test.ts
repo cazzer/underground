@@ -14,9 +14,27 @@ describe('tiltForDistance', () => {
     expect(tiltForDistance(1)).toBeCloseTo(ISO_POLAR, 10)
   })
 
-  it('is half-tilted at the log-midpoint', () => {
-    const mid = Math.sqrt(farDistance * nearDistance)
-    expect(tiltForDistance(mid)).toBeCloseTo(ISO_POLAR / 2, 6)
+  it('is top-down from 1450 m, visibly tipped by 1250 m and isometric at 400 m', () => {
+    const deg = (d: number) => (tiltForDistance(d) * 180) / Math.PI
+    expect(farDistance).toBe(1450)
+    expect(nearDistance).toBe(400)
+    expect(deg(1350)).toBeLessThan(3.5)
+    expect(deg(1250)).toBeGreaterThan(8)
+    expect(deg(1250)).toBeLessThan(10)
+    expect(deg(800)).toBeGreaterThan(35)
+    expect(deg(800)).toBeLessThan(40)
+  })
+
+  it('has a continuous rate in log-distance: 0 at both ends, no kink where the ease-in hands over', () => {
+    const span = Math.log(farDistance / nearDistance)
+    const at = (x: number) => tiltT(farDistance * Math.exp(-x * span))
+    const rate = (x: number, h = 1e-6) => (at(x + h) - at(x - h)) / (2 * h)
+    expect(rate(1e-5)).toBeLessThan(1e-3)
+    expect(rate(1 - 1e-5)).toBeLessThan(1e-3)
+    const a = DEFAULT_TILT.easeIn
+    expect(rate(a - 1e-4)).toBeCloseTo(2, 2)
+    expect(rate(a + 1e-4)).toBeCloseTo(2, 2)
+    for (let x = 0.01; x < 1; x += 0.01) expect(rate(x)).toBeLessThanOrEqual(2 + 1e-6)
   })
 
   it('increases monotonically as the camera approaches', () => {

@@ -60,7 +60,7 @@ export function consistCenter(lengthM: number, shown: number, trainM: number): n
 
 /**
  * Dots from this camera distance out, cars from CARS_AT in. DOTS_FROM_M sits well outside where the camera
- * starts to tilt (DEFAULT_TILT.farDistance, 1400 m), so a train unfolds into a flat, true-length footprint
+ * starts to tilt (DEFAULT_TILT.farDistance, 1450 m), so a train unfolds into a flat, true-length footprint
  * while the view is top-down; its height then grows with the depth factor as the camera tips (writeConsist).
  */
 export const DOTS_FROM_M = 2400

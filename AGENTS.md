@@ -94,7 +94,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
     if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
-    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.3 to 0.6; the focused station's tie is dropped when it has an interior, kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
+    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
     instance is scaled to 0 when it has an interior (ready or loading), so it has no marker, and drawn when it has none or its load failed, with a `theme.stationFocus` `FocusRing.tsx` over the trains (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
@@ -408,20 +408,22 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `tiltT` is `depthFactor`, the one parameter for every drawn depth (track profile, car height, ties, interior
   levels, veil, level labels), so depth only shows as the camera tips: 0 top-down, 1 (the authored ×yScale) fully tilted.
   The zoom stages, by camera distance: above 2400 m dots and station markers; 2400 to 1600 m dots unfold
-  into flat true-length footprints; the tilt runs from 1400 m (top-down) to 400 m (isometric, `nearDistance`);
-  1100 to 800 m the interior fades in as a flat plan (depth 0.05 to 0.40); 800 to 400 m the levels
+  into flat true-length footprints; the tilt runs from 1450 m (top-down) to 400 m (isometric, `nearDistance`), with a
+  short ease-in to about 1340 m and a long ease-out (two parabolas joined with equal slope at `easeIn` 0.06 of the
+  log-distance span), so it shows from about 1250 m (9°; 25° at 1000 m, 38° at 800 m); 1250 to 1000 m the interior
+  fades in as a flat plan (depth 0.17 to 0.46, a level gap of about 5 px on a phone at most); 1000 to 400 m the levels
   separate and the veil and labels come in; at 400 m everything is full 3D.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
-  focused or a train is followed (focus engages inside 1100 m within 140 m of a station once the view has held still for 400 ms
+  focused or a train is followed (focus engages inside 1250 m within 140 m of a station once the view has held still for 400 ms
   (`ENTER_DWELL_S`: target and distance within 0.2% of the distance, no gesture active, and a gesture's end
-  restarts the wait), so a pan across the city opens no panels; it drops at once past 1400 m or 350 m away;
+  restarts the wait), so a pan across the city opens no panels; it drops at once past 1450 m, where the view is top-down, or 350 m away;
   taps and flights focus immediately; `focusMachine.ts`): |azimuth| is capped by tilt, rising from 0 top-down to π at tiltT 0.67 and a full spin
   (azimuth bounds ±Infinity) from there, and the turn pivots on the focus point
   (the interior's mid-depth center, or a bare station's point, at the middle of the free area).
   The focus point pans within the interior's reach (farthest outline vertex or entrance from its plan
   center) + 20 m (100 m of a bare station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`), so
   on a phone a drag can bring every part of the interior to the free area at any angle. The pan clamp applies
-  only from tiltT 0.5 (further out a pan is free), and arms only once the view is inside the radius. Dropping focus (zoom out,
+  only from tiltT 0.5, about 970 m (further out a pan is free), and arms only once the view is inside the radius. Dropping focus (zoom out,
   close the panel) springs the view back to north-up the short way round (an exponential ease capped at
   180°/s; under prefers-reduced-motion it snaps to north-up at once), so the city and top-down views
   are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it
@@ -525,9 +527,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   level up, so upper levels paint over lower ones; levels farther from the street (in level count; deeper, or
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
-  in between 1100 m and 800 m (`interiorReveal.ts`), as a flat plan while the camera is still nearly top-down. A background-colored veil (render order 7) dims every street
+  in between 1250 m and 1000 m (`interiorReveal.ts`), as a flat plan while the camera is only slightly tipped. A background-colored veil (render order 7) dims every street
   layer, live trains included, in one draw call, at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
-  level labels show by `labelOpacity` (gated between depth 0.3 and 0.6); the interior draws at 8 (fine) and 9 (strong);
+  level labels show by `labelOpacity` (gated between depth 0.35 and 0.65); the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
   are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.4 to 9.5; not in look C),
   and the levels above it draw over those trains at 9.6 (fine) and 9.7 (strong): `buildInteriorBuffers` splits at
@@ -550,7 +552,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,
   `interiorReframe.ts`). Under prefers-reduced-motion station and point flights snap with no turn, and a late
   interior snaps once onto it, no turn. The
-  location button frames its fix at ENTER_DISTANCE × 1.1 (about 1210 m) or farther.
+  location button frames its fix at EXIT_DISTANCE (1450 m, top-down, outside the focus range) or farther.
   The level labels sit at z-index 0 in the canvas container, so they stay under the HUD panel.
 
 ## Station interior format

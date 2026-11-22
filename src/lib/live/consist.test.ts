@@ -106,8 +106,8 @@ describe('stage distances', () => {
   it('trains are footprints (cars) by the time the camera starts to tilt, and only dots before 2400 m', () => {
     expect(DOTS_FROM_M).toBe(2400)
     expect(CARS_AT_M).toBe(1600)
-    expect(carMix(1400)).toBe(1)
-    expect(tiltT(1400)).toBe(0)
+    expect(carMix(1450)).toBe(1)
+    expect(tiltT(1450)).toBe(0)
   })
 })
 

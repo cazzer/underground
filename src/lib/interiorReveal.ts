@@ -1,10 +1,12 @@
 /**
- * The interior fades in as a flat plan between these camera distances, while the camera is still nearly top-down
- * (tilt 1400 to 400 m; depth is about 0.05 at 1100 m and 0.4 at 800 m), so the levels only separate afterwards.
+ * The interior fades in as a flat plan between these camera distances, while the camera is still only slightly
+ * tipped (tilt 1450 to 400 m; depth is about 0.17 at 1250 m and 0.46 at 1000 m), so the levels only separate
+ * afterwards. The far end is where the tilt first shows; at the near end a drawn level gap covers the same share of
+ * the screen (depth x sin(polar) / distance) as it did at 800 m on the older, later tilt.
  */
-export const REVEAL_NEAR = 800
+export const REVEAL_NEAR = 1000
 /** Hidden at or beyond this camera distance. */
-export const REVEAL_FAR = 1100
+export const REVEAL_FAR = 1250
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
 
@@ -23,9 +25,13 @@ export function veilWeight(opacity: number, depth: number): number {
   return opacity * depth
 }
 
-/** Level labels show from this depth factor and are fully in by LABELS_FULL_DEPTH: a flat plan has no levels to name. */
-export const LABELS_FROM_DEPTH = 0.3
-export const LABELS_FULL_DEPTH = 0.6
+/**
+ * Level labels show from this depth factor and are fully in by LABELS_FULL_DEPTH: a flat plan has no levels to name.
+ * The tilt now reaches a depth farther out, where a level gap is smaller on screen, so these sit 0.05 above the
+ * older 0.3 and 0.6 to show at the same on-screen gap.
+ */
+export const LABELS_FROM_DEPTH = 0.35
+export const LABELS_FULL_DEPTH = 0.65
 
 /** Level label opacity: the interior's opacity, gated on the depth factor between the two label depths. */
 export function labelOpacity(opacity: number, depth: number): number {

@@ -15,9 +15,10 @@ import { RENDER_ORDER } from './renderOrder'
 
 /**
  * Ties fade in from TIE_FROM_DEPTH of the depth factor, fully shown TIE_RAMP later: below that a tie is shorter on
- * screen than the ring radius, a stray tick under the ring rather than a connection.
+ * screen than the ring radius, a stray tick under the ring rather than a connection. (0.35, not 0.3: the tilt reaches
+ * a depth farther out now, where the tie is shorter on screen; LABELS_FROM_DEPTH moved the same way.)
  */
-const TIE_FROM_DEPTH = 0.3
+const TIE_FROM_DEPTH = 0.35
 const TIE_RAMP = 0.3
 const tieOpacity = (depth: number): number => Math.min(Math.max((depth - TIE_FROM_DEPTH) / TIE_RAMP, 0), 1)
 

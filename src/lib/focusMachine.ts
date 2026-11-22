@@ -3,12 +3,16 @@ import type { Ground } from './projection'
 
 /**
  * Zooming inside ENTER_DISTANCE with a station within ENTER_RADIUS of the view center focuses it, once the view
- * has settled (focusDwell.ts), so a pan across the city doesn't flick panels open.
+ * has settled (focusDwell.ts), so a pan across the city doesn't flick panels open. It is the interior reveal's far
+ * end (REVEAL_FAR), where the tilt first shows, so a focused station's plan fades in from nothing.
  */
-export const ENTER_DISTANCE = 1100
+export const ENTER_DISTANCE = 1250
 export const ENTER_RADIUS = 140
-/** Focus is dropped once zoomed out past EXIT_DISTANCE or panned EXIT_RADIUS from the focused station. */
-export const EXIT_DISTANCE = 1400
+/**
+ * Focus is dropped once zoomed out past EXIT_DISTANCE or panned EXIT_RADIUS from the focused station. It is the
+ * tilt's top-down distance (DEFAULT_TILT.farDistance), so a view that loses focus is already flat.
+ */
+export const EXIT_DISTANCE = 1450
 export const EXIT_RADIUS = 350
 
 export interface FocusState {
