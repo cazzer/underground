@@ -2,8 +2,8 @@ import { fetchJson, HttpError } from './loadNetwork'
 import type { StationStreets } from './streetSchema'
 
 /**
- * Checks the outer shape of a fetched street file: its station and anchor, format 1, a node table of three
- * equal-length arrays, and the way and entrance arrays. Entries are trusted; the build that writes them is typed
+ * Checks the outer shape of a fetched street file: its station and anchor, format 1, its two radii (walk within
+ * street), a node table of three equal-length arrays, and the way and entrance arrays. Entries are trusted; the build that writes them is typed
  * against streetSchema.ts.
  */
 export function expectStationStreets(raw: unknown, id: string, url: string): StationStreets {
@@ -11,7 +11,7 @@ export function expectStationStreets(raw: unknown, id: string, url: string): Sta
   if (typeof raw !== 'object' || raw === null) throw fail()
   const r = raw as Record<string, unknown>
   const anchor = r.anchor as Record<string, unknown> | null | undefined
-  const { nodeId, x, z } = r
+  const { nodeId, x, z, radiusM, walkRadiusM } = r
   if (
     r.stationId !== id ||
     typeof anchor !== 'object' ||
@@ -19,6 +19,10 @@ export function expectStationStreets(raw: unknown, id: string, url: string): Sta
     !Number.isFinite(anchor.lat) ||
     !Number.isFinite(anchor.lon) ||
     r.format !== 1 ||
+    typeof radiusM !== 'number' ||
+    typeof walkRadiusM !== 'number' ||
+    !(radiusM > 0) ||
+    !(walkRadiusM > 0 && walkRadiusM <= radiusM) ||
     !Array.isArray(nodeId) ||
     !Array.isArray(x) ||
     !Array.isArray(z) ||
