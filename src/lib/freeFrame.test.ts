@@ -8,7 +8,7 @@ import {
   STATION_ONLY_RADIUS_M,
   type BareStationFrame,
   type BareStationFrameInput,
-} from './bareStationFrame'
+} from './freeFrame'
 import type { Viewport } from './framing'
 import { LANDING_DISTANCE, type ScreenRect } from './interiorCamera'
 import { PAN_RADIUS_BARE } from './orbitLimits'

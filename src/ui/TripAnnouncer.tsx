@@ -4,6 +4,7 @@ import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { Network } from '../lib/network'
 import { useTrip } from '../lib/trip'
+import { isTripEnd } from '../lib/tripEnds'
 import { shouldAnnounceOnMap } from '../lib/tripOnMap'
 import { planViews, shouldAnnounceTrip, tripAnnounceId, tripAnnouncement, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
 
@@ -15,6 +16,8 @@ interface TripAnnouncerProps {
   arrivals: ArrivalsSource | null
   /** A train panel or the gone notice is in front of the trip panel. */
   covered: boolean
+  /** The focused station's complex siblings (siblingIdsOf): a member of an end's complex counts as that end. */
+  focusSiblings: readonly string[]
 }
 
 /**
@@ -25,7 +28,7 @@ interface TripAnnouncerProps {
  * that is neither end. It is emptied whenever its text could be stale: the panel closing, a plan running, the ends
  * changing.
  */
-export function TripAnnouncer({ network, arrivals, covered }: TripAnnouncerProps) {
+export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: TripAnnouncerProps) {
   const { open, ends, plan } = useTrip()
   const { focusedId } = useFocus()
   const [text, setText] = useState('')
@@ -35,8 +38,8 @@ export function TripAnnouncer({ network, arrivals, covered }: TripAnnouncerProps
   const refill = useRef(0)
   const lastFocused = useRef<string | null>(focusedId)
   const settledAt = useRef<number | null>(null)
-  const latest = useRef({ ends, plan })
-  latest.current = { ends, plan }
+  const latest = useRef({ ends, plan, focusSiblings })
+  latest.current = { ends, plan, focusSiblings }
 
   const say = (next: string | null) => {
     window.clearTimeout(refill.current)
@@ -82,14 +85,14 @@ export function TripAnnouncer({ network, arrivals, covered }: TripAnnouncerProps
     const station = focusedId !== null ? network.stationById.get(focusedId) : undefined
     if (!station) return
     const timer = window.setTimeout(() => {
-      const { ends: now, plan: current } = latest.current
+      const { ends: now, plan: current, focusSiblings: siblings } = latest.current
       const settled = settledAt.current
       if (
         shouldAnnounceOnMap({
           focusedId,
           previousId,
           shown,
-          isEnd: focusedId === now.from || focusedId === now.to,
+          isEnd: isTripEnd(station.id, siblings, now),
           planLoading: current.status === 'loading',
           sinceSettledMs: settled === null ? null : performance.now() - settled,
         })

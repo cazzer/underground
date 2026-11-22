@@ -78,6 +78,25 @@ export function exitPathCenterline(interior: StationInterior, choice: StationPat
   return out
 }
 
+type MarkerOptions = Pick<ExitPathOptions, 'yScale' | 'railDrop' | 'boardHalfM'>
+
+/** A marker: the stretch of the track `boardHalfM` either side of the point (kept on the track), and its drawn rail height. */
+function markerSpan(interior: StationInterior, at: TrackAt, opts: MarkerOptions): { marker: LocalPoint[]; railY: number } {
+  const total = nearestOnPolyline(at.track, at.track[0]!).total
+  const length = Math.min(2 * opts.boardHalfM, total)
+  const from = Math.max(0, Math.min(at.along - length / 2, total - length))
+  return { marker: slicePolyline(at.track, from, from + length), railY: (interior.levels[at.level]!.y - opts.railDrop) * opts.yScale }
+}
+
+/** The ends of the path's markers, group-local at their drawn rail height: the board marker's, then a transfer's second. */
+export function stationPathMarkerEnds(interior: StationInterior, choice: StationPathChoice, opts: MarkerOptions & Pick<ExitPathOptions, 'stepRise'>): Vec3[] {
+  const walk = walkOf(interior, choice, connectorContext(interior, { yScale: opts.yScale, stepRise: opts.stepRise, colorOf: () => [0, 0, 0] }))
+  return [walk.start, ...(walk.end ? [walk.end] : [])].flatMap((at) => {
+    const { marker, railY } = markerSpan(interior, at, opts)
+    return [marker[0]!, marker.at(-1)!].map((p): Vec3 => [p[0], railY, p[1]])
+  })
+}
+
 /**
  * The station path, one layer per stroke band: the centerline (dashed when `dashInStation`), the board marker (the
  * stretch of track at rail height where the rider is assumed to stand in the train, `boardHalfM` either side of the
@@ -112,11 +131,7 @@ export function exitPathBuffers(interior: StationInterior, choice: StationPathCh
 
   // A marker: the stretch of track at rail height around the point (kept on the track); returns its ends and middle.
   const markerAt = (at: TrackAt): Vec3[] => {
-    const total = nearestOnPolyline(at.track, at.track[0]!).total
-    const length = Math.min(2 * opts.boardHalfM, total)
-    const from = Math.max(0, Math.min(at.along - length / 2, total - length))
-    const marker = slicePolyline(at.track, from, from + length)
-    const railY = (interior.levels[at.level]!.y - opts.railDrop) * yScale
+    const { marker, railY } = markerSpan(interior, at, opts)
     for (let i = 1; i < marker.length; i++) {
       const [p, q] = [marker[i - 1]!, marker[i]!]
       levelSink(at.level).segment([p[0], railY, p[1]], [q[0], railY, q[1]], rgb, rgb, dash)

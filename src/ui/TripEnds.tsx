@@ -2,12 +2,15 @@ import { useRef, type Ref } from 'react'
 import type { TripEnd } from '../lib/trip'
 import type { TripEnds as Ends } from '../lib/tripView'
 import type { Network } from '../lib/network'
+import { isTripEnd } from '../lib/tripEnds'
 
 interface TripEndsProps {
   network: Network
   ends: Ends
   /** The station under the camera, offered as an end while it is neither. */
   focusedId: string | null
+  /** The focused station's complex siblings (siblingIdsOf): while one is an end, the focused station isn't offered either. */
+  focusSiblings: readonly string[]
   /** The station nearest a marked fix, offered as From while it is neither end. In memory only. */
   nearestId: string | null
   /** Opens that end's search. The row has already taken focus, so the dialog hands it back there. */
@@ -58,7 +61,7 @@ function EndRow({ label, name, onPress, ref }: EndRowProps) {
  * doesn't focus a tapped button, and the dialog hands focus back to what had it). A shortcut disappears when it
  * is used, so focus moves to the row it filled, one frame later (after the row's new name has rendered).
  */
-export function TripEnds({ network, ends, focusedId, nearestId, onPick, onSet, onSwap }: TripEndsProps) {
+export function TripEnds({ network, ends, focusedId, focusSiblings, nearestId, onPick, onSet, onSwap }: TripEndsProps) {
   const rows = { from: useRef<HTMLButtonElement>(null), to: useRef<HTMLButtonElement>(null) }
   const nameOf = (id: string | null) => (id ? (network.stationById.get(id)?.name ?? null) : null)
   const press = (end: TripEnd) => (button: HTMLButtonElement) => {
@@ -71,7 +74,7 @@ export function TripEnds({ network, ends, focusedId, nearestId, onPick, onSet, o
   }
   // Never offers a From that is the To, nor one already chosen.
   const nearest = nearestId !== null && nearestId !== ends.from && nearestId !== ends.to ? nameOf(nearestId) : null
-  const onMap = focusedId !== null && focusedId !== ends.from && focusedId !== ends.to ? nameOf(focusedId) : null
+  const onMap = focusedId !== null && !isTripEnd(focusedId, focusSiblings, ends) ? nameOf(focusedId) : null
   return (
     <div className="mt-2">
       <div className="flex items-center gap-1">

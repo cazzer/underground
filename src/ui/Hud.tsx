@@ -51,9 +51,11 @@ interface HudProps {
   tripExits: ReadonlyMap<string, ExitLineView> | null
   /** The trip panel's transfer lines, by change leg key. */
   tripTransfers: ReadonlyMap<string, TransferLineView> | null
+  /** The focused station's complex siblings (siblingIdsOf): the trip panel treats them as the focused station. */
+  focusSiblings: readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers, focusSiblings }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
@@ -191,7 +193,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             {notice ?? ''}
           </p>
           <FocusAnnouncer network={network} covered={trainOpen || noticeOpen || tripOpen} panel={panel} />
-          <TripAnnouncer network={network} arrivals={arrivals} covered={trainOpen || noticeOpen} />
+          <TripAnnouncer network={network} arrivals={arrivals} covered={trainOpen || noticeOpen} focusSiblings={focusSiblings} />
           <LinkNotice
             show={linkNotice.show}
             onDismiss={linkNotice.onDismiss}
@@ -256,6 +258,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             covered={trainOpen || noticeOpen}
             exits={tripExits}
             transfers={tripTransfers}
+            focusSiblings={focusSiblings}
             ref={trainOpen || noticeOpen ? null : panel}
           />
         )}

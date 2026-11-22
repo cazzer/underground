@@ -4,7 +4,8 @@ import type { ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import type { IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
-import { bareStationFrame } from '../lib/bareStationFrame'
+import { pathLanding, type PathFrame } from '../lib/pathFrame'
+import { bareStationFrame } from '../lib/freeFrame'
 import { flightDuration } from '../lib/flight'
 import type { FlyRequest } from '../lib/focus'
 import { EXIT_DISTANCE } from '../lib/focusMachine'
@@ -92,6 +93,9 @@ export function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void
  * `azimuth`. With `turn`, a portrait free area first picks a landing azimuth that runs the platforms
  * nearly up the screen (landingAzimuth); the result's `azimuth` is that turn, or null for none. `stationId` is the
  * focused station, which for a complex member is not the model's own (file) id: the flight's focus hold follows it.
+ * With the trip's way out at this interior (`exit`, the trip panel open) it frames that instead, as much of it as
+ * fits from the landing distance out, the target near one of the interior's stations, unless the usual interior
+ * framing shows as much of it (pathLanding).
  */
 export function interiorFlight(
   stationId: string,
@@ -102,10 +106,13 @@ export function interiorFlight(
   fovDeg: number,
   azimuth: number,
   turn: boolean,
+  path: PathFrame | null = null,
 ): Destination {
   const free = interiorFreeRect(viewport, insets, panel)
   const land = turn ? landingAzimuth(model.axis, azimuth, free) : azimuth
-  const { distance, target } = frameInterior({ ...model.focusAnchor, azimuth: land, viewport, free, fovDeg })
+  const view = { azimuth: land, viewport, free, fovDeg }
+  const plain = frameInterior({ ...model.focusAnchor, ...view })
+  const { distance, target } = path?.interiorId === model.stationId ? pathLanding(path, view, plain) : plain
   return {
     stationId,
     target: new Vector3(target.x, 0, target.z),
@@ -118,7 +125,7 @@ export function interiorFlight(
 /**
  * Fly-to for a station with no interior: its point and as many of its entrance marks `points` as fit in the free area
  * (above a stacked panel), from the landing distance out as far as they need, the target near the station
- * (bareStationFrame).
+ * (bareStationFrame in freeFrame.ts).
  */
 export function stationFlight(
   network: Network,

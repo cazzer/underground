@@ -30,6 +30,8 @@ interface TripPanelProps {
   exits: ReadonlyMap<string, ExitLineView> | null
   /** The transfer line of each change through a hand-authored complex, by its `transferKey`. */
   transfers: ReadonlyMap<string, TransferLineView> | null
+  /** The focused station's complex siblings (siblingIdsOf), for the "On the map" row. */
+  focusSiblings: readonly string[]
   ref: Ref<HTMLElement>
 }
 
@@ -38,7 +40,7 @@ interface TripPanelProps {
  * station panel does, in front of it and behind a train panel or notice. What a screen reader hears is the HUD's
  * `TripAnnouncer`; the visible message under the ends is hidden from assistive tech to match.
  */
-export function TripPanel({ network, arrivals, locate, onClose, covered, headingRef, exits, transfers, ref }: TripPanelProps) {
+export function TripPanel({ network, arrivals, locate, onClose, covered, headingRef, exits, transfers, focusSiblings, ref }: TripPanelProps) {
   const { ends, plan, showLoading, setEnd, swap, retry } = useTrip()
   const { focusedId, select } = useFocus()
   const { selectTrain } = useTrainSelection()
@@ -99,6 +101,7 @@ export function TripPanel({ network, arrivals, locate, onClose, covered, heading
           network={network}
           ends={ends}
           focusedId={focusedId}
+          focusSiblings={focusSiblings}
           nearestId={placement?.nearest.id ?? null}
           onPick={(end) => (end === 'from' ? fromSearch : toSearch).current?.open()}
           onSet={setEnd}

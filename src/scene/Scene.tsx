@@ -10,8 +10,10 @@ import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { createLabelBlockers } from '../lib/labelBlockers'
+import { stationPathFrameOf } from '../lib/pathFrame'
+import { RAIL_DROP_M } from '../lib/interiorGeometry'
 import type { ExitLabel } from '../lib/exitView'
-import type { StationPathDraw } from '../lib/interiorPath'
+import { BOARD_HALF_M, type StationPathDraw } from '../lib/interiorPath'
 import type { Network } from '../lib/network'
 import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
@@ -21,7 +23,7 @@ import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { Basemap } from './Basemap'
 import { basemapLook } from './basemapLook'
 import { CameraRig } from './CameraRig'
-import type { InteriorModel } from './interiorModel'
+import { STEP_RISE_M, type InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
 import { ScenePicker } from './ScenePicker'
@@ -65,9 +67,11 @@ interface SceneProps {
   stationPaths: readonly StationPathDraw[]
   /** The trip's drawn exit's label, which the street labels place first; null for none. */
   exitLabel: ExitLabel | null
+  /** The trip panel is open: a flight to the trip's To station frames its way out above the panel. */
+  tripOpen: boolean
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, stationPaths, exitLabel }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, stationPaths, exitLabel, tripOpen }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -87,6 +91,14 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   )
   // The index says who shares the file; the model says who it draws. Their markers and ties go with the focused one's.
   const hiddenSiblings = useMemo(() => hiddenSiblingIds(siblings, interior), [siblings, interior])
+  /** The trip's path the focused interior draws (the first listed for it): its way out or a change of trains. */
+  const path = interior ? (stationPaths.find((p) => p.interiorId === interior.stationId)?.choice ?? null) : null
+  /** What a flight there frames while the trip panel is open; a complex's members anchor its target. */
+  const pathFrame = useMemo(() => {
+    if (!interior || !path) return null
+    const anchors = interiorStationIds(interior).flatMap((id) => network.stationById.get(id)?.pos ?? [])
+    return stationPathFrameOf(interior, path, anchors, { stepRise: STEP_RISE_M, railDrop: RAIL_DROP_M, boardHalfM: BOARD_HALF_M })
+  }, [interior, path, network])
   /** Written by the level labels each frame, read by the street labels: their screen rects. */
   const labelBlockers = useMemo(() => createLabelBlockers(), [])
   return (
@@ -128,10 +140,19 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
           network={network}
           outOfService={outOfService}
           labelBlockers={labelBlockers}
-          path={stationPaths.find((p) => p.interiorId === interior.stationId)?.choice ?? null}
+          path={path}
         />
       )}
-      <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
+      <CameraRig
+        network={network}
+        insets={insets}
+        panel={panel}
+        interior={interior}
+        index={index}
+        anchor={anchor}
+        path={pathFrame}
+        tripOpen={tripOpen}
+      />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
