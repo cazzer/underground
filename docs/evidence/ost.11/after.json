@@ -4,14 +4,14 @@
     "reduced": false,
     "station": "127",
     "distance": 400,
-    "offset": 120,
-    "inside": "7/11",
-    "minMarginPx": -92.4,
+    "offset": 98.1,
+    "inside": "6/11",
+    "minMarginPx": -129.4,
     "stationPx": {
       "x": 195,
-      "y": 236
+      "y": 264
     },
-    "stationMarginPx": 13.7,
+    "stationMarginPx": -14.6,
     "free": {
       "left": 0,
       "top": 60,
@@ -25,14 +25,14 @@
     "reduced": false,
     "station": "120",
     "distance": 400,
-    "offset": 120,
+    "offset": 98.1,
     "inside": "2/6",
-    "minMarginPx": -153,
+    "minMarginPx": -195.5,
     "stationPx": {
       "x": 195,
-      "y": 236
+      "y": 264
     },
-    "stationMarginPx": 13.7,
+    "stationMarginPx": -14.6,
     "free": {
       "left": 0,
       "top": 60,
@@ -46,14 +46,14 @@
     "reduced": true,
     "station": "127",
     "distance": 400,
-    "offset": 120,
-    "inside": "7/11",
-    "minMarginPx": -92.4,
+    "offset": 98.2,
+    "inside": "3/11",
+    "minMarginPx": -152.8,
     "stationPx": {
-      "x": 195,
-      "y": 236
+      "x": 291,
+      "y": 272
     },
-    "stationMarginPx": 13.7,
+    "stationMarginPx": -22.8,
     "free": {
       "left": 0,
       "top": 60,
@@ -103,5 +103,26 @@
       "bottom": 833
     },
     "focusedAfter": "120"
+  },
+  {
+    "view": "phone",
+    "reduced": false,
+    "deepLink": true,
+    "station": "127",
+    "distance": 400,
+    "offset": 98.1,
+    "inside": "6/11",
+    "minMarginPx": -129.4,
+    "stationPx": {
+      "x": 195,
+      "y": 264
+    },
+    "stationMarginPx": -14.6,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 249.5
+    }
   }
 ]

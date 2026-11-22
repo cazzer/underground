@@ -103,5 +103,26 @@
       "bottom": 833
     },
     "focusedAfter": "120"
+  },
+  {
+    "view": "phone",
+    "reduced": false,
+    "deepLink": true,
+    "station": "127",
+    "distance": 400,
+    "offset": 70.8,
+    "inside": "9/11",
+    "minMarginPx": -71.4,
+    "stationPx": {
+      "x": 195,
+      "y": 303
+    },
+    "stationMarginPx": 195,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 510.5
+    }
   }
 ]

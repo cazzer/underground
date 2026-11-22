@@ -4,7 +4,15 @@ import type { IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
 import type { Insets, Viewport } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
-import { interiorReadyFor, reframeAction, reframeDuration, streetsReadyFor, type AwaitingInterior } from '../lib/interiorReframe'
+import {
+  classifyAwaiting,
+  interiorReadyFor,
+  reframeAction,
+  reframeDuration,
+  streetsMissingFor,
+  streetsReadyFor,
+  type AwaitingInterior,
+} from '../lib/interiorReframe'
 import type { Network } from '../lib/network'
 import { wrapAngle } from '../lib/orbitLimits'
 import { bareStationPoints, flushMotion, interiorFlight, newFlight, stationFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
@@ -16,7 +24,7 @@ export interface ReframeLayout {
   panel: ScreenRect | null
   size: Viewport
   insets: Insets
-  streets: StreetLayer | null
+  streets: StreetLayer | null | undefined
   index: IndexLoad
   network: Network
 }
@@ -29,7 +37,8 @@ interface InteriorReframeOptions {
   awaiting: RefObject<AwaitingInterior | null>
   layout: RefObject<ReframeLayout>
   interior: InteriorModel | null
-  streets: StreetLayer | null
+  streets: StreetLayer | null | undefined
+  index: IndexLoad
   focusedId: string | null
   following: () => boolean
 }
@@ -38,7 +47,7 @@ interface InteriorReframeOptions {
  * Frames a station's interior that arrived too late for its flight: once the flight has landed and the interior is
  * known, a short eased flight (reframeDuration) moves onto the interior framing with the landing turn decided then;
  * reduced motion snaps there, no turn. A bare station's streets that arrived too late get the same, onto the framing
- * of its entrances (no turn). Asked when the interior, the streets or the focus changes, and on landing; returns the
+ * of its entrances (no turn). Asked when the interior, the streets, the index or the focus changes, and on landing; returns the
  * landing call, which is stable (underground-by0). Runs per event (interior, focus, landing), never per frame.
  */
 export function useInteriorReframe({
@@ -49,6 +58,7 @@ export function useInteriorReframe({
   layout,
   interior,
   streets,
+  index,
   focusedId,
   following,
 }: InteriorReframeOptions): () => void {
@@ -59,12 +69,15 @@ export function useInteriorReframe({
 
   const check = useCallback(() => {
     const l = layout.current
-    const a = awaiting.current
+    // A flight that set off before the index loaded (a deep link) learns here that its station is bare.
+    const a = classifyAwaiting(awaiting.current, l.index)
+    awaiting.current = a
     const action = reframeAction(a, {
       flying: flight.current !== null,
       following: following(),
       focusedId: focused.current,
       ready: a?.kind === 'streets' ? streetsReadyFor(a, l.streets) : interiorReadyFor(a, l.interior),
+      missing: streetsMissingFor(a, l.streets),
     })
     if (action === 'none' || action === 'wait') return
     awaiting.current = null
@@ -75,9 +88,7 @@ export function useInteriorReframe({
     const turn = action === 'reframe'
     let dest: Destination
     if (a.kind === 'streets') {
-      const station = l.network.stationById.get(a.stationId)
-      if (!station) return
-      dest = stationFlight(a.stationId, station.pos, bareStationPoints(a.stationId, l.streets, l.index), l.size, l.insets, l.panel, camera.fov, az)
+      dest = stationFlight(l.network, a.stationId, bareStationPoints(a.stationId, l.streets, l.index), l.size, l.insets, l.panel, camera.fov, az)
     } else {
       if (!l.interior) return
       dest = interiorFlight(a.stationId, l.interior, l.size, l.insets, l.panel, camera.fov, az, turn)
@@ -96,6 +107,6 @@ export function useInteriorReframe({
   }, [controls, camera, flight, awaiting, layout, following])
 
   // Passive, after CameraRig's layout effects: a fly request has armed `awaiting` and `layout` is current.
-  useEffect(check, [interior, streets, focusedId, check])
+  useEffect(check, [interior, streets, index, focusedId, check])
   return check
 }

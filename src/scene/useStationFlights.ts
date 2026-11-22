@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, type RefObject } from 'react'
 import type { PerspectiveCamera } from 'three'
-import { interiorCovers, interiorIdOf } from '../data/interiorLoad'
+import { interiorCovers, type IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
 import type { FlyRequest } from '../lib/focus'
 import type { FocusHold } from '../lib/focusHold'
 import { flightProgress } from '../lib/flight'
 import type { Insets, Viewport } from '../lib/framing'
 import { LATE_TURN_PROGRESS, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
-import { streetsReadyFor, type AwaitingInterior } from '../lib/interiorReframe'
+import { classifyAwaiting, stationIsBare, streetsReadyFor, type AwaitingInterior } from '../lib/interiorReframe'
 import type { Network } from '../lib/network'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import {
@@ -41,8 +41,10 @@ interface StationFlightsOptions {
   panel: ScreenRect | null
   size: Viewport
   insets: Insets
-  /** The focused station's streets once loaded: a bare station's flight frames their entrances. */
-  streets: StreetLayer | null
+  /** The focused station's streets once loaded (null: none; undefined: loading): a bare station's flight frames their entrances. */
+  streets: StreetLayer | null | undefined
+  /** The station index: a flight that set off before it loaded learns from it that its station is bare. */
+  index: IndexLoad
 }
 
 /**
@@ -64,6 +66,7 @@ export function useStationFlights({
   size,
   insets,
   streets,
+  index,
 }: StationFlightsOptions): void {
   // Layout effect, not a passive one: a frame between the select and a passive effect would see
   // the new focus with no flight and drop it again (the camera is still far out).
@@ -89,22 +92,22 @@ export function useStationFlights({
     flushMotion(c, camera)
     const reduced = prefersReducedMotion()
     const known = interiorCovers(l.interior, station.id) ? l.interior : null
-    // A bare station (the index lists no interior) awaits only its streets, and nothing once they are cached.
-    const bare = l.index.status === 'ready' && interiorIdOf(station.id, l.index) === null
+    // A bare station (the index lists no interior) awaits only its streets: nothing once they are cached, or once
+    // its load found no file (null).
     const points = bareStationPoints(station.id, l.streets, l.index)
     if (known) awaiting.current = null
-    else if (!bare) awaiting.current = { stationId: station.id, kind: 'interior', reduced }
-    else awaiting.current = l.streets?.stationId === station.id ? null : { stationId: station.id, kind: 'streets', reduced }
+    else if (!stationIsBare(station.id, l.index)) awaiting.current = { stationId: station.id, kind: 'interior', reduced }
+    else awaiting.current = l.streets === undefined ? { stationId: station.id, kind: 'streets', reduced } : null
     const dest = known
       ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
-      : stationFlight(station.id, station.pos, points, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
+      : stationFlight(network, station.id, points, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
     flight.current = newFlight(dest, c, camera, reduced, known !== null || reduced)
   }, [flyRequest, network, camera, controls, flight, hold, awaiting, layout])
 
-  // The interior (first visit) or the panel's measurement (it grows as arrivals fill in) can land
-  // mid-flight: retarget that flight's destination. It rebases on the camera's current pose and keeps
-  // the timing, so the camera doesn't jump. An interior that arrives late in the flight, or after it,
-  // is framed after landing (useInteriorReframe). Focus reached by zooming has no flight.
+  // The interior (first visit), a bare station's streets or the index, or the panel's measurement (it grows as
+  // arrivals fill in) can land mid-flight: retarget that flight's destination. It rebases on the camera's current
+  // pose and keeps the timing, so the camera doesn't jump. An interior or streets that arrive late in the flight, or
+  // after it, are framed after landing (useInteriorReframe). Focus reached by zooming has no flight.
   useEffect(() => {
     const f = flight.current
     const c = controls.current
@@ -115,11 +118,14 @@ export function useStationFlights({
     const e0 = flightProgress(f.elapsed, f.duration)
     let dest
     if (!interior || !interiorCovers(interior, f.stationId)) {
-      // Streets that load late in the flight wait for the landing too: the reframe folds them in.
-      const a = awaiting.current
+      // A flight that set off before the index loaded (a deep link) learns here that its station is bare.
+      const a = classifyAwaiting(awaiting.current, index)
+      awaiting.current = a
+      // Streets that load late in the flight wait for the landing too: the reframe folds them in. A station not known
+      // to be bare has no points (bareStationPoints) and frames its point alone: the panel may still have changed.
       const late = a?.kind === 'streets' && e0 > LATE_TURN_PROGRESS
-      const points = late ? [] : bareStationPoints(station.id, streets, layout.current.index)
-      dest = stationFlight(station.id, station.pos, points, size, insets, panel, camera.fov, az)
+      const points = late ? [] : bareStationPoints(station.id, streets, index)
+      dest = stationFlight(network, station.id, points, size, insets, panel, camera.fov, az)
       if (!late && streetsReadyFor(a, streets)) awaiting.current = null
     } else {
       const turn = retargetTurn(f.turnDecided, e0)
@@ -138,5 +144,5 @@ export function useStationFlights({
     f.target = dest.target
     f.distance = dest.distance
     f.azimuth = dest.azimuth
-  }, [interior, panel, size, insets, streets, camera, network, controls, flight, awaiting, layout])
+  }, [interior, panel, size, insets, streets, index, camera, network, controls, flight, awaiting])
 }

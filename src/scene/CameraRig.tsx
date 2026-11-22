@@ -94,7 +94,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor }: C
     latest.current = { interior, panel, size, insets, maxDistance, network, streets, index }
   }, [interior, panel, size, insets, maxDistance, network, streets, index])
 
-  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets })
+  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets, index })
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
@@ -125,7 +125,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor }: C
     following: follow.active,
     holdAzimuth: follow.holdAzimuth,
   })
-  const landed = useInteriorReframe({ controls, camera, flight, awaiting, layout: latest, interior, streets, focusedId, following: follow.active })
+  const landed = useInteriorReframe({ controls, camera, flight, awaiting, layout: latest, interior, streets, index, focusedId, following: follow.active })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((state, delta) => {

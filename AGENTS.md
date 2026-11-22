@@ -313,8 +313,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     split only once both bundles fit); `trackOffset.ts` also exports `miterNormals`;
     `focusMachine.ts` camera-driven focus transitions; `focusDwell.ts` `settled`, the 400 ms stillness auto-focus
     waits for; `focusHold.ts` interrupted-flight release rule; `bareStationFrame.ts` a bare station's landing (the smallest
-    distance in 400..600 m and the target nearest the centred one that fit the station and its entrance marks in the free
-    rect less 12 px, the target within 120 m of the station; entrances that can't fit are dropped, farthest first) over
+    distance in 400..600 m, and there the target nearest the centred one, that fit the station and as many entrance marks
+    as fit in the free rect less 12 px, the target within PAN_RADIUS_BARE (100 m) of the station; where the free area
+    allows, also within 100 m of the centred target and nearer the station than any neighbour within 200 m. Entrances
+    join nearest first, each only if it still fits; a free area too small for the station alone gets the centred target
+    pulled to 100 m) over
     `convexRegion.ts` (half-plane clipping, nearest point); `interiorReframe.ts` when a landed station flight reframes onto its interior, and how long; `follow.ts` the train follow's math (`followTargetInto`:
     the ground target that puts a world point on a screen point, exact under perspective at any height; the catch-up
     ease, the 8 px pan break (16 px on touch), the 100 px jump re-fly, `followDistanceFor`); `followStep.ts` `stepFollow`,
@@ -859,8 +862,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
-  up the screen); a bare station lands with its point and its entrance marks in the free area above the panel, at that distance or farther (to 600 m), its target within 120 m of the station (`bareStationFrame.ts`; streets loading late reframe after landing like an interior). Both
-  retarget mid-flight when the interior or the panel's final size arrives. An interior arriving after 90% of the
+  up the screen); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (`bareStationFrame.ts`; streets loading late reframe after landing like an interior). Both
+  retarget mid-flight when the interior, a bare station's streets (or the index, for a deep link) or the panel's final size arrives. An interior arriving after 90% of the
   flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,
   unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,
   `interiorReframe.ts`). Under prefers-reduced-motion station and point flights snap with no turn, and a late

@@ -1,5 +1,6 @@
 // Usage: node ost11.mjs <port> <outDir> <label>
-// Lands on 127 then 120 at phone and desktop, probes the entrance marks, screenshots; plus 127 phone reduced motion.
+// Lands on 127 then 120 at phone and desktop, probes the entrance marks, screenshots; plus 127 phone reduced motion
+// and a phone deep link to 127.
 import { chromium } from 'playwright-core'
 import { mkdirSync, writeFileSync } from 'node:fs'
 
@@ -57,6 +58,17 @@ for (const v of views) {
     if (!reduced) rows.push({ view: v.name, reduced, ...(await land(page, '120', `${tag}-120`)) })
     await page.close()
   }
+}
+// A deep link selects before the station index loads (ost.11 review): the landing still frames the entrances.
+{
+  const page = await browser.newPage(views[0])
+  await page.goto(`http://localhost:${port}/underground/#station=127`)
+  await page.waitForFunction(() => window.__underground?.select, null, { timeout: 30000 })
+  await page.waitForTimeout(7000)
+  const m = metrics(await page.evaluate(() => window.__underground.entrancesAt()))
+  await page.screenshot({ path: `${outDir}/${label}-phone-deeplink-127.png` })
+  rows.push({ view: 'phone', reduced: false, deepLink: true, ...m })
+  await page.close()
 }
 for (const r of rows) console.log(JSON.stringify(r))
 writeFileSync(`${outDir}/${label}.json`, JSON.stringify(rows, null, 2) + '\n')

@@ -2,7 +2,7 @@
 import type { MapControls } from '@react-three/drei'
 import type { ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
-import { interiorIdOf, type IndexLoad } from '../data/interiorLoad'
+import type { IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
 import { bareStationFrame } from '../lib/bareStationFrame'
 import { flightDuration } from '../lib/flight'
@@ -10,7 +10,9 @@ import type { FlyRequest } from '../lib/focus'
 import { EXIT_DISTANCE } from '../lib/focusMachine'
 import { framePoint, type Insets, type Viewport } from '../lib/framing'
 import { frameInterior, interiorFreeRect, landingAzimuth, type ScreenRect } from '../lib/interiorCamera'
-import { wrapAngle } from '../lib/orbitLimits'
+import { stationIsBare } from '../lib/interiorReframe'
+import type { Network } from '../lib/network'
+import { PAN_RADIUS_BARE, wrapAngle } from '../lib/orbitLimits'
 import type { Ground } from '../lib/projection'
 import type { InteriorModel } from './interiorModel'
 
@@ -113,13 +115,17 @@ export function interiorFlight(
   }
 }
 
+/** Other stations this close to a bare station can bound its landing target (it stays within PAN_RADIUS_BARE). */
+const NEIGHBOUR_REACH_M = 2 * PAN_RADIUS_BARE
+
 /**
- * Fly-to for a station with no interior: its point and its entrance marks `points` in the free area (above a stacked
- * panel), from the landing distance out as far as they need (bareStationFrame), the target near the station.
+ * Fly-to for a station with no interior: its point and as many of its entrance marks `points` as fit in the free area
+ * (above a stacked panel), from the landing distance out as far as they need, the target near the station and nearer
+ * it than its neighbours (bareStationFrame).
  */
 export function stationFlight(
+  network: Network,
   stationId: string,
-  pos: Ground,
   points: readonly Ground[],
   viewport: Viewport,
   insets: Insets,
@@ -127,8 +133,14 @@ export function stationFlight(
   fovDeg: number,
   azimuth: number,
 ): Destination {
+  const station = network.stationById.get(stationId)
+  if (!station) throw new Error(`Station flight to unknown station "${stationId}"`)
+  const pos = station.pos
+  const others = network.stations
+    .filter((o) => o.id !== stationId && Math.hypot(o.pos.x - pos.x, o.pos.z - pos.z) <= NEIGHBOUR_REACH_M)
+    .map((o) => o.pos)
   const free = interiorFreeRect(viewport, insets, panel)
-  const { distance, target } = bareStationFrame({ station: pos, points, azimuth, viewport, free, fovDeg })
+  const { distance, target } = bareStationFrame({ station: pos, points, others, azimuth, viewport, free, fovDeg })
   return { stationId, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false }
 }
 
@@ -136,8 +148,8 @@ export function stationFlight(
  * The entrance marks a bare station's flight frames, on the ground: its loaded streets' marks once the index says it
  * has no interior, else none (an interior station frames its interior; an unknown one waits for the index).
  */
-export function bareStationPoints(stationId: string, streets: StreetLayer | null, index: IndexLoad): Ground[] {
-  if (index.status !== 'ready' || interiorIdOf(stationId, index) !== null || streets?.stationId !== stationId) return []
+export function bareStationPoints(stationId: string, streets: StreetLayer | null | undefined, index: IndexLoad): Ground[] {
+  if (!stationIsBare(stationId, index) || !streets || streets.stationId !== stationId) return []
   return streets.marks.map((m) => ({ x: streets.anchor.x + m.x, z: streets.anchor.z + m.z }))
 }
 

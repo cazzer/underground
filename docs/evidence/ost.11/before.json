@@ -103,5 +103,26 @@
       "bottom": 833
     },
     "focusedAfter": "120"
+  },
+  {
+    "view": "phone",
+    "reduced": false,
+    "deepLink": true,
+    "station": "127",
+    "distance": 400,
+    "offset": 138.3,
+    "inside": "8/11",
+    "minMarginPx": -63.7,
+    "stationPx": {
+      "x": 195,
+      "y": 214
+    },
+    "stationMarginPx": 35.9,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 249.5
+    }
   }
 ]

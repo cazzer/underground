@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { interiorReadyFor, reframeAction, reframeDuration, streetsReadyFor, REFRAME_MAX_S, REFRAME_MIN_S, type ReframeInput } from './interiorReframe'
+import type { IndexLoad } from '../data/interiorLoad'
+import {
+  classifyAwaiting,
+  interiorReadyFor,
+  reframeAction,
+  reframeDuration,
+  stationIsBare,
+  streetsMissingFor,
+  streetsReadyFor,
+  REFRAME_MAX_S,
+  REFRAME_MIN_S,
+  type ReframeInput,
+} from './interiorReframe'
 
-const landed: ReframeInput = { flying: false, following: false, focusedId: 'L08', ready: true }
+const landed: ReframeInput = { flying: false, following: false, focusedId: 'L08', ready: true, missing: false }
 const awaiting = { stationId: 'L08', kind: 'interior' as const, reduced: false }
 
 describe('reframeAction', () => {
@@ -83,5 +95,40 @@ describe('streetsReadyFor', () => {
 
   it('leaves a flight awaiting streets unready for any interior', () => {
     expect(interiorReadyFor(bare, { stationId: '127' })).toBe(false)
+  })
+})
+
+describe('a bare station found out after the flight set off', () => {
+  const loading: IndexLoad = { status: 'loading' }
+  const ready: IndexLoad = { status: 'ready', index: { stations: { L08: { provenance: 'authored' }, U01: { provenance: 'generated', file: 'T01' } } } }
+  const deepLink = { stationId: '127', kind: 'interior' as const, reduced: false }
+
+  it('is bare only once the index has loaded and does not list it', () => {
+    expect(stationIsBare('127', ready)).toBe(true)
+    expect(stationIsBare('127', loading)).toBe(false)
+    expect(stationIsBare('127', { status: 'error', message: 'x' })).toBe(false)
+    expect(stationIsBare('L08', ready)).toBe(false)
+    expect(stationIsBare('U01', ready)).toBe(false)
+  })
+
+  it('turns an interior await into a streets await once the index shows the station bare (a deep link)', () => {
+    expect(classifyAwaiting(deepLink, ready)).toEqual({ ...deepLink, kind: 'streets' })
+    expect(classifyAwaiting(deepLink, loading)).toBe(deepLink)
+    const l08 = { ...deepLink, stationId: 'L08' }
+    expect(classifyAwaiting(l08, ready)).toBe(l08)
+    expect(classifyAwaiting(null, ready)).toBeNull()
+  })
+
+  it('then reframes once its streets load, and drops the await if it has no street file', () => {
+    const a = classifyAwaiting(deepLink, ready)
+    const at127 = { ...landed, focusedId: '127' }
+    expect(reframeAction(a, { ...at127, ready: streetsReadyFor(a, undefined), missing: streetsMissingFor(a, undefined) })).toBe('wait')
+    expect(reframeAction(a, { ...at127, ready: streetsReadyFor(a, { stationId: '127' }), missing: false })).toBe('reframe')
+    expect(reframeAction(a, { ...at127, ready: false, missing: streetsMissingFor(a, null) })).toBe('drop')
+  })
+
+  it('never calls an interior await missing', () => {
+    expect(streetsMissingFor(deepLink, null)).toBe(false)
+    expect(streetsMissingFor(null, null)).toBe(false)
   })
 })
