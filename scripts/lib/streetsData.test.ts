@@ -43,40 +43,60 @@ describe('the street pin manifest', () => {
 
 describe('the street pin shards', () => {
   it('sort ways and nodes by id, with each way id in one shard only', () => {
+    const bad: string[] = []
     const wayIds = new Set<number>()
     for (const [file, shard] of shards) {
       const ids = shard.ways.map((w) => w.id)
-      expect(ids, file).toEqual([...ids].sort((a, b) => a - b))
+      if (ids.some((id, i) => i > 0 && id <= ids[i - 1]!)) bad.push(`${file}: way ids not strictly ascending`)
       const nodeIds = shard.nodes.map((n) => n[0])
-      expect(nodeIds, file).toEqual([...nodeIds].sort((a, b) => a - b))
-      expect(new Set(nodeIds).size, file).toBe(nodeIds.length)
+      if (nodeIds.some((id, i) => i > 0 && id <= nodeIds[i - 1]!)) bad.push(`${file}: node ids not strictly ascending`)
       for (const id of ids) {
-        expect(wayIds.has(id), `way ${id} in ${file} and another shard`).toBe(false)
+        if (wayIds.has(id)) bad.push(`way ${id} in ${file} and another shard`)
         wayIds.add(id)
       }
     }
+    expect(bad).toEqual([])
   })
-  it('hold only STREET_TAGS, every way node in the node table, and the first vertex in the shard cell', () => {
+  it('hold only STREET_TAGS, allowed classes, names on every road, and at least 2 nodes per way', () => {
+    const bad: string[] = []
+    const allowed = new Set([...ROAD_CLASSES, ...(manifest.walk ? WALK_CLASSES : [])])
+    for (const [file, shard] of shards) {
+      for (const w of shard.ways) {
+        const at = `${file} way ${w.id}`
+        if (w.nodes.length < 2) bad.push(`${at}: ${w.nodes.length} nodes`)
+        for (const k of Object.keys(w.tags)) if (!STREET_TAGS.includes(k)) bad.push(`${at}: tag ${k}`)
+        const highway = w.tags.highway
+        if (highway === undefined || !allowed.has(highway)) bad.push(`${at}: highway=${String(highway)}`)
+        else if (w.tags.name === undefined && !WALK_CLASSES.includes(highway)) bad.push(`${at}: unnamed highway=${highway}`)
+      }
+    }
+    expect(bad).toEqual([])
+  })
+  it('have every way node in the shard node table and the first vertex in the shard cell', () => {
+    const bad: string[] = []
     for (const [file, shard] of shards) {
       const coords = new Map<number, PinNode>(shard.nodes.map((n) => [n[0], [n[1], n[2]]]))
       for (const w of shard.ways) {
-        expect(w.nodes.length, `${file} way ${w.id}`).toBeGreaterThanOrEqual(2)
-        for (const k of Object.keys(w.tags)) expect(STREET_TAGS, `${file} way ${w.id} tag ${k}`).toContain(k)
-        for (const n of w.nodes) expect(coords.has(n), `${file} way ${w.id} node ${n}`).toBe(true)
-        const first = coords.get(w.nodes[0]!)!
-        expect(shardCell({ lat: first[0], lon: first[1] }, manifest.cellDeg), `${file} way ${w.id}`).toEqual(shard.cell)
+        for (const n of w.nodes) if (!coords.has(n)) bad.push(`${file} way ${w.id}: node ${n} missing from the table`)
+        const first = coords.get(w.nodes[0]!)
+        if (first === undefined) continue
+        const cell = shardCell({ lat: first[0], lon: first[1] }, manifest.cellDeg)
+        if (cell.i !== shard.cell.i || cell.j !== shard.cell.j) bad.push(`${file} way ${w.id}: first vertex is in cell ${cell.i},${cell.j}`)
       }
     }
+    expect(bad).toEqual([])
   })
   it('give a node the same coordinates in every shard', () => {
+    const bad: string[] = []
     const seen = new Map<number, PinNode>()
     for (const [file, shard] of shards) {
       for (const [id, lat, lon] of shard.nodes) {
         const prev = seen.get(id)
-        if (prev !== undefined) expect([lat, lon], `${file} node ${id}`).toEqual([...prev])
+        if (prev !== undefined && (prev[0] !== lat || prev[1] !== lon)) bad.push(`${file} node ${id}`)
         seen.set(id, [lat, lon])
       }
     }
+    expect(bad).toEqual([])
   })
   it('reach every station with a named way, or list it in UNCOVERED_STATIONS', () => {
     const nodes = new Map<number, PinNode>()

@@ -131,7 +131,7 @@ the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `n
   see `../docs/research/data-sources.md` §5.1 (licensing decisions included).
 - `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors,
   available under the ODbL 1.0.
-- `streets/` is © OpenStreetMap contributors, available under the ODbL 1.0 (`manifest.json` carries the attribution).
+- `streets/` is © OpenStreetMap contributors, available under the ODbL 1.0 (see `../public/data/LICENSE-ODbL.md`).
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.

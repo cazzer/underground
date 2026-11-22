@@ -1,19 +1,20 @@
 /** Pins the OSM streets and walking ways near every station into data/streets/ (a manifest and sharded cell-*.json).
  *
- *  npm run data:streets:fetch [-- --no-walk] [-- --batches N] [-- --overpass <url>]
+ *  npm run data:streets:fetch -- [--no-walk] [--batches N] [--overpass <url>]
  *
  *  Uses the network (the Overpass API, public and read-only; the requests carry only the public station points
  *  of public/data/stations.json), so it only runs by hand; CI and every other `npm run data*` stay offline.
  *  The response is untrusted: scripts/lib/streetsOsm.ts validates and trims it, and nothing is written unless
  *  every request succeeds, every station has a named way nearby and the sizes are within budget.
  *
- *  One request for the whole city; if Overpass refuses it after the retries, the stations are split into
- *  sequential batches (also `--batches N` to start there) and the answers merged by way id. The default
+ *  One request for the whole city, tried once; if Overpass is overloaded (504, timeout, a dropped connection or a
+ *  runtime-error remark) the stations are split into sequential batches, each with the usual retries (also
+ *  `--batches N` to start there), and the answers merged by way id. Any other failure, a 400 for one, stops. The default
  *  server is the one the catalog fetch uses; `--overpass` is for a person to point elsewhere. */
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import { finite, list, record, text } from './lib/check.ts'
-import { getJson, sleep } from './lib/fetchJson.ts'
+import { getJson, isRetryable, sleep } from './lib/fetchJson.ts'
 import { toStableJson } from './lib/stableJson.ts'
 import { RADIUS_M, ROAD_CLASSES, UNCOVERED_STATIONS, WALK_CLASSES, mergeOverpass, streetsQuery, streetsQueryParts, trimOverpassStreets } from './lib/streetsOsm.ts'
 import type { StreetStation } from './lib/streetsOsm.ts'
@@ -47,8 +48,15 @@ function readStations(): { feedVersion: string; stations: StreetStation[] } {
   return { feedVersion: text(root.feedVersion, 'stations.json.feedVersion'), stations }
 }
 
-async function post(url: string, query: string): Promise<unknown> {
-  return getJson(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ data: query }) }, OVERPASS_TIMEOUT_MS)
+/** Overpass answers HTTP 200 with a `remark` (and partial elements) when a query hits its time or memory limit. */
+class RemarkError extends Error {}
+
+async function post(url: string, query: string, retries?: number): Promise<unknown> {
+  const body = new URLSearchParams({ data: query })
+  const json = await getJson(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }, OVERPASS_TIMEOUT_MS, retries)
+  const remark = record(json, 'overpass').remark
+  if (typeof remark === 'string') throw new RemarkError(`overpass remark (the answer may be partial): ${remark}`)
+  return json
 }
 
 /** Stations in `n` contiguous latitude bands, so each request covers a compact share of the city. */
@@ -72,8 +80,9 @@ async function fetchBatches(url: string, stations: readonly StreetStation[], wal
 async function fetchStreets(url: string, stations: readonly StreetStation[], walk: boolean, batches: number): Promise<{ response: unknown; requests: number }> {
   if (batches > 1) return fetchBatches(url, stations, walk, batches)
   try {
-    return { response: await post(url, streetsQuery(stations, RADIUS_M, walk)), requests: 1 }
+    return { response: await post(url, streetsQuery(stations, RADIUS_M, walk), 0), requests: 1 }
   } catch (err) {
+    if (!(err instanceof RemarkError) && !isRetryable(err)) throw err
     console.log(`the single request failed (${err instanceof Error ? err.message : String(err)}); falling back to ${FALLBACK_BATCHES} batches`)
     return fetchBatches(url, stations, walk, FALLBACK_BATCHES)
   }
@@ -128,10 +137,12 @@ async function main(): Promise<void> {
   if (total > cap) throw new Error(`the pin is ${total} bytes, over the ${cap} byte budget${walk ? '; rerun with --no-walk to keep the named roads only' : ''}; nothing written`)
 
   mkdirSync(DIR, { recursive: true })
-  const stale = readdirSync(DIR).filter((f) => /^cell-.*\.json$/.test(f) || f.endsWith('.tmp'))
+  const names = new Set(files.map((f) => f.name))
+  // Everything new is written and renamed first; only then is anything old deleted, so an interrupted run leaves a whole pin.
+  const stale = readdirSync(DIR).filter((f) => (/^cell-.*\.json$/.test(f) && !names.has(f)) || (f.endsWith('.tmp') && !names.has(f.slice(0, -4))))
   for (const { name, text: body } of files) writeFileSync(new URL(`${name}.tmp`, DIR), body)
-  for (const f of stale) rmSync(new URL(f, DIR))
   for (const { name } of files) renameSync(new URL(`${name}.tmp`, DIR), new URL(name, DIR))
+  for (const f of stale) rmSync(new URL(f, DIR))
   console.log('Review the diff of data/streets/')
 }
 

@@ -209,12 +209,12 @@ node ids for a later walk graph (underground-2q7). Three sources were compared.
 | Source | Terms | Node ids | Names | Verdict |
 |---|---|---|---|---|
 | OpenStreetMap via Overpass | ODbL 1.0, credit "© OpenStreetMap contributors" | yes (way nodes) | as mapped ("North 9th Street") | **chosen** |
-| NYC CSCL centerline (`inkn-q76z`) | NYC.gov Terms of Use, not OPEN-NY | no (segments only) | abbreviated ("N  7 ST") | rejected |
-| NYC LION (`2v4z-66xt`) | as CSCL | no | as CSCL | rejected: file geodatabase only, needs GDAL |
+| NYC CSCL centerline ([`inkn-q76z`](https://data.cityofnewyork.us/api/views/inkn-q76z.json)) | NYC.gov Terms of Use, not OPEN-NY | no (segments only) | abbreviated ("N  7 ST") | rejected |
+| NYC LION ([`2v4z-66xt`](https://data.cityofnewyork.us/api/views/2v4z-66xt.json)) | as CSCL | segment from/to node ids and a node layer, roadway only (no sidewalks, crossings or steps) | as CSCL | rejected: file geodatabase only, needs GDAL |
 
 OSM is already a source (§5, platforms and tracks), its licence is already handled, and it is the only one of the
-three that has sidewalks, crossings and steps with shared node ids, which a walk graph needs. CSCL has no node ids
-and its names would need expanding before they match what a rider sees on a sign.
+three that has sidewalks, crossings and steps with shared node ids, which a walk graph needs (LION's node ids cover
+the roadway only). CSCL has no node ids and its names would need expanding before they match what a rider sees on a sign.
 
 `npm run data:streets:fetch` pins the result in `data/streets/`. One Overpass request (`out geom`, no meta, so no
 contributor names) takes every way within 300 m of any `public/data/stations.json` point: named roads
@@ -226,7 +226,7 @@ Measured before the pin: around Bedford Av (300 m) 30 named ways were 3.3 KB gzi
 The pin (fetched 2026-11-22, OSM base 2026-11-22T04:33:58Z, one request that succeeded on the first try): 96,808 ways
 (75,465 footway, 8,360 residential, 3,672 secondary, 3,060 primary, 2,186 steps, 1,686 tertiary, 1,358 pedestrian,
 365 service, 349 unclassified, 128 path, 110 trunk, 69 living_street), 276,489 distinct nodes (285,761 rows, since
-border nodes repeat across shards), 132 shards, 25.1 MB raw and 4.7 MB gzipped, the largest shard 1.5 MB (Midtown,
+border nodes repeat across shards), 132 shards, 25.1 MB raw and 4.7 MB gzipped, the largest shard 1.5 MB (Lower Manhattan,
 cell-40.70_-74.025). Every one of the 496 stations has a named way within 300 m. The caps are 2 MB a file and 30 MB in
 all (8 MB with `--no-walk`, which keeps the named roads only); GitHub Pages serves none of it, since the per-station
 files (ost.3) are what ship.

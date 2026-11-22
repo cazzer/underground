@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ROADWAY_HIGHWAYS } from '../../src/lib/streetClass.ts'
-import { ROAD_CLASSES, STREET_TAGS, WALK_CLASSES, mergeOverpass, stationsWithoutNamedWay, streetsDistance, streetsQuery, trimOverpassStreets } from './streetsOsm.ts'
+import { ROAD_CLASSES, STREET_TAGS, WALK_CLASSES, mergeOverpass, stationsWithoutNamedWay, streetsQuery, trimOverpassStreets } from './streetsOsm.ts'
 import type { StreetsOptions, StreetStation } from './streetsOsm.ts'
 import { shardCell, shardFileName, shardStreets } from './streetsShard.ts'
 
@@ -21,13 +21,12 @@ const trim = (elements: unknown[], o: StreetsOptions = options, stations: Street
 const near = road(1, [pt(0.001), pt(0.001, 0.001)])
 
 describe('the class lists', () => {
-  it('are no wider than the street classes the client draws', () => {
-    for (const c of [...ROAD_CLASSES, ...WALK_CLASSES].filter((c) => c !== 'footway' && c !== 'steps' && c !== 'path')) {
-      expect(ROADWAY_HIGHWAYS.has(c), c).toBe(true)
-    }
+  it('ROAD_CLASSES are all street classes the client draws', () => {
+    expect(ROAD_CLASSES.filter((c) => !ROADWAY_HIGHWAYS.has(c))).toEqual([])
   })
-  it('keep the walk-only classes out of the roadway set', () => {
-    for (const c of ['footway', 'steps', 'path']) expect(ROADWAY_HIGHWAYS.has(c), c).toBe(false)
+  it('WALK_CLASSES beyond the roads are not street classes', () => {
+    expect(WALK_CLASSES.filter((c) => !ROAD_CLASSES.includes(c) && ROADWAY_HIGHWAYS.has(c))).toEqual([])
+    expect(WALK_CLASSES.filter((c) => !ROAD_CLASSES.includes(c))).toEqual(['footway', 'steps', 'path'])
   })
 })
 
@@ -45,13 +44,6 @@ describe('streetsQuery', () => {
     const q = streetsQuery(stations, 300, false)
     expect(q).not.toContain('footway')
     expect(q).toContain('residential')
-  })
-})
-
-describe('streetsDistance', () => {
-  it('measures to a segment, not to its vertices', () => {
-    // Vertices about 560 m either side of the station; the segment passes 111 m north of it.
-    expect(streetsDistance(station, [pt(0.001, -0.0067), pt(0.001, 0.0067)])).toBeCloseTo(111.3, 0)
   })
 })
 

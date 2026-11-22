@@ -44,7 +44,7 @@ so dev and preview serve under that path.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
   `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
-- `npm run data:streets:fetch [-- --no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
+- `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
   within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
   `streetsData.test.ts` checks it. Nothing reads it yet (ost.3 builds the per-station street files from it).
 

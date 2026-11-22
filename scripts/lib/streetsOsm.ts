@@ -104,17 +104,6 @@ function segmentDistanceM(p: Ground, a: Ground, b: Ground): number {
   return Math.hypot(p.x - (a.x + t * dx), p.z - (a.z + t * dz))
 }
 
-/** The smallest distance from a station point to any segment of a polyline (a lone point counts as one segment). */
-export function streetsDistance(station: LatLon, points: readonly LatLon[]): number {
-  if (points.length === 0) throw new Error('streetsDistance: no points')
-  const s = toGround(station)
-  const g = points.map((p) => toGround(p))
-  if (g.length === 1) return Math.hypot(g[0]!.x - s.x, g[0]!.z - s.z)
-  let best = Infinity
-  for (let i = 1; i < g.length; i++) best = Math.min(best, segmentDistanceM(s, g[i - 1]!, g[i]!))
-  return best
-}
-
 /** Station grid with cell = radius, so a segment checks only the cells under its box plus one on each side. */
 function stationsNearSegment(stations: readonly LatLon[], radiusM: number): (a: Ground, b: Ground) => number[] {
   const ground = stations.map((s) => toGround(s))
