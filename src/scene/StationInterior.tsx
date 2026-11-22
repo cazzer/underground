@@ -1,4 +1,3 @@
-import { Html } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
@@ -12,13 +11,9 @@ import type { InteriorModel } from './interiorModel'
 import { InteriorVeil } from './InteriorVeil'
 import { RENDER_ORDER } from './renderOrder'
 import { useLineLayer, type LineDash } from './useLineLayer'
+import { useLevelLabels } from './useLevelLabels'
 
 const DASH: LineDash = { size: theme.interiorApproxDash, gap: theme.interiorApproxGap }
-
-function showLabel(el: HTMLDivElement, opacity: number): void {
-  el.style.opacity = String(opacity)
-  el.style.visibility = opacity > 0 ? 'visible' : 'hidden'
-}
 
 interface StationInteriorProps {
   model: InteriorModel
@@ -36,7 +31,6 @@ export function StationInterior({ model, network }: StationInteriorProps) {
   if (!station) throw new Error(`Interior for unknown station "${model.stationId}"`)
   const group = useRef<Group>(null)
   const veil = useRef<Mesh>(null)
-  const labels = useRef<(HTMLDivElement | null)[]>([])
   const shown = useRef(-1)
   const shownDepth = useRef(-1)
   /** The labels' opacity as last written, for a label div mounted after it. */
@@ -77,8 +71,9 @@ export function StationInterior({ model, network }: StationInteriorProps) {
     if (overFine) overFine.material.opacity = o
     if (veil.current) (veil.current.material as MeshBasicMaterial).opacity = interiorLook.veilOpacity * veilWeight(o, depth)
     labelShown.current = labelOpacity(o, depth)
-    for (const el of labels.current) if (el) showLabel(el, labelShown.current)
   })
+
+  useLevelLabels(model.labels, group, labelShown)
 
   return (
     <>
@@ -88,25 +83,6 @@ export function StationInterior({ model, network }: StationInteriorProps) {
       {strong && <primitive object={strong} />}
       {overFine && <primitive object={overFine} />}
       {overStrong && <primitive object={overStrong} />}
-      {model.labels.map((label, i) => (
-        // zIndexRange [0, 0]: drei's default z-index would paint labels over the HUD panel.
-        <Html key={label.levelId} position={label.position} zIndexRange={[0, 0]}>
-          <div
-            ref={(el) => {
-              labels.current[i] = el
-              // drei mounts Html content in its own root, often after the first frames have set
-              // the opacity; a still camera would never update it again.
-              if (el) showLabel(el, labelShown.current)
-            }}
-            style={{ opacity: 0, visibility: 'hidden' }}
-            // pointer-events-none on the div itself: drei's pointerEvents prop only applies in
-            // transform mode, and label events would bubble into r3f with the wrong offsets.
-            className="pointer-events-none -translate-x-1/2 [text-shadow:0_0_2px_var(--ug-bg),0_0_2px_var(--ug-bg),0_0_5px_var(--ug-bg)] font-mono text-[10px] whitespace-nowrap text-ink-dim uppercase tracking-widest"
-          >
-            {label.text}
-          </div>
-        </Html>
-      ))}
       </group>
     </>
   )
