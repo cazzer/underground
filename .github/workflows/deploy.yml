@@ -154,6 +154,7 @@ jobs:
     needs: [build, deploy]
     if: needs.build.outputs.basemap_bytes != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:

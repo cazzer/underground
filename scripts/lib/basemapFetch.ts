@@ -4,11 +4,24 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { mkdir, rename, rm, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { Transform } from 'node:stream'
 import type { BasemapPin } from './basemapSpec.ts'
 
 export interface EnsureDeps {
-  /** Writes the body of `url` to `toPath`; throws on any non-success. */
-  download(url: string, toPath: string): Promise<void>
+  /** Writes the body of `url` to `toPath`, stopping with an error past `maxBytes`; throws on any non-success. */
+  download(url: string, toPath: string, maxBytes: number): Promise<void>
+}
+
+/** A pass-through that fails the stream once more than `maxBytes` have gone by, so a wrong or runaway download stops early. */
+export function byteLimit(maxBytes: number): Transform {
+  let seen = 0
+  return new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      seen += chunk.length
+      if (seen > maxBytes) callback(new Error(`the download passed ${maxBytes} bytes, the size in the pin`))
+      else callback(null, chunk)
+    },
+  })
 }
 
 export async function sha256OfFile(path: string): Promise<string> {
@@ -37,7 +50,7 @@ export async function ensureBasemap(pin: BasemapPin, url: string, out: string, d
   await mkdir(dirname(out), { recursive: true })
   await rm(tmp, { force: true })
   try {
-    await deps.download(url, tmp)
+    await deps.download(url, tmp, pin.bytes)
   } catch (err) {
     await rm(tmp, { force: true })
     throw err

@@ -3,7 +3,9 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ensureBasemap } from './basemapFetch.ts'
+import { Readable, Writable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+import { byteLimit, ensureBasemap } from './basemapFetch.ts'
 import type { EnsureDeps } from './basemapFetch.ts'
 import { releaseAssetUrl, releaseTag } from './basemapSpec.ts'
 import type { BasemapPin } from './basemapSpec.ts'
@@ -31,6 +33,19 @@ function serving(content: Buffer): EnsureDeps & { calls: string[] } {
     },
   }
 }
+
+describe('byteLimit', () => {
+  const sink = () => new Writable({ write: (_chunk, _encoding, done) => done() })
+  const run = (chunks: Buffer[], max: number) => pipeline(Readable.from(chunks), byteLimit(max), sink())
+
+  it('passes a body of exactly the limit', async () => {
+    await expect(run([Buffer.alloc(5), Buffer.alloc(5)], 10)).resolves.toBeUndefined()
+  })
+
+  it('fails as soon as the body passes the limit', async () => {
+    await expect(run([Buffer.alloc(6), Buffer.alloc(6), Buffer.alloc(6)], 10)).rejects.toThrow(/passed 10 bytes/)
+  })
+})
 
 describe('ensureBasemap', () => {
   it('downloads once, then makes no request while the file matches (offline after one fetch)', async () => {

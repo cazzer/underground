@@ -14,12 +14,17 @@ export interface ProbeResponse {
   body?: Uint8Array
 }
 
-/** The first and the last `length` bytes of a `total`-byte file: the header and directory a PMTiles client reads first, and the tail a tile may sit in. */
-export function probeRanges(total: number, length = 127): ByteRange[] {
-  if (!Number.isInteger(total) || total < length) throw new Error(`a ${total}-byte file is too small to probe`)
+/** The PMTiles header is 127 bytes; pmtiles-js first reads the head 16 KiB (header and root directory in one request). */
+const HEADER_BYTES = 127
+const FIRST_READ_BYTES = 16384
+
+/** The header, the tail of the file (where a tile may sit) and the first read a PMTiles client makes, of a `total`-byte file. */
+export function probeRanges(total: number): ByteRange[] {
+  if (!Number.isInteger(total) || total < FIRST_READ_BYTES) throw new Error(`a ${total}-byte file is too small to probe`)
   return [
-    { start: 0, end: length - 1 },
-    { start: total - length, end: total - 1 },
+    { start: 0, end: HEADER_BYTES - 1 },
+    { start: total - HEADER_BYTES, end: total - 1 },
+    { start: 0, end: FIRST_READ_BYTES - 1 },
   ]
 }
 

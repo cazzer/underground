@@ -12,8 +12,16 @@ function ok(range: { start: number; end: number }, body: Uint8Array): ProbeRespo
 }
 
 describe('probeRanges', () => {
-  it('asks for the first and the last 127 bytes', () => {
-    expect(probeRanges(total)).toEqual([head, tail])
+  it('asks for the header, the last 127 bytes and the 16 KiB first read', () => {
+    expect(probeRanges(total)).toEqual([head, tail, { start: 0, end: 16383 }])
+  })
+
+  it('passes a correct 16 KiB first read and fails a short one', () => {
+    const first = { start: 0, end: 16383 }
+    const body = new Uint8Array(16384)
+    body.set(header)
+    expect(rangeProblems(first, total, ok(first, body))).toEqual([])
+    expect(rangeProblems(first, total, ok(first, body.subarray(0, 127))).join()).toMatch(/body is 127 bytes, not 16384/)
   })
 
   it('refuses a file too small to probe', () => {

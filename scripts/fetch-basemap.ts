@@ -10,17 +10,17 @@ import { createWriteStream, readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
-import { ensureBasemap } from './lib/basemapFetch.ts'
+import { byteLimit, ensureBasemap } from './lib/basemapFetch.ts'
 import { BASEMAP_ASSET, parseBasemapFile, releaseAssetUrl } from './lib/basemapSpec.ts'
 
 const FILE = new URL('../data/basemap/basemap.json', import.meta.url)
 const DEFAULT_OUT = fileURLToPath(new URL(`../public/basemap/${BASEMAP_ASSET}`, import.meta.url))
 const TIMEOUT_MS = 600_000
 
-async function download(url: string, toPath: string): Promise<void> {
+async function download(url: string, toPath: string, maxBytes: number): Promise<void> {
   const res = await fetch(url, { headers: { 'User-Agent': 'underground-basemap-fetch/1.0' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
   if (!res.ok || res.body === null) throw new Error(`${url}: HTTP ${res.status}`)
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(toPath))
+  await pipeline(Readable.fromWeb(res.body), byteLimit(maxBytes), createWriteStream(toPath))
 }
 
 async function main(): Promise<void> {

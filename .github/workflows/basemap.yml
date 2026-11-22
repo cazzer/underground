@@ -41,6 +41,7 @@ env:
 
 jobs:
   generate:
+    timeout-minutes: 60
     # Only on the default branch (a dispatch from another branch does nothing).
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
@@ -51,6 +52,7 @@ jobs:
       basemap_version: ${{ steps.gate.outputs.basemap_version }}
       sha256: ${{ steps.result.outputs.sha256 }}
       bytes: ${{ steps.result.outputs.bytes }}
+      layers: ${{ steps.build.outputs.layers }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -70,12 +72,13 @@ jobs:
             echo "::error::build must be YYYYMMDD, got '$build'"
             exit 1
           fi
-          status=$(curl -s -o /dev/null -w '%{http_code}' -I "https://build.protomaps.com/${build}.pmtiles")
+          status=$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' -I "https://build.protomaps.com/${build}.pmtiles")
           if [ "$status" != 200 ]; then
             echo "::error::https://build.protomaps.com/${build}.pmtiles answered HTTP ${status}; daily builds are kept for about a week, pick a recent one"
             exit 1
           fi
           echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "layers=$(jq -r '.spec.layers | join(", ")' data/basemap/basemap.json)" >> "$GITHUB_OUTPUT"
 
       - name: Install go-pmtiles ${{ env.GO_PMTILES_VERSION }}
         run: |
@@ -89,6 +92,7 @@ jobs:
       # tag and its commit (a moved tag fails the build), built here only, never in the deploy.
       - name: Build tippecanoe's tile-join ${{ env.TIPPECANOE_TAG }}
         run: |
+          sudo apt-get update
           sudo apt-get install -y --no-install-recommends libsqlite3-dev zlib1g-dev
           git clone --quiet --depth 1 --branch "$TIPPECANOE_TAG" https://github.com/felt/tippecanoe "$RUNNER_TEMP/tippecanoe"
           test "$(git -C "$RUNNER_TEMP/tippecanoe" rev-parse HEAD)" = "$TIPPECANOE_COMMIT"
@@ -171,11 +175,11 @@ jobs:
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ github.token }}
       BUILD: ${{ needs.generate.outputs.build }}
       BASEMAP_VERSION: ${{ needs.generate.outputs.basemap_version }}
       SHA256: ${{ needs.generate.outputs.sha256 }}
       BYTES: ${{ needs.generate.outputs.bytes }}
+      LAYERS: ${{ needs.generate.outputs.layers }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -188,11 +192,13 @@ jobs:
 
       - name: Create the release
         id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           tag="basemap-${BUILD}-${SHA256:0:8}"
           cat > notes.md <<EOF
           NYC basemap tiles for the underground map: the Protomaps basemap build ${BUILD} (basemap ${BASEMAP_VERSION}),
-          cut to the five boroughs, zoom 0 to 15, with only the earth, water, landuse and roads layers.
+          cut to the five boroughs, zoom 0 to 15, with only the ${LAYERS} layers.
 
           - Source: https://build.protomaps.com/${BUILD}.pmtiles (https://docs.protomaps.com/basemaps/downloads)
           - sha256: \`${SHA256}\`, ${BYTES} bytes
@@ -200,10 +206,10 @@ jobs:
 
           Licence and credits: © OpenStreetMap contributors, available under the Open Database License 1.0
           (https://opendatacommons.org/licenses/odbl/1-0/); this file is a derivative database under the ODbL.
-          The Protomaps build also contains Natural Earth data (public domain) and OSM-derived earth and water polygons
-          (osmdata.openstreetmap.de, ODbL). Its landcover layer (ESA WorldCover, CC BY 4.0), places layer (Tilezen terms)
-          and the pois, buildings and boundaries layers are removed. The metadata's own attribution reads
-          "© OpenStreetMap". Protomaps' terms: https://github.com/protomaps/basemaps/blob/main/LICENSE_DATA.md.
+          The earth and water layers also hold Natural Earth data at low zooms (public domain) and OSM-derived polygons
+          (osmdata.openstreetmap.de, ODbL). The landcover layer (ESA WorldCover, CC BY 4.0), the places layer (minzoom values
+          derived from Tilezen and Natural Earth) and the pois, buildings and boundaries layers are removed. The metadata's
+          own attribution reads "© OpenStreetMap". Protomaps' terms: https://github.com/protomaps/basemaps/blob/main/LICENSE_DATA.md.
           EOF
           gh release create "$tag" nyc.pmtiles \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \

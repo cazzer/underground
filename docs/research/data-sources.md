@@ -260,8 +260,8 @@ test fixture).
 |---|---|---|---|
 | OpenStreetMap | ODbL 1.0, credit "© OpenStreetMap" | roads, landuse, earth, water | yes, covered by the footer's OSM credit |
 | osmdata.openstreetmap.de (OSM-derived water and earth polygons) | ODbL | water, earth | yes, same credit |
-| Natural Earth | public domain | `places` minzoom values (low-zoom country and region labels) | no layer that uses it ships |
-| Tilezen | not stated | `places` minzoom for countries | no |
+| Natural Earth | public domain, credit not required | `earth` land and `water` ocean and lakes at z0 to z5 (ne_50m, ne_10m), and `places` minzoom values | yes, in earth and water (public domain, so no credit is needed) |
+| Tilezen | not stated | `places` minzoom for countries | no (`places` is dropped) |
 | ESA WorldCover (Daylight landcover) | CC BY 4.0, needs its own credit | `landcover` (z0 to z7) | **no: dropped.** Shipping it would need a licensing card |
 | Tangrams (Mapzen) icons | MIT | `pois` icons for the default styles only | no |
 
@@ -323,18 +323,26 @@ GitHub Actions cron runs at most every 5 minutes, so it can't provide realtime. 
 That totals about 170 KB raw, or about 35 KB gzipped. Refresh it with a scheduled Action whenever the zip's `Last-Modified` changes.
 
 **Range requests on Pages (the basemap, ost.9.1).** The PMTiles client reads `nyc.pmtiles` in ranges, so GitHub Pages must
-answer a correct uncompressed 206. Measured on the live site with a JSON file of the same size class (`data/shapes.json`,
-211,122 bytes; `scripts/verify-basemap.ts` printed these headers):
+answer a correct uncompressed 206. Measured on the live site with curl (2026-11-22) on a JSON file of the same size class
+(`data/shapes.json`, 211,122 bytes), since `.pmtiles` is not deployed yet:
 
-- `Range: bytes=0-126` with `Accept-Encoding: identity`: 206, `content-range: bytes 0-126/211122`, `content-length: 127`, no
-  `content-encoding`, `accept-ranges: bytes`. The same at the file's end.
-- The same with `Accept-Encoding: gzip`: Pages gzips the *range* (`content-encoding: gzip`) and reports the compressed file's
-  size as the total: `content-range: bytes 0-126/22952` (the real file is 211,122), and a range at the real end gets 416
-  with `content-range: bytes */22952`. A client that sends gzip (reported for Firefox before 148; UNVERIFIED here) would misread
-  such an archive, so `verify-basemap` reports it as a warning and the client should send `Accept-Encoding: identity` or
-  the file must not be compressed on the wire (Pages compresses by content type; whether it does for `.pmtiles` is what the
-  deploy check records).
-- `cache-control: max-age=600`; the `etag` changes with each deploy, so a cached range can go stale for up to 10 minutes after a deploy.
+- `Range: bytes=0-126`, `Accept-Encoding: identity`: `206`, `content-range: bytes 0-126/211122`, `content-length: 127`, no
+  `content-encoding`, `etag: "6b027b5f-338b2"`, `accept-ranges: bytes`, `cache-control: max-age=600`,
+  `vary: Accept-Encoding`, `content-type: application/json; charset=utf-8`.
+- The same with `Accept-Encoding: gzip, deflate, br, zstd` (what a browser sends): `206` but `content-encoding: gzip`,
+  `content-range: bytes 0-126/22952` (the real file is 211,122 bytes; 22,952 is its gzipped size), a weak `etag: W/"..."`.
+  `bytes=0-16383` the same (`content-range: bytes 0-16383/22952`, `content-length: 16384`), and a range at the real end
+  (`bytes=211122-`) gets `416` with `content-range: bytes */22952`. So Pages applies a range to the gzipped body and reports
+  the gzipped total.
+- Who sends which header: a page's JavaScript cannot set `Accept-Encoding` (it is a forbidden header), and spec-following
+  browsers send `identity` on a Range request, so the client normally gets the correct answer. Firefox before 148 reportedly
+  sends gzip on a Range request (UNVERIFIED here); that cannot be fixed client-side. The only lever is the server's choice of
+  compression by `content-type`: the deploy's `verify-basemap` records the `.pmtiles` content-type and prints "BLOCKS ost.9.2
+  if the .pmtiles is compressed on the wire" (a warning, not a job failure) when the gzip probe differs from the identity one.
+  Because a gzipped answer reports a total other than the file's, **ost.9.2 should treat a `content-range` total different
+  from `pin.bytes` as a hard error**, never read the archive from it.
+- Cache: `cache-control: max-age=600`, so a cached range can go stale for up to 10 minutes after a deploy; the `etag` changes
+  with each deploy. The CDN varies on `Accept-Encoding`.
 - Vite dev (sirv) answered `bytes=0-126` on the real file with a correct uncompressed 206 (checked with
   `verify-basemap`); `vite preview` compresses only text and JSON. Neither is Pages.
 
