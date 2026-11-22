@@ -54,6 +54,11 @@ so dev and preview serve under that path.
   writing, prints the largest files, the totals and the join log (no street, near misses, bridge/tunnel ways, far entrances),
   and checks the startup budget total did not move. If a file passes its cap, lower the one global `WALK_RADIUS_M` in
   `scripts/lib/streetsBuild.ts` (footways only), never per file.
+- `npm run basemap:fetch [-- --out path]`: downloads the pinned NYC basemap (`data/basemap/basemap.json` `pin`, a GitHub Release
+  asset) to the gitignored `public/basemap/nyc.pmtiles`, sha256-checked, no network once it matches; fails while the pin is
+  null. `npm run basemap:gate -- <source|output> <metadata.json>` is the workflow's licensing gate (offline) and
+  `npm run basemap:verify -- <url> <bytes>` its Range check (network; the deploy's `verify-basemap` job runs it). The basemap is
+  built by hand-dispatching `.github/workflows/basemap.yml` (see Data below), then pinned in a normal PR.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -360,6 +365,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`loadPin`, `waysNear`), `streetsBuild.ts` (`buildStationStreets`: `clipSpan`, `simplifySpans`, `onewayOf`, packing),
   `streetsEntrances.ts` (the station's entrances, `joinEntrance` from `entranceStreet.ts` and the join log), with
   `streetsFixture.ts` the tests' mini pin. Outside the startup budget; own caps in `scripts/lib/budget.ts`
+- `data/basemap/`: `basemap.json` (the NYC basemap's `spec`: bbox, z15, layers kept and dropped; and its `pin`, null until the
+  first publish) and `source-metadata.20261121.json` (the Protomaps metadata the terms were reviewed against, the gate's test
+  fixture). `scripts/lib/basemapSpec.ts` (parse, release tag and URL), `basemapGate.ts` (licensing gate over `pmtiles show
+  --metadata`), `basemapFetch.ts` (`ensureBasemap`), `rangeProbe.ts` (what a correct Range answer is); IO in
+  `scripts/fetch-basemap.ts`, `gate-basemap.ts` and `verify-basemap.ts`. The file itself is never in git
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
@@ -691,6 +701,15 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   near it, with a `WARNING:` line in the log (`data:streets` prints it for any station the pin manifest's `stationIds`
   lacks); it does not block the refresh, and the next `data:streets:fetch` covers it. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).
+- **The NYC basemap (vector tiles for streets, water and parks) is never in git and loads on demand only.** It is a
+  PMTiles file: the five boroughs at z0 to z15 (about 33 MB), only the earth, water, landuse and roads layers of a Protomaps
+  daily build, cut by `.github/workflows/basemap.yml` (manual; go-pmtiles `extract`, then tippecanoe `tile-join -l` to drop
+  layers) and published as a GitHub Release. `deploy.yml` copies the pinned release into `dist/basemap/nyc.pmtiles`
+  (sha256-checked; skipped with a warning while the pin is null) and fails above 900 MB; its `verify-basemap` job checks
+  uncompressed 206 Range answers on the live site. Nothing in the startup files names it, and it is not the walk graph.
+  The licensing gate (`basemapGate.ts`) fails the workflow on any credit beyond "© OpenStreetMap" (so never the landcover
+  layer, which is CC BY 4.0, nor places or pois); a failure goes to a person as a licensing card. The pin changes only by a
+  normal PR. Details and sizes: `docs/research/data-sources.md` §5.3. The client never fetches Protomaps' servers.
 - **Station interiors are hand-authored or generated.** Bedford Av (L08) is hand-authored and wins over a generated
   one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".
   Both are merged with OSM platform polygons, NY Open Data entrances, and E&E elevator/escalator data.

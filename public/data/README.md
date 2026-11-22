@@ -48,6 +48,11 @@ whole file is a derivative database under the ODbL; the entrance points are MTA 
 OPEN-NY Terms of Use, not ODbL, and each file's `attribution` says so. The files load on focus and sit outside the
 startup budget.
 
+The citywide basemap tiles (`/basemap/nyc.pmtiles`, a Protomaps build cut to the five boroughs, only the earth, water,
+landuse and roads layers) are not in this directory or in git: they are built by `.github/workflows/basemap.yml`, copied in
+at deploy, and an ODbL 1.0 derivative database under the same credit. Their licence notes are in the release text, and the
+sources and terms in `docs/research/data-sources.md` §5.3.
+
 ## NY Open Data / MTA Elevator and Escalator feeds
 
 Attribution: Metropolitan Transportation Authority, https://www.mta.info/open-data.
