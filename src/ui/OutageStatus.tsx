@@ -9,14 +9,15 @@ const ANNOUNCEMENT_MS = 6000
 
 interface ToggleProps {
   expanded: boolean
-  hidden: number
+  count: number
   controls: string
   onToggle: () => void
   /** Called when the button goes away while it has focus. */
   onFocusLost: () => void
 }
 
-function Toggle({ expanded, hidden, controls, onToggle, onFocusLost }: ToggleProps) {
+/** "Out of service (N)": the one control that opens and closes the rows, so toggling keeps focus. */
+function Toggle({ expanded, count, controls, onToggle, onFocusLost }: ToggleProps) {
   const button = useRef<HTMLButtonElement>(null)
   const lost = useRef(onFocusLost)
   useLayoutEffect(() => {
@@ -35,11 +36,17 @@ function Toggle({ expanded, hidden, controls, onToggle, onFocusLost }: TogglePro
       ref={button}
       type="button"
       aria-expanded={expanded}
-      aria-controls={controls}
+      aria-controls={expanded ? controls : undefined}
       onClick={onToggle}
-      className="-mx-2 flex min-h-11 cursor-pointer items-center px-2 text-sm text-ink-dim hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+      className="-mx-2 flex min-h-11 w-[calc(100%+1rem)] cursor-pointer items-center justify-between gap-2 px-2 text-xs text-ink hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
     >
-      {expanded ? 'Show fewer' : `Show ${hidden} more`}
+      <span className="flex items-center gap-2">
+        <span aria-hidden="true" className="size-2 shrink-0 bg-status-error" />
+        Out of service ({count})
+      </span>
+      <span aria-hidden="true" className="text-ink-dim">
+        {expanded ? '−' : '+'}
+      </span>
     </button>
   )
 }
@@ -51,39 +58,43 @@ interface OutageListProps {
   onFocusLost: () => void
 }
 
-/** The rows as plain panel text (no live region: opening a panel must not speak them over the station's name). */
+/**
+ * The rows as plain panel text (no live region: opening a panel must not speak them over the station's name). They
+ * start collapsed behind "Out of service (N)" (the user's call: keep the panel short); "No step-free access now"
+ * stays visible above it, since it changes whether the station is usable at all.
+ */
 function OutageList({ body, noStepFree, onFocusLost }: OutageListProps) {
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
   if (body.kind === 'none') return null
   if (body.kind === 'unknown') return <p className="mt-2 text-xs text-ink-dim">{body.text}</p>
-  const hidden = Math.max(0, body.rows.length - body.shown)
-  const rows = expanded ? body.rows : body.rows.slice(0, body.shown)
   return (
     <div className="mt-2 text-xs">
-      {noStepFree && <p className="mb-1.5 text-ink">{NO_STEP_FREE_TEXT}</p>}
-      <ul id={listId} aria-label="Out of service" className="space-y-1.5">
-        {rows.map((row) => (
-          <li key={row.id} className="flex items-start gap-2">
-            <span aria-hidden="true" className="mt-0.5 size-2 shrink-0 bg-status-error" />
-            <span className="min-w-0">
-              <span className="block text-ink">{row.title}</span>
-              {row.levels !== null && (
-                <span className={row.wraps ? 'line-clamp-3 text-ink-dim' : 'block whitespace-nowrap text-ink-dim'}>{row.levels}</span>
-              )}
-              <span className="block text-ink-dim">
-                {row.meta.map((part, i) => (
-                  <span key={part}>
-                    {i > 0 && ' · '}
-                    <span className="whitespace-nowrap">{part}</span>
-                  </span>
-                ))}
+      {noStepFree && <p className="mb-1 text-ink">{NO_STEP_FREE_TEXT}</p>}
+      <Toggle expanded={expanded} count={body.rows.length} controls={listId} onToggle={() => setExpanded((e) => !e)} onFocusLost={onFocusLost} />
+      {expanded && (
+        <ul id={listId} aria-label="Out of service" className="mt-1 space-y-1.5">
+          {body.rows.map((row) => (
+            <li key={row.id} className="flex items-start gap-2">
+              <span aria-hidden="true" className="mt-0.5 size-2 shrink-0 bg-status-error" />
+              <span className="min-w-0">
+                <span className="block text-ink">{row.title}</span>
+                {row.levels !== null && (
+                  <span className={row.wraps ? 'line-clamp-3 text-ink-dim' : 'block whitespace-nowrap text-ink-dim'}>{row.levels}</span>
+                )}
+                <span className="block text-ink-dim">
+                  {row.meta.map((part, i) => (
+                    <span key={part}>
+                      {i > 0 && ' · '}
+                      <span className="whitespace-nowrap">{part}</span>
+                    </span>
+                  ))}
+                </span>
               </span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      {hidden > 0 && <Toggle expanded={expanded} hidden={hidden} controls={listId} onToggle={() => setExpanded((e) => !e)} onFocusLost={onFocusLost} />}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -121,7 +132,7 @@ interface OutageStatusProps {
 }
 
 /**
- * The station panel's out-of-service machines: a short list as plain text (two rows, then "Show N more") or a dim
+ * The station panel's out-of-service machines: a closed "Out of service (N)" disclosure over the rows, or a dim
  * "status unavailable" line. One polite screen-reader-only region stays mounted and speaks only a change to the
  * machines out at the station already open.
  */
@@ -132,7 +143,7 @@ export function OutageStatus({ view, stationId, onFocusLost }: OutageStatusProps
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
-      <OutageList key={stationId} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
+      <OutageList key={`${stationId}|${view.body.kind}`} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
     </>
   )
 }

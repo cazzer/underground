@@ -126,7 +126,7 @@ interface ShowAllProps {
   onFocusLost: () => void
 }
 
-/** "Show all N destinations" / "Show fewer": one button, so toggling keeps focus (like EntranceList's). */
+/** "Show all N destinations" / "Show fewer": one button, so toggling keeps focus (like OutageStatus's). */
 function ShowAll({ expanded, controls, total, onToggle, onFocusLost }: ShowAllProps) {
   const button = useRef<HTMLButtonElement>(null)
   useFocusLostOnUnmount(button, onFocusLost)

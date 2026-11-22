@@ -63,7 +63,6 @@ describe('outagePanelView', () => {
     )
     expect(view.body).toEqual({
       kind: 'out',
-      shown: 2,
       rows: [
         { id: 'EL358', kind: 'elevator', title: 'Elevator out of service', levels: 'Mezzanine to platform', wraps: false, meta: ['EL358', 'back about 6 PM'] },
         { id: 'ES2', kind: 'escalator', title: 'Escalator out of service', levels: 'Street to mezzanine', wraps: false, meta: ['ES2', 'return time passed'] },

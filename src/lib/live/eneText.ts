@@ -1,9 +1,6 @@
 import { addDays, nyDate } from '../realtime/serviceDate'
 import type { MachineOutage, OutageJoin } from './eneJoin'
 
-/** Rows shown before "Show N more". */
-export const OUTAGE_ROWS_SHOWN = 2
-
 const NY_TIME = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true })
 const NY_WEEKDAY = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' })
 const NY_MONTH_DAY = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })
@@ -49,7 +46,7 @@ export interface OutageRow {
 export type OutagePanelBody =
   | { kind: 'none' }
   | { kind: 'unknown'; text: string }
-  | { kind: 'out'; rows: OutageRow[]; shown: number }
+  | { kind: 'out'; rows: OutageRow[] }
 
 export interface OutagePanelView {
   /** Fresh data says which machines are out (or that none are): the only time a change is news. */
@@ -82,6 +79,6 @@ export function outagePanelView(join: OutageJoin, nowS: number, noStepFree = fal
     case 'unknown':
       return { known, noStepFree: false, body: { kind: 'unknown', text: unknownText(panel.kinds) } }
     case 'out':
-      return { known, noStepFree, body: { kind: 'out', rows: panel.outages.map((o) => outageRow(o, nowS)), shown: OUTAGE_ROWS_SHOWN } }
+      return { known, noStepFree, body: { kind: 'out', rows: panel.outages.map((o) => outageRow(o, nowS)) } }
   }
 }
