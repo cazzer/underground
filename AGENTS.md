@@ -305,8 +305,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `raptor.ts` `route(tt, from, to, departS, { maxTransfers })`: two labels per round, `arr` (stepped off a train) and
     `ready` (can board, after a same-station change or a walk between stations), so the change time also holds on the
     same platform; Pareto on arrival and transfers (a round's journey is returned only if it beats every earlier
-    round); `journey.ts` rebuilds legs from the labels (every change is a walk leg, possibly 0 s)
-  - Times are integer seconds since the query day's midnight (may be negative or past 86400); a loader shifts other
+    round); `seed.ts` its round-0 seeding and egress walks; `journey.ts` rebuilds legs from the labels (every change
+    is a walk leg, possibly 0 s) and keeps only the Pareto set on (arrival, transfers)
+  - Times are integer seconds since the query day's midnight (may be negative or past 86400, |t| < 2^29); a loader shifts other
     service days itself and keeps their patterns separate
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
