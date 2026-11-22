@@ -376,7 +376,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     the banded shapes (`BandedShapes`) and sets each variant's `cover`, `bandNetwork` runs the search too (tests, the worker fallback);
     `variantCover.ts` `coverVariants`: a variant's segments with the same ends, y and band inputs as one of its route
     and direction's primary's (1 mm, 1e-4), outside the primary's platform spans (its fade would show the variant
-    under it), so the lines skip them (about half of the variant segments; trains keep every shape whole;
+    under it), so the lines skip them (about 57% of the variant segments; trains keep every shape whole;
     `variantCover.data.test.ts` checks the skipped ones draw within 0.05 px of the primary at six views);
     `trackLine.ts` a shape's drawn track (decode, project, `dropSpurs` removes out-and-back tips of
     160°+ turns, then offset); `trackOffset.ts` `offsetPolyline` (miter joins, capped at 2× on sharp
@@ -389,7 +389,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
     adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
     `lineBreaks`, every extra vertex a drawn line needs (ramps via `rampSampling.ts`, band tapers every 30 m but only once the slot
-    moved 0.25, fade ramps);
+    moved 0.25, less 1e-3 so a variant's mapped knots keep its primary's breaks, fade ramps);
     `corridors.ts` shared corridors at load (`corridorBands` gives each shape a `ShapeBands`: slot and corridor
     half-width as `TrackProfile`s. 30 m samples, other band keys within 18 m heading within 15 degrees, gaps under
     150 m filled, runs under 200 m dropped, slot = place minus the middle; band key = short name minus a trailing X),
@@ -400,7 +400,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     order: primaries vote, weighed by offset (0.5 m or more, capped at 3 m), for the side each neighbour's track lies
     on, times the run sign; greedy single moves from route_sort_order, then unvoted neighbours back in rank order;
     so a band shift adds to the real spacing and no pair swaps along a run) and `corridorProfile.ts` (blips under 200 m dropped, changes within 300 m
-    eased as one; a join eases before the change, a leave after). About 100 ms in node, off the main thread
+    eased as one; a join eases before the change, a leave after), then `corridorShare.ts` (`sharePrimaryBands`: a
+    variant takes its route and direction's primary's slot and half-width knots, mapped to its own distances, along each
+    run on the primary's track, `sharedTrack.ts` `sharedRuns`: vertices within 1 mm (the cover's tolerance) both ways,
+    moving along both together; it hands over only where all four profiles are flat and agree, or at the variant's own
+    start or end, so its own taper stays across a run's ends; else each shape's own 30 m grid put its knots up to 15 m
+    off the primary's and the cover couldn't skip it: about 2.9k more segments skipped, about 5 ms). About 80 ms in node, off the main thread
     (`src/data/bandWorker.ts`); `corridorData.test.ts` checks it on the real data (full mirrored bundles at stations,
     B/D west of A/C on CPW, the G beside the F at Bergen St, no clashes, no swaps) and `bandOverlap.test.ts` the
     drawn result (under 5% of shared Manhattan track within 1 px of another colour at 600 m and 1 km; A/B/C/D
@@ -998,7 +1003,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - All route shapes draw as one merged `LineSegments2` (one draw call, per-vertex colors in linear
   space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then
   route_sort_order. A variant's stretches under its primary are left out (`variantCover.ts`): the primary draws
-  the same pixels after them. Don't add per-route `<Line>`s.
+  the same pixels after them. Along those a variant rides its primary's band slot and half-width (`corridorShare.ts`),
+  so its trains ride where the primary's do. Don't add per-route `<Line>`s.
 - Routes sharing a corridor draw as side-by-side bands `theme.bandPitchPx` apart on screen at any zoom and tilt.
   Each shape point carries band inputs (`ShapePath.bandInputs`: miter, slot and half-width, from corridors.ts via
   networkBands.ts) and the vertex shader moves it along its miter normal by `bandShift` (`src/lib/bandOffset.ts`);

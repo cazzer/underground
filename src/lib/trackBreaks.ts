@@ -18,6 +18,12 @@ const MIN_BREAK_GAP_M = 5
  * (the ease's flat ends need fewer vertices than its steep middle; the chord strays under 0.05 slot).
  */
 const MIN_TAPER_STEP = 0.25
+/**
+ * A 0.5 slot ease is exactly MIN_TAPER_STEP from its start at its middle. A variant's knots mapped from its primary's
+ * (corridorShare.ts) sit up to a millimetre off theirs, so float noise there must not decide whether the variant keeps
+ * the break the primary keeps: a step this close to MIN_TAPER_STEP counts as reaching it.
+ */
+const STEP_EPS = 1e-3
 
 /** Sorted break distances for `resampleAt`: ramps, tapers, and the fade ramps of each station span of shape `id`. */
 export function lineBreaks(
@@ -41,7 +47,7 @@ export function lineBreaks(
     if (d - last < MIN_BREAK_GAP_M) continue
     const s = profileAt(bands.slot, d)
     const h = profileAt(bands.half, d)
-    if (!knots.has(d) && Math.abs(s - slot) < MIN_TAPER_STEP && Math.abs(h - half) < MIN_TAPER_STEP) continue
+    if (!knots.has(d) && Math.abs(s - slot) < MIN_TAPER_STEP - STEP_EPS && Math.abs(h - half) < MIN_TAPER_STEP - STEP_EPS) continue
     out.push(d)
     last = d
     slot = s

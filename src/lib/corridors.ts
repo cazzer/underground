@@ -8,6 +8,7 @@ import { buildSegmentGrid } from './corridorHash'
 import { addVotes, createVotes, orderFromVotes, slotByPlace, type OrderVotes } from './corridorLateral'
 import { orientRuns } from './corridorOrient'
 import { slotProfile, suppressBlips } from './corridorProfile'
+import { sharePrimaryBands } from './corridorShare'
 import { sampleNeighbours, type LineSamples } from './corridorSearch'
 import type { Polyline } from './realtime/polyline'
 import { EMPTY_PROFILE, type TrackProfile } from './trackProfile'
@@ -100,7 +101,8 @@ export function cleanPresence(masks: Int32Array, bit: number, maxGap: number, mi
  * own form a set ordered across the corridor by where their tracks lie (corridorLateral.ts), so a band shift adds
  * to the real spacing. Routes on one track are ordered by route_sort_order (`routes` order, a band key taking its
  * first route's place) times a sign that holds for each whole run beside other routes (corridorOrient.ts), so they
- * keep one order across the street. Out-and-back slot blips shorter than `minRunM` are dropped before easing.
+ * keep one order across the street. Out-and-back slot blips shorter than `minRunM` are dropped before easing. A
+ * variant then takes its primary's bands where it runs on the primary's track (corridorShare.ts).
  */
 export function corridorBands(
   shapes: readonly CorridorShape[],
@@ -193,5 +195,6 @@ export function corridorBands(
     const half = slotProfile(halves, dist, shape.line.length, opts.taperM, masks)
     if (slot !== EMPTY_PROFILE || half !== EMPTY_PROFILE) out.set(shape.id, { slot, half })
   })
+  sharePrimaryBands(shapes, grid, out)
   return out
 }

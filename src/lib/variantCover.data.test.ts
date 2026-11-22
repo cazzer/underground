@@ -99,8 +99,9 @@ describe('real public/data: variant cover', () => {
   it('leaves out most of the variant segments', () => {
     const skipped = variants.reduce((n, s) => n + covered(s), 0)
     const all = segmentCount(shapes)
-    // 52% of the variants' 51.5k segments on the fall 2026 data: 64.7k segments drawn as 38.0k.
-    expect(skipped / segmentCount(variants)).toBeGreaterThan(0.4)
+    // 57% of the variants' 52.2k segments on the fall 2026 data: 65.4k segments drawn as 35.6k (52% and 38.5k
+    // before variants shared their primary's bands, corridorShare.ts).
+    expect(skipped / segmentCount(variants)).toBeGreaterThan(0.53)
     expect(buildLineBuffers(shapes, new Map(), () => [0, 0, 0], true).positions.length / 6).toBe(all - skipped)
   })
 
