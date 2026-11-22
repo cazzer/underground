@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 
 const LINK_CLASS =
   'underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
@@ -17,10 +17,15 @@ function ExternalLink({ href, children }: ExternalLinkProps) {
   )
 }
 
+interface AttributionProps {
+  /** The HUD measures its bottom inset from this element. */
+  ref?: Ref<HTMLElement>
+}
+
 /** Required data attribution and not-real-time notice (MTA terms, OSM ODbL). */
-export function Attribution() {
+export function Attribution({ ref }: AttributionProps) {
   return (
-    <footer className="pointer-events-auto w-fit min-w-0 self-start border border-edge bg-panel p-2 text-xs leading-snug text-ink-dim backdrop-blur-sm sm:self-auto">
+    <footer ref={ref} className="pointer-events-auto w-fit min-w-0 self-start border border-edge bg-panel p-2 text-xs leading-snug text-ink-dim backdrop-blur-sm sm:self-auto">
       <p>
         <ExternalLink href="https://www.mta.info/open-data">Data: MTA</ExternalLink>. Not endorsed by MTA. Data may not
         be real time.
