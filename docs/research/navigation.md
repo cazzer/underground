@@ -2,22 +2,22 @@
 
 Research for epic underground-2q7 (2026-11-21). Three parallel investigations: trip planning on the
 subway, paths through a station, and address search plus walking. Anything marked UNVERIFIED was not
-checked against a primary source. Nothing here is built yet.
+checked against a primary source. Built since: see the tickets named in each section.
 
 ## Recommendation
 
-Door-to-door navigation can mostly run on the device with no new external API:
+Door-to-door navigation can mostly run on the device; the one external API is address and place search, through our Worker:
 
 1. **Trip planning:** our own RAPTOR over an exact per-service timetable, loaded on demand, with live
    TripUpdates replacing the schedule for the next 30 minutes.
 2. **In-station paths:** "which exit / which end" at every station with an interior (marked "probably"
    on generated ones), and full transfer routes only where a station is hand-authored, Union Sq first.
 3. **Walking and search:** per-station OSM walk graphs (shared with the street layer, epic
-   underground-ost) with a small A* router, and search over stations, streets, addresses and landmarks
-   from lazy shards of NYC Open Data.
+   underground-ost) with a small A* router; search over stations and streets on the device, and
+   addresses and places through our Worker (NYC GeoSearch, Photon as the fallback; decided 2026-11-22, 2q7.33).
 
-Three things need the user's decision (cards on underground-2q7): an optional geocoding API for places
-our data lacks, how to get Union Sq's real layout, and whether to add the supplemented GTFS feed for
+Three things needed the user's decision (cards on underground-2q7): a geocoding API for places
+our data lacks (decided: first own data only, then on 2026-11-22 GeoSearch and Photon through the Worker), how to get Union Sq's real layout, and whether to add the supplemented GTFS feed for
 planned service changes (decided: yes, as dated timetable files; 2q7.7).
 
 ## 1. Trip planning
@@ -137,7 +137,7 @@ non-Google map, and our scene is one.
 
 | Option | Cost | Terms | What leaves the device | Effort |
 |---|---|---|---|---|
-| On-device addresses: NYC AddressPoint `uf93-f8nk` (967,871) + CommonPlace `t95h-5fsr` (20,447 landmarks) | $0 | NYC Open Data | A hash-bucket shard request to GitHub Pages | M |
+| On-device addresses: NYC AddressPoint `uf93-f8nk` (967,871) + CommonPlace `t95h-5fsr` (20,447 landmarks) | $0 | NYC Open Data | A hash-bucket shard request to GitHub Pages | M (not built: superseded, 2q7.15) |
 | On-device walk graph: OSM `highway=*`, sidewalks included | $0 | ODbL (already shipped) | Nothing beyond a station-keyed shard request | M |
 | NYC GeoSearch (Pelias on PAD) | Free, no key, CORS `*` | No published terms or limits found (UNVERIFIED) | Typed text, to NYC Planning | S |
 | Photon (komoot) | Free | Throttled when heavy; no guarantee | Typed text | S |
@@ -163,27 +163,36 @@ hash-bucket shards: 523 KB gzipped in total (3.6 MB raw), 27.5 KB the largest sh
 first two characters of each distinctive token (not st, av, a compass letter and the like), spelled as published, canonical and as a long form, so
 one fetch finds it from any prefix of 2+ characters of that token (a query like "w 4" reads only the "4" bucket). The borough is the nearest station's, wrong on a few land-border streets.
 
-**Address index:** Manhattan (63,245 points, 872 streets) is 264 KB gzipped at 1 m; citywide about 4 MB
-(UNVERIFIED), in hash-bucket shards.
+**Address index (not built):** Manhattan (63,245 points, 872 streets) is 264 KB gzipped at 1 m; citywide about 4 MB
+(UNVERIFIED), in hash-bucket shards. Dropped on 2026-11-22 (2q7.15 closed as superseded) for the Worker's `/geocode`.
+
+**Address and place search (decided 2026-11-22, 2q7.33 and 2q7.16):** the Worker's `GET /geocode?q=&focus=lat,lon` calls
+NYC GeoSearch (Pelias on PAD, autocomplete) first and, when that has no place-like hit or the query reads like a business
+name, Photon bounded to the NYC bbox. It merges and dedupes them, trims each to `{label, kind, lat, lon, source}`, at most 8,
+drops anything outside the bbox, returns the attribution with the results (NYC Planning; © OpenStreetMap contributors), caches
+by normalized query for 1 h, rate-limits Photon per isolate, logs no query text, and answers only the site's origins. The client
+never calls either service directly. The station search dialog queries it after stations and on-device street matches (3+
+characters, about 250 ms debounce, stale requests aborted) and says so in one line: "Addresses and places are looked up through
+our server; your location is never sent." `focus` is the map center or the chosen station, never the location fix.
 
 **Privacy.**
 - Static shards still reveal a little to GitHub Pages: walk shards are keyed by the station the user
-  picked or focused, never by the fix; address shards by hash bucket, not street name. A street shard
+  picked or focused, never by the fix. A street shard
   holds about 5 of the 315 keys (283 two-character prefixes and 32 one-character keys; 1 to 10 per bucket), so
   one request narrows the first distinctive word to those. But a client that fetches the one-character bucket
   and then the two-character one as the user types sends both, and together they can reveal the first two letters
   of that word to the Pages log (measured: 247 of the 283 prefixes are pinned exactly, and all 283 when the word
-  starts with a letter). The fetch rule is decided in 2q7.14 (privacy card underground-2q7.14.1). No URL ever holds
-  the text typed, and no query text is sent. Routing runs on
+  starts with a letter). The fetch rule is decided in 2q7.14 (privacy card underground-2q7.14.1). No page URL ever holds
+  the text typed. Address and place search does send it (3+ characters) to our Worker, which passes it on to NYC Planning and,
+  for places, komoot's Photon, from the Worker's address, not the user's. Routing runs on
   the fix in memory, so the rule that no request carries the location holds.
 - Any hosted routing API needs the origin, which breaks that rule; it would need the user to change it,
   plus consent on every request. Not recommended.
-- A geocoding API sends typed text only after an explicit opt-in ("Search beyond our data: your text
-  is sent to NYC Planning via our server"), biased by the map center or chosen station, never the fix,
-  never logged by the Worker, and listed in an about/privacy line.
+- The geocoding route sends typed text with a standing disclosure in the search dialog rather than a per-search
+  opt-in (the user's call, 2026-11-22), biased by the map center or chosen station, never the fix, never logged by the Worker.
 
-**v1:** extend `stationSearch.ts` to streets and intersections (from the street layer), addresses and
-landmarks (lazy shards); per-station walk shards (with topology and junction ids kept, shared with
+**v1:** extend `stationSearch.ts` to streets and intersections (from the street index), then addresses and
+places from the Worker's `/geocode`; per-station walk shards (with topology and junction ids kept, shared with
 underground-ost) and A* to each entrance to pick the best exit; beyond 800 m, a straight-line
 "~N min walk" estimate.
 
@@ -192,7 +201,9 @@ underground-ost) and A* to each entrance to pick the best exit; beyond 800 m, a 
 - Phone timings for RAPTOR and A* are extrapolated; measure on a device.
 - Dropping trips as cancelled on a stale feed could invent gaps; fall back to the schedule per feed.
 - Generated interiors make routes look more certain than they are; keep the "probably" wording and dashes.
-- The address and walk-graph totals are extrapolations; the per-shard sizes are measured.
+- The walk-graph total is an extrapolation; the per-shard sizes are measured.
+- GeoSearch publishes no terms or limits (UNVERIFIED) and Photon is best-effort with fair-use throttling; either can
+  vanish or slow down, so station and street search must never wait on them.
 - The draft pathways feed may only guide a survey, never be a source.
 
 ## Sources
