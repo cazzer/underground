@@ -83,8 +83,8 @@ const PARTIAL_RETRY_MS = 5000
 
 interface Loaded {
   layer: StreetLayer | null
-  /** A member's file failed (not a 404): the layer lacks its entrances. */
-  partial: boolean
+  /** Members whose file failed (not a 404): the layer lacks their entrances. */
+  missing: readonly string[]
   at: number
 }
 
@@ -96,26 +96,26 @@ function reasonOf(err: unknown): string {
  * The layer of the street files `ids` (lead first), the buffers built inside the promise so a data error rejects. A
  * lead that fails rejects the layer, as for any station. A member with no file (404, warned by the loader) is skipped;
  * a member that fails otherwise is warned about once (id and reason) and left out, the lead's layer being worth
- * showing without it (`partial`).
+ * showing without it (`missing`).
  */
-async function loadLayer(ids: readonly string[]): Promise<{ layer: StreetLayer | null; partial: boolean }> {
+async function loadLayer(ids: readonly string[]): Promise<{ layer: StreetLayer | null; missing: string[] }> {
   const [leadResult, ...memberResults] = await Promise.allSettled(ids.map((id) => files.get(id)))
   if (leadResult!.status === 'rejected') throw leadResult!.reason
   const lead = leadResult!.value
-  if (!lead) return { layer: null, partial: false }
+  if (!lead) return { layer: null, missing: [] }
   const members: StationStreets[] = []
-  let partial = false
+  const missing: string[] = []
   memberResults.forEach((r, i) => {
     if (r.status === 'fulfilled') {
       if (r.value) members.push(r.value)
       return
     }
-    partial = true
-    console.warn(`Streets of station ${ids[i + 1]} (complex ${ids[0]}) did not load (${reasonOf(r.reason)}); its entrances are left out`)
+    missing.push(ids[i + 1]!)
+    console.warn(`Streets of station ${ids[i + 1]} (complex ${ids[0]}) did not load (${reasonOf(r.reason)}); its entrances are left out`, r.reason)
   })
-  if (members.length === 0) return { layer: buildLayer(ids[0]!, lead, []), partial }
+  if (members.length === 0) return { layer: buildLayer(ids[0]!, lead, []), missing }
   const merged = mergeComplexStreets(lead, members)
-  return { layer: buildLayer(ids[0]!, merged.file, merged.extraLines), partial }
+  return { layer: buildLayer(ids[0]!, merged.file, merged.extraLines), missing }
 }
 
 // Layers by key (the file ids joined with '+': station ids are alphanumeric), loads in flight, keys whose last load failed.
@@ -126,19 +126,21 @@ const failed = new Set<string>()
 const listeners = new Set<(key: string) => void>()
 
 /**
- * Starts the load of `key` unless it is loaded or loading. A layer missing a member (`partial`) is tried again when a
- * focus asks for it once it is PARTIAL_RETRY_MS old, so the next focus retries without a retry storm. A failure is
+ * Starts the load of `key` unless it is loaded or loading. A layer missing a member is tried again when a hook asks
+ * for it (mount or key change) once it is PARTIAL_RETRY_MS old, so the next focus retries without a retry storm. A retry
+ * still missing the same members keeps the old layer object, so nothing rebuilds. A failure is
  * logged here, once per load however many components wait on it, and leaves any older layer in place.
  */
 function request(key: string): void {
   const hit = loaded.get(key)
-  if (pending.has(key) || (hit && !(hit.partial && performance.now() - hit.at >= PARTIAL_RETRY_MS))) return
+  if (pending.has(key) || (hit && !(hit.missing.length > 0 && performance.now() - hit.at >= PARTIAL_RETRY_MS))) return
   pending.add(key)
   const ids = key.split('+')
   loadLayer(ids)
     .then(
       (r) => {
-        loaded.set(key, { ...r, at: performance.now() })
+        const same = hit && hit.missing.length > 0 && hit.missing.join() === r.missing.join()
+        loaded.set(key, { layer: same ? hit.layer : r.layer, missing: r.missing, at: performance.now() })
         failed.delete(key)
       },
       (err: unknown) => {
@@ -162,6 +164,7 @@ function useLayerKey(stationId: string | null): string | null {
 function useRequested(key: string | null): void {
   const [, setSettles] = useState(0)
   const seen = key === null ? undefined : loaded.get(key)
+  const failedAtRender = key !== null && failed.has(key)
   useEffect(() => {
     if (key === null) return
     const listen = (settledKey: string) => {
@@ -170,7 +173,7 @@ function useRequested(key: string | null): void {
     listeners.add(listen)
     request(key)
     // A load that settled between this render and now was announced to nobody.
-    if (loaded.get(key) !== seen) listen(key)
+    if (loaded.get(key) !== seen || failed.has(key) !== failedAtRender) listen(key)
     return () => {
       listeners.delete(listen)
     }

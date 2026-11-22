@@ -7,7 +7,7 @@ import { isClosedRing, isStreet, streetKey } from './streetClass'
 import { abbreviateStreet, entranceLabel, entranceParts, entranceSpoken, joinParts, type EntranceWording } from './streetName'
 
 /** The file's coordinates are integer decimeters. */
-const DM_PER_M = 10
+export const DM_PER_M = 10
 /** A nearby street names an entrance with no cross street only within this far of it, meters. */
 export const NEAR_STREET_M = 60
 

@@ -778,8 +778,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   then the added ones nearest the lead's point first, worded in one `entranceTexts` pass with the members' named streets
   as extra lines (`NamedLine`, `namedLines`); lines, street labels, route clip and street mask stay the lead's, member
   lines are not drawn, and the far marks sit on the basemap's roads. A member 404 is skipped; a member that fails
-  otherwise is warned about once (id and reason) and left out, the lead's layer showing without it, and a focus asks for
-  it again once that layer is 5 s old (a lead's failure fails the layer, retried on the next focus). Raw files and layers
+  otherwise is warned about once (id and reason) and left out, the lead's layer showing without it, retried once that
+  layer is 5 s old when a hook asks for it (mount or key change; a lead's failure fails the layer, retried on the next focus). Raw files and layers
   are cached separately (one fetch per file per page load). The merge adds Times Sq 10 entrances, WTC 9, 6 Av 7, Grand
   Central 2, Borough Hall 1, Bryant Pk 1 (`streetMerge.data.test.ts`; WTC's 35 labels are over the 32 marker-exemption
   cap, so its farthest lose that exemption). `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways

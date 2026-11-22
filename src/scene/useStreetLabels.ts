@@ -198,11 +198,6 @@ export function useStreetLabels(
 
   useEffect(() => {
     if (!host) return
-    // Only the first 32 entrances can ignore a station marker over their own mark (one exemption bit each, in a
-    // Uint32 per rect; labelDeclutter.ts). The rest still place, just blocked by such a marker.
-    if (import.meta.env.DEV && layer.entrances.length > 32) {
-      console.warn(`Street labels: station ${layer.stationId} has ${layer.entrances.length} entrance labels; marker exemptions cover 32`)
-    }
     const wrapper = document.createElement('div')
     wrapper.className = WRAPPER_CLASS
     wrapper.style.zIndex = '0'

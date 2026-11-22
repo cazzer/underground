@@ -2,12 +2,9 @@
  *  files are built per station and clip a station to 300 m, dropping entrances over 260 m from it, so a complex's far
  *  members (Port Authority at Times Sq) have entrances the lead's file does not carry. Pure; the lines stay the lead's. */
 import type { StationStreets, StreetEntrance } from '../data/streetSchema'
-import { namedLines, type NamedLine } from './entranceText'
+import { DM_PER_M, namedLines, type NamedLine } from './entranceText'
 import { ENTRANCE_MATCH_M } from './entranceMarks'
 import { toGround } from './projection'
-
-/** The file's coordinates are integer decimeters. */
-const DM_PER_M = 10
 
 /**
  * The street files a station's layer is built from: a complex's lead (`memberIds[0] === stationId`, 2+ members) reads
