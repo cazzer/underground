@@ -23,6 +23,12 @@ interface TrainSelectionValue {
   selectTrain: (key: string) => void
   /** User closed the train panel. */
   clearTrain: () => void
+  /** The camera follows the selected train (never without one). */
+  following: boolean
+  /** Follow the selected train again (the panel's Follow button); a no-op with none. */
+  follow: () => void
+  /** Stop following and keep the train selected (a pan, a location flight). */
+  unfollow: () => void
 }
 
 interface TrainSelectionProviderProps {
@@ -52,12 +58,13 @@ export function TrainSelectionProvider({ layer, network, children }: TrainSelect
   useEffect(() => dispatch({ type: 'observe', trips, summarize }), [trips, summarize])
 
   // An explicit station pick (each one is a new station fly request) replaces the train, without a notice.
-  // A point flight (the location button) leaves it selected.
+  // A point flight (the location button) leaves it selected, but the camera stops following it.
   const lastFly = useRef(flyRequest)
   useEffect(() => {
     if (flyRequest === lastFly.current) return
     lastFly.current = flyRequest
     if (flyRequest?.kind === 'station') dispatch({ type: 'clear' })
+    else if (flyRequest?.kind === 'point') dispatch({ type: 'unfollow' })
   }, [flyRequest])
 
   useEffect(() => {
@@ -69,6 +76,8 @@ export function TrainSelectionProvider({ layer, network, children }: TrainSelect
   const selectTrain = useCallback((key: string) => dispatch({ type: 'select', key, summarize }), [summarize])
   const clearTrain = useCallback(() => dispatch({ type: 'clear' }), [])
   const dismissNotice = useCallback(() => dispatch({ type: 'dismissNotice' }), [])
+  const follow = useCallback(() => dispatch({ type: 'follow' }), [])
+  const unfollow = useCallback(() => dispatch({ type: 'unfollow' }), [])
 
   // Dev-only test tooling: `__underground.selectTrain(key)` and `trainKeys()`; the scene adds `trainAt`.
   const latestTrips = useRef(trips)
@@ -94,6 +103,7 @@ export function TrainSelectionProvider({ layer, network, children }: TrainSelect
   const selectedTrip = selected ? state.lastTrip : null
   const selectedSummary = selected ? state.lastSummary : null
   const notice = state.notice ? goneNotice(state.notice.summary) : null
+  const following = state.following && state.key !== null
   const value = useMemo<TrainSelectionValue>(
     () => ({
       selectedKey: state.key,
@@ -104,8 +114,11 @@ export function TrainSelectionProvider({ layer, network, children }: TrainSelect
       dismissNotice,
       selectTrain,
       clearTrain,
+      following,
+      follow,
+      unfollow,
     }),
-    [state.key, selectedTrip, selectedSummary, state.selections, notice, dismissNotice, selectTrain, clearTrain],
+    [state.key, selectedTrip, selectedSummary, state.selections, notice, dismissNotice, selectTrain, clearTrain, following, follow, unfollow],
   )
   return <TrainSelectionContext.Provider value={value}>{children}</TrainSelectionContext.Provider>
 }

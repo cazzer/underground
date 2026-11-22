@@ -83,7 +83,7 @@ interface HudProps {
 
 export function Hud({ network, live, arrivals, onInsets, interior, onPanel, locate, linkNotice }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
-  const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain } = useTrainSelection()
+  const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
   const trainOpen = selectedSummary !== null
   const noticeOpen = notice !== null
@@ -225,7 +225,18 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
       <div ref={bottom} className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <Attribution />
         {selectedSummary ? (
-          <TrainPanel network={network} summary={selectedSummary} trip={selectedTrip} source={arrivals} status={live} focusKey={selections} onClose={closeTrain} ref={panel} />
+          <TrainPanel
+            network={network}
+            summary={selectedSummary}
+            trip={selectedTrip}
+            source={arrivals}
+            status={live}
+            focusKey={selections}
+            following={following}
+            onFollow={follow}
+            onClose={closeTrain}
+            ref={panel}
+          />
         ) : notice ? (
           <TrainGonePanel notice={notice} onDismiss={closeNotice} ref={panel} />
         ) : focusedId ? (

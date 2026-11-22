@@ -37,12 +37,15 @@ interface TrainPanelProps {
   status: LiveStatus
   /** Changes on every explicit pick; the heading takes focus each time. */
   focusKey: number
+  /** The camera follows this train; when it doesn't (after a pan), a Follow button brings it back. */
+  following: boolean
+  onFollow: () => void
   onClose: () => void
   ref: Ref<HTMLElement>
 }
 
 /** The selected train: its route and where it is headed. Sits where the station panel does, over it. */
-export function TrainPanel({ network, summary, trip, source, status, focusKey, onClose, ref }: TrainPanelProps) {
+export function TrainPanel({ network, summary, trip, source, status, focusKey, following, onFollow, onClose, ref }: TrainPanelProps) {
   const heading = useRef<HTMLHeadingElement>(null)
   // Two frames late: after a touch tap the browser's compatibility mouse events land on the canvas and would
   // blur a heading focused at once.
@@ -75,6 +78,19 @@ export function TrainPanel({ network, summary, trip, source, status, focusKey, o
         </h2>
         <CloseButton label="Close train panel" onClick={onClose} />
       </div>
+      {!following && (
+        <button
+          type="button"
+          onClick={() => {
+            onFollow()
+            // The button goes away with the click; the heading keeps focus in the panel.
+            heading.current?.focus({ preventScroll: true })
+          }}
+          className="-mx-2 mt-1 flex min-h-11 cursor-pointer items-center px-2 text-sm text-ink-dim underline hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          Follow train
+        </button>
+      )}
       <TrainStops key={trip?.key} network={network} trip={trip} source={source} status={status} />
     </aside>
   )

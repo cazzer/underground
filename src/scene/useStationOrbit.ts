@@ -46,6 +46,8 @@ interface StationOrbitOptions {
   flying: () => boolean
   /** True during a fly-to or an interrupted-flight focus hold: the pan clamp stays off. */
   busy: () => boolean
+  /** True while the camera follows a train: the view may turn as when focused (the follow pivots it on the train). */
+  following: () => boolean
 }
 
 /** Gesture hooks for the controls' start and end events; both stay referentially stable. */
@@ -74,7 +76,17 @@ interface OrbitFocus {
  * hint. All frames write the controls imperatively: passing these as props or changing on* handlers would
  * re-run drei's connect effect and could lock the controls (underground-by0). Nothing here allocates per frame.
  */
-export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, flying, busy }: StationOrbitOptions): StationOrbitGestures {
+export function useStationOrbit({
+  controls,
+  camera,
+  focusPos,
+  interior,
+  viewport,
+  free,
+  flying,
+  busy,
+  following,
+}: StationOrbitOptions): StationOrbitGestures {
   const input = useRef<AzimuthInput>({ theta: 0, focused: false, tilt: 0, dt: 0, reducedMotion: false })
   const bounds = useRef<AzimuthBounds>({ min: 0, max: 0 })
   const lastTheta = useRef(0)
@@ -96,8 +108,8 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
 
   const onGestureStart = useCallback(() => {
     const c = controls.current
-    rotating.current = c !== null && rotateArmed(focusRef.current !== null, tiltT(camera.position.distanceTo(c.target)))
-  }, [controls, camera])
+    rotating.current = c !== null && rotateArmed(focusRef.current !== null || following(), tiltT(camera.position.distanceTo(c.target)))
+  }, [controls, camera, following])
   const onGestureEnd = useCallback(() => {
     rotating.current = false
   }, [])
@@ -115,7 +127,8 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     if (!c) return
     const inp = input.current
     inp.theta = c.getAzimuthalAngle()
-    inp.focused = focusPos !== null
+    // Ending a follow with no station focused springs the view back to north-up, as dropping focus does.
+    inp.focused = focusPos !== null || following()
     inp.tilt = tiltT(camera.position.distanceTo(c.target))
     inp.dt = delta
     inp.reducedMotion = reduceMotion.matches
