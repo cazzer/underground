@@ -1,4 +1,4 @@
-/** Decoder for the trips of a timetable pattern. Pure. Type-only imports so Node can run this file directly. */
+/** Decoder for the trips of a timetable pattern. Pure. Explicit .ts imports (and no enums) so Node can run this file directly. */
 import { TIMETABLE_UNIT_SEC, type TimetablePattern } from './timetableSchema.ts'
 
 /** One trip's times in seconds after service-day midnight, one entry per stop of its pattern. */

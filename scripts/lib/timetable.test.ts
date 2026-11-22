@@ -195,6 +195,14 @@ describe('buildTimetables', () => {
     const slash = timetableFeed()
     slash.calendar.push({ serviceId: 'a/b', days: [1], start: '20261101', end: '20270515' })
     expect(() => buildTimetables(slash)).toThrow(/Service id "a\/b" cannot be a file name/)
+
+    const up = timetableFeed()
+    up.calendar.push({ serviceId: '../x', days: [1], start: '20261101', end: '20270515' })
+    expect(() => buildTimetables(up)).toThrow(/Service id "\.\.\/x" cannot be a file name/)
+
+    const casing = timetableFeed()
+    casing.calendar.push({ serviceId: 'WEEKDAY', days: [1], start: '20261101', end: '20270515' })
+    expect(() => buildTimetables(casing)).toThrow(/"WEEKDAY" and "Weekday" differ only by case|"Weekday" and "WEEKDAY" differ only by case/)
   })
 })
 

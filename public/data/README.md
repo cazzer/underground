@@ -23,8 +23,10 @@ Route colors come from `routes.txt`. MTA's IP status for those colors is UNVERIF
 - `segments.json`
 - `transfers.json`
 - `trip-index.json`
-- `timetable/<serviceId>.json` (derived: each service's stop_times regrouped by stop pattern, in 30 s
-  units, plus the same-station `transfers.txt` rows; loaded on demand, outside the startup budget)
+- `timetable/<serviceId>.json` (derived: each service's exact scheduled arrival and departure times, not
+  medians, regrouped by stop pattern in 30 s units: a lossless re-encoding of `stop_times.txt` minus trip ids,
+  stop_sequence, shapes and headsigns; plus the same-station `transfers.txt` rows; loaded on demand, outside the
+  startup budget)
 
 ## OpenStreetMap (ODbL 1.0)
 

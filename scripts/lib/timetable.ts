@@ -1,6 +1,6 @@
 /** Per-service timetables (public/data/timetable/<serviceId>.json): stop_times regrouped by stop pattern in
  *  30 s units, plus the same-station transfers.txt rows. The file contract is src/data/timetableSchema.ts.
- *  Pure. Never reads shape_id or the trip id: a trip is identified by its times alone. */
+ *  Pure. Never reads shape_id; trip ids are used only to break ties and in error messages, never in the output. */
 import type { Direction, RouteId, ServiceId, StationId, StopId } from '../../src/data/schema.ts'
 import {
   TIMETABLE_FORMAT,
@@ -12,7 +12,7 @@ import {
 } from '../../src/data/timetableSchema.ts'
 import { compareIds, groupByTrip, parseNum, type GtfsFeed, type StopRow, type StopTimeRow } from './gtfs.ts'
 
-/** A service id becomes a file name, so it may not carry a path. */
+/** A service id becomes a file name, so it may not carry a path (and no two may differ only by case: macOS and Windows would overwrite one). */
 const SERVICE_ID = /^[A-Za-z0-9_-]+$/
 
 /** The transfers.txt rows with from = to: the minimum time to change trains inside one station. */
@@ -127,8 +127,12 @@ export function buildTimetables(feed: GtfsFeed): {
     ...feed.trips.map((t) => t.serviceId),
   ])
   const serviceIds = [...ids].sort(compareIds)
+  const lowered = new Map<string, ServiceId>()
   for (const id of serviceIds) {
     if (!SERVICE_ID.test(id)) throw new Error(`Service id ${JSON.stringify(id)} cannot be a file name`)
+    const clash = lowered.get(id.toLowerCase())
+    if (clash !== undefined) throw new Error(`Service ids ${JSON.stringify(clash)} and ${JSON.stringify(id)} differ only by case, so their files would collide`)
+    lowered.set(id.toLowerCase(), id)
   }
 
   const stops = new Map(feed.stops.map((s) => [s.id, s]))

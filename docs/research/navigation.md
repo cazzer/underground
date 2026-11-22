@@ -39,7 +39,7 @@ multiple of 30 s), gzip -9:
 
 One service file loads per query day (plus yesterday's before about 03:00, for times past 24:00),
 outside the 60 KB startup budget with its own cap, like interiors. (The shipped weekday file is
-39.5 KB because it also carries each pattern's stop list and the file's indentation, which the 31.7 KB
+39,662 B (node zlib level 9) because it also carries each pattern's stop list and the file's indentation, which the 31.7 KB
 figure left out.) Store each trip's first departure
 explicitly: 240 trips' trip-id origin differs from it by more than 30 s.
 

@@ -151,6 +151,14 @@ and removes a file for a service the feed no longer has. Never commit the zip. T
 service) comes with 2q7.7. `scripts/lib/timetableOutputs.test.ts` checks the committed files against the rest
 of the data.
 
+The build throws, and writes nothing, when a timetable can't be built safely: a time that isn't a multiple of
+30 s, a departure before its arrival, an arrival before the previous departure, a stop that isn't a child stop
+(or isn't in `stops.txt`), a service id that isn't a plain file name (letters, digits, `_`, `-`) or collides
+with another by case, a blank or repeated same-station transfer, or a file over its cap. This is deliberate
+(a bad file never ships), but it also stops the unattended daily refresh. The error names the trip and stop.
+Look at the feed first: if the MTA really changed its format, change the encoding (`timetableSchema.ts`,
+bump `TIMETABLE_FORMAT`) or the cap in one reviewed PR; don't loosen a check to get a refresh through.
+
 ## Licenses
 
 - The `osm` section of `*.sources.json` is © OpenStreetMap contributors, available under the

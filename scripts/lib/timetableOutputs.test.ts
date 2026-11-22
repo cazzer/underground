@@ -30,29 +30,41 @@ const services = [...new Set([...Object.keys(tripIndex.calendar), ...tripIndex.c
 
 const patternKey = (p: { routeId: string; direction: string; stops: string[] }): string => `${p.routeId}|${p.direction}|${p.stops}`
 
-/** Per service and stop pattern, the sorted first departures paired with the sorted trip-id origins (seconds): the
- *  difference of each pair. Throws when the counts differ. */
-function pairedOffsets(): { label: string; offset: number }[] {
-  const out: { label: string; offset: number }[] = []
-  for (const [service, file] of files) {
-    const departures = new Map<string, number[]>()
-    for (const p of file.patterns) {
-      const list = departures.get(patternKey(p)) ?? []
-      list.push(...decodePatternTimes(p).map((t) => t.departures[0]!))
-      departures.set(patternKey(p), list)
-    }
-    const origins = new Map<string, number[]>()
-    for (const [shape, list] of Object.entries(tripIndex.origins[service] ?? {})) {
-      const key = patternKey(tripIndex.patterns[shape]!)
-      origins.set(key, [...(origins.get(key) ?? []), ...deltaDecode(list).map((o) => o * 0.6)])
-    }
-    const keys = [...departures.keys()].sort(compareIds)
-    if (keys.join(';') !== [...origins.keys()].sort(compareIds).join(';')) throw new Error(`${service}: stop patterns differ from trip-index.json`)
-    for (const key of keys) {
-      const deps = departures.get(key)!.sort((a, b) => a - b)
-      const orig = origins.get(key)!.sort((a, b) => a - b)
-      if (deps.length !== orig.length) throw new Error(`${service} ${key}: ${deps.length} trips, ${orig.length} origins`)
-      deps.forEach((d, i) => out.push({ label: `${service} ${key}`, offset: d - orig[i]! }))
+/** Per stop pattern of one service: the sorted first departures in its timetable file, and the sorted unique trip-id
+ *  origins (seconds) in trip-index.json, whose patterns are per shape. */
+function departuresAndOrigins(service: string): Map<string, { departures: number[]; origins: number[] }> {
+  const out = new Map<string, { departures: number[]; origins: number[] }>()
+  const entry = (key: string) => out.get(key) ?? out.set(key, { departures: [], origins: [] }).get(key)!
+  for (const p of files.get(service)!.patterns) entry(patternKey(p)).departures.push(...decodePatternTimes(p).map((t) => t.departures[0]!))
+  for (const [shape, list] of Object.entries(tripIndex.origins[service] ?? {})) {
+    entry(patternKey(tripIndex.patterns[shape]!)).origins.push(...deltaDecode(list).map((o) => o * 0.6))
+  }
+  for (const e of out.values()) {
+    e.departures.sort((x, y) => x - y)
+    e.origins.sort((x, y) => x - y)
+  }
+  return out
+}
+
+/** The distance from `value` to the nearest of the sorted `list`. */
+function nearest(list: readonly number[], value: number): number {
+  let lo = 0
+  let hi = list.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (list[mid]! < value) lo = mid + 1
+    else hi = mid
+  }
+  return Math.min(...[list[lo - 1], list[lo]].filter((v): v is number => v !== undefined).map((v) => Math.abs(v - value)))
+}
+
+/** On this feed every pattern's trips pair one to one with its origins (sorted against sorted): the difference of each pair. */
+function pairedOffsets(): number[] {
+  const out: number[] = []
+  for (const service of files.keys()) {
+    for (const [key, { departures, origins }] of departuresAndOrigins(service)) {
+      if (departures.length !== origins.length) throw new Error(`${service} ${key}: ${departures.length} trips, ${origins.length} origins`)
+      departures.forEach((d, i) => out.push(d - origins[i]!))
     }
   }
   return out
@@ -117,9 +129,15 @@ describe('public/data/timetable', () => {
     expect(Object.fromEntries([...samples].map(([key, list]) => [key, Math.round(median(list))]))).toEqual(segments)
   })
 
-  it('has the trip index trips: the same count per service and stop pattern, first departures near the origins', () => {
-    expect(pairedOffsets().length).toBeGreaterThan(0)
-    for (const { label, offset } of pairedOffsets()) expect(Math.abs(offset), label).toBeLessThanOrEqual(300)
+  it('has every trip-index origin: its stop pattern, at least as many trips, and a departure within 300 s', () => {
+    for (const service of files.keys()) {
+      for (const [key, { departures, origins }] of departuresAndOrigins(service)) {
+        if (origins.length === 0) continue // a pattern of trips the index skips (no shape)
+        expect(departures.length, `${service} ${key} has no trips`).toBeGreaterThan(0)
+        expect(departures.length, `${service} ${key}`).toBeGreaterThanOrEqual(origins.length)
+        for (const origin of origins) expect(nearest(departures, origin), `${service} ${key} origin ${origin}`).toBeLessThanOrEqual(300)
+      }
+    }
   })
 
   it('carries the same sorted, unique station changes in every file, all at stations', () => {
@@ -135,7 +153,10 @@ describe('public/data/timetable', () => {
     const histogram: Record<number, number> = {}
     for (const c of [...files.values()][0]!.changes) histogram[c.minTransferSec] = (histogram[c.minTransferSec] ?? 0) + 1
     expect(histogram).toEqual({ 0: 57, 180: 400, 300: 6 })
-    expect(pairedOffsets().filter((o) => Math.abs(o.offset) > 30)).toHaveLength(240)
+    // Exact pairing: one trip per origin, none more than 300 s apart, 240 more than 30 s apart.
+    const offsets = pairedOffsets()
+    expect(offsets.every((o) => Math.abs(o) <= 300)).toBe(true)
+    expect(offsets.filter((o) => Math.abs(o) > 30)).toHaveLength(240)
     expect([...files.values()].reduce((n, f) => n + f.patterns.length, 0)).toBe(383)
     expect([...files.values()].reduce((n, f) => n + f.patterns.reduce((m, p) => m + p.trips.length, 0), 0)).toBe(20310)
   })

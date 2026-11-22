@@ -15,6 +15,8 @@
  *  Everything is built in memory first; nothing is written if a build step throws, the
  *  gzipped total is over budget or a timetable file is over its cap. */
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { unzipSync } from 'fflate'
 import { readFeed } from './lib/gtfs.ts'
@@ -100,7 +102,7 @@ async function main(): Promise<void> {
   const written = new Set(timetableFiles.map((f) => f.name))
   for (const name of readdirSync(TIMETABLE_DIR).sort()) {
     if (!name.endsWith('.json') || written.has(name)) continue
-    rmSync(new URL(name, TIMETABLE_DIR))
+    rmSync(join(fileURLToPath(TIMETABLE_DIR), name))
     console.log(`timetable/${name}: removed (no such service any more)`)
   }
 

@@ -21,7 +21,7 @@ export const WALK_FILE_GZIP_CAP_BYTES = 64_000
 /** ...and the directory this one: the measured total (3,629,681 B) plus about a quarter, rounded up. */
 export const WALK_TOTAL_GZIP_CAP_BYTES = 4_600_000
 /** public/data/timetable/<serviceId>.json loads on demand, outside the budget above; each file has this cap:
- *  the measured Weekday file (39,491 B in fall 2026) plus about a fifth. */
+ *  the committed Weekday file (39,662 B, node zlib level 9, fall 2026) plus about a fifth. */
 export const TIMETABLE_FILE_GZIP_CAP_BYTES = 48_000
 
 export interface RenderedFile {
