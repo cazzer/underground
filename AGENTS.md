@@ -954,7 +954,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   only from tiltT 0.5, about 970 m (further out a pan is free), and arms only once the view is inside the radius. A bare
   complex pans within the union of discs round its members, each of `complexPanRadius` (100 m, or half the longest edge of
   the members' shortest joining tree plus 20 m, so the discs join; 180 m at most: Times Sq 153 m, reaching Port Authority),
-  held to the member nearest the free area's middle. Dropping focus (zoom out,
+  held to the member nearest the free area's middle (`clampToDiscs`, `insideDiscs`). The wider pan can bring a neighbour
+  within ENTER_RADIUS of a still view, which then focuses it by the usual auto-focus rule (accepted, as an interior's
+  180 m pan already can): at 14 St (L02, 132, D19; 166 m) a view held about 160 m west of 132 focuses 8 Av (L01). The
+  landing itself never does (within 100 m of a member, `bareStationFrame`). Dropping focus (zoom out,
   close the panel) springs the view back to north-up the short way round (an exponential ease capped at
   180°/s; under prefers-reduced-motion it snaps to north-up at once), so the city and top-down views
   are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it

@@ -6,8 +6,10 @@ import type { Viewport } from '../lib/framing'
 import { freeCenterShift, type ScreenRect, type ScreenShift } from '../lib/interiorCamera'
 import {
   azimuthBounds,
+  clampToDiscs,
   complexPanRadius,
   focusPoint,
+  insideDiscs,
   nearestPoint,
   panClampArmed,
   PAN_RADIUS_BARE,
@@ -15,7 +17,6 @@ import {
   pivotShift,
   rotateArmed,
   screenOffsetTo,
-  softClampToRadius,
   type AzimuthBounds,
   type AzimuthInput,
 } from '../lib/orbitLimits'
@@ -228,14 +229,13 @@ export function useStationOrbit({
       camera.position.z += m.z
     }
     const p = focusPoint(c.target, s.right, s.toward, theta, point.current)
-    // A bare complex's clamp is the union of its members' discs: the free area's middle is held to the nearest one.
-    const hub = nearestPoint(p, f.members)
-    const inside = Math.hypot(p.x - hub.x, p.z - hub.z) <= f.radius
+    // A bare complex's clamp is the union of its members' discs (clampToDiscs).
+    const inside = insideDiscs(p, f.members, f.radius)
     armed.current = panClampArmed(armed.current, armedFor.current === f.center, isBusy, tiltT(distance), inside)
     armedFor.current = f.center
     if (!armed.current) return
     const out = clamped.current
-    if (!softClampToRadius(p, hub, f.radius, delta, out)) return
+    if (!clampToDiscs(p, f.members, f.radius, delta, out)) return
     c.target.x += out.x - p.x
     c.target.z += out.z - p.z
     camera.position.x += out.x - p.x

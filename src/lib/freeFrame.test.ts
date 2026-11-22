@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 import {
   BARE_MAX_DISTANCE,
   bareStationFrame,
-  bareTargetAt,
   FRAME_PAD_PX,
+  framedCount,
+  freeFrame,
   STATION_ONLY_RADIUS_M,
   type BareStationFrame,
   type BareStationFrameInput,
+  type FramePoint,
 } from './freeFrame'
 import type { Viewport } from './framing'
 import { LANDING_DISTANCE, type ScreenRect } from './interiorCamera'
@@ -86,11 +88,32 @@ function input(points: Ground[], free: ScreenRect, azimuth: number, viewport = P
   return { station: STATION, points, azimuth, viewport, free, fovDeg: FOV }
 }
 
-/** Whether any distance in range has a target for these points, within `radius` of the station. */
-function fitsAnywhere(i: BareStationFrameInput, points: Ground[], radius = PAN_RADIUS_BARE): boolean {
-  for (let d = LANDING_DISTANCE; d <= BARE_MAX_DISTANCE; d += 10) if (bareTargetAt(i, points, d, radius)) return true
-  return false
+const level = (p: Ground): FramePoint => ({ x: p.x, y: 0, z: p.z })
+
+/**
+ * freeFrame with the station and `points` all required, set up as bareStationFrame sets up its station (the centred
+ * target within PAN_RADIUS_BARE, `radius` the fallback's): its frame, and whether that frames them all, so whether any
+ * distance in range has a target for them within `radius` of the station (the frame then at the nearest such distance).
+ */
+function requiredFit(i: BareStationFrameInput, points: Ground[], radius = PAN_RADIUS_BARE) {
+  const pts = [i.station, ...points].map(level)
+  const { azimuth, viewport, free, fovDeg } = i
+  const frame = freeFrame({
+    required: pts,
+    wanted: [],
+    center: level(i.station),
+    anchors: [i.station],
+    centerRadius: PAN_RADIUS_BARE,
+    fallbackRadius: radius,
+    azimuth,
+    viewport,
+    free,
+    fovDeg,
+  })
+  return { frame, fits: framedCount(i, frame, pts) === pts.length }
 }
+
+const fitsAnywhere = (i: BareStationFrameInput, points: Ground[], radius = PAN_RADIUS_BARE) => requiredFit(i, points, radius).fits
 
 const PAD = FRAME_PAD_PX - 0.5
 
@@ -103,6 +126,7 @@ function expectBounded(f: BareStationFrame) {
 /** Every entrance it shows fits with every one it doesn't: none was skipped that could have joined. */
 function expectMaximal(i: BareStationFrameInput, f: BareStationFrame) {
   const shown = i.points.filter((p) => inside(p, i, f, PAD))
+  expect(fitsAnywhere(i, shown)).toBe(true)
   for (const p of i.points.filter((q) => !shown.includes(q))) expect(fitsAnywhere(i, [...shown, p])).toBe(false)
   return shown.length
 }
@@ -135,7 +159,9 @@ describe('bareStationFrame above a three-row phone panel', () => {
       const f = bareStationFrame(i)
       expect(f.distance).toBeGreaterThan(LANDING_DISTANCE)
       const shown = i.points.filter((p) => inside(p, i, f, PAD))
-      expect(bareTargetAt(i, shown, f.distance - 10)).toBeNull()
+      const nearest = requiredFit(i, shown)
+      expect(nearest.fits).toBe(true)
+      expect(nearest.frame.distance).toBe(f.distance)
     })
   }
 })
@@ -217,7 +243,7 @@ describe('bareStationFrame with few entrances', () => {
   it('skips an entrance that would need more than 600 m and keeps the nearer one', () => {
     const far = at([200, 0])
     const i = input([far, near], PHONE_SHORT, 0)
-    expect(bareTargetAt(i, [far], BARE_MAX_DISTANCE)).toBeNull()
+    expect(fitsAnywhere(i, [far])).toBe(false)
     const f = bareStationFrame(i)
     expect(f.distance).toBe(LANDING_DISTANCE)
     expect(inside(near, i, f, PAD)).toBe(true)

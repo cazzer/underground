@@ -282,12 +282,6 @@ function bareInput(i: BareStationFrameInput, wanted: readonly FramePoint[]): Fre
   }
 }
 
-/** The bare-station target at exactly `distance` that frames the station and `points` within `radius` of it, or null. */
-export function bareTargetAt(input: BareStationFrameInput, points: readonly Ground[], distance: number, radius = PAN_RADIUS_BARE): Ground | null {
-  const f = framer(bareInput(input, []))
-  return targetAt(f, input.station, [level(input.station), ...points.map(level)], distance, radius)
-}
-
 /**
  * A bare station's landing: freeFrame with the station required, then its complex's other members, then its entrances
  * wanted, each nearest the station first, the target within PAN_RADIUS_BARE of the station or a member. When not even the

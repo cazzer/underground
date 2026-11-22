@@ -206,6 +206,22 @@ export function softClampToRadius(p: Ground, c: Ground, r: number, dt: number, o
   return true
 }
 
+/** Whether `p` lies in the union of the discs of radius `r` round `centers` (at least one). No allocation. */
+export function insideDiscs(p: Ground, centers: readonly Ground[], r: number): boolean {
+  const c = nearestPoint(p, centers)
+  return Math.hypot(p.x - c.x, p.z - c.z) <= r
+}
+
+/**
+ * softClampToRadius onto the union of the discs of radius `r` round `centers` (a bare complex's members; one center for
+ * a lone station or an interior): `p` is held to the disc of its nearest center, the union's nearest edge for equal
+ * radii. The ease moves `p` straight toward that center, which brings it nearer that center than any other by as much,
+ * so the nearest center never changes mid-ease. Writes `out`; true when it moved. No allocation: called every frame.
+ */
+export function clampToDiscs(p: Ground, centers: readonly Ground[], r: number, dt: number, out: Ground): boolean {
+  return softClampToRadius(p, nearestPoint(p, centers), r, dt, out)
+}
+
 /**
  * Ground offset for a screen-space shift when the camera sits at azimuth `theta` (camera at
  * target + (sin θ, cos θ)·horizontal): `right` along screen-right, `toward` toward the camera.
