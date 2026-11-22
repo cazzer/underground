@@ -165,11 +165,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `Scene.tsx` canvas; `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `interiorFlight` takes the focused station id, which for a complex member is not the file's `stationId`, so the focus hold follows the member; `follows` marks a flight to the selected
-    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; `interiorFlight` frames the interior's priority frame when there is one, `priorityLanding`), `newFlight`, `flushMotion` and the landing turn;
+    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, and its complex's other members' points, `complexMemberPoints` (`network.groupById`), through `bareStationFrame` in `lib/freeFrame.ts`; `bareStationTiers` the same points by tier (station, members, marks) for the collapse and resize reframe; `interiorFlight` frames the interior's priority frame when there is one, `priorityLanding`), `newFlight`, `flushMotion` and the landing turn;
     `useStationFlights.ts` the fly-request effect and the mid-flight retarget (interior, bare streets, the trip's path frame, panel size; a point flight, place or location, on a viewport or HUD inset change only, same pace, `rebaseFlight`, `pointFlight` recomputed whole, so its distance may grow slightly with a taller header (intended); matched by identity, so a follow or reframe that replaced it is left alone; under reduced motion, where it snapped in its first frame, one change within 500 ms of the request snaps it once more unless the camera moved or a gesture began since, `shouldResnapPoint` in `lib/pointResnap.ts`);
     `useEntranceProbe.ts` dev-only `__underground.entrancesAt()` (entrance marks and station in viewport px, free rect);
     `usePathProbe.ts` dev-only `__underground.stationPathAt()` (the priority frame's path marker ends and centerline, and its out-of-service machines' ends, in viewport px, free rect);
-    `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);
+    `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal; CameraRig passes the focused complex's member points, `members`);
     `useTouchOrbit.ts` its two-finger twist on touch (see Rendering conventions; dev-only `__underground.orbit(at?)`: azimuth,
     distance, target, lock, zoomSpeed, rotateSpeed, and a ground point's viewport px);
     `useInteriorReframe.ts` frames an interior that loaded too late for its station flight (after LATE_TURN_PROGRESS
@@ -200,7 +200,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     already moved past the bottom the landed flight framed in (`Destination.freeBottom`), arms the same settle
     (`CollapsePending.kind: 'resize'`; `panelMoveArms`: same station, the viewport recorded at the landing, no gesture, flight,
     follow or late interior/streets await; a desktop side panel never moves the bottom). It reframes onto `stationFlight` in the
-    final free rect only when that frames strictly more (`moveGains`: `showsMore`, the station first, then marks; no tie move), no
+    final free rect only when that frames strictly more (`moveGains`: `showsMore`, lexicographic over the tiers: the station, its complex's other members, then marks; no tie move), no
     turn, reduced motion snaps. The window closes on that reframe, on any `pointerdown` or `keydown` (so "Show all N destinations",
     "Show fewer" or the outage disclosure never move the camera, even tapped within 2 s), a fly request, or its expiry; after it, of the panel's changes
     only a user collapse or expand moves the camera. What can still grow a bare station's phone panel after landing: the "Out of
@@ -436,7 +436,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     distance in 400..600 m, and there the target nearest the centred one, that fit the station and as many entrance marks
     as fit in the free rect less 12 px, the target within PAN_RADIUS_BARE (100 m) of the station and of the centred
     target. Entrances join nearest first, each only if it still fits; when not even the station fits within 100 m it is
-    framed alone within STATION_ONLY_RADIUS_M (120 m), else the centred target is pulled within 120 m) over
+    framed alone within STATION_ONLY_RADIUS_M (120 m), else the centred target is pulled within 120 m. A complex (2q7.42)
+    wants its other members' points before the marks, nearest the lead first, and every member is an anchor: the target
+    within 100 m of the lead or a member (its focused distance is the nearest member's, so under ENTER_RADIUS 140 focus
+    stays), `centerRadius` 100 m plus the farthest member's distance. `complexFrame.data.test.ts`: Times Sq under the
+    open phone panel frames 3 of its 4 other members and 17 of 18 marks (was 1 and 9), Canal St 3 of 3 and 14 of 15 (1, 7),
+    Fulton St 2 of 3 and 14 of 28 (1, 7); never less for any complex at 390x844 or 1440x900; a lone station lands exactly as before) over
     `convexRegion.ts` (half-plane clipping, nearest point); `interiorReframe.ts` when a landed station flight reframes onto its interior, and how long; `follow.ts` the train follow's math (`followTargetInto`:
     the ground target that puts a world point on a screen point, exact under perspective at any height; the catch-up
     ease, the 8 px pan break (16 px on touch), the 100 px jump re-fly, `followDistanceFor`); `followStep.ts` `stepFollow`,
@@ -946,7 +951,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   The focus point pans within the interior's reach (farthest outline vertex or entrance from its plan
   center) + 20 m (100 m of a bare station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`), so
   on a phone a drag can bring every part of the interior to the free area at any angle. The pan clamp applies
-  only from tiltT 0.5, about 970 m (further out a pan is free), and arms only once the view is inside the radius. Dropping focus (zoom out,
+  only from tiltT 0.5, about 970 m (further out a pan is free), and arms only once the view is inside the radius. A bare
+  complex pans within the union of discs round its members, each of `complexPanRadius` (100 m, or half the longest edge of
+  the members' shortest joining tree plus 20 m, so the discs join; 180 m at most: Times Sq 153 m, reaching Port Authority),
+  held to the member nearest the free area's middle (`clampToDiscs`, `insideDiscs`). The wider pan can bring a neighbour
+  within ENTER_RADIUS of a still view, which then focuses it by the usual auto-focus rule (accepted, as an interior's
+  180 m pan already can): at 14 St (L02, 132, D19; 166 m) a view held about 160 m west of 132 focuses 8 Av (L01). The
+  landing itself never does (within 100 m of a member, `bareStationFrame`). Dropping focus (zoom out,
   close the panel) springs the view back to north-up the short way round (an exponential ease capped at
   180°/s; under prefers-reduced-motion it snaps to north-up at once), so the city and top-down views
   are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it
@@ -965,8 +976,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   gesture do both (pah.6.1); a gesture locked to zoom never turns. A mouse or pen press forgets the fingers. A third finger, any lift or a cancel ends it, a new
   first touch forgets every finger (a lost pointerup can't count a stale one), and only a later touch making exactly two
   fingers down starts the next. A pinch with modest drift turns nothing.
-  A bare station pivots on its own point while that point is within its 100 m pan radius of the free
-  area's middle, else on that middle, so a far-off or held station can't swing the view away. Markers and dots rescale with distance
+  A bare station pivots on its own point (a complex on its member nearest the free area's middle) while that point is
+  within 100 m of the free area's middle, else on that middle, so a far-off or held station can't swing the view away. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
 - Every `on*` handler passed to `MapControls` (today `onStart` and `onEnd`) stays referentially
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
@@ -1105,7 +1116,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   more toward the camera from what the free area shows, so at Union Sq the Lexington and Canarsie paths, and the station-house
   machines at Pelham Pkwy (211), can't be framed within 100 m looking north and land as usual, part of them under the panel
   (collapsing the panel to its bar frames them, `useCollapseReframe.ts`; `pathFrame.data.test.ts`, `outageFrame.data.test.ts`; a phone panel with the outage list expanded leaves too little free area
-  for any frame); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior; a phone panel that changes height within 2 s of landing reframes once onto the marks when that frames more, `useCollapseReframe.ts`). Both
+  for any frame); a bare station lands with its point (a complex's other members' points next) and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station or a member (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior; a phone panel that changes height within 2 s of landing reframes once onto the marks when that frames more, `useCollapseReframe.ts`). Both
   retarget mid-flight when the interior, a bare station's streets (or the index, for a deep link) or the panel's final size arrives. An interior arriving after 90% of the
   flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,
   unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,

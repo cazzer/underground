@@ -18,7 +18,7 @@ import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { tiltForDistance } from '../lib/tilt'
-import { flushMotion, newFlight, turnOffset, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
+import { complexMemberPoints, flushMotion, newFlight, turnOffset, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
 import { useCollapseReframe } from './useCollapseReframe'
 import { usePathProbe } from './usePathProbe'
@@ -38,7 +38,7 @@ interface CameraRigProps {
   insets: Insets
   /** The focused station's interior once loaded; a click on that station frames it instead. */
   interior: InteriorModel | null
-  /** The station index: the focused and the closed station's complexes come from it. */
+  /** The station index: which stations have an interior (the flights and reframes read it). */
   index: IndexLoad
   /** The station panel's screen rect, kept clear when framing an interior. */
   panel: ScreenRect | null
@@ -71,7 +71,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     focusGroup: NO_FOCUS_GROUP,
     dismissedGroup: NO_FOCUS_GROUP,
   })
-  const focusGroup = useFocusGroups(input, index, interior, focusedId, dismissedId)
+  const focusGroup = useFocusGroups(input, interior, focusedId, dismissedId)
   // Auto-focus enters only once the view has held still (focusDwell.ts); a gesture in progress never has.
   const dwell = useRef(newDwell())
   const gesture = useRef(false)
@@ -110,6 +110,8 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
   useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets, index, frame, tookOver })
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
+  // A bare complex pans and pivots around every member (useStationOrbit), as its landing frames them (stationFlight).
+  const members = useMemo(() => (focusPos && focusedId ? [focusPos, ...complexMemberPoints(network, focusedId)] : []), [network, focusedId, focusPos])
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
   const startFlight = useCallback(
     (dest: Destination) => {
@@ -131,6 +133,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     controls,
     camera,
     focusPos,
+    members,
     interior: interiorCovers(interior, focusedId) ? interior : null,
     viewport: size,
     free,

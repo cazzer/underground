@@ -128,8 +128,14 @@ export function priorityTiers(frame: PriorityFrame): [FramePoint[], FramePoint[]
   return [wanted.slice(0, pathCount), wanted.slice(pathCount, pathCount + outageCount)]
 }
 
-/** Whether `a` (path, machine counts) shows more than `b`: more of the path, or as much of it and more of the machines. */
-export const showsMore = (a: readonly number[], b: readonly number[]): boolean => a[0]! > b[0]! || (a[0] === b[0] && a[1]! > b[1]!)
+/**
+ * Whether `a` (counts by tier: path, machines; a bare station's point, complex members, marks) shows more than `b`: more
+ * of the first tier where they differ.
+ */
+export function showsMore(a: readonly number[], b: readonly number[]): boolean {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i]! > b[i]!
+  return false
+}
 
 /**
  * The landing for `frame` in this view: `plain` (the interior framed as usual, frameInterior) when it already shows

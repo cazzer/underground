@@ -90,4 +90,12 @@ describe('a resize (ost.18)', () => {
     // A toggle keeps its own rule: a tie takes the landing for the new layout.
     expect(moveGains('toggle', [1, 2], [1, 2], [1, 6])).toBe(true)
   })
+
+  it('reads every tier in order: the station, its complex members (none for a lone station), then marks', () => {
+    expect(moveGains('resize', [1, 0, 8], [1, 0, 10], [1, 0, 16])).toBe(true)
+    expect(moveGains('resize', [1, 1, 12], [1, 2, 9], [1, 4, 17])).toBe(true)
+    expect(moveGains('resize', [1, 2, 9], [1, 1, 12], [1, 4, 17])).toBe(false)
+    expect(moveGains('resize', [1, 2, 9], [1, 2, 9], [1, 4, 17])).toBe(false)
+    expect(moveGains('toggle', [1, 2, 9], [1, 1, 12], [1, 4, 17])).toBe(false)
+  })
 })

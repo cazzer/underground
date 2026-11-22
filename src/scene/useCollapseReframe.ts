@@ -11,7 +11,7 @@ import { priorityTiers } from '../lib/pathFrame'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { opensResizeWindow, panelMoveArms, RESIZE_WINDOW_MS, type ResizeWindow } from '../lib/resizeReframe'
 import { useTrainSelection } from '../lib/trainSelection'
-import { bareStationPoints, flushMotion, interiorFlight, newFlight, stationFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
+import { bareStationPoints, bareStationTiers, flushMotion, interiorFlight, newFlight, stationFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { ReframeLayout } from './useInteriorReframe'
 
 interface CollapseReframeOptions {
@@ -46,13 +46,11 @@ function collapseTarget(l: ReframeLayout, stationId: string, azimuth: number, fo
     const own = frame?.interiorId === interior.stationId ? frame : null
     return { dest: interiorFlight(stationId, interior, l.size, l.insets, l.panel, fovDeg, azimuth, false, own), tiers: own && priorityTiers(own) }
   }
-  const station = l.network.stationById.get(stationId)
   // An interior still loading frames itself once it arrives (useInteriorReframe).
-  if (!station || !stationIsBare(stationId, l.index)) return null
+  if (!l.network.stationById.has(stationId) || !stationIsBare(stationId, l.index)) return null
   const marks = bareStationPoints(stationId, l.streets, l.index)
   const dest = stationFlight(l.network, stationId, marks, l.size, l.insets, l.panel, fovDeg, azimuth)
-  const level = (p: { x: number; z: number }): FramePoint => ({ x: p.x, y: 0, z: p.z })
-  return { dest, tiers: [[level(station.pos)], marks.map(level)] }
+  return { dest, tiers: bareStationTiers(l.network, stationId, marks) }
 }
 
 /**

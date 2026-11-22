@@ -63,6 +63,47 @@ export function panRadius(reach: number | null): number {
   return Math.min(reach + PAN_MARGIN, PAN_RADIUS_MAX)
 }
 
+/**
+ * Pan radius around each member of a bare station complex (`points`, every member's point): PAN_RADIUS_BARE, or wide
+ * enough that the members' discs overlap along their shortest joining tree by PAN_MARGIN at each join (half its longest
+ * edge plus the margin), so a pan can travel from any member to any other; capped at PAN_RADIUS_MAX. The focused
+ * distance being the nearest member's (focusMachine.ts), the cap keeps a full stretch inside EXIT_RADIUS as for one station.
+ */
+export function complexPanRadius(points: readonly Ground[]): number {
+  // Prim's tree over a handful of members (five at most today); called when the focus changes, never per frame.
+  const joined = points.slice(0, 1)
+  const rest = points.slice(1)
+  let longest = 0
+  while (rest.length > 0) {
+    let best = Infinity
+    let at = 0
+    for (let j = 0; j < rest.length; j++) {
+      for (const p of joined) {
+        const d = Math.hypot(rest[j]!.x - p.x, rest[j]!.z - p.z)
+        if (d < best) [best, at] = [d, j]
+      }
+    }
+    longest = Math.max(longest, best)
+    joined.push(...rest.splice(at, 1))
+  }
+  return Math.min(Math.max(PAN_RADIUS_BARE, longest / 2 + PAN_MARGIN), PAN_RADIUS_MAX)
+}
+
+/** The point of `points` (at least one) nearest `p`. No allocation: called every frame. */
+export function nearestPoint(p: Ground, points: readonly Ground[]): Ground {
+  let best = points[0]!
+  let bd = Infinity
+  for (let i = 0; i < points.length; i++) {
+    const q = points[i]!
+    const d = Math.hypot(q.x - p.x, q.z - p.z)
+    if (d < bd) {
+      bd = d
+      best = q
+    }
+  }
+  return best
+}
+
 /** Exponential ease of `value` toward `goal`; snaps onto the goal once within 1e-4, so it lands exactly. */
 export function springToward(value: number, goal: number, dt: number, rate: number): number {
   const next = goal + (value - goal) * Math.exp(-rate * dt)
@@ -163,6 +204,22 @@ export function softClampToRadius(p: Ground, c: Ground, r: number, dt: number, o
   out.x = c.x + dx * k
   out.z = c.z + dz * k
   return true
+}
+
+/** Whether `p` lies in the union of the discs of radius `r` round `centers` (at least one). No allocation. */
+export function insideDiscs(p: Ground, centers: readonly Ground[], r: number): boolean {
+  const c = nearestPoint(p, centers)
+  return Math.hypot(p.x - c.x, p.z - c.z) <= r
+}
+
+/**
+ * softClampToRadius onto the union of the discs of radius `r` round `centers` (a bare complex's members; one center for
+ * a lone station or an interior): `p` is held to the disc of its nearest center, the union's nearest edge for equal
+ * radii. The ease moves `p` straight toward that center, which brings it nearer that center than any other by as much,
+ * so the nearest center never changes mid-ease. Writes `out`; true when it moved. No allocation: called every frame.
+ */
+export function clampToDiscs(p: Ground, centers: readonly Ground[], r: number, dt: number, out: Ground): boolean {
+  return softClampToRadius(p, nearestPoint(p, centers), r, dt, out)
 }
 
 /**

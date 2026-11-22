@@ -48,7 +48,10 @@ export function reframeGains(current: readonly number[], next: readonly number[]
   return !showsMore(current, next)
 }
 
-/** Whether a move is worth it: a toggle by reframeGains; a resize only when the new framing shows strictly more (the station first, then marks). */
+/**
+ * Whether a move is worth it: a toggle by reframeGains; a resize only when the new framing shows strictly more (showsMore:
+ * the station first, then its complex's other members, then marks).
+ */
 export function moveGains(kind: CollapsePending['kind'], current: readonly number[], next: readonly number[], totals: readonly number[]): boolean {
   return kind === 'toggle' ? reframeGains(current, next, totals) : showsMore(next, current)
 }
