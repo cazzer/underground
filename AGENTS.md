@@ -419,12 +419,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   list at `/ene` (equipment code, reason, since, returnAt; the client re-export is 2q7.21)
   - `src/schema.ts` the JSON contracts (types and consts only); the client re-exports the `/rt` one
   - `src/index.ts` routing (a `Map` of path to `CachedRoute`: `/rt` 15 s, `/ene` 120 s), CORS;
-    `serveCached.ts` the per-route memo, Cache API layer and herd guard (`serveCached`; its `x-rt-cache` and
-    `x-rt-expires` header names are shared by both routes); `cache.ts` pure memo/herd-guard
+    `serveCached.ts` the per-route memo, Cache API layer and herd guard (`serveCached`, with a 15 s backoff after a failed
+    refresh; its `x-rt-cache` and `x-rt-expires` header names are shared by both routes); `cache.ts` pure memo/herd-guard
     decision and the per-route TTLs; `upstream.ts` feed and outage fetches (`fetchBytes`: 5 s timeout, 2 MB cap)
   - `src/transform.ts` pure decode-to-snapshot logic; `ene.ts` pure E&E transform (`parseNyTime`,
-    `transformEne`; the feed's `isupcomingoutage` is unreliable, so a row is kept unless it is flagged
-    upcoming and not yet started); `cors.ts` allowed origins
+    `transformEne`; the feed's `isupcomingoutage` is unreliable, so it is ignored: a row is skipped only if it has
+    not started yet); `cors.ts` allowed origins
   - `src/gen/` generated protobufjs decoder (`npm run gen`); never hand-edit
   - `proto/subway-rt.proto` trimmed subset of gtfs-realtime + nyct-subway
   - `fixtures/` recorded feeds for tests (see its README; `ene.json` is the E&E sample)

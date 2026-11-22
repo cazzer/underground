@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { REFRESH_GRACE_MS } from './cache'
+import { FAILURE_BACKOFF_MS, REFRESH_GRACE_MS } from './cache'
 import { serveCached, type CachedRoute, type EdgeCache } from './serveCached'
 
 const T0 = 1_800_000_000_000
@@ -30,7 +30,7 @@ function fakeCtx(): { waitUntil(p: Promise<unknown>): void; flush(): Promise<voi
 }
 
 function makeRoute(cachePath: string, ttlMs: number, build: CachedRoute['build']): CachedRoute {
-  return { cachePath, ttlMs, build, state: { memo: null, refreshingSince: null } }
+  return { cachePath, ttlMs, build, state: { memo: null, refreshingSince: null, failedUntil: null } }
 }
 
 function deferred<T>(): { promise: Promise<T>; resolve(v: T): void } {
@@ -139,6 +139,45 @@ describe('serveCached', () => {
     const empty = makeRoute('/rt?v=1', 15_000, vi.fn().mockRejectedValue(new Error('upstream down')))
     await expect(serveCached(empty, req(), ctx, null, fakeEdge())).rejects.toThrow('upstream down')
     expect(empty.state.refreshingSince).toBeNull()
+  })
+
+  it('backs off after a failed refresh: stale (or 503 busy) without calling build, then retries', async () => {
+    const build = vi.fn().mockResolvedValueOnce('old').mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce('new')
+    const route = makeRoute('/ene?v=1', 15_000, build)
+    const edge = fakeEdge()
+    const ctx = fakeCtx()
+    await serveCached(route, req('/ene'), ctx, null, edge)
+    vi.setSystemTime(T0 + 15_000)
+    expect((await serveCached(route, req('/ene'), ctx, null, edge)).headers.get('x-rt-cache')).toBe('stale')
+    expect(build).toHaveBeenCalledTimes(2)
+
+    vi.setSystemTime(T0 + 15_000 + FAILURE_BACKOFF_MS - 1)
+    const backedOff = await serveCached(route, req('/ene'), ctx, null, edge)
+    expect(backedOff.headers.get('x-rt-cache')).toBe('stale')
+    expect(await backedOff.text()).toBe('old')
+    expect(build).toHaveBeenCalledTimes(2)
+
+    vi.setSystemTime(T0 + 15_000 + FAILURE_BACKOFF_MS)
+    const retried = await serveCached(route, req('/ene'), ctx, null, edge)
+    expect(retried.headers.get('x-rt-cache')).toBe('miss')
+    expect(await retried.text()).toBe('new')
+    expect(route.state.failedUntil).toBeNull()
+  })
+
+  it('backs off with no memo too: the first failure rejects, the next requests get 503 busy', async () => {
+    const build = vi.fn().mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce('fresh')
+    const route = makeRoute('/ene?v=1', 120_000, build)
+    const edge = fakeEdge()
+    const ctx = fakeCtx()
+    await expect(serveCached(route, req('/ene'), ctx, null, edge)).rejects.toThrow('down')
+    const busy = await serveCached(route, req('/ene'), ctx, ALLOWED, edge)
+    expect(busy.status).toBe(503)
+    expect(busy.headers.get('retry-after')).toBe('1')
+    expect(busy.headers.get('access-control-allow-origin')).toBe(ALLOWED)
+    expect(build).toHaveBeenCalledTimes(1)
+
+    vi.setSystemTime(T0 + FAILURE_BACKOFF_MS)
+    expect(await (await serveCached(route, req('/ene'), ctx, null, edge)).text()).toBe('fresh')
   })
 
   it('answers a concurrent request with the stale body, or 503 busy with no body', async () => {

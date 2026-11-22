@@ -32,7 +32,7 @@ const rtRoute: CachedRoute = {
     logMiss(request, snapshot, outcomes)
     return JSON.stringify(snapshot)
   },
-  state: { memo: null, refreshingSince: null },
+  state: { memo: null, refreshingSince: null, failedUntil: null },
 }
 
 const eneRoute: CachedRoute = {
@@ -57,7 +57,7 @@ const eneRoute: CachedRoute = {
     )
     return JSON.stringify(snapshot)
   },
-  state: { memo: null, refreshingSince: null },
+  state: { memo: null, refreshingSince: null, failedUntil: null },
 }
 
 const ROUTES = new Map<string, CachedRoute>([

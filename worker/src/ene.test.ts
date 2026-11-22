@@ -27,7 +27,8 @@ describe('parseNyTime', () => {
     expect(parseNyTime('07/04/2026 12:00:00 AM')).toBe(1783137600)
   })
 
-  it('moves a time inside the spring-forward gap an hour later', () => {
+  it('reads a time inside the spring-forward gap with the daylight offset (an hour earlier on the wall clock)', () => {
+    // 02:30 does not exist on 03/08/2026; 1772951400 is 06:30 UTC = 01:30 EST.
     expect(parseNyTime('03/08/2026 02:30:00 AM')).toBe(1772951400)
   })
 
@@ -93,8 +94,24 @@ describe('transformEne', () => {
     expect(snapshot.outages.map((o) => o.reason)).toEqual([null, null, null, 'x'.repeat(100)])
   })
 
+  it('cleans a reason: collapses whitespace, strips control and bidi characters, caps by code point', () => {
+    const reasons = [
+      'Re‮pair\u0000  \n work​',
+      '‮\u0007',
+      `${'x'.repeat(99)}😀y`,
+      `${'x'.repeat(98)}😀😀`,
+    ].map((reason, i) => ({ ...row('EL738'), equipment: `EL10${i}`, reason }))
+    const { snapshot } = transformEne(reasons, GENERATED_AT)
+    expect(snapshot.outages.map((o) => o.reason)).toEqual([
+      'Repair work',
+      null,
+      `${'x'.repeat(99)}😀`,
+      `${'x'.repeat(98)}😀😀`,
+    ])
+  })
+
   it('keeps the earliest since when a code appears twice in effect', () => {
-    const later = { ...row('EL738'), outagedate: '11/22/2026 01:00:00 AM', reason: 'Repair' }
+    const later = { ...row('EL738'), outagedate: '11/22/2026 12:05:00 AM', reason: 'Repair' }
     for (const rows of [[row('EL738'), later], [later, row('EL738')]]) {
       const { snapshot, duplicates } = transformEne(rows, GENERATED_AT)
       expect(duplicates).toBe(1)
@@ -106,6 +123,14 @@ describe('transformEne', () => {
     // EL783 starts 11/22/2026 10:00 PM New York = 1795399200.
     expect(transformEne(fixture, GENERATED_AT).snapshot.outages.map((o) => o.code)).not.toContain('EL783')
     expect(transformEne(fixture, 1795417200).snapshot.outages.map((o) => o.code)).toContain('EL783')
+  })
+
+  it('ignores the upcoming flag: a not-yet-started row is skipped even when flagged N', () => {
+    const future = { ...row('EL738'), equipment: 'EL555', outagedate: '11/29/2026 10:00:00 PM', isupcomingoutage: 'N' }
+    const { snapshot, upcoming } = transformEne([future], GENERATED_AT)
+    expect(snapshot.outages).toEqual([])
+    expect(snapshot.dropped).toBe(0)
+    expect(upcoming).toBe(1)
   })
 
   it('throws on a top level that is not an array', () => {

@@ -1,4 +1,4 @@
-import { cacheDecision, type CacheDecision, type Memo } from './cache'
+import { FAILURE_BACKOFF_MS, cacheDecision, type CacheDecision, type Memo } from './cache'
 import { corsHeaders } from './cors'
 
 type CacheState = Exclude<CacheDecision, 'busy' | 'refresh'> | 'edge' | 'miss'
@@ -13,7 +13,7 @@ export interface CachedRoute {
    * The route's per-isolate state. Resolved values only: Workers can hang on promises
    * shared across requests.
    */
-  state: { memo: Memo | null; refreshingSince: number | null }
+  state: { memo: Memo | null; refreshingSince: number | null; failedUntil: number | null }
 }
 
 /** The part of the Cache API used here (`caches.default` fits). */
@@ -81,7 +81,11 @@ export async function serveCached(
 ): Promise<Response> {
   const { state } = route
   const now = Date.now()
-  const decision = cacheDecision(now, state.memo, state.refreshingSince)
+  let decision = cacheDecision(now, state.memo, state.refreshingSince)
+  // After a failed refresh, don't hit a struggling upstream on every request.
+  if (decision === 'refresh' && state.failedUntil !== null && now < state.failedUntil) {
+    decision = state.memo ? 'stale' : 'busy'
+  }
   if (decision === 'busy') {
     return new Response('{"error":"warming"}', {
       status: 503,
@@ -96,8 +100,10 @@ export async function serveCached(
     const result = await refresh(route, request, ctx, edge)
     // Overlapping refreshes can finish out of order; never move the memo backwards.
     if (!state.memo || result.memo.expiresAt > state.memo.expiresAt) state.memo = result.memo
+    state.failedUntil = null
     return respond(result.memo.body, result.state, origin)
   } catch (e) {
+    state.failedUntil = Date.now() + FAILURE_BACKOFF_MS
     if (!state.memo) throw e
     console.error(e)
     return respond(state.memo.body, 'stale', origin)

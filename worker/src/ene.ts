@@ -17,22 +17,34 @@ const NY_FIELDS = new Intl.DateTimeFormat('en-US', {
   second: 'numeric',
 })
 
-/** New York's UTC offset in ms at an instant (negative: behind UTC). */
-function nyOffsetMs(ms: number): number {
+const HOUR_MS = 3_600_000
+
+/**
+ * New York's UTC offset in ms at an instant (negative: behind UTC). It only changes on a UTC hour
+ * boundary, so `cache` holds one answer per UTC hour (a feed repeats the same few hours many times).
+ */
+function nyOffsetMs(ms: number, cache: Map<number, number>): number {
+  const hour = Math.floor(ms / HOUR_MS)
+  const known = cache.get(hour)
+  if (known !== undefined) return known
   const fields: Record<string, number> = {}
   for (const part of NY_FIELDS.formatToParts(new Date(ms))) {
     if (part.type !== 'literal') fields[part.type] = Number(part.value)
   }
   const asUtc = Date.UTC(fields.year ?? NaN, (fields.month ?? NaN) - 1, fields.day, fields.hour, fields.minute, fields.second)
-  return asUtc - Math.floor(ms / 1000) * 1000
+  const offset = asUtc - Math.floor(ms / 1000) * 1000
+  cache.set(hour, offset)
+  return offset
 }
 
 /**
  * A feed time to epoch seconds, or null if it is not exactly that format or not a real date.
- * A time skipped by the spring-forward gap lands an hour later; an ambiguous fall-back time
- * takes its first (daylight) occurrence.
+ * A wall-clock time inside the spring-forward gap does not exist; it is read with the daylight
+ * offset, so it lands an hour earlier on the wall clock (02:30 reads as 01:30 EST). An ambiguous
+ * fall-back time takes its first (daylight) occurrence. `offsets` memoises New York's offset per
+ * UTC hour across calls.
  */
-export function parseNyTime(text: string): number | null {
+export function parseNyTime(text: string, offsets: Map<number, number> = new Map()): number | null {
   const m = TIME_PATTERN.exec(text)
   if (!m) return null
   const [month, day, year, hour12, minute, second] = m.slice(1, 7).map(Number) as [number, number, number, number, number, number]
@@ -48,8 +60,10 @@ export function parseNyTime(text: string): number | null {
     check.getUTCMinutes() === minute &&
     check.getUTCSeconds() === second
   if (!roundTrips) return null
-  let t = guess - nyOffsetMs(guess)
-  if (nyOffsetMs(t) !== nyOffsetMs(guess)) t = guess - nyOffsetMs(t)
+  const guessOffset = nyOffsetMs(guess, offsets)
+  let t = guess - guessOffset
+  const offset = nyOffsetMs(t, offsets)
+  if (offset !== guessOffset) t = guess - offset
   return Math.floor(t / 1000)
 }
 
@@ -57,9 +71,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** Free text from upstream: whitespace collapsed, control and format characters (bidi overrides) removed, 100 code points. */
 function parseReason(value: unknown): string | null {
   if (typeof value !== 'string') return null
-  const reason = value.trim().slice(0, REASON_MAX_CHARS)
+  const clean = value.replace(/\s+/g, ' ').replace(/[\p{Cc}\p{Cf}]/gu, '').trim()
+  // By code point, so the cap never splits a surrogate pair.
+  const reason = Array.from(clean).slice(0, REASON_MAX_CHARS).join('').trim()
   return reason === '' ? null : reason
 }
 
@@ -73,9 +90,9 @@ export interface EneResult {
 
 /**
  * Trims the MTA outage list to the outages in effect at `generatedAt`, one per equipment code.
- * `isupcomingoutage` is unreliable (started outages flagged Y, overdue ones flagged N), so a row
- * is kept unless it is flagged Y and starts after `generatedAt`; a past return time never removes
- * one. Malformed rows are dropped and counted, never silent. Throws TypeError if the list is not an array.
+ * `isupcomingoutage` is unreliable both ways (started outages flagged Y, overdue ones flagged N), so
+ * it is ignored: a row is upcoming, and skipped, exactly when it starts after `generatedAt`. A past
+ * return time never removes one. Malformed rows are dropped and counted, never silent. Throws TypeError if the list is not an array.
  */
 export function transformEne(json: unknown, generatedAt: number): EneResult {
   if (!Array.isArray(json)) throw new TypeError(`ene: expected an array, got ${json === null ? 'null' : typeof json}`)
@@ -83,13 +100,14 @@ export function transformEne(json: unknown, generatedAt: number): EneResult {
   let dropped = 0
   let upcoming = 0
   let duplicates = 0
+  const offsets = new Map<number, number>()
   for (const row of json as unknown[]) {
-    const since = isRecord(row) && typeof row.outagedate === 'string' ? parseNyTime(row.outagedate) : null
+    const since = isRecord(row) && typeof row.outagedate === 'string' ? parseNyTime(row.outagedate, offsets) : null
     if (!isRecord(row) || typeof row.equipment !== 'string' || !CODE_PATTERN.test(row.equipment) || since === null) {
       dropped++
       continue
     }
-    if (row.isupcomingoutage === 'Y' && since > generatedAt) {
+    if (since > generatedAt) {
       upcoming++
       continue
     }
@@ -97,7 +115,7 @@ export function transformEne(json: unknown, generatedAt: number): EneResult {
       code: row.equipment,
       reason: parseReason(row.reason),
       since,
-      returnAt: typeof row.estimatedreturntoservice === 'string' ? parseNyTime(row.estimatedreturntoservice) : null,
+      returnAt: typeof row.estimatedreturntoservice === 'string' ? parseNyTime(row.estimatedreturntoservice, offsets) : null,
     }
     const earlier = byCode.get(outage.code)
     if (earlier) duplicates++

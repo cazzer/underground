@@ -1,4 +1,4 @@
-import { ENE_TTL_MS } from './cache'
+import { ENE_TTL_MS, RT_TTL_MS } from './cache'
 import { decodeFeed } from './decode'
 import { FEED_IDS, type FeedId } from './schema'
 import type { FeedOutcome } from './transform'
@@ -77,7 +77,7 @@ async function fetchBytes(path: string, cacheTtlS: number): Promise<BytesOutcome
 }
 
 async function fetchFeed(id: FeedId): Promise<FeedOutcome> {
-  const got = await fetchBytes(FEED_PATHS[id], 15)
+  const got = await fetchBytes(FEED_PATHS[id], RT_TTL_MS / 1000)
   if (!got.ok) return got
   try {
     return { ok: true, message: decodeFeed(got.bytes), cacheStatus: got.cacheStatus }
