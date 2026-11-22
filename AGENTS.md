@@ -46,7 +46,7 @@ so dev and preview serve under that path.
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
 - `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
   within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
-  `streetsData.test.ts` checks it. Rerun `data:streets` after it.
+  `streetsData.test.ts` checks it. Rerun `data:streets` and `data:walk` after it.
 - `npm run data:streets`: offline; builds `public/data/streets/<stationId>.json` for every `stations.json` station from
   the street pin and the catalog entrances (clip to 300 m, simplify, project to decimeters, join each entrance to its street).
   Rerun it after `data`, `data:streets:fetch`, `data:catalog:fetch` or a change to the `searchText.ts` synonyms (street join
@@ -59,6 +59,10 @@ so dev and preview serve under that path.
   null. `npm run basemap:gate -- <source|output> <metadata.json>` is the workflow's licensing gate (offline) and
   `npm run basemap:verify -- <url> <bytes>` its Range check (network; the deploy's `verify-basemap` job runs it). The basemap is
   built by hand-dispatching `.github/workflows/basemap.yml` (see Data below), then pinned in a normal PR.
+- `npm run data:walk`: offline; builds `public/data/walk/<stationId>.json` (the walk graph: every walkable pinned way within
+  300 m, junctions shared, OSM node ids, x/z in dm around the stations.json point, edges with kind and length; oneway ignored)
+  for every station from the street pin. Rerun after `data` or `data:streets:fetch`; `walkOutputs.test.ts` fails while stale.
+  Caps in `budget.ts` (64 KB per file, 4.6 MB total), outside the startup budget.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -373,6 +377,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   fixture). `scripts/lib/basemapSpec.ts` (parse, release tag and URL), `basemapGate.ts` (licensing gate over `pmtiles show
   --metadata`), `basemapFetch.ts` (`ensureBasemap`), `rangeProbe.ts` (what a correct Range answer is); IO in
   `scripts/fetch-basemap.ts`, `gate-basemap.ts` and `verify-basemap.ts`. The file itself is never in git
+- `public/data/walk/<stationId>.json`: one walk graph per station (`StationWalk`, `src/data/walkSchema.ts`), built by
+  `scripts/build-walk.ts` (IO only) from the pin through `scripts/lib/walkGraph.ts` (pure; reuses `clipSpan`/`simplifySpans`/`waysNear`).
+  Not loaded by the client yet (2q7.11).
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
@@ -696,11 +703,11 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
-  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors and street files don't count (street files have their own caps: 16 KB gzipped each, and a total, in `budget.ts`).
+  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors and street files don't count (street and walk files have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, and a total for each).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow
-  the stations), change `public/data`. A station new to the feed gets a street file from whatever pinned ways lie
+  the stations), then `npm run data:walk`, change `public/data`. A station new to the feed gets a street file from whatever pinned ways lie
   near it, with a `WARNING:` line in the log (`data:streets` prints it for any station the pin manifest's `stationIds`
   lacks); it does not block the refresh, and the next `data:streets:fetch` covers it. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).

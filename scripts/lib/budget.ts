@@ -15,6 +15,11 @@ export const STREETS_FILE_GZIP_CAP_BYTES = 16_000
 /** ...and the directory this one: the measured total plus a quarter, rounded up, so growth in the pin shows in review. */
 export const STREETS_TOTAL_GZIP_CAP_BYTES = 1_800_000
 
+/** public/data/walk/<id>.json loads on demand (the walk router), outside the budget above; each file has this cap... */
+export const WALK_FILE_GZIP_CAP_BYTES = 64_000
+/** ...and the directory this one: the measured total (3,629,681 B) plus about a quarter, rounded up. */
+export const WALK_TOTAL_GZIP_CAP_BYTES = 4_600_000
+
 export interface RenderedFile {
   name: string
   text: string
@@ -70,5 +75,12 @@ export function checkIndexCap(index: RenderedFile): number {
 export function checkStreetsTotal(files: readonly RenderedFile[], capBytes: number = STREETS_TOTAL_GZIP_CAP_BYTES): number {
   const total = files.reduce((sum, f) => sum + f.gzip, 0)
   if (total > capBytes) throw new Error(`The ${files.length} street files total ${total} B gzipped, over the ${capBytes} B cap. Nothing written.`)
+  return total
+}
+
+/** The walk files together must fit their total cap; returns their gzip total. */
+export function checkWalkTotal(files: readonly RenderedFile[], capBytes: number = WALK_TOTAL_GZIP_CAP_BYTES): number {
+  const total = files.reduce((sum, f) => sum + f.gzip, 0)
+  if (total > capBytes) throw new Error(`The ${files.length} walk files total ${total} B gzipped, over the ${capBytes} B cap. Nothing written.`)
   return total
 }
