@@ -3,6 +3,7 @@ import type { GeocodeResult } from '../data/realtime'
 import { nearestStation, type NearestStation } from './locate'
 import type { Station } from './network'
 import { toGround, type Ground } from './projection'
+import type { StationGroup } from './stationGroups'
 
 const SMALL_WORDS = new Set(['of', 'the', 'and', 'at', 'on', 'in', 'for', 'de', 'la'])
 /** Vowel-less abbreviations that are words, not initials: "ST" is "St", "JFK" stays "JFK". */
@@ -83,9 +84,14 @@ export interface PlacePick {
 }
 
 /** Null for an empty network. */
-export function placePick(result: GeocodeResult, text: PlaceText, stations: readonly Station[]): PlacePick | null {
+export function placePick(
+  result: GeocodeResult,
+  text: PlaceText,
+  stations: readonly Station[],
+  groups: ReadonlyMap<string, StationGroup>,
+): PlacePick | null {
   const ground = toGround({ lat: result.lat, lon: result.lon })
-  const nearest = nearestStation(ground, stations)
+  const nearest = nearestStation(ground, stations, groups)
   if (!nearest) return null
   return {
     name: text.name,

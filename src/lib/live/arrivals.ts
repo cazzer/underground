@@ -58,15 +58,19 @@ const directionOfStop = (stop: StopId): Direction => (stop.endsWith('N') ? 'N' :
  * the best name left; when that is this station and the list runs to the horizon, the trip is kept, since
  * it was cut short rather than ending here.
  *
+ * For a complex, `stops` is every member's and `memberIds` lists them: a trip is listed once, at its soonest member
+ * stop, and one ending at any member is skipped.
+ *
  * Groups are ordered by direction (north first, so rows stay put between polls), then soonest time.
  */
 export function arrivalsAt(
   snapshot: RealtimeSnapshot,
-  station: { id: StationId; stops: readonly StopId[] },
+  station: { id: StationId; stops: readonly StopId[]; memberIds?: readonly StationId[] },
   nowS: number,
   opts: ArrivalOptions,
 ): ArrivalGroup[] {
   const stops = new Set(station.stops)
+  const members = new Set(station.memberIds ?? [station.id])
   const groups = new Map<string, ArrivalGroup>()
 
   for (const feed of FEED_IDS) {
@@ -83,9 +87,10 @@ export function arrivalsAt(
       const last = trip.arrivals.at(-1)
       const terminal = patternTerminal ?? last?.[0]
       if (terminal === undefined || last === undefined) continue
-      // A trip whose last known stop is this one is skipped: nobody boards it here, and a headsign naming
-      // this station would be wrong. That includes unjoined trips cut at the Worker horizon (rare, and ~30 min out).
-      if (stationOfStop(terminal) === station.id) continue
+      // A trip whose last known stop is this station (any member of its complex) is skipped: nobody boards it here,
+      // and a headsign naming this station would be wrong. That includes unjoined trips cut at the Worker horizon
+      // (rare, and ~30 min out).
+      if (members.has(stationOfStop(terminal))) continue
       const headsign = opts.stationName(stationOfStop(terminal))
       const routeId = trainRouteId({ trip, shapeId }, opts.routeById, opts.lookup.patterns)
       if (headsign === undefined || routeId === null) continue

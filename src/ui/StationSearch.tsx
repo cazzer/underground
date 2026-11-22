@@ -7,7 +7,8 @@ import { locateMemoryFor } from '../lib/locateMemory'
 import { announcementFor, nextErrorSpoken, searchEmptyText, type ErrorSpoken } from '../lib/geocodeView'
 import { multiBoroughNames } from '../lib/labels'
 import type { MarkedPlacement } from '../lib/locate'
-import type { Network, Station } from '../lib/network'
+import type { Network } from '../lib/network'
+import type { StationGroup } from '../lib/stationGroups'
 import { placePick, type PlacePick } from '../lib/placeLabel'
 import { searchItems, type SearchItem } from '../lib/searchItems'
 import { rowActions } from '../lib/searchRowActions'
@@ -76,8 +77,8 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
   const hintId = `${id}-hint`
   const disclosureId = `${id}-disclosure`
   const enterId = `${id}-enter`
-  const index = useMemo(() => buildSearchIndex(network.stations), [network])
-  const multiBorough = useMemo(() => multiBoroughNames(network.stations), [network])
+  const index = useMemo(() => buildSearchIndex(network.stationGroups), [network])
+  const multiBorough = useMemo(() => multiBoroughNames(network.stationGroups), [network])
   const keyboardInset = useKeyboardInset()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -121,17 +122,17 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
   }))
   const close = () => dialog.current?.close()
   // A pick sets the caller's state before `close()`: the dialog hands focus back to the opener, then the caller's own focus move lands.
-  const placeOf = (item: Extract<SearchItem<Station>, { kind: 'address' | 'place' }>) => {
-    const pick = placePick(item.result, item.text, network.stations)
+  const placeOf = (item: Extract<SearchItem<StationGroup>, { kind: 'address' | 'place' }>) => {
+    const pick = placePick(item.result, item.text, network.stations, network.groupById)
     if (!pick || !onChoosePlace) throw new Error('A place was picked with no station to name or nobody to tell')
     return pick
   }
-  const choose = (item: SearchItem<Station>) => {
+  const choose = (item: SearchItem<StationGroup>) => {
     if (item.kind === 'station') onChoose(item.station.id)
     else onChoosePlace?.(placeOf(item))
     close()
   }
-  const directions = (item: SearchItem<Station>, end: TripEnd) => {
+  const directions = (item: SearchItem<StationGroup>, end: TripEnd) => {
     if (!onDirections) throw new Error('Directions were picked in a search that offers none')
     if (item.kind === 'station') onDirections(end, { stationId: item.station.id, place: null })
     else {

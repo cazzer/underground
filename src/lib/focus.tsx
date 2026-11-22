@@ -3,6 +3,7 @@ import type { BasemapStats } from '../data/basemapTypes'
 import { nextFocus, NO_FOCUS_GROUP, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'
+import type { StationGroup } from './stationGroups'
 import type { TouchLock } from './touchOrbit'
 
 /** Who asked for a point flight: the location button, or a searched place. A place flight lifts the basemap's location zoom cap. */
@@ -23,8 +24,13 @@ interface FocusValue {
   /** Station the user closed; the camera won't auto-focus it until it moves away. */
   dismissedId: string | null
   flyRequest: FlyRequest | null
-  /** Explicit pick (click): focus the station and fly the camera to it. */
+  /**
+   * Explicit pick (click): focus the station and fly the camera to it. A complex is one station, so a member's id
+   * focuses (and flies to) its lead: `focusedId` is always a lead.
+   */
   select: (stationId: string) => void
+  /** Every member of the complex `id` belongs to, the lead first (`[id]` for a lone station); `[]` for null or an unknown id. */
+  membersOf: (id: string | null) => readonly string[]
   /**
    * Fly the camera to a ground point showing `radiusM` around it. Drops focus without dismissing it, so
    * the orbit's azimuth springs back to north-up during the flight (the framing assumes north-up). Returns the
@@ -52,6 +58,8 @@ interface FocusValue {
 }
 
 interface FocusProviderProps {
+  /** Every station id, a complex member too, to its group (Network.groupById). */
+  groups: ReadonlyMap<string, StationGroup>
   children: ReactNode
 }
 
@@ -115,18 +123,24 @@ declare global {
 }
 
 const FocusContext = createContext<FocusValue | null>(null)
+const NO_MEMBERS: readonly string[] = []
 
-export function FocusProvider({ children }: FocusProviderProps) {
+export function FocusProvider({ groups, children }: FocusProviderProps) {
   const [state, setState] = useState<FocusState>({ focusedId: null, dismissedId: null })
   const [flyRequest, setFlyRequest] = useState<FlyRequest | null>(null)
 
   // One counter for both kinds of flight, so a caller holding a nonce can tell later flights from its own.
   const lastNonce = useRef(0)
-  const select = useCallback((stationId: string) => {
-    const nonce = ++lastNonce.current
-    setState({ focusedId: stationId, dismissedId: null })
-    setFlyRequest({ kind: 'station', stationId, nonce })
-  }, [])
+  const select = useCallback(
+    (picked: string) => {
+      const stationId = groups.get(picked)?.id ?? picked
+      const nonce = ++lastNonce.current
+      setState({ focusedId: stationId, dismissedId: null })
+      setFlyRequest({ kind: 'station', stationId, nonce })
+    },
+    [groups],
+  )
+  const membersOf = useCallback((id: string | null) => (id === null ? NO_MEMBERS : (groups.get(id)?.memberIds ?? NO_MEMBERS)), [groups])
   const flyToPoint = useCallback((center: Ground, radiusM: number, source: PointSource) => {
     const nonce = ++lastNonce.current
     setState((s) => (s.focusedId === null ? s : { focusedId: null, dismissedId: s.dismissedId }))
@@ -164,8 +178,8 @@ export function FocusProvider({ children }: FocusProviderProps) {
 
   const { focusedId, dismissedId } = state
   const value = useMemo<FocusValue>(
-    () => ({ focusedId, dismissedId, flyRequest, select, flyToPoint, viewCenter, setViewCenterSource, dismiss, updateFromCamera }),
-    [focusedId, dismissedId, flyRequest, select, flyToPoint, viewCenter, setViewCenterSource, dismiss, updateFromCamera],
+    () => ({ focusedId, dismissedId, flyRequest, select, membersOf, flyToPoint, viewCenter, setViewCenterSource, dismiss, updateFromCamera }),
+    [focusedId, dismissedId, flyRequest, select, membersOf, flyToPoint, viewCenter, setViewCenterSource, dismiss, updateFromCamera],
   )
   return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>
 }

@@ -66,7 +66,7 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
       (pos) => {
         if (id !== requestId.current) return
         const fix = toFix(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy)
-        const placement = fix && placeFix(fix, latest.current.network.stations, latest.current.network.bounds)
+        const placement = fix && placeFix(fix, latest.current.network.stations, latest.current.network.groupById, latest.current.network.bounds)
         if (!placement) {
           console.warn('Geolocation returned an unusable position')
           fail('unavailable')

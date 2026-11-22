@@ -6,7 +6,8 @@ import { clockNow } from '../lib/live/clock'
 import { stationFeedHealth } from '../lib/live/feedHealth'
 import type { LiveStatus } from '../lib/live/liveStatus'
 import { routeSpokenName } from '../lib/labels'
-import type { Network, Station } from '../lib/network'
+import type { Network } from '../lib/network'
+import type { StationGroup } from '../lib/stationGroups'
 import { useTrainSelection } from '../lib/trainSelection'
 import { RouteChip } from './RouteChip'
 import { useStackedPanel } from './useStackedPanel'
@@ -146,7 +147,7 @@ function ShowAll({ expanded, controls, total, onToggle, onFocusLost }: ShowAllPr
 
 interface ArrivalsListProps {
   network: Network
-  station: Station
+  station: StationGroup
   source: ArrivalsSource | null
   status: LiveStatus
   /** Takes focus when a row or the "Show all" button that has it goes away (a poll, or the panel unstacked). */

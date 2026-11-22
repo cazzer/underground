@@ -1,4 +1,4 @@
-import { interiorCovers, siblingIdsOf, type IndexLoad } from '../data/interiorLoad'
+import { interiorCovers } from '../data/interiorLoad'
 import type { Station } from './network'
 import type { Ground } from './projection'
 
@@ -31,10 +31,9 @@ export interface FocusInput extends FocusState {
   /** The view has held still long enough to enter a station (focusDwell's `settled`). Exits never wait. */
   settled: boolean
   /**
-   * The stations that share the focused station's interior (a complex's members, the focused one included), or
-   * NO_FOCUS_GROUP. An interior flight lands on the complex's hull centre, which can be farther than ENTER_RADIUS or
-   * EXIT_RADIUS from the focused member's own point, so the focused distance is the nearest member's and focus never
-   * switches to another member. Ignored unless it holds `focusedId`.
+   * The focused station's complex (its members, the lead included), or NO_FOCUS_GROUP. An interior flight lands on the
+   * complex's hull centre, which can be farther than ENTER_RADIUS or EXIT_RADIUS from the lead's own point, so the
+   * focused distance is the nearest member's and focus never switches within the group. Ignored unless it holds `focusedId`.
    */
   focusGroup: ReadonlySet<string>
   /**
@@ -49,20 +48,16 @@ export interface FocusInput extends FocusState {
 export const NO_FOCUS_GROUP: ReadonlySet<string> = new Set()
 
 /**
- * The complex `id` belongs to, from the station index (which still lists it once the interior has unloaded, as when
- * the panel closes): `id` and its siblings, or NO_FOCUS_GROUP for a lone station or an index that isn't ready. When
- * the loaded `interior` covers `id`, the group is cut to the members it really draws (a stale index can't widen
- * it). Allocates, so call it when the index or the id changes, never per frame.
+ * The complex `id` belongs to (the catalog's complex, stations.json `complexes`; `members` is its group's `memberIds`,
+ * which holds `id`): the members, or NO_FOCUS_GROUP for a lone station. When the loaded `interior` covers `id`, the
+ * group is cut to the members it really draws. Allocates, so call it when the id changes, never per frame.
  */
 export function focusGroupOf(
   id: string | null,
-  index: IndexLoad,
+  members: readonly string[],
   interior: { stationId: string; memberStationIds?: readonly string[] } | null,
 ): ReadonlySet<string> {
-  if (id === null) return NO_FOCUS_GROUP
-  const siblings = siblingIdsOf(id, index)
-  if (siblings.length === 0) return NO_FOCUS_GROUP
-  const members = [id, ...siblings]
+  if (id === null || members.length < 2) return NO_FOCUS_GROUP
   const drawn = interiorCovers(interior, id) ? members.filter((m) => interiorCovers(interior, m)) : members
   return drawn.length > 1 ? new Set(drawn) : NO_FOCUS_GROUP
 }
@@ -76,6 +71,7 @@ export function nextFocus(input: FocusInput): FocusState {
   const { focusedId, dismissedId, distance, target, stations, settled, focusGroup, dismissedGroup } = input
   const grouped = focusedId !== null && focusGroup.has(focusedId)
   const dismissedGrouped = dismissedId !== null && dismissedGroup.has(dismissedId)
+  // The nearest station's lead: a complex is one station, so a view centered on any member enters it as its lead.
   let nearest: string | null = null
   let nd = Infinity
   let fd = Infinity
@@ -85,7 +81,7 @@ export function nextFocus(input: FocusInput): FocusState {
     const d = Math.hypot(s.pos.x - target.x, s.pos.z - target.z)
     if (d < nd) {
       nd = d
-      nearest = s.id
+      nearest = s.leadId
     }
     // Focused distance: from the focused station, or from the nearest member of its complex.
     if (s.id === focusedId || (grouped && focusGroup.has(s.id))) fd = Math.min(fd, d)

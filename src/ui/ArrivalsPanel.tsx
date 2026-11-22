@@ -40,7 +40,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
   const { collapsed, collapse, expand } = usePanelToggle('station', headingRef)
   const bodyId = useId()
   const setHeading = useCallback((el: HTMLElement | null) => { headingRef.current = el }, [headingRef])
-  const station = network.stationById.get(stationId)
+  const station = network.groupById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   const access = accessLabel(station.access)
   const barLabel = `Arrivals at ${station.name}${access === null ? '' : `, ${access}${outages.noStepFree ? '; no step-free access now' : ''}.`}`
@@ -65,6 +65,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
         </div>
       )}
       <div id={bodyId} hidden={collapsed}>
+        {station.otherNames.length > 0 && <p className="mt-1 text-sm text-ink-dim">with {station.otherNames.join(', ')}</p>}
         <PartialAccessNote access={station.access} />
         <p className="-ml-2 mt-1 flex flex-wrap text-sm">
           <button type="button" onClick={() => onDirections('from')} className={LINK}>

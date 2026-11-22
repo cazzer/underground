@@ -55,9 +55,9 @@ interface HudProps {
   tripExits: ReadonlyMap<string, ExitLineView> | null
   /** The trip panel's transfer lines, by change leg key. */
   tripTransfers: ReadonlyMap<string, TransferLineView> | null
-  /** The focused station's complex siblings (siblingIdsOf): the trip panel treats them as the focused station. */
+  /** The focused station's complex siblings (its group's other members): the trip panel treats them as the focused station. */
   focusSiblings: readonly string[]
-  /** Any station's complex siblings (siblingIdsOf): a directions pick never pairs a station with its own complex. */
+  /** Any station's complex siblings (its group's other members): a directions pick never pairs a station with its own complex. */
   siblingsOf: (stationId: string) => readonly string[]
 }
 

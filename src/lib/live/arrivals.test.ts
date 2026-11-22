@@ -114,6 +114,45 @@ describe('arrivalsAt', () => {
   })
 })
 
+describe('arrivalsAt for a station complex', () => {
+  // Stations 102 and 103 as one: both members' stops, the north terminal (103) is one of them.
+  const both = { id: '102', stops: ['102N', '102S', '103N', '103S'], memberIds: ['102', '103'] }
+  const south = (tripId: string, arrivals: [string, number][]) => trip(tripId, '1', arrivals)
+
+  it('lists the trips of every member', () => {
+    const snap = snapshot([
+      south('131000_1..S03R', [['103S', NOW + 100], ['101S', NOW + 400]]),
+      south('131100_1..S03R', [['102S', NOW + 200], ['101S', NOW + 500]]),
+    ])
+    const [group] = arrivalsAt(snap, both, NOW, opts)
+    expect(group).toMatchObject({ direction: 'S', headsign: 'Stop 101', times: [NOW + 100, NOW + 200] })
+  })
+
+  it('skips a trip ending at any member, not only the lead', () => {
+    // The 1 north ends at 103: a member, so nobody boards it anywhere in the complex.
+    expect(arrivalsAt(snapshot([north(NOW + 100)]), both, NOW, opts)).toEqual([])
+    expect(arrivalsAt(snapshot([north(NOW + 100)]), { id: '102', stops: ['102N', '102S'] }, NOW, opts)).toHaveLength(1)
+  })
+
+  it('lists a trip seen at two members once, at its soonest', () => {
+    const snap = snapshot([south('131000_1..S03R', [['103S', NOW + 100], ['102S', NOW + 160], ['101S', NOW + 400]])])
+    const groups = arrivalsAt(snap, both, NOW, opts)
+    expect(groups).toHaveLength(1)
+    expect(groups[0]!.times).toEqual([NOW + 100])
+    expect(groups[0]!.tripKeys).toEqual(['l:131000_1..S03R'])
+  })
+
+  it('orders north first, then soonest', () => {
+    const pair = { id: '102', stops: ['102N', '102S', '999N'], memberIds: ['102', '999'] }
+    const snap = snapshot([
+      south('131000_1..S03R', [['102S', NOW + 10], ['101S', NOW + 300]]),
+      trip('128750_N..N70R', 'W', [['102N', NOW + 300]]),
+      north(NOW + 100),
+    ])
+    expect(arrivalsAt(snap, pair, NOW, opts).map((g) => `${g.direction}${g.routeId}`)).toEqual(['N1', 'NW', 'S1'])
+  })
+})
+
 describe('trip keys', () => {
   const trips = [
     trip('129600_1..N03R', '1', [['102N', NOW + 600]]),

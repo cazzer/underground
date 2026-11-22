@@ -8,7 +8,7 @@ const BAYSIDE = { lat: 40.7685, lon: -73.7771 }
 const BOSTON = { lat: 42.3601, lon: -71.0589 }
 
 function station(id: string, name: string, lat: number, lon: number): Station {
-  return { id, name, pos: toGround({ lat, lon }), routeIds: [], stops: [], access: { status: 'none' } }
+  return { id, name, pos: toGround({ lat, lon }), routeIds: [], stops: [], access: { status: 'none' }, leadId: id }
 }
 
 const stations = [
@@ -16,6 +16,8 @@ const stations = [
   station('R20', '14 St-Union Sq', 40.7347, -73.9906),
   station('G08', 'Jamaica Center', 40.7022, -73.8011),
 ]
+const groupsOf = (list: readonly Station[]) => new Map(list.map((s) => [s.id, { ...s, memberIds: [s.id], otherNames: [] }]))
+const groups = groupsOf(stations)
 const bounds: Bounds = { minX: -9000, maxX: 20000, minZ: -20000, maxZ: 9000 }
 
 describe('toFix', () => {
@@ -34,8 +36,17 @@ describe('toFix', () => {
 })
 
 describe('placeFix', () => {
+  it('lifts the nearest member of a complex to its group, with the distance to the member', () => {
+    const lead = station('A27', 'Times Sq-42 St', 40.7553, -73.9872)
+    const member = { ...station('R16', '42 St-Port Authority', 40.7573, -73.9897), leadId: 'A27' }
+    const group = { ...lead, memberIds: ['A27', 'R16'], otherNames: ['42 St-Port Authority'] }
+    const p = placeFix({ lat: 40.7574, lon: -73.9897, accuracyM: 10 }, [lead, member], new Map([['A27', group], ['R16', group]]), bounds)
+    expect(p?.nearest).toMatchObject({ id: 'A27', name: 'Times Sq-42 St', pos: lead.pos })
+    expect(p?.nearest.distanceM).toBeLessThan(20)
+  })
+
   it('puts a fix at Times Square near its station, projected through toGround', () => {
-    const p = placeFix({ ...TIMES_SQ, accuracyM: 20 }, stations, bounds)
+    const p = placeFix({ ...TIMES_SQ, accuracyM: 20 }, stations, groups, bounds)
     expect(p?.kind).toBe('near')
     if (p?.kind !== 'near') return
     expect(p.ground).toEqual(toGround(TIMES_SQ))
@@ -45,13 +56,13 @@ describe('placeFix', () => {
   })
 
   it('marks a fix inside the network but far from any station as far', () => {
-    const p = placeFix({ ...BAYSIDE, accuracyM: 20 }, stations, bounds)
+    const p = placeFix({ ...BAYSIDE, accuracyM: 20 }, stations, groups, bounds)
     expect(p?.kind).toBe('far')
     expect(p?.nearest.id).toBe('G08')
   })
 
   it('frames a far fix together with its nearest station', () => {
-    const p = placeFix({ ...BAYSIDE, accuracyM: 20 }, stations, bounds)
+    const p = placeFix({ ...BAYSIDE, accuracyM: 20 }, stations, groups, bounds)
     if (p?.kind !== 'far') throw new Error('expected far')
     const station = stations.find((s) => s.id === 'G08')!
     expect(p.viewCenter.x).toBeCloseTo((p.ground.x + station.pos.x) / 2)
@@ -60,25 +71,25 @@ describe('placeFix', () => {
   })
 
   it('frames a near fix on itself', () => {
-    const p = placeFix({ ...TIMES_SQ, accuracyM: 20 }, stations, bounds)
+    const p = placeFix({ ...TIMES_SQ, accuracyM: 20 }, stations, groups, bounds)
     if (p?.kind !== 'near') throw new Error('expected near')
     expect(p.viewCenter).toEqual(p.ground)
   })
 
   it('puts a fix far outside the network as outside, with the nearest station', () => {
-    const p = placeFix({ ...BOSTON, accuracyM: 20 }, stations, bounds)
+    const p = placeFix({ ...BOSTON, accuracyM: 20 }, stations, groups, bounds)
     expect(p?.kind).toBe('outside')
     expect(p).not.toHaveProperty('ground')
     expect(p?.nearest.id).toBe('G08')
   })
 
   it('has no placement for an empty network', () => {
-    expect(placeFix({ ...TIMES_SQ, accuracyM: 20 }, [], bounds)).toBeNull()
+    expect(placeFix({ ...TIMES_SQ, accuracyM: 20 }, [], groups, bounds)).toBeNull()
   })
 
   it('flips approximate just above the threshold', () => {
-    const at = placeFix({ ...TIMES_SQ, accuracyM: APPROXIMATE_M }, stations, bounds)
-    const over = placeFix({ ...TIMES_SQ, accuracyM: APPROXIMATE_M + 1 }, stations, bounds)
+    const at = placeFix({ ...TIMES_SQ, accuracyM: APPROXIMATE_M }, stations, groups, bounds)
+    const over = placeFix({ ...TIMES_SQ, accuracyM: APPROXIMATE_M + 1 }, stations, groups, bounds)
     expect(at?.kind === 'near' && at.approximate).toBe(false)
     expect(over?.kind === 'near' && over.approximate).toBe(true)
   })
@@ -86,7 +97,7 @@ describe('placeFix', () => {
   it('frames at least the floor radius, grows with accuracy, and caps the station contribution', () => {
     const lone = [station('127', 'Times Sq-42 St', 40.7553, -73.9872)]
     const radius = (lat: number, accuracyM: number) => {
-      const p = placeFix({ lat, lon: -73.9872, accuracyM }, lone, bounds)
+      const p = placeFix({ lat, lon: -73.9872, accuracyM }, lone, groupsOf(lone), bounds)
       return p?.kind === 'near' ? p.viewRadiusM : NaN
     }
     // Standing on the station with a small accuracy: the floor.
@@ -112,8 +123,8 @@ describe('failureFromCode', () => {
 })
 
 describe('locate state transitions', () => {
-  const near = placeFix({ ...TIMES_SQ, accuracyM: 20 }, stations, bounds) as Placement
-  const outside = placeFix({ ...BOSTON, accuracyM: 20 }, stations, bounds) as Placement
+  const near = placeFix({ ...TIMES_SQ, accuracyM: 20 }, stations, groups, bounds) as Placement
+  const outside = placeFix({ ...BOSTON, accuracyM: 20 }, stations, groups, bounds) as Placement
   const located: LocateState = { status: 'located', placement: near }
 
   it('keeps the last good placement while re-locating and after a failure', () => {

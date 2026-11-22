@@ -72,11 +72,11 @@ interface StreetLinesProps extends StationStreetsProps {
 /** Stations this far beyond the street label radius still block (their marker reaches in), meters. */
 const STATION_REACH_M = DESKTOP_LABEL_RADIUS_M + 50
 
-/** The stations near the layer whose markers are drawn: not the focused one, nor the members its interior covers
+/** The station groups (a complex's lead) near the layer whose markers are drawn: not the focused one, nor the members its interior covers
  *  (their markers are hidden with it). */
 function nearbyStations(network: Network, layer: StreetLayer, interior: InteriorModel | null): Ground[] {
   const hidden = new Set(interior ? interiorStationIds(interior) : [])
-  return network.stations
+  return network.stationGroups
     .filter((s) => s.id !== layer.stationId && !hidden.has(s.id))
     .filter((s) => Math.hypot(s.pos.x - layer.anchor.x, s.pos.z - layer.anchor.z) <= STATION_REACH_M)
     .map((s) => s.pos)

@@ -37,7 +37,7 @@ interface StationTiesProps {
  * for island platforms, roughly right for side platforms. One merged LineSegments2 drawn at the depth factor
  * (tilt.ts): scale.y follows it as the lines' does, so each tie ends on its sunken track; the opacity ramps in
  * once the tie is long enough to read (tieOpacity).
- * A focused station with an interior draws no marker, so its tie is left out too, and so are its complex siblings'
+ * A complex member that isn't its lead draws no marker, so no tie. A focused station with an interior draws no marker, so its tie is left out too, and so are its complex siblings'
  * (compactTies shifts the ties that remain to the front, in order, and the layer draws only those). With no interior
  * (focusedMarker) its marker stays and so does its tie; a station with no depth gets a short stub (stationTie.ts)
  * instead, written in the slot just after the drawn ties.
@@ -50,6 +50,8 @@ export function StationTies({ network, focusedMarker, hiddenSiblings }: StationT
     for (const [id, y] of network.stationTrackY) {
       const station = network.stationById.get(id)
       if (!station) throw new Error(`Station tie: unknown station ${id}`)
+      // A complex is one marker, at its lead: a tie hangs only under a drawn marker.
+      if (station.leadId !== id) continue
       indexOf.set(id, positions.length / 6)
       positions.push(station.pos.x, MARKER_Y, station.pos.z, station.pos.x, y, station.pos.z)
     }

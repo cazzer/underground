@@ -5,11 +5,16 @@ export interface SearchableStation {
   id: string
   name: string
   routeIds: readonly string[]
+  /** A complex's other member names (StationGroup.otherNames): matched too, a little below the name itself. */
+  otherNames?: readonly string[]
 }
 
 interface Entry<S extends SearchableStation> {
   station: S
+  /** The name's tokens. */
   tokens: readonly SearchToken[]
+  /** The other member names' tokens. */
+  aliases: readonly (readonly SearchToken[])[]
 }
 
 export interface SearchIndex<S extends SearchableStation> {
@@ -22,10 +27,19 @@ const FUZZY = 1
 /** Unmatched name words cost at most this much, so an exact word (3) always beats a prefix (2) by more. */
 const MAX_UNMATCHED_PENALTY = 0.9
 
+/** A match on another member's name scores this much below the same match on the station's own name, so a station's name beats an equal alias. */
+export const ALIAS_PENALTY = 0.5
+
 export const SEARCH_LIMIT = 20
 
 export function buildSearchIndex<S extends SearchableStation>(stations: readonly S[]): SearchIndex<S> {
-  return { entries: stations.map((station) => ({ station, tokens: searchTokens(station.name) })) }
+  return {
+    entries: stations.map((station) => ({
+      station,
+      tokens: searchTokens(station.name),
+      aliases: (station.otherNames ?? []).map(searchTokens),
+    })),
+  }
 }
 
 function isFuzzy(q: SearchToken, n: SearchToken, last: boolean): boolean {
@@ -95,7 +109,11 @@ export function searchStations<S extends SearchableStation>(index: SearchIndex<S
   if (q.length === 0) return []
   const scored: { station: S; score: number }[] = []
   for (const entry of index.entries) {
-    const score = scoreEntry(q, entry.tokens)
+    let score = scoreEntry(q, entry.tokens)
+    for (const alias of entry.aliases) {
+      const aliasScore = scoreEntry(q, alias)
+      if (aliasScore > 0) score = Math.max(score, aliasScore - ALIAS_PENALTY)
+    }
     if (score > 0) scored.push({ station: entry.station, score })
   }
   scored.sort(

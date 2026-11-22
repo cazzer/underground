@@ -15,7 +15,7 @@ interface TripPanelArgs {
   stationHeading: RefObject<HTMLElement | null>
   /** Where focus goes when the trip panel closes with no station panel under it. */
   searchButton: RefObject<HTMLElement | null>
-  /** Any station's complex siblings (siblingIdsOf): a directions pick never fills the other end from the target's complex. */
+  /** Any station's complex siblings (its group's other members): a directions pick never fills the other end from the target's complex. */
   siblingsOf: (stationId: string) => readonly string[]
 }
 

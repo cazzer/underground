@@ -38,7 +38,7 @@ interface TripPanelProps {
   exits: ReadonlyMap<string, ExitLineView> | null
   /** The transfer line of each change through a hand-authored complex, by its `transferKey`. */
   transfers: ReadonlyMap<string, TransferLineView> | null
-  /** The focused station's complex siblings (siblingIdsOf), for the "On the map" row. */
+  /** The focused station's complex siblings (its group's other members), for the "On the map" row. */
   focusSiblings: readonly string[]
   ref: Ref<HTMLElement>
 }
@@ -97,7 +97,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
 
   const names = tripNamesOf(network)
   const views = planViews(plan, tripNowS(arrivals, performance.now(), Date.now()), names)
-  const bar = tripBarText(ends, names.station)
+  const bar = tripBarText(ends, (id) => network.groupById.get(id)?.name ?? id)
   const message = tripMessage(ends, plan, showLoading)
   const placement = markedPlacement(locate.state)
   const loading = plan.status === 'loading'

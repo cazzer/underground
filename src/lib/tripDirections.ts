@@ -16,7 +16,7 @@ export interface DirectionsInput {
   current: TripEnds
   currentPlaces: TripPlaces
   focusedId: string | null
-  /** Any station's complex siblings (siblingIdsOf): no candidate may be the target or one of them. */
+  /** Any station's complex siblings (its group's other members): no candidate may be the target or one of them. */
   siblingsOf: (stationId: string) => readonly string[]
   /** The marked location fix (markedPlacement), read here and kept nowhere. */
   fix: MarkedPlacement | null

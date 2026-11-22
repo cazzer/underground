@@ -11,12 +11,13 @@ const east = (g: Ground, m: number): Ground => ({ x: g.x + m, z: g.z })
 const flewTo = (center: Ground, radiusM = 250, nearestId = 'A'): LocateMemory => ({ center, radiusM, nearestId })
 
 function station(id: string, lat: number, lon: number): Station {
-  return { id, name: id, pos: toGround({ lat, lon }), routeIds: [], stops: [], access: { status: 'none' } }
+  return { id, name: id, pos: toGround({ lat, lon }), routeIds: [], stops: [], access: { status: 'none' }, leadId: id }
 }
 const stations = [station('A', 40.7347, -73.9906), station('B', 40.7527, -73.9772), station('C', 40.6926, -73.9871), station('D', 40.8296, -73.9262)]
+const groups = new Map(stations.map((s) => [s.id, { ...s, memberIds: [s.id], otherNames: [] }]))
 const bounds: Bounds = { minX: -12000, maxX: 12000, minZ: -22000, maxZ: 12000 }
 const marked = (lat: number, lon: number, accuracyM = 30): MarkedPlacement => {
-  const p = placeFix({ lat, lon, accuracyM }, stations, bounds)
+  const p = placeFix({ lat, lon, accuracyM }, stations, groups, bounds)
   if (!p || p.kind === 'outside') throw new Error('fixture fix is not marked')
   return p
 }
@@ -65,7 +66,7 @@ describe('geocodeFocus', () => {
     for (let i = 0; i < 200; i++) {
       const lat = minLat + rand() * (maxLat - minLat)
       const lon = minLon + rand() * (maxLon - minLon)
-      const placement = placeFix({ lat, lon, accuracyM: 20 + rand() * 400 }, stations, bounds)
+      const placement = placeFix({ lat, lon, accuracyM: 20 + rand() * 400 }, stations, groups, bounds)
       if (!placement || placement.kind === 'outside') continue
       tested++
       const locate = flewTo(placement.viewCenter, placement.viewRadiusM, placement.nearest.id)

@@ -27,7 +27,7 @@ export function FocusAnnouncer({ network, covered, panel }: FocusAnnouncerProps)
     const focusInPanelAtEntry = inPanel()
     if (!shouldAnnounce({ focusedId, covered, focusInPanelAtEntry, focusInPanelNow: false })) return
     const timer = setTimeout(() => {
-      const station = focusedId ? network.stationById.get(focusedId) : undefined
+      const station = focusedId ? network.groupById.get(focusedId) : undefined
       if (station && shouldAnnounce({ focusedId, covered, focusInPanelAtEntry, focusInPanelNow: inPanel() })) setText(focusAnnouncement(station.name))
     }, ANNOUNCE_DELAY_MS)
     return () => clearTimeout(timer)

@@ -1,6 +1,7 @@
 /** Where a geolocation fix lands on the map, and what the HUD should offer for it. Pure; no coordinates leave memory. */
 import type { Bounds, Station } from './network'
 import { toGround, type Ground } from './projection'
+import type { StationGroup } from './stationGroups'
 
 /** A fix this close to a station is "near": the camera flies to it. */
 export const NEAR_STATION_M = 2000
@@ -103,14 +104,27 @@ export function toFix(lat: number, lon: number, accuracyM: number): Fix | null {
   return ok ? { lat, lon, accuracyM } : null
 }
 
-/** Closest station to `ground` by straight-line distance; null for an empty network. */
-export function nearestStation(ground: Ground, stations: readonly Station[]): NearestStation | null {
-  let best: NearestStation | null = null
+/**
+ * Closest station to `ground` by straight-line distance; null for an empty network. A complex is one station, so the
+ * nearest member is lifted to its group's id, name and point; `distanceM` stays the distance to the member itself.
+ */
+export function nearestStation(
+  ground: Ground,
+  stations: readonly Station[],
+  groups: ReadonlyMap<string, StationGroup>,
+): NearestStation | null {
+  let best: Station | null = null
+  let bestM = Infinity
   for (const s of stations) {
     const d = Math.hypot(s.pos.x - ground.x, s.pos.z - ground.z)
-    if (!best || d < best.distanceM) best = { id: s.id, name: s.name, pos: s.pos, distanceM: d }
+    if (d < bestM) {
+      bestM = d
+      best = s
+    }
   }
-  return best
+  if (!best) return null
+  const group = groups.get(best.id) ?? best
+  return { id: group.id, name: group.name, pos: group.pos, distanceM: bestM }
 }
 
 function insidePadded(g: Ground, b: Bounds): boolean {
@@ -124,9 +138,14 @@ function insidePadded(g: Ground, b: Bounds): boolean {
  * its nearest station together. Outside the network: no marker, just the nearest station. Null for an
  * empty network.
  */
-export function placeFix(fix: Fix, stations: readonly Station[], bounds: Bounds): Placement | null {
+export function placeFix(
+  fix: Fix,
+  stations: readonly Station[],
+  groups: ReadonlyMap<string, StationGroup>,
+  bounds: Bounds,
+): Placement | null {
   const ground = toGround({ lat: fix.lat, lon: fix.lon })
-  const nearest = nearestStation(ground, stations)
+  const nearest = nearestStation(ground, stations, groups)
   if (!nearest) return null
   const approximate = fix.accuracyM > APPROXIMATE_M
   if (nearest.distanceM <= NEAR_STATION_M) {
