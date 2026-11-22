@@ -1,5 +1,6 @@
 /** Reads the committed data/streets/ pin: the manifest and the shards must agree, and every station the manifest lists
- *  (`stationIds`) must be in public/data/stations.json with a named way near it. It does not compare feedVersion:
+ *  (`stationIds`) that is still in public/data/stations.json must have a named way near it (a station dropped from
+ *  the feed is skipped; build-streets.ts removes its file). It does not compare feedVersion:
  *  stations.json refreshes daily, and a station added since is only warned about by build-streets.ts. */
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
