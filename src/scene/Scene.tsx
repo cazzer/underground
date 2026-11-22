@@ -68,9 +68,11 @@ interface SceneProps {
   stationPaths: readonly StationPathDraw[]
   /** The trip's drawn exit's label, which the street labels place first; null for none. */
   exitLabel: ExitLabel | null
+  /** The trip panel is open: a landing there goes on framing the trip's path above the panel as it changes. */
+  tripOpen: boolean
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, stationPaths, exitLabel }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, stationPaths, exitLabel, tripOpen }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -153,6 +155,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         index={index}
         anchor={anchor}
         frame={priorityFrame}
+        tripOpen={tripOpen}
       />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.

@@ -103,6 +103,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             here={here}
             stationPaths={stationPaths}
             exitLabel={tripExit?.drawn ? tripExit.mapLabel : null}
+            tripOpen={trip.open}
           />
         )}
       </ErrorBoundary>

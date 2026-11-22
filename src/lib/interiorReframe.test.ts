@@ -135,15 +135,18 @@ describe('a bare station found out after the flight set off', () => {
   })
 })
 
-describe('awaiting the priority frame once the interior is framed', () => {
+describe('awaiting the priority frame with the trip panel open', () => {
   const union = { stationId: '635', memberStationIds: ['635', 'L03', 'R20'] }
   const frame = { stationId: 'L03', kind: 'frame' as const, reduced: false }
 
-  it('follows every framed interior, trip panel or not, and never a bare station', () => {
-    expect(nextAwaiting(awaiting)).toEqual({ ...awaiting, kind: 'frame' })
-    expect(nextAwaiting(frame)).toBe(frame)
-    expect(nextAwaiting({ stationId: 'L08', kind: 'streets', reduced: false })).toBeNull()
-    expect(nextAwaiting(null)).toBeNull()
+  it('follows an interior that is framed while the trip panel is open, and nothing else', () => {
+    expect(nextAwaiting(awaiting, true)).toEqual({ ...awaiting, kind: 'frame' })
+    expect(nextAwaiting(frame, true)).toBe(frame)
+    // Trip panel closed: the landing is final, so a later outage poll or panel resize never moves the camera.
+    expect(nextAwaiting(awaiting, false)).toBeNull()
+    expect(nextAwaiting(frame, false)).toBeNull()
+    expect(nextAwaiting({ stationId: 'L08', kind: 'streets', reduced: false }, true)).toBeNull()
+    expect(nextAwaiting(null, true)).toBeNull()
   })
 
   it("is ready once the frame is the loaded interior's and the interior covers the awaited member", () => {
@@ -155,11 +158,12 @@ describe('awaiting the priority frame once the interior is framed', () => {
     expect(frameReadyFor({ ...frame, kind: 'interior' }, { interiorId: '635' }, union)).toBe(false)
   })
 
-  it('drops on a focus change or a follow, and waits while there is no frame', () => {
+  it('drops on a focus change, a follow or the trip panel closing (missing), and waits while there is no frame', () => {
     const ready = { ...landed, focusedId: 'L03' }
     expect(reframeAction(frame, ready)).toBe('reframe')
     expect(reframeAction(frame, { ...ready, ready: false })).toBe('wait')
     expect(reframeAction(frame, { ...ready, focusedId: '635' })).toBe('drop')
     expect(reframeAction(frame, { ...ready, following: true })).toBe('drop')
+    expect(reframeAction(frame, { ...ready, missing: true })).toBe('drop')
   })
 })

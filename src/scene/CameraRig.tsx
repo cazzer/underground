@@ -44,9 +44,11 @@ interface CameraRigProps {
   anchor: FollowAnchor
   /** The loaded interior's priority frame (the trip's path there, the machines out of service): a flight there frames it. */
   frame: PriorityFrame | null
+  /** The trip panel is open: a framed interior goes on reframing onto its priority frame (useInteriorReframe). */
+  tripOpen: boolean
 }
 
-export function CameraRig({ network, insets, interior, index, panel, anchor, frame }: CameraRigProps) {
+export function CameraRig({ network, insets, interior, index, panel, anchor, frame, tripOpen }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -93,10 +95,10 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
   // Read by the fly effect through a ref: depending on these would re-fire a stale fly request.
   // onStart reads `network` here too, so it stays referentially stable (underground-by0).
   const streets = useStationStreets(focusedId)
-  const latest = useRef({ interior, panel, size, insets, maxDistance, network, streets, index, frame })
+  const latest = useRef({ interior, panel, size, insets, maxDistance, network, streets, index, frame, tripOpen })
   useLayoutEffect(() => {
-    latest.current = { interior, panel, size, insets, maxDistance, network, streets, index, frame }
-  }, [interior, panel, size, insets, maxDistance, network, streets, index, frame])
+    latest.current = { interior, panel, size, insets, maxDistance, network, streets, index, frame, tripOpen }
+  }, [interior, panel, size, insets, maxDistance, network, streets, index, frame, tripOpen])
 
   usePathProbe(frame, insets, panel)
   useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets, index, frame })

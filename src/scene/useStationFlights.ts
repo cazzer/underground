@@ -100,8 +100,8 @@ export function useStationFlights({
     // A bare station (the index lists no interior) awaits only its streets: nothing once they are cached, or once
     // its load found no file (null).
     const points = bareStationPoints(station.id, l.streets, l.index)
-    // A framed interior goes on awaiting its priority frame (the trip's path, the machines out; useInteriorReframe).
-    if (known) awaiting.current = { stationId: station.id, kind: 'frame', reduced }
+    // With the trip panel open, a framed interior goes on awaiting its priority frame (useInteriorReframe).
+    if (known) awaiting.current = l.tripOpen ? { stationId: station.id, kind: 'frame', reduced } : null
     else if (!stationIsBare(station.id, l.index)) awaiting.current = { stationId: station.id, kind: 'interior', reduced }
     else awaiting.current = l.streets === undefined ? { stationId: station.id, kind: 'streets', reduced } : null
     const dest = known
@@ -141,7 +141,7 @@ export function useStationFlights({
       dest = interiorFlight(f.stationId, interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide', frame, landingLook === 'half')
       if (turn === 'keep') dest.azimuth = f.azimuth
       f.turnDecided = true
-      awaiting.current = nextAwaiting(awaiting.current)
+      awaiting.current = nextAwaiting(awaiting.current, layout.current.tripOpen)
     }
     f.from.copy(c.target)
     f.fromDistance = camera.position.distanceTo(c.target)

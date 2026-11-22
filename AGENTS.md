@@ -157,8 +157,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);
     `useInteriorReframe.ts` frames an interior that loaded too late for its station flight (after LATE_TURN_PROGRESS
     or after landing): once landed, a 0.6-1 s eased flight onto it with the landing turn decided then (reduced motion
-    snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `ready` is `interiorReadyFor`, `interiorCovers(interior, awaited station)`, so a complex's other member reframes too, or for a bare station awaiting its streets (`kind: 'streets'`) `streetsReadyFor`: the same reframe onto its entrances, no turn; a framed interior goes on
-    awaiting its priority frame (`kind: 'frame'`, `nextAwaiting`, `frameReadyFor`; the trip's path, the machines out of service): its arrival, a change to it (a new set of machines out, not every /ene poll: Scene memoises on the ids) or a panel move (expanding the outage list) reframes onto it, no turn, until a gesture, a focus change, a follow or another flight; while there is no frame it waits; a reframe with nothing to move is skipped);
+    snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `ready` is `interiorReadyFor`, `interiorCovers(interior, awaited station)`, so a complex's other member reframes too, or for a bare station awaiting its streets (`kind: 'streets'`) `streetsReadyFor`: the same reframe onto its entrances, no turn; with the trip panel open a framed interior goes on
+    awaiting its priority frame (`kind: 'frame'`, `nextAwaiting`, `frameReadyFor`; the trip's path, then the machines out of service): its arrival, a change to it or a panel move reframes onto it, no turn, until a gesture, a focus change, a follow or the panel closing; with the trip panel closed the landing (which frames the machines out, as known by then, the late-interior reframe included) is final, so a later /ene poll, an outage list expanded or the trip panel opened never moves the camera (on a phone the expanded list leaves about 32 px above the panel, too little to frame anyway); a reframe with nothing to move is skipped);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
@@ -614,7 +614,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   rebuilds its four line layers only when that set changes (`interiorLayers`; `InteriorModel` itself never changes). `outIds` is a new
   array every render, so Scene keys on its joined ids for `outageFramePoints` (`lib/outageFrame.ts`: each machine's two drawn ends,
   `planEnds` over `connectorContext`, so a zero-run escalator's 30 degree run and its bank spread are where they draw), the camera's
-  priority frame (`lib/pathFrame.ts`).
+  priority frame (`lib/pathFrame.ts`), so a poll with the same machines out leaves a flight's destination alone.
   The panel alone also names machines only the equipment index lists (every station, interior or not): `useEquipmentIndex.ts` fetches
   `stations/equipment.json` (`loadEquipmentIndex.ts`, contract `equipmentSchema.ts`) on the first focus, only while `/ene` is configured
   (`loading` from the first render that wants it, a failure retried on the next focus change), and `eneIndexJoin.ts` (`joinPanelOutages`,

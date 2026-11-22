@@ -3,9 +3,10 @@ import { interiorCovers, interiorIdOf, type IndexLoad } from '../data/interiorLo
  * The "landed, awaiting interior" rule: a station flight that set off before its interior was known, and couldn't
  * frame it in flight (it arrived after LATE_TURN_PROGRESS, or after landing), reframes onto it once it is known and
  * the flight has landed. A bare station's flight awaits its streets the same way: their entrances join the framing
- * (freeFrame.ts). An interior's flight then keeps awaiting its priority frame (pathFrame.ts: the trip's path there
- * while the trip panel is open, and the machines out of service), and reframes onto it when it arrives, changes or the
- * panel moves, until a gesture or a focus change. Pure; useInteriorReframe applies it.
+ * (freeFrame.ts). Its landing frames the interior's priority frame (pathFrame.ts: the trip's path there, the machines
+ * out of service) when it has one. With the trip panel open an interior's flight then keeps awaiting that frame, and
+ * reframes onto it when it arrives, changes or the panel moves, until a gesture; with it closed the landing is final, so
+ * a later outage poll or panel resize never moves the camera. Pure; useInteriorReframe applies it.
  */
 
 /** A station flight that set off before its interior (or a bare station's streets) was known. A gesture, a new flight or a follow clears it. */
@@ -13,8 +14,8 @@ export interface AwaitingInterior {
   stationId: string
   /**
    * interior: the station has (or may have) an interior. streets: it has none, and its entrances are not loaded yet.
-   * frame: its interior is framed: its priority frame (the trip's path there, the machines out of service) is framed
-   * whenever it, or the panel, changes, while there is one.
+   * frame: its interior is framed and the trip panel is open: its priority frame (the trip's path there, then the
+   * machines out of service) is framed whenever it, or the panel, changes, while there is one.
    */
   kind: 'interior' | 'streets' | 'frame'
   /** Under reduced motion the reframe snaps, without a landing turn. */
@@ -38,9 +39,9 @@ export function frameReadyFor(
   return awaiting?.kind === 'frame' && frame !== null && interior !== null && frame.interiorId === interior.stationId && interiorCovers(interior, awaiting.stationId)
 }
 
-/** What an await becomes once its interior is framed: its priority frame; a bare station's streets are done. */
-export function nextAwaiting(awaiting: AwaitingInterior | null): AwaitingInterior | null {
-  if (!awaiting || awaiting.kind === 'streets') return null
+/** What an await becomes once its interior is framed: its priority frame while the trip panel is open, else nothing. */
+export function nextAwaiting(awaiting: AwaitingInterior | null, tripOpen: boolean): AwaitingInterior | null {
+  if (!awaiting || awaiting.kind === 'streets' || !tripOpen) return null
   return awaiting.kind === 'frame' ? awaiting : { ...awaiting, kind: 'frame' }
 }
 
@@ -76,7 +77,7 @@ export interface ReframeInput {
   focusedId: string | null
   /** What the flight awaits has loaded: interiorReadyFor, streetsReadyFor or frameReadyFor, by its kind. */
   ready: boolean
-  /** It never will: a bare station with no streets file (streetsMissingFor). */
+  /** It never will: a bare station with no streets file (streetsMissingFor), or a priority frame once the trip panel closed. */
   missing: boolean
 }
 

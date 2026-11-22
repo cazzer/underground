@@ -33,6 +33,7 @@ export interface ReframeLayout {
   network: Network
   /** What a landing on the loaded interior frames first (pathFrame.ts): the trip's path there, the machines out. */
   frame: PriorityFrame | null
+  tripOpen: boolean
 }
 
 interface InteriorReframeOptions {
@@ -55,9 +56,10 @@ interface InteriorReframeOptions {
  * Frames a station's interior that arrived too late for its flight: once the flight has landed and the interior is
  * known, a short eased flight (reframeDuration) moves onto the interior framing with the landing turn decided then;
  * reduced motion snaps there, no turn. A bare station's streets that arrived too late get the same, onto the framing
- * of its entrances (no turn). A framed interior then goes on awaiting its priority frame (the trip's path there while
- * the trip panel is open, the machines out of service): its arrival, a change to it or a move of the panel reframes onto
- * it (no turn), until a gesture, a focus change, a follow or another flight. Asked when the interior, the streets, the
+ * of its entrances (no turn). Either way the interior's priority frame (the trip's path, the machines out of service)
+ * is what it frames. While the trip panel is open a framed interior goes on awaiting that frame: its arrival, a change
+ * to it or a move of the panel reframes onto it (no turn), until a gesture, a focus change, a follow, another flight or
+ * the panel closing; with it closed the landing is final. Asked when the interior, the streets, the
  * index, the panel, the frame or the focus changes, and on landing; returns the landing call, which is stable (underground-by0). Runs per event, never per frame.
  */
 export function useInteriorReframe({
@@ -91,7 +93,7 @@ export function useInteriorReframe({
       following: following(),
       focusedId: focused.current,
       ready,
-      missing: streetsMissingFor(a, l.streets),
+      missing: streetsMissingFor(a, l.streets) || (a?.kind === 'frame' && !l.tripOpen),
     })
     if (action === 'none' || action === 'wait') return
     const c = controls.current
@@ -99,8 +101,8 @@ export function useInteriorReframe({
       awaiting.current = null
       return
     }
-    // An interior goes on awaiting its priority frame; streets are done.
-    awaiting.current = nextAwaiting(a)
+    // An interior goes on awaiting its priority frame while the trip panel is open; streets are done.
+    awaiting.current = nextAwaiting(a, l.tripOpen)
     flushMotion(c, camera)
     const az = c.getAzimuthalAngle()
     const eased = action === 'reframe'
