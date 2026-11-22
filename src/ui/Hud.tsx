@@ -108,6 +108,12 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
     setFocusReturns((n) => n + 1)
   }, [dismissNotice])
   const searchButton = useRef<HTMLButtonElement>(null)
+  // Closing the station panel (× or Esc) removes the element that had focus; it goes to Search, the way back in.
+  const closeStation = useCallback(() => {
+    const hadFocus = panel.current?.contains(document.activeElement) ?? false
+    dismiss()
+    if (hadFocus) searchButton.current?.focus({ preventScroll: true })
+  }, [dismiss])
   const search = useRef<StationSearchHandle>(null)
   // Mirrors the dialog's native open state (set on open and on its close event); the Esc guard reads it.
   const [searchOpen, setSearchOpen] = useState(false)
@@ -181,11 +187,11 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
       if (e.key !== 'Escape') return
       if (trainOpen) closeTrain()
       else if (noticeOpen) closeNotice()
-      else dismiss()
+      else closeStation()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedId, trainOpen, noticeOpen, searchOpen, dismiss, closeTrain, closeNotice])
+  }, [focusedId, trainOpen, noticeOpen, searchOpen, closeStation, closeTrain, closeNotice])
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
@@ -248,7 +254,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
             stationId={focusedId}
             live={live}
             arrivals={arrivals}
-            onClose={dismiss}
+            onClose={closeStation}
             interior={interior}
             ref={panel}
             headingRef={stationHeading}

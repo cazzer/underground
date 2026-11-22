@@ -8,6 +8,7 @@ import {
   MAX_TIMES_PER_GROUP,
   minutesAway,
   PAST_GRACE_S,
+  selectableArrival,
   type ArrivalOptions,
 } from './arrivals'
 
@@ -51,9 +52,9 @@ describe('arrivalsAt', () => {
       trip('128750_N..N70R', 'W', [['102N', NOW + 300]]),
     ])
     expect(arrivalsAt(snap, at102, NOW, opts)).toEqual([
-      { routeId: '1', direction: 'N', headsign: 'Stop 103', times: [NOW + 120, NOW + 600] },
-      { routeId: 'W', direction: 'N', headsign: 'Stop 103', times: [NOW + 300] },
-      { routeId: '1', direction: 'S', headsign: 'Stop 101', times: [NOW + 90] },
+      { routeId: '1', direction: 'N', headsign: 'Stop 103', times: [NOW + 120, NOW + 600], tripKeys: ['l:129600_1..N03R', 'l:129600_1..N03R'] },
+      { routeId: 'W', direction: 'N', headsign: 'Stop 103', times: [NOW + 300], tripKeys: ['l:128750_N..N70R'] },
+      { routeId: '1', direction: 'S', headsign: 'Stop 101', times: [NOW + 90], tripKeys: ['l:131000_1..S03R'] },
     ])
   })
 
@@ -94,7 +95,7 @@ describe('arrivalsAt', () => {
   it('falls back to the last predicted stop when the trip id cannot be joined', () => {
     const unjoined = trip('bogus', '1', [['102N', NOW + 60], ['103N', NOW + 160]])
     expect(arrivalsAt(snapshot([unjoined]), at102, NOW, opts)).toEqual([
-      { routeId: '1', direction: 'N', headsign: 'Stop 103', times: [NOW + 60] },
+      { routeId: '1', direction: 'N', headsign: 'Stop 103', times: [NOW + 60], tripKeys: ['l:bogus'] },
     ])
   })
 
@@ -110,6 +111,28 @@ describe('arrivalsAt', () => {
     const noRoutes: ArrivalOptions = { ...opts, routeById: new Map() }
     expect(arrivalsAt(snapshot([unknown]), at102, NOW, opts)[0]!.routeId).toBe('1')
     expect(arrivalsAt(snapshot([unknown]), at102, NOW, noRoutes)).toEqual([])
+  })
+})
+
+describe('trip keys', () => {
+  const trips = [
+    trip('129600_1..N03R', '1', [['102N', NOW + 600]]),
+    trip('129700_1..N03R', '1', [['102N', NOW + 100]]),
+    trip('129800_1..N03R', '1', [['102N', NOW + 300]], { assigned: false, timestamp: null }),
+  ]
+  const [group] = arrivalsAt(snapshot(trips), at102, NOW, opts)
+
+  it('keeps each time\'s trip key in step through the sort, as the map keys the trip', () => {
+    expect(group!.times).toEqual([NOW + 100, NOW + 300, NOW + 600])
+    expect(group!.tripKeys).toEqual(['l:129700_1..N03R', 'l:129800_1..N03R', 'l:129600_1..N03R'])
+  })
+
+  it('selects the soonest arrival whose train is drawn, and none when no train is', () => {
+    const drawn = new Set(['l:129600_1..N03R', 'l:129700_1..N03R'])
+    expect(selectableArrival(group!, drawn)).toEqual({ tripKey: 'l:129700_1..N03R', time: NOW + 100 })
+    // The not-yet-dispatched 129800 is listed but not drawn: the row skips to the next drawn train.
+    expect(selectableArrival(group!, new Set(['l:129600_1..N03R']))).toEqual({ tripKey: 'l:129600_1..N03R', time: NOW + 600 })
+    expect(selectableArrival(group!, new Set())).toBeNull()
   })
 })
 
