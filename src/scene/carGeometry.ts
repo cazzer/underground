@@ -1,4 +1,4 @@
-import { BufferAttribute, type BufferGeometry, ExtrudeGeometry, PlaneGeometry, Shape } from 'three'
+import { BufferAttribute, BufferGeometry, ExtrudeGeometry, Float32BufferAttribute, PlaneGeometry, Shape } from 'three'
 
 import { CAR_HEIGHT_M, CAR_WIDTH_M } from '../lib/carDims'
 
@@ -24,18 +24,62 @@ function shadeByNormal(geometry: BufferGeometry, side: number, end: number): Buf
   return geometry
 }
 
-/** Hexagonal section: vertical walls, then roof edges set in by `inset` at 45 degrees. */
-function prism(width: number, height: number, inset: number): BufferGeometry {
+/** Hexagonal section, counter-clockwise from +z: vertical walls, then roof edges set in by `inset` at 45 degrees. */
+function section(width: number, height: number, inset: number): [number, number][] {
   const w = width / 2
+  return [
+    [-w, 0],
+    [w, 0],
+    [w, height - inset],
+    [w - inset, height],
+    [-w + inset, height],
+    [-w, height - inset],
+  ]
+}
+
+function prism(width: number, height: number, inset: number): BufferGeometry {
+  const points = section(width, height, inset)
   const shape = new Shape()
-  shape.moveTo(-w, 0)
-  shape.lineTo(w, 0)
-  shape.lineTo(w, height - inset)
-  shape.lineTo(w - inset, height)
-  shape.lineTo(-w + inset, height)
-  shape.lineTo(-w, height - inset)
+  shape.moveTo(...points[0]!)
+  for (const p of points.slice(1)) shape.lineTo(...p)
   shape.closePath()
   return new ExtrudeGeometry(shape, { depth: 1, bevelEnabled: false }).translate(0, 0, -0.5)
+}
+
+/**
+ * The body's walls without its end faces, unit length along z, faces outward: drawn back faces only behind the
+ * bodies, a slightly larger copy is the selected train's outline. Open ends, so where two cars' shells meet at a
+ * joint no end face crosses the next car. The train's own two ends need a face (a ray past the far roof edge would
+ * leave through the open end and draw nothing): createCarOutlineCapGeometry, placed by writeEndCaps.
+ */
+export function createCarOutlineGeometry(): BufferGeometry {
+  const points = section(CAR_WIDTH_M, CAR_HEIGHT_M, CAR_ROOF_INSET_M)
+  const positions: number[] = []
+  for (let i = 0; i < points.length; i++) {
+    const [ax, ay] = points[i]!
+    const [bx, by] = points[(i + 1) % points.length]!
+    // A counter-clockwise section: (a, b, b'), (a, b', a') winds outward.
+    positions.push(ax, ay, -0.5, bx, by, -0.5, bx, by, 0.5, ax, ay, -0.5, bx, by, 0.5, ax, ay, 0.5)
+  }
+  const geometry = new BufferGeometry()
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3))
+  return geometry
+}
+
+/** The outline tube's rear end face at z = -0.5, facing -z (a front cap is the same face turned about y). */
+export function createCarOutlineCapGeometry(): BufferGeometry {
+  const points = section(CAR_WIDTH_M, CAR_HEIGHT_M, CAR_ROOF_INSET_M)
+  const positions: number[] = []
+  // A fan over the convex section, wound clockwise seen from +z so it faces -z.
+  for (let i = 1; i + 1 < points.length; i++) {
+    const [ax, ay] = points[0]!
+    const [bx, by] = points[i + 1]!
+    const [cx, cy] = points[i]!
+    positions.push(ax, ay, -0.5, bx, by, -0.5, cx, cy, -0.5)
+  }
+  const geometry = new BufferGeometry()
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3))
+  return geometry
 }
 
 /**
