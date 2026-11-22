@@ -10,6 +10,8 @@ import type { Buffers } from './interiorSegments'
 import { connectorContext, RAIL_DROP_M } from './interiorGeometry'
 import { NOT_INTERIOR_FILES } from '../../scripts/lib/stationIndex.ts'
 import { BOARD_HALF_M, exitPathBuffers, exitPathCenterline } from './interiorPath'
+import { chooseTransfer } from './interiorTransfer'
+import { nearestOnPolyline } from './planGeometry'
 
 const DIR = 'public/data/stations'
 const interiors = readdirSync(DIR)
@@ -72,5 +74,30 @@ describe('the exit path on every committed interior', () => {
     expect(drawn).toBeGreaterThan(300)
     // Union Sq (635) has three decks: its paths cross the bands between them.
     expect([...midBand]).toContain('635')
+  })
+})
+
+describe('the transfer path at Union Sq', () => {
+  it('draws every transfer between its members, dashed, ending on the next train track', () => {
+    const interior = interiors.find((i) => i.stationId === '635')!
+    const decks = interiorDecks(interior)
+    const stops = [...new Set(interior.platforms.flatMap((p) => p.tracks.map((t) => t.stopId)))]
+    let drawn = 0
+    for (const from of stops) {
+      for (const to of stops) {
+        if (from.slice(0, -1) === to.slice(0, -1)) continue
+        const where = `${from} to ${to}`
+        const choice = chooseTransfer({ interior, fromStop: from, toStop: to })
+        if (choice.kind !== 'transfer' || choice.connectorIds.length === 0) continue
+        const layers = exitPathBuffers(interior, choice, { ...opts, decks, dashInStation: choice.probable })
+        expect(layers.dashed, where).toBe(true)
+        const last = exitPathCenterline(interior, choice, opts).at(-1)!
+        const track = interior.platforms.find((p) => p.id === choice.areaIds.at(-1))!.tracks.find((t) => t.stopId === to)!
+        expect(nearestOnPolyline(track.path, [last.p[0], last.p[2]]).distance, where).toBeLessThan(1e-6)
+        expect(last.p[1], where).toBeCloseTo(interior.levels[last.level]!.y * Y, 9)
+        drawn++
+      }
+    }
+    expect(drawn).toBe(24)
   })
 })

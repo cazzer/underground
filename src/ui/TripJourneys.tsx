@@ -1,9 +1,11 @@
 import { useId, useRef, useState } from 'react'
 import type { ExitLineView } from '../lib/exitView'
 import type { Network } from '../lib/network'
+import type { TransferLineView } from '../lib/transferView'
 import type { JourneyView, LegView, RideLegView } from '../lib/tripView'
 import { RouteChip } from './RouteChip'
 import { TripExitLine } from './TripExitLine'
+import { TripTransferLine } from './TripTransferLine'
 
 interface TripJourneysProps {
   network: Network
@@ -16,6 +18,8 @@ interface TripJourneysProps {
   onShowTrain: (tripId: string) => void
   /** The way out at the To station, by the trip id of a journey's last ride. */
   exits: ReadonlyMap<string, ExitLineView> | null
+  /** The way through a complex at a change, by the change leg's `transferKey`. */
+  transfers: ReadonlyMap<string, TransferLineView> | null
 }
 
 interface LegProps {
@@ -26,6 +30,7 @@ interface LegProps {
   drawnKeys: ReadonlySet<string> | null
   onStation: (stationId: string) => void
   onShowTrain: (tripId: string) => void
+  transfers: ReadonlyMap<string, TransferLineView> | null
 }
 
 interface StationLinkProps {
@@ -77,12 +82,16 @@ function ShowTrain({ leg, routeName, drawn, onShowTrain }: ShowTrainProps) {
   )
 }
 
-function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain }: LegProps) {
+function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain, transfers }: LegProps) {
   if (leg.kind === 'change') {
+    const transfer = transfers?.get(leg.transferKey)
     return (
-      <li className="text-ink-dim">
-        Change at {leg.name}
-        {leg.minutes !== null && ` · ${leg.minutes} min`}
+      <li>
+        <p className="text-ink-dim">
+          Change at {leg.name}
+          {leg.minutes !== null && ` · ${leg.minutes} min`}
+        </p>
+        {transfer && <TripTransferLine view={transfer} />}
       </li>
     )
   }
@@ -123,9 +132,10 @@ interface JourneyProps {
   drawnKeys: ReadonlySet<string> | null
   onShowTrain: (tripId: string) => void
   exits: ReadonlyMap<string, ExitLineView> | null
+  transfers: ReadonlyMap<string, TransferLineView> | null
 }
 
-function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTrain, exits }: JourneyProps) {
+function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTrain, exits, transfers }: JourneyProps) {
   const legsId = useId()
   const last = view.legs.at(-1)
   const exit = last?.kind === 'ride' ? exits?.get(last.tripId) : undefined
@@ -158,7 +168,16 @@ function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTr
       </button>
       <ol id={legsId} hidden={!open} className="flex flex-col gap-2 pb-3 pl-1 text-sm">
         {view.legs.map((leg, i) => (
-          <Leg key={i} network={network} leg={leg} mixed={view.source === 'mixed'} drawnKeys={drawnKeys} onStation={onStation} onShowTrain={onShowTrain} />
+          <Leg
+            key={i}
+            network={network}
+            leg={leg}
+            mixed={view.source === 'mixed'}
+            drawnKeys={drawnKeys}
+            onStation={onStation}
+            onShowTrain={onShowTrain}
+            transfers={transfers}
+          />
         ))}
         {exit && <TripExitLine view={exit} />}
       </ol>
@@ -167,7 +186,7 @@ function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTr
 }
 
 /** The journeys as disclosures, soonest arrival first; the first starts open, the rest collapsed. */
-export function TripJourneys({ network, views, onStation, drawnKeys, onShowTrain, exits }: TripJourneysProps) {
+export function TripJourneys({ network, views, onStation, drawnKeys, onShowTrain, exits, transfers }: TripJourneysProps) {
   // Only the ones the visitor toggled are kept; the rest follow the default (the first is open).
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(new Map())
   if (views.length === 0) return null
@@ -184,6 +203,7 @@ export function TripJourneys({ network, views, onStation, drawnKeys, onShowTrain
           drawnKeys={drawnKeys}
           onShowTrain={onShowTrain}
           exits={exits}
+          transfers={transfers}
         />
       ))}
     </ol>

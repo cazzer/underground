@@ -5,9 +5,7 @@ import {
   defaultEnds,
   journeySource,
   journeyView,
-  ON_MAP_QUIET_MS,
   orderJourneys,
-  shouldAnnounceOnMap,
   shouldAnnounceTrip,
   tripAnnouncement,
   tripMessage,
@@ -94,7 +92,7 @@ describe('journeyView', () => {
   it('joins two rides with a 0 s change that has no minutes', () => {
     const legs = [ride('L', 'L08', '635', T, T + 600), walk('635N', '635N', T + 600, 0, true), ride('4', '635', '630', T + 660, T + 900)]
     const v = journeyView(journey(legs, 1), NOW, names)
-    expect(v.legs[1]).toEqual({ kind: 'change', stationId: '635', name: '14 St-Union Sq', minutes: null })
+    expect(v.legs[1]).toEqual({ kind: 'change', stationId: '635', name: '14 St-Union Sq', minutes: null, transferKey: '635N>635N>4' })
     expect(v.transfersText).toBe('1 transfer')
     expect(v.routes).toEqual(['L', '4'])
     expect(v.spoken).toContain('15 minutes, 1 transfer: L, then 4.')
@@ -115,7 +113,7 @@ describe('journeyView', () => {
   it('calls a walk between two stations of one name a change', () => {
     const named: TripNames = { ...names, station: (id) => (id === 'L03' ? 'Union Sq' : id === '635' ? 'Union Sq' : names.station(id)) }
     const legs = [ride('L', 'L08', 'L03', T, T + 600), walk('L03N', '635N', T + 600, 180, false), ride('4', '635', '630', T + 840, T + 1200)]
-    expect(journeyView(journey(legs, 1), NOW, named).legs[1]).toEqual({ kind: 'change', stationId: '635', name: 'Union Sq', minutes: 3 })
+    expect(journeyView(journey(legs, 1), NOW, named).legs[1]).toEqual({ kind: 'change', stationId: '635', name: 'Union Sq', minutes: 3, transferKey: 'L03N>635N>4' })
   })
 
   it('rounds a short walk up to one minute', () => {
@@ -297,26 +295,5 @@ describe('tripNowS', () => {
   it('reads the live clock when a snapshot has set it, else the device clock', () => {
     expect(tripNowS({ offsetS: 1000 }, 5000, 9e12)).toBe(1005)
     expect(tripNowS(null, 5000, 1_800_000_000_000)).toBe(1_800_000_000)
-  })
-})
-
-describe('shouldAnnounceOnMap', () => {
-  const base = { focusedId: 'X', previousId: 'Y', shown: true, isEnd: false, planLoading: false, sinceSettledMs: null }
-  it('says a station that newly took focus while the panel is in front', () => {
-    expect(shouldAnnounceOnMap(base)).toBe(true)
-    expect(shouldAnnounceOnMap({ ...base, previousId: null })).toBe(true)
-  })
-  it('stays silent when focus did not change (opening, a swap, an end pick, the cover going)', () => {
-    expect(shouldAnnounceOnMap({ ...base, previousId: 'X' })).toBe(false)
-  })
-  it('stays silent with nothing focused, the panel not in front, or an end focused', () => {
-    expect(shouldAnnounceOnMap({ ...base, focusedId: null })).toBe(false)
-    expect(shouldAnnounceOnMap({ ...base, shown: false })).toBe(false)
-    expect(shouldAnnounceOnMap({ ...base, isEnd: true })).toBe(false)
-  })
-  it('never talks over a loading or just-settled result', () => {
-    expect(shouldAnnounceOnMap({ ...base, planLoading: true })).toBe(false)
-    expect(shouldAnnounceOnMap({ ...base, sinceSettledMs: ON_MAP_QUIET_MS - 1 })).toBe(false)
-    expect(shouldAnnounceOnMap({ ...base, sinceSettledMs: ON_MAP_QUIET_MS })).toBe(true)
   })
 })

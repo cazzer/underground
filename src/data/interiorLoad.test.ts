@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InteriorModel } from '../scene/interiorModel'
-import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, type IndexLoad, type InteriorLoad } from './interiorLoad'
+import { authoredInteriorIds, deriveInteriorLoad, focusedMarkerShown, interiorIdOf, type IndexLoad, type InteriorLoad } from './interiorLoad'
 
 const model = { stationId: 'L08' } as InteriorModel
 const empty = () => undefined
@@ -19,6 +19,25 @@ describe('interiorIdOf', () => {
   it('ignores inherited object keys', () => {
     expect(interiorIdOf('toString', ready)).toBeNull()
     expect(interiorIdOf('__proto__', ready)).toBeNull()
+  })
+})
+
+describe('authoredInteriorIds', () => {
+  it('lists each hand-authored interior file once, a complex by its file id, and no generated one', () => {
+    const index: IndexLoad = {
+      status: 'ready',
+      index: {
+        stations: {
+          L08: { provenance: 'authored' },
+          R20: { provenance: 'authored', file: '635' },
+          '635': { provenance: 'authored' },
+          L03: { provenance: 'authored', file: '635' },
+          A01: { provenance: 'generated' },
+        },
+      },
+    }
+    expect(authoredInteriorIds(index)).toEqual(['635', 'L08'])
+    expect(authoredInteriorIds({ status: 'loading' })).toEqual([])
   })
 })
 

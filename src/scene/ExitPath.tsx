@@ -2,10 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { Color } from 'three'
 import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
-import type { ExitChoice } from '../lib/exitChoice'
 import { MAX_DECKS } from '../lib/interiorDecks'
 import { RAIL_DROP_M } from '../lib/interiorGeometry'
-import { BOARD_HALF_M, exitPathBuffers } from '../lib/interiorPath'
+import { BOARD_HALF_M, exitPathBuffers, type StationPathChoice } from '../lib/interiorPath'
 import { interiorOpacity } from '../lib/interiorReveal'
 import { theme } from '../theme'
 import { cameraDistance } from './cameraDistance'
@@ -22,16 +21,18 @@ const NO_KEEP_OUT = new Float32Array(0)
 
 interface ExitPathProps {
   model: InteriorModel
-  choice: ExitChoice
+  /** The way out at the trip's To station, or a change of trains through the complex. */
+  choice: StationPathChoice
   /** Where the path's start goes for the level labels to keep clear of (StationInterior's); emptied on unmount. */
   keepOut: RefObject<Float32Array>
 }
 
 /**
- * The trip's way out over the focused interior, inside its group (so it shares the anchor, the depth factor and the
+ * The trip's way out, or its transfer, over the focused interior, inside its group (so it shares the anchor, the depth factor and the
  * visibility): one layer per stroke band (`model.decks`), each over that band's interior strokes and under the next
  * deck's lifted trains (`strokeOrders(band, count).exitPath`: 9.3 for band 0, 9.8 for the top band). It fades in with
- * the interior (`interiorOpacity`); dashed on an estimated layout or for an estimated walk.
+ * the interior (`interiorOpacity`); dashed on an estimated layout or for an estimated walk. A transfer marks both
+ * trains: where the rider steps off and the next train's track.
  */
 export function ExitPath({ model, choice, keepOut }: ExitPathProps) {
   const layers = useMemo(
@@ -49,7 +50,7 @@ export function ExitPath({ model, choice, keepOut }: ExitPathProps) {
       }),
     [model, choice],
   )
-  if (layers.bands.length > MAX_DECKS + 1) throw new Error(`Exit path at ${model.stationId}: ${layers.bands.length} bands; at most ${MAX_DECKS + 1} draw`)
+  if (layers.bands.length > MAX_DECKS + 1) throw new Error(`Station path at ${model.stationId}: ${layers.bands.length} bands; at most ${MAX_DECKS + 1} draw`)
   useEffect(() => {
     const ref = keepOut
     ref.current = layers.keepOut

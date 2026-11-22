@@ -10,6 +10,7 @@ import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
 import { useTrainSelection } from '../lib/trainSelection'
+import type { TransferLineView } from '../lib/transferView'
 import type { LocateControls } from '../data/useLocate'
 import { ArrivalsPanel } from './ArrivalsPanel'
 import { Attribution } from './Attribution'
@@ -48,9 +49,11 @@ interface HudProps {
   linkNotice: { show: boolean; onDismiss: () => void }
   /** The trip panel's exit lines, by the trip id of a journey's last ride. */
   tripExits: ReadonlyMap<string, ExitLineView> | null
+  /** The trip panel's transfer lines, by change leg key. */
+  tripTransfers: ReadonlyMap<string, TransferLineView> | null
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
@@ -252,6 +255,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             headingRef={tripHeading}
             covered={trainOpen || noticeOpen}
             exits={tripExits}
+            transfers={tripTransfers}
             ref={trainOpen || noticeOpen ? null : panel}
           />
         )}

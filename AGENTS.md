@@ -192,12 +192,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target; `STEP_RISE_M`); `interiorLook.ts` TEMPORARY look overrides;
     `StationInterior` renders its `children` inside the interior group
-  - `ExitPath.tsx` the trip's way out at its To station, a child of `StationInterior` (only while that interior is the
-    focused one, in an `ErrorBoundary`): `exitPathBuffers` in one LineMaterial layer per stroke band (`model.decks`), at
+  - `ExitPath.tsx` a station path (`StationPathChoice`): the trip's way out at its To station, or a change of trains
+    through a hand-authored complex (with a second marker on the next train's track), a child of `StationInterior`
+    (Scene's `stationPaths`, the first for the focused interior file; only while that interior is the focused one, in an
+    `ErrorBoundary` keyed by `stationPathKey`): `exitPathBuffers` in one LineMaterial layer per stroke band (`model.decks`), at
     `strokeOrders(band, count).exitPath`: over that band's strokes, under the next deck's lifted trains (9.3 band 0, 9.8
     the top band, 9.545 / 9.578 Union Sq's mid bands), `theme.exitPathWidth`, dashed (`exitPathDash`/`exitPathGap`)
     when the layout is estimated or the walk outside is; opacity `interiorOpacity`; `exitPathLook.ts` TEMPORARY look flags.
-    It hands its start (`ExitPathLayers.keepOut`) to the level labels, which drop just below it on screen
+    It hands its start and markers (`ExitPathLayers.keepOut`) to the level labels, which drop just below it on screen
     (`src/lib/labelKeepOut.ts`). The exit's entrance (`TripExit.mapLabel`: ground x/z and raw type) goes to
     `StationStreets` as `exitLabel`, which finds it in the street file it shows (`exitEntranceIndex`, within 1.5 m, same
     type; any complex member's file); the label with it among its `EntranceText.members` (its own index plus each same-text
@@ -386,24 +388,35 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`distanceToRing`, a client copy of the scripts one, `nearestOnPolyline`, `slicePolyline`); `walkRoute.ts`
     (`walkQuery` per-edge seconds at `WALK_SPEED_MPS` with roads x1.3 and, step-free, no steps, plus the largest connected
     component; `snapToWalk` the nearest point on an edge of it; `routeWalk` multi-source A* with a virtual target, so exits
-    snap to edge points, not nodes); `interiorGraph.ts` (`endpointArea`: authored `Endpoint.area`, else the outline within
-    0.5 m; `routesToStreet`: Dijkstra from a stop's platform over connectors (stair/escalator 0.5 m/s of slope, elevator 45 s
-    plus 1 m/s, ramp and walkway at walking pace, escalators one way when `travel` says so; step-free keeps elevator, ramp,
-    walkway) and same-area walks, to each exit: an `exit: true` entrance, or the street end of a connector no entrance lists,
-    `entranceId` null); `exitChoice.ts` (`chooseExit`: the exit minimizing in-station plus outside time, the outside walk
+    snap to edge points, not nodes); `interiorGraphCore.ts` the graph both searches share (`buildInteriorGraph`: connector
+    ends as nodes, connectors priced stair/escalator 0.5 m/s of slope, elevator 45 s plus 1 m/s, ramp and walkway at walking
+    pace, escalators one way when `travel` says so; step-free keeps elevator, ramp, walkway; same-area walks; transfer mode
+    drops every connector with an end on the street or in a `paid: false` slab, so a transfer never leaves fare control;
+    `shortestFrom` the multi-source Dijkstra from a stop's tracks, `pathBack`); `interiorGraph.ts` (`endpointArea`: authored
+    `Endpoint.area`, else the outline within 0.5 m; `routesToStreet`: from a stop's platform to each exit, an `exit: true`
+    entrance, or the street end of a connector no entrance lists, `entranceId` null; exits may cross unpaid slabs);
+    `interiorTransfer.ts` (`transferRoute`, track to track in transfer mode, or across one platform with no connector;
+    `chooseTransfer`: the quickest plus `stepFreeAlt` when it has steps; `probable` for an estimated layout or
+    `paidAssumed`, a slab with no `paid` stood on); `complexFixture.ts` the tests' two-deck complex (T01/U01, a direct
+    stair, elevators, a walkway, override helpers); `exitChoice.ts` (`chooseExit`: the exit minimizing in-station plus outside time, the outside walk
     over the shard when the destination is within its radius, else a straight-line estimate at `WALK_DETOUR` 1.3;
     `probable` for a generated or `approximate` interior; `street` joins the street-file entrance within 1.5 m of the same type;
     `walkMinutes`; `quickestExit`: no destination, the least in-station time, `walk` and `destination` null;
-    `streetEntranceIndex`); `interiorPath.ts` (`exitPathBuffers`: an `ExitChoice` as group-local buffers: from platform
+    `streetEntranceIndex`); `interiorPath.ts` (`exitPathBuffers`: a `StationPathChoice` (exit or transfer; the walk itself in
+    `interiorPathWalk.ts`) as group-local buffers: from platform
     height over the track point below the first connector, each connector's centerline between its drawn ends
     (`planEnds` in interiorConnectors.ts, shared with the drawing; `connectorContext` in interiorGeometry.ts), the street
     walk to the exit, then the walk outside (solid over the graph, one dashed line when estimated), a board marker (the
     track at rail height, `BOARD_HALF_M` 9 either side), and with restroke each connector redrawn and the exit's entrance
-    square 1 m larger; `interiorPathStrokes.ts` its writers: one per stroke band (`strokeBandOf`), a connector crossing
+    square 1 m larger; a transfer instead ends on the next train's track with a second marker, no walk outside or
+    square; `interiorPathStrokes.ts` its writers: one per stroke band (`strokeBandOf`), a connector crossing
     bands cut at each deck roof it spans (`bandCutYs`, nested SplitAtY like the interior's), the restroke; one dash phase
     runs along the path, across bands); `exitView.ts` (`finalRideStops`, `exitLineView`: the panel's
     "Quickest way out: Bedford Av & N 7 St" plus a dim note (label tail, "probably", walk, a machine's unknown status),
-    and the spoken sentence via `streetSpoken`); `walkFixture.ts` the tests' synthetic walk graphs
+    and the spoken sentence via `streetSpoken`; `machinesUsed`); `transferView.ts` (`transferLegs`, `transferLegKey`
+    (`from>to>nextRoute`), `transferLineView`: "Stairs up to the N platform", one phrase per connector in travel order,
+    merged when repeated; the dim note ("probably", a machine's unknown status) and step-free line; the spoken sentence);
+    `walkFixture.ts` the tests' synthetic walk graphs
   - `searchBucket.ts` which hash bucket a street or intersection entry is filed in and which one a query reads
     (`entryBucketKeys`, `queryBucketKey`, FNV-1a over the first two characters of the first distinctive token; `.ts` imports,
     scripts share it); `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
@@ -615,7 +628,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   loaders are their own chunk, not the startup bundle. `planTripBetween` expands each end to its complex (`lib/route/ends.ts`
   `complexMembers`: same-named stations linked in transfers.json) so a trip never starts or ends with a walk to a same-named station;
   `journeySource` tags a journey Live (every ride leg live), Live and scheduled (a dim "scheduled" on the others) or Scheduled, in the summary ("Leaves in 4 min · Live") and as the spoken sentence's last words; a live ride leg the map draws (`ArrivalsSource.drawnKeys`) has a "Show train" button calling `selectTrain`, so the train panel covers the trip and its × returns focus to the trip heading. A journey's key is its legs' routes and stops, not trip ids, so a scheduled-to-live swap keeps its disclosure and focus; the "Show train" button, once offered, stays as an `aria-disabled` no-op while the train is off the map. A silent poll that first turns a journey's tag from Scheduled to Live (or mixed) stays silent, like any refresh. `journeyView` still words a mid-trip walk between same-named stations as a change.
-  `src/lib/tripView.ts` (pure, tested): `defaultEnds` (a marked fix's nearest station is From, the focused station To; no fix: focused
+  `src/lib/tripView.ts` (pure, tested; `tripOnMap.ts` holds `shouldAnnounceOnMap`): `defaultEnds` (a marked fix's nearest station is From, the focused station To; no fix: focused
   is From), `tripMessage`, `orderJourneys`, `journeyView` (a journey departs with its first train), the spoken text, and the
   announce rules (`shouldAnnounceTrip`: a settled plan once, not a refresh). `TripAnnouncer.tsx` is the one polite live region for it,
   mounted in the HUD header (so it outlasts the panel being covered): it speaks a settled plan, the message for ends that can't be planned
@@ -625,7 +638,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   while the capped panel scrolls) with `TripEnds.tsx` (From/To rows take focus, then open their own `StationSearch`; a shortcut that fills an
   end returns focus to that row; "Nearest to you" never offers a From equal to To) and `TripJourneys.tsx` (disclosures, first open; a
   station name calls `select`, the only camera move; a journey ending on a train ends with `TripExitLine.tsx`, its way out: the
-  visible text and note aria-hidden, one sr-only sentence, never a live region). The header button's aria-expanded is true only while the panel is in front; pressing
+  visible text and note aria-hidden, one sr-only sentence, never a live region; a change through a hand-authored complex has
+  `TripTransferLine.tsx` under its "Change at …" row, the same way). The header button's aria-expanded is true only while the panel is in front; pressing
   it when a train or notice covers the panel (or the panel is closed) closes that cover first. × and Esc move focus only from inside the
   panel. The trip panel stays mounted (hidden, inert) under a train panel or notice, so its journeys, scroll and focus survive and a
   notice's auto-dismiss never moves focus; only an explicit open, the button, or a deliberate train/notice close focuses its heading.
@@ -1065,6 +1079,12 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   are closed, and the line says the status is unknown only when the station panel would: never while still connecting). The map draws the first journey's (ending on a train) at the To station while the trip panel
   is open, even under a train panel; only once that station is focused. It fetches no walk graph: only the DEV
   `__underground.exitTo(x, z | null)` seam aims it at a point (and loads that station's walk graph) until 2q7.14.
+- **Trip transfers.** While a plan is ready, `src/data/useTripTransfers.ts` loads every hand-authored interior in the index
+  (`authoredInteriorIds`, `useInteriorModels`; today 635 and L08, under 5 KB gzipped), not only the change station's, because
+  the change station is derived from the plan rather than chosen, and fetching it alone would reveal it. Each change whose two
+  stops are in one of them gets `chooseTransfer` (machines out avoided as for the exit) and a transfer line; the map draws the
+  first journey's change per interior that takes a connector. The router's change time stays transfers.json's (180 s at
+  Union Sq). Revisit fetching all of them above about 8 authored files.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
   `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it. Basemap tiles
   follow the camera, never the fix. After a location fly-to, tiles load no finer than z12 (several km a tile) until

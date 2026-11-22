@@ -125,3 +125,39 @@ export function useInteriorModel(id: string | null): InteriorModel | null {
   }, [id])
   return (id && cache.peek(id)) || null
 }
+
+const NO_MODELS: ReadonlyMap<string, InteriorModel> = new Map()
+
+/**
+ * Several interiors' models by file id, from the same cache: those loaded so far (a failure is logged and left out).
+ * The map keeps its identity until another one loads or `ids` changes (compared joined).
+ */
+export function useInteriorModels(ids: readonly string[]): ReadonlyMap<string, InteriorModel> {
+  const key = ids.join(',')
+  const [loaded, setLoaded] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    for (const id of key === '' ? [] : key.split(',')) {
+      if (cache.peek(id)) continue
+      cache.get(id).then(
+        () => {
+          if (!cancelled) setLoaded((n) => n + 1)
+        },
+        (err: unknown) => console.error(`Failed to load the interior of station ${id}`, err),
+      )
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [key])
+  return useMemo(() => {
+    if (key === '') return NO_MODELS
+    const out = new Map<string, InteriorModel>()
+    for (const id of key.split(',')) {
+      const model = cache.peek(id)
+      if (model) out.set(id, model)
+    }
+    return out
+    // `loaded` counts the loads that settled: a new one rebuilds the map.
+  }, [key, loaded])
+}

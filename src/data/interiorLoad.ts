@@ -54,6 +54,14 @@ export function interiorIdOf(stationId: string | null, index: IndexLoad): string
   return index.index.stations[stationId]!.file ?? stationId
 }
 
+/** The distinct interior file ids of the hand-authored stations in the index, sorted; none until it is ready. */
+export function authoredInteriorIds(index: IndexLoad): string[] {
+  if (index.status !== 'ready') return []
+  const ids = new Set<string>()
+  for (const [id, entry] of Object.entries(index.index.stations)) if (entry.provenance === 'authored') ids.add(entry.file ?? id)
+  return [...ids].sort()
+}
+
 /** Shared, so an unchanged "no siblings" keeps its identity. */
 export const NO_SIBLINGS: readonly string[] = Object.freeze([])
 

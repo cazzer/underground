@@ -2,9 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
 import { interiorStationIds } from '../data/interiorLoad'
-import type { ExitChoice } from '../lib/exitChoice'
 import type { LabelBlockers } from '../lib/labelBlockers'
 import type { Network } from '../lib/network'
+import { stationPathKey, type StationPathChoice } from '../lib/interiorPath'
 import { interiorOpacity, labelOpacity, veilWeight } from '../lib/interiorReveal'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
@@ -27,9 +27,9 @@ interface StationInteriorProps {
   outOfService: readonly string[]
   /** Where the level labels write their screen rects, for the street labels to keep clear of. */
   labelBlockers: LabelBlockers
-  /** The trip's way out here (ExitPath.tsx), drawn inside the group (its anchor, depth factor and visibility); the
-   *  level labels keep clear of its start. Null for none. */
-  exit: ExitChoice | null
+  /** The trip's way out or transfer here (ExitPath.tsx), drawn inside the group (its anchor, depth factor and
+   *  visibility); the level labels keep clear of its markers. Null for none. */
+  path: StationPathChoice | null
 }
 
 const NO_KEEP_OUT = new Float32Array(0)
@@ -41,7 +41,7 @@ const NO_KEEP_OUT = new Float32Array(0)
  * veil and DOM level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
-export function StationInterior({ model, network, outOfService, labelBlockers, exit }: StationInteriorProps) {
+export function StationInterior({ model, network, outOfService, labelBlockers, path }: StationInteriorProps) {
   // Every station the interior covers must be on the map: its spans, markers and camera all look them up.
   for (const id of interiorStationIds(model)) {
     if (!network.stationById.has(id)) throw new Error(`Interior ${model.stationId} covers unknown station "${id}"`)
@@ -125,9 +125,9 @@ export function StationInterior({ model, network, outOfService, labelBlockers, e
       {mid1Strong && <primitive object={mid1Strong} />}
       {overFine && <primitive object={overFine} />}
       {overStrong && <primitive object={overStrong} />}
-      {exit && (
-        <ErrorBoundary key={`${exit.stopId}>${exit.exit.entranceId ?? ''}`} fallback={null}>
-          <ExitPath model={model} choice={exit} keepOut={keepOut} />
+      {path && (
+        <ErrorBoundary key={stationPathKey(path)} fallback={null}>
+          <ExitPath model={model} choice={path} keepOut={keepOut} />
         </ErrorBoundary>
       )}
       </group>

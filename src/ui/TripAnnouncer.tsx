@@ -4,7 +4,8 @@ import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { Network } from '../lib/network'
 import { useTrip } from '../lib/trip'
-import { planViews, shouldAnnounceOnMap, shouldAnnounceTrip, tripAnnounceId, tripAnnouncement, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
+import { shouldAnnounceOnMap } from '../lib/tripOnMap'
+import { planViews, shouldAnnounceTrip, tripAnnounceId, tripAnnouncement, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
 
 /** A gap between clearing the region and refilling it, so the same sentence twice is spoken twice. */
 const REFILL_MS = 80
