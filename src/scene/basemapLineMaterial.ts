@@ -33,7 +33,7 @@ export interface ExtentUniforms {
   edgeBox: IUniform<Vector4>
   /** The bbox edge fade's width (edgeFadeFor), written per frame. */
   edgeFadeM: IUniform<number>
-  /** The network outline's half-planes (networkHull.ts): (nx, nz, c) each, HULL_MAX_EDGES of them. */
+  /** The network outline's half-planes (networkHull.ts): (nx, nz, c) each; the shader's NET_EDGES is their count. */
   netEdges: IUniform<Vector3[]>
   netPadM: IUniform<number>
   netFadeM: IUniform<number>
@@ -46,7 +46,7 @@ export function createExtentUniforms(
   netPadM: number,
   netFadeM: number,
 ): ExtentUniforms {
-  if (hull.length !== HULL_MAX_EDGES) throw new Error(`The network hull must have ${HULL_MAX_EDGES} edges, got ${hull.length}`)
+  if (hull.length < 1 || hull.length > HULL_MAX_EDGES) throw new Error(`The network hull must have 1 to ${HULL_MAX_EDGES} edges, got ${hull.length}`)
   return {
     edgeBox: { value: new Vector4(edge.minX, edge.maxX, edge.minZ, edge.maxZ) },
     edgeFadeM: { value: edgeFadeM },
@@ -70,7 +70,7 @@ const FRAG_COLOR_ANCHOR = 'gl_FragColor = vec4( diffuseColor.rgb, alpha );'
 const VERT_GLSL = /* glsl */ `
 uniform vec2 maskCenter;
 uniform vec4 edgeBox;
-uniform vec3 netEdges[ ${HULL_MAX_EDGES} ];
+uniform vec3 netEdges[ NET_EDGES ];
 varying vec2 vMaskOffset;
 varying vec4 vEdgeInside;
 varying float vNetOutside;
@@ -81,7 +81,7 @@ vec2 groundXZ = ( modelMatrix * vec4( position.y < 0.5 ? instanceStart : instanc
 vMaskOffset = groundXZ - maskCenter;
 vEdgeInside = vec4( groundXZ.x - edgeBox.x, edgeBox.y - groundXZ.x, groundXZ.y - edgeBox.z, edgeBox.w - groundXZ.y );
 vNetOutside = - 1e9;
-for ( int i = 0; i < ${HULL_MAX_EDGES}; i ++ ) vNetOutside = max( vNetOutside, dot( netEdges[ i ].xy, groundXZ ) - netEdges[ i ].z );
+for ( int i = 0; i < NET_EDGES; i ++ ) vNetOutside = max( vNetOutside, dot( netEdges[ i ].xy, groundXZ ) - netEdges[ i ].z );
 `
 
 export const MASK_GLSL = /* glsl */ `
@@ -142,5 +142,7 @@ export class BasemapLineMaterial extends LineMaterial {
     this.vertexShader = patchBasemapVertex(this.vertexShader)
     this.fragmentShader = patchBasemapFragment(this.fragmentShader)
     Object.assign(this.uniforms, mask, extent)
+    // The array and its loop are sized to the real hull; a different count is a different program.
+    this.defines = { ...this.defines, NET_EDGES: extent.netEdges.value.length }
   }
 }

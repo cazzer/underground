@@ -213,7 +213,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     class draws with `basemapLineMaterial.ts` (LineMaterial with three factors on its fragment alpha, a fragment at 0
     discarded; anchors throw, naming the file, if three moves them; not in `BAND_UNIFORMS`), all twins of
     `lib/basemap/edgeFade.ts` or `streetMask.ts`: the network fade (`NETWORK_GLSL` / `networkAlpha`: 1 within 5 km of
-    the stations' convex hull, `lib/basemap/networkHull.ts`, as at most 32 half-planes in a uniform array, then smoothstep
+    the stations' convex hull, `lib/basemap/networkHull.ts`, one half-plane per hull edge (at most 32; the vertex loop and uniform array
+    are sized by the `NET_EDGES` define), then smoothstep
     to 0 over 7 km more; the network's bounding box would sit outside the bbox once padded), the bbox edge (`EDGE_GLSL` /
     `edgeAlpha`: 0 at the spec bbox, in over `edgeFadeFor(distance)`, 4% of the camera distance held to 100 m..3 km and
     written per frame, so a station near the edge keeps its streets close in), and for roads the street mask

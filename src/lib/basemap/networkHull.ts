@@ -2,12 +2,12 @@
  * The network's outline for the basemap's network fade (edgeFade.ts `networkAlpha`): the convex hull of the station
  * points as at most HULL_MAX_EDGES half-planes, each an outward normal (nx, nz) and offset c, so a point's distance
  * outside is max(nx·x + nz·z − c) (≤ 0 inside; outside it is the distance to the nearest edge line, so the padded
- * outline keeps sharp corners, which a fade this wide hides). The shader loops over a fixed-size uniform array, so a
- * hull with more vertices drops the ones whose removal cuts the least area until it fits.
+ * outline keeps sharp corners, which a fade this wide hides). The shader sizes its loop to the edge count (a define), up
+ * to HULL_MAX_EDGES; a hull with more vertices drops the ones whose removal cuts the least area until it fits.
  */
 import type { Ground } from '../projection'
 
-/** The shader's array size; unused entries are `UNUSED_EDGE`. */
+/** The most edges the shader is given. */
 export const HULL_MAX_EDGES = 32
 
 export interface HullEdge {
@@ -16,7 +16,7 @@ export interface HullEdge {
   c: number
 }
 
-/** An edge no point is ever outside of: its term is −1e9 wherever the basemap draws. */
+/** An edge no point is ever outside of (its term is −1e9 wherever the basemap draws): a degenerate network's whole outline. */
 export const UNUSED_EDGE: HullEdge = { nx: 0, nz: 0, c: 1e9 }
 
 const cross = (o: Ground, a: Ground, b: Ground) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x)
@@ -52,10 +52,13 @@ function reduce(hull: Ground[], max: number): Ground[] {
   return out
 }
 
-/** The network outline as half-planes (outward normals), padded to HULL_MAX_EDGES with UNUSED_EDGE. Throws on fewer than 3 points. */
+/**
+ * The network outline as half-planes (outward normals), one per hull edge. Under 3 points that span an area there is no
+ * outline: the result is `[UNUSED_EDGE]`, so nothing fades (the caller says so; see `isNoOutline`).
+ */
 export function networkHull(points: readonly Ground[]): HullEdge[] {
   const hull = reduce(convexHull(points), HULL_MAX_EDGES)
-  if (hull.length < 3) throw new Error(`The network hull needs 3 points that are not collinear, got ${hull.length}`)
+  if (hull.length < 3) return [UNUSED_EDGE]
   const edges: HullEdge[] = []
   // monotone chain winds counterclockwise in (x, z): the outward normal of a→b is (dz, −dx).
   for (let i = 0; i < hull.length; i++) {
@@ -66,8 +69,12 @@ export function networkHull(points: readonly Ground[]): HullEdge[] {
     const nz = -(b.x - a.x) / len
     edges.push({ nx, nz, c: nx * a.x + nz * a.z })
   }
-  while (edges.length < HULL_MAX_EDGES) edges.push(UNUSED_EDGE)
   return edges
+}
+
+/** Whether `networkHull` found no outline (a degenerate network): the network fade is then off. */
+export function isNoOutline(edges: readonly HullEdge[]): boolean {
+  return edges.length === 1 && edges[0] === UNUSED_EDGE
 }
 
 /** How far (meters) the point lies outside the outline: ≤ 0 inside, the distance to the nearest edge line outside. */

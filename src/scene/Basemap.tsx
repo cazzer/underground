@@ -13,7 +13,7 @@ import type { BasemapConfig } from '../data/basemapConfig'
 import { classVisibility } from '../lib/basemap/classFade'
 import { edgeFadeFor, NETWORK_FADE_M, NETWORK_PAD_M, sceneBox } from '../lib/basemap/edgeFade'
 import { BASEMAP_CLASSES, type BasemapClass } from '../lib/basemap/featureClass'
-import { networkHull } from '../lib/basemap/networkHull'
+import { isNoOutline, networkHull } from '../lib/basemap/networkHull'
 import { maskInner, type StreetMask } from '../lib/basemap/streetMask'
 import { planPool } from '../lib/basemap/tilePool'
 import type { Station } from '../lib/network'
@@ -65,6 +65,7 @@ export function Basemap({ config, stations, mask }: BasemapProps) {
   const background = useMemo(() => new Color(theme.background), [])
   const { entries, extent, drawn } = useMemo(() => {
     const hull = networkHull(stations.map((s) => s.pos))
+    if (isNoOutline(hull)) console.warn(`Basemap: ${stations.length} stations span no area, so the network fade is off`)
     const extent = createExtentUniforms(sceneBox(config.bbox), edgeFadeFor(Infinity), hull, NETWORK_PAD_M, NETWORK_FADE_M)
     // Water and parks share a mask that is never written: strength 0, so they are never masked.
     const unmasked = createMaskUniforms()

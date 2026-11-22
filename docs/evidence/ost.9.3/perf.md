@@ -29,4 +29,6 @@ applies, p50 4.0 ms, max 12.3 ms (the first city tiles into empty pools); statio
 max 2.1 ms; zoom out 19, max 6.8 ms. Worker decode (off the main thread): mean 1.9 ms a tile, max 13 ms.
 
 Caveats: a desktop CPU slowed 4× is not a phone (memory bandwidth, thermal limits and the GPU differ), and headless
-Chrome composites differently; these are main-thread numbers. No physical phone was measured. The prod run has no dev hook, so the station step was not checked to land on L08 (in dev, with `select("L08")`, the numbers match).
+Chrome composites differently; these are main-thread numbers. The GPU was not throttled at all: the network fade's vertex loop
+(about n × 8 vertex invocations per drawn segment, n the hull's edge count, 11 today, sized by `NET_EDGES`) and the fragment work
+of the six layers are unmeasured on a phone GPU. No physical phone was measured. The prod run has no dev hook, so the station step was not checked to land on L08 (in dev, with `select("L08")`, the numbers match).
