@@ -22,6 +22,7 @@ import type { ScreenRect } from './lib/interiorCamera'
 import type { StationPathDraw } from './lib/interiorPath'
 import type { Network } from './lib/network'
 import type { BandedShapes } from './lib/networkBands'
+import { PanelCollapseProvider } from './lib/panelCollapse'
 import { TrainSelectionProvider } from './lib/trainSelection'
 import { TripProvider, useTrip } from './lib/trip'
 import { tripNamesOf } from './lib/tripView'
@@ -141,7 +142,9 @@ export function App() {
         {load.status === 'ready' ? (
           <TrainSelectionProvider layer={live.layer} network={load.network}>
             <TripProvider stations={load.files.stations} arrivals={live.arrivals}>
-              <MapView network={load.network} bands={load.bands} live={live} />
+              <PanelCollapseProvider>
+                <MapView network={load.network} bands={load.bands} live={live} />
+              </PanelCollapseProvider>
             </TripProvider>
           </TrainSelectionProvider>
         ) : (

@@ -66,8 +66,8 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const bottom = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLElement>(null)
   const locateButton = useRef<HTMLButtonElement>(null)
-  const stationHeading = useRef<HTMLHeadingElement>(null)
-  const tripHeading = useRef<HTMLHeadingElement>(null)
+  const stationHeading = useRef<HTMLElement>(null)
+  const tripHeading = useRef<HTMLElement>(null)
   const tripButton = useRef<HTMLButtonElement>(null)
   const { tripOpen, tripShown, toggleTrip, closeTrip } = useTripPanel({ locate, panel, stationHeading, tripHeading, tripButton })
   // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
@@ -89,7 +89,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     setFocusReturns((n) => n + 1)
   }, [dismissNotice])
   const searchButton = useRef<HTMLButtonElement>(null)
-  // Closing the station panel (× or Esc) removes the element that had focus; it goes to Search, the way back in.
+  // Closing the station panel (Esc) removes the element that had focus; it goes to Search, the way back in.
   const closeStation = useCallback(() => {
     const hadFocus = panel.current?.contains(document.activeElement) ?? false
     dismiss()
@@ -240,7 +240,6 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             stationId={focusedId}
             live={live}
             arrivals={arrivals}
-            onClose={closeStation}
             interior={interior}
             outages={outages}
             ref={panel}
@@ -253,7 +252,6 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             network={network}
             arrivals={arrivals}
             locate={locate}
-            onClose={closeTrip}
             headingRef={tripHeading}
             covered={trainOpen || noticeOpen}
             exits={tripExits}
