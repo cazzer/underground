@@ -3,9 +3,10 @@
  * and band inputs as one of its primary's segments gets the same pixels at every zoom, tilt, depth and band state
  * (the band shader reads nothing else), and the primary draws after every variant (buildLineBuffers' order), so
  * the merged route lines can leave it out. Only the drawn lines skip it: trains, picks and the realtime join keep
- * every shape's full track. About half of the variant segments are like this (shared GTFS points under the
- * primary's). The rest stay drawn: their unique stretches (express tracks, branches, short turns), shared stretches
- * resampled at other distances than the primary's, and those under the primary's platform fade. Pure.
+ * every shape's full track. About 57% of the variant segments are like this (shared GTFS points under the
+ * primary's, with the primary's bands there: corridorShare.ts). The rest stay drawn: their unique stretches (express
+ * tracks, branches, short turns), shared stretches resampled at other distances than the primary's or at other
+ * heights, and those under the primary's platform fade. Pure.
  */
 import type { ShapeId, StationId } from '../data/schema'
 import { BAND_INPUTS } from './lineBuffers'
