@@ -23,16 +23,17 @@ export function FocusAnnouncer({ network, covered, panel }: FocusAnnouncerProps)
   const [text, setText] = useState('')
   useEffect(() => {
     setText('')
-    if (!shouldAnnounce({ focusedId, covered, focusInPanel: false })) return
+    const inPanel = () => panel.current?.contains(document.activeElement) ?? false
+    const focusInPanelAtEntry = inPanel()
+    if (!shouldAnnounce({ focusedId, covered, focusInPanelAtEntry, focusInPanelNow: false })) return
     const timer = setTimeout(() => {
       const station = focusedId ? network.stationById.get(focusedId) : undefined
-      const focusInPanel = panel.current?.contains(document.activeElement) ?? false
-      if (station && shouldAnnounce({ focusedId, covered, focusInPanel })) setText(focusAnnouncement(station.name))
+      if (station && shouldAnnounce({ focusedId, covered, focusInPanelAtEntry, focusInPanelNow: inPanel() })) setText(focusAnnouncement(station.name))
     }, ANNOUNCE_DELAY_MS)
     return () => clearTimeout(timer)
   }, [focusedId, covered, network, panel])
   return (
-    <p role="status" aria-live="polite" className="sr-only">
+    <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
       {text}
     </p>
   )

@@ -5,17 +5,21 @@ export interface AnnounceInput {
   focusedId: string | null
   /** A train panel or the gone notice sits over the station panel. */
   covered: boolean
-  /** Focus is already inside the station panel, so its heading is (or will be) read out. */
-  focusInPanel: boolean
+  /** Focus was inside the station panel when the station was entered. */
+  focusInPanelAtEntry: boolean
+  /** Focus is inside the station panel now (the delay has passed). */
+  focusInPanelNow: boolean
 }
 
 /**
  * Whether the focused station's name is spoken once its delay has passed. Every way a panel opens is covered
- * (camera auto-focus, map tap, link, "Go to" button); only search moves focus to the heading itself, which
- * `focusInPanel` leaves silent. Never moves focus.
+ * (camera auto-focus, map tap, link, "Go to" button). It stays silent when focus *entered* the panel meanwhile
+ * (a search pick, or a closed train panel handing focus to the heading): that heading speaks. Focus already in
+ * the panel when the station changed (the panel isn't keyed by station, so A's heading keeps focus while its
+ * text becomes B) did not enter it, so B is announced. Never moves focus.
  */
-export function shouldAnnounce({ focusedId, covered, focusInPanel }: AnnounceInput): boolean {
-  return focusedId !== null && !covered && !focusInPanel
+export function shouldAnnounce({ focusedId, covered, focusInPanelAtEntry, focusInPanelNow }: AnnounceInput): boolean {
+  return focusedId !== null && !covered && !(!focusInPanelAtEntry && focusInPanelNow)
 }
 
 /** Live-region text for a newly focused station: the name alone. */
