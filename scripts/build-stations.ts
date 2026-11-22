@@ -17,6 +17,7 @@ import { CATALOG_FILES, generatorCatalog, generatorLines } from './lib/generator
 import { buildStationDepths } from './lib/stationDepths.ts'
 import { buildStationIndex, INDEX_FILE, NOT_INTERIOR_FILES } from './lib/stationIndex.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
+import { membersOf } from './lib/stationMembers.ts'
 import { markGenerated } from './lib/stationProvenance.ts'
 import { toStableJson } from './lib/stableJson.ts'
 
@@ -66,7 +67,7 @@ function main(): void {
   console.log(`generate: ${result.stations.length} stations generated, ${result.skipped.length} skipped`)
   for (const s of result.skipped) console.log(`generate: skipped ${s.stationId}: ${s.reason}`)
   const generated = result.stations
-  const authoredIds = new Set(ids)
+  const authoredIds = new Set(authoredInteriors.flatMap(membersOf))
   const skipped = generated.filter((g) => authoredIds.has(g.authored.stationId)).map((g) => g.authored.stationId)
   if (skipped.length > 0) console.log(`generated stations skipped (hand-authored wins): ${skipped.join(', ')}`)
   const generatedInteriors = generated

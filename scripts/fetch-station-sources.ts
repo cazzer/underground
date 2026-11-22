@@ -8,7 +8,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
-import { epochToIso, trimEntrances, trimEquipment, trimOverpassWays } from './lib/stationSources.ts'
+import { dedupeEntrances, dedupeEquipment, epochToIso, sodaFilter, trimEntrances, trimEquipment, trimOverpassWays } from './lib/stationSources.ts'
 import { toStableJson } from './lib/stableJson.ts'
 
 const DIR = new URL('../data/stations/', import.meta.url)
@@ -50,8 +50,8 @@ async function main(): Promise<void> {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ data: query }),
   })
-  const entrancesUrl = sodaUrl('i9wp-a4ja', { gtfs_stop_id: wanted.entrancesGtfsStopId })
-  const equipmentUrl = sodaUrl('94fv-bak7', { station_mrn: wanted.equipmentStationMrn })
+  const entrancesUrl = sodaUrl('i9wp-a4ja', sodaFilter('gtfs_stop_id', wanted.entrancesGtfsStopId))
+  const equipmentUrl = sodaUrl('94fv-bak7', sodaFilter('station_mrn', wanted.equipmentStationMrn))
   const entranceRows = await getJson(entrancesUrl)
   const equipmentRows = await getJson(equipmentUrl)
   assertNotTruncated(entranceRows, 'i9wp-a4ja')
@@ -62,8 +62,8 @@ async function main(): Promise<void> {
     stationId: id,
     fetchedAt: new Date().toISOString(),
     osm: { license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors', query, ...osm },
-    entrances: { dataset: 'i9wp-a4ja', url: entrancesUrl, rowsUpdatedAt: await rowsUpdatedAt('i9wp-a4ja'), rows: trimEntrances(entranceRows) },
-    equipment: { dataset: '94fv-bak7', url: equipmentUrl, rowsUpdatedAt: await rowsUpdatedAt('94fv-bak7'), rows: trimEquipment(equipmentRows) },
+    entrances: { dataset: 'i9wp-a4ja', url: entrancesUrl, rowsUpdatedAt: await rowsUpdatedAt('i9wp-a4ja'), rows: dedupeEntrances(trimEntrances(entranceRows)) },
+    equipment: { dataset: '94fv-bak7', url: equipmentUrl, rowsUpdatedAt: await rowsUpdatedAt('94fv-bak7'), rows: dedupeEquipment(trimEquipment(equipmentRows)) },
   }
   writeFileSync(new URL(`${id}.sources.json`, DIR), toStableJson(sources, 3))
   console.log(`${id}: ${sources.osm.ways.length} ways, ${sources.entrances.rows.length} entrance rows, ${sources.equipment.rows.length} equipment rows`)

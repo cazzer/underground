@@ -34,6 +34,23 @@ describe('expectStationInterior', () => {
   })
 })
 
+describe('expectStationInterior complex files', () => {
+  const complex = () => ({ ...valid(), memberStationIds: ['L08', 'L09'] })
+  it('accepts members with the file id first', () => {
+    const raw = complex()
+    expect(expectStationInterior(raw, 'L08', URL)).toBe(raw)
+  })
+
+  it.each([
+    ['one member', { memberStationIds: ['L08'] }],
+    ['members not starting with the file id', { memberStationIds: ['L07', 'L08'] }],
+    ['a non-string member', { memberStationIds: ['L08', 9] }],
+    ['members that are not a list', { memberStationIds: 'L08' }],
+  ])('throws for %s', (_name, over) => {
+    expect(() => expectStationInterior({ ...valid(), ...over }, 'L08', URL)).toThrow(`${URL}: not a station interior for L08`)
+  })
+})
+
 describe('loadStationInterior', () => {
   afterEach(() => vi.unstubAllGlobals())
 

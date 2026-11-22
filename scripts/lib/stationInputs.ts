@@ -8,18 +8,20 @@ export type FramePoint = [u: number, v: number]
 /** data/stations/<id>.authored.json, hand-edited. */
 export interface AuthoredStation {
   stationId: string
+  /** A station complex: every member's GTFS station id, sorted, `stationId` first (the file is named after it). */
+  memberStationIds?: string[]
   name: string
   /** Free text. Facts not confirmed by a source start with "UNVERIFIED:". Not copied to output. */
   notes: string[]
   frame: { anchor: LatLon; bearingDeg: number }
-  /** What fetch-station-sources pulls. */
-  fetch: { osmWays: number[]; entrancesGtfsStopId: string; equipmentStationMrn: string }
+  /** What fetch-station-sources pulls; a complex lists one value per member. */
+  fetch: { osmWays: number[]; entrancesGtfsStopId: string | string[]; equipmentStationMrn: string | string[] }
   levels: Level[]
   platforms: { id: string; level: LevelId; osmWay: number; tracks: { stopId: string; path: FramePoint[] }[] }[]
-  slabs: { id: string; level: LevelId; name: string; outline: FramePoint[] }[]
+  slabs: { id: string; level: LevelId; name: string; outline: FramePoint[]; paid?: boolean }[]
   /** Must cover every Open Data row exactly once; matched by the row's exact lat/lon (tolerance 1e-6 deg). */
   entrances: { id: string; source: [lat: number, lon: number] }[]
-  /** Stairs and ramps (no source provides them). Escalators/elevators come from E&E. */
+  /** Stairs, ramps and walkways (no source provides them). Escalators/elevators come from E&E. */
   connectors: AuthoredConnector[]
   /** Per-machine corrections to E&E rows, keyed by equipment code. */
   equipment: EquipmentOverride[]
@@ -27,10 +29,10 @@ export interface AuthoredStation {
 }
 /** `entrance` resolves to the entrance point at the street level: the upper end below ground, the lower end
  *  at an elevated station (the lower end must still be below the upper end). */
-export type AuthoredEnd = { level: LevelId; at: FramePoint } | { entrance: string }
+export type AuthoredEnd = { level: LevelId; at: FramePoint; area?: string } | { entrance: string }
 export interface AuthoredConnector {
   id: string
-  kind: 'stair' | 'ramp'
+  kind: 'stair' | 'ramp' | 'walkway'
   width: number
   lower: AuthoredEnd
   upper: AuthoredEnd

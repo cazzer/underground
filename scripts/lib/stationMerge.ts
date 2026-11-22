@@ -2,17 +2,18 @@
  *  StationInterior contract. Hand-edited input is read through the path-labelled checkers, so a bad
  *  field fails with its JSON path. No IO. */
 import type {
-  Connector, Endpoint, Entrance, FareLine, Level, LocalPoint, Platform, Slab, StationInterior,
+  Connector, Entrance, FareLine, Level, LocalPoint, Platform, Slab, StationInterior,
 } from '../../src/data/stationSchema.ts'
 import { bool, finite, list, oneOf, pair, record, text } from './check.ts'
 import type { Ctx } from './stationCtx.ts'
-import { entranceOf, levelOf, srcs } from './stationCtx.ts'
+import { levelOf, srcs } from './stationCtx.ts'
+import { buildAuthoredConnectors, checkContainment } from './stationConnectors.ts'
 import { buildMachines } from './stationEquipment.ts'
-import { distanceToRing, makeFrame, openRing } from './stationGeometry.ts'
+import { makeFrame, openRing } from './stationGeometry.ts'
 import type { AuthoredStation, StationSources } from './stationInputs.ts'
+import { checkMembers, trackOwner } from './stationMembers.ts'
 
 const ROW_TOLERANCE_DEG = 1e-6
-const CONTAINMENT_M = 0.5
 export const MTA_CREDIT = 'Metropolitan Transportation Authority, data.ny.gov'
 const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
   osm: '© OpenStreetMap contributors',
@@ -50,7 +51,7 @@ function buildLevels(authored: AuthoredStation): Level[] {
   return levels.sort((a, b) => b.y - a.y)
 }
 
-function buildPlatforms(authored: AuthoredStation, sources: StationSources, ctx: Ctx): Platform[] {
+function buildPlatforms(authored: AuthoredStation, members: readonly string[], sources: StationSources, ctx: Ctx): Platform[] {
   return list(authored.platforms, 'platforms').map((p, i): Platform => {
     const at = `platforms[${i}]`
     const r = record(p, at)
@@ -64,7 +65,7 @@ function buildPlatforms(authored: AuthoredStation, sources: StationSources, ctx:
     const tracks = list(r.tracks, `${at}.tracks`).map((t, j) => {
       const tr = record(t, `${at}.tracks[${j}]`)
       const stopId = text(tr.stopId, `${at}.tracks[${j}].stopId`)
-      if (!stopId.startsWith(authored.stationId)) throw new Error(`${at}.tracks[${j}].stopId: ${stopId} is not a stop of ${authored.stationId}`)
+      if (trackOwner(stopId, members) === undefined) throw new Error(`${at}.tracks[${j}].stopId: ${stopId} is not a stop of ${members.join(', ')}`)
       return { stopId, path: points(ctx, tr.path, `${at}.tracks[${j}].path`, 2) }
     })
     return { id, level: levelOf(ctx, r.level, `${at}.level`).id, outline: openRing(ring, `platform ${id}`), tracks, osmRef: `way/${wayId}`, sources: srcs('authored', 'osm') }
@@ -80,6 +81,7 @@ function buildSlabs(authored: AuthoredStation, ctx: Ctx): Slab[] {
       level: levelOf(ctx, r.level, `${at}.level`).id,
       name: text(r.name, `${at}.name`),
       outline: openRing(points(ctx, r.outline, `${at}.outline`, 3), `slab ${String(r.id)}`),
+      ...(r.paid === undefined ? {} : { paid: bool(r.paid, `${at}.paid`) }),
       sources: ['authored'],
     }
   })
@@ -129,43 +131,6 @@ function buildEntrances(authored: AuthoredStation, sources: StationSources, ctx:
   return out
 }
 
-function buildStairs(authored: AuthoredStation, ctx: Ctx, entrances: Map<string, Entrance>): Connector[] {
-  return list(authored.connectors, 'connectors').map((c, i): Connector => {
-    const at = `connectors[${i}]`
-    const r = record(c, at)
-    const id = text(r.id, `${at}.id`)
-    const end = (role: 'lower' | 'upper'): { end: Endpoint; viaEntrance: Entrance | undefined } => {
-      const e = record(r[role], `${at}.${role}`)
-      // Either end may be an entrance: it sits on the street, which is the lowest level at an elevated station.
-      // The lower-below-upper check then rejects an entrance end on the wrong side of the other end.
-      if ('entrance' in e) {
-        const entrance = entranceOf(entrances, e.entrance, `${at}.${role}.entrance`)
-        return { end: { x: entrance.x, z: entrance.z, level: ctx.street.id }, viaEntrance: entrance }
-      }
-      const [x, z] = ctx.frame.fromUV(pair(e.at, `${at}.${role}.at`))
-      return { end: { x, z, level: levelOf(ctx, e.level, `${at}.${role}.level`).id }, viaEntrance: undefined }
-    }
-    const lower = end('lower')
-    const upper = end('upper')
-    // Both ends on entrances would be two street ends; the elevation check below rejects that.
-    const viaEntrance = lower.viaEntrance ?? upper.viaEntrance
-    viaEntrance?.connectors.push(id)
-    const width = finite(r.width, `${at}.width`)
-    if (width <= 0) throw new Error(`${at}.width: must be > 0, got ${width}`)
-    if (ctx.levels.get(lower.end.level)!.y >= ctx.levels.get(upper.end.level)!.y) {
-      throw new Error(`${at} (${id}): lower end must be below the upper end`)
-    }
-    return {
-      id,
-      kind: oneOf(r.kind, ['stair', 'ramp'], `${at}.kind`),
-      lower: lower.end,
-      upper: upper.end,
-      width,
-      sources: srcs('authored', ...(viaEntrance ? (['nyopendata'] as const) : [])),
-    }
-  })
-}
-
 /** Every entrance has a connector of a matching kind, and no connector is listed by two entrances. Sorts each list. */
 export function checkEntranceLinks(entrances: Map<string, Entrance>, connectors: Connector[]): void {
   const owner = new Map<string, string>()
@@ -186,18 +151,6 @@ export function checkEntranceLinks(entrances: Map<string, Entrance>, connectors:
   }
 }
 
-function checkContainment(connectors: Connector[], areas: (Platform | Slab)[], ctx: Ctx): void {
-  for (const c of connectors) {
-    for (const [name, end] of [['lower', c.lower], ['upper', c.upper]] as const) {
-      if (ctx.levels.get(end.level)!.kind === 'street') continue
-      const nearest = Math.min(...areas.filter((a) => a.level === end.level).map((a) => distanceToRing([end.x, end.z], a.outline)))
-      if (!(nearest <= CONTAINMENT_M)) {
-        throw new Error(`connector ${c.id} ${name} end at ${end.x},${end.z} is ${nearest.toFixed(2)} m outside every polygon on level ${end.level}`)
-      }
-    }
-  }
-}
-
 export function buildStationInterior(authored: AuthoredStation, sources: StationSources): StationInterior {
   const stationId = text(authored.stationId, 'stationId')
   const levels = buildLevels(authored)
@@ -209,11 +162,13 @@ export function buildStationInterior(authored: AuthoredStation, sources: Station
     levels: new Map(levels.map((l) => [l.id, l])),
     street: levels.find((l) => l.kind === 'street')!,
   }
-  const platforms = buildPlatforms(authored, sources, ctx)
+  const members = checkMembers(stationId, authored.memberStationIds, 'memberStationIds')
+  const platforms = buildPlatforms(authored, members ?? [stationId], sources, ctx)
   const slabs = buildSlabs(authored, ctx)
   const fareLines = buildFareLines(authored, ctx)
   const entrances = buildEntrances(authored, sources, ctx)
-  const connectors = [...buildStairs(authored, ctx, entrances), ...buildMachines(authored, sources, ctx, entrances)]
+  const areas = new Map<string, Platform | Slab>([...platforms, ...slabs].map((a) => [a.id, a]))
+  const connectors = [...buildAuthoredConnectors(authored, ctx, entrances, areas), ...buildMachines(authored, sources, ctx, entrances)]
   checkEntranceLinks(entrances, connectors)
   checkContainment(connectors, [...platforms, ...slabs], ctx)
 
@@ -226,6 +181,7 @@ export function buildStationInterior(authored: AuthoredStation, sources: Station
   const used = new Set([...platforms, ...slabs, ...connectors, ...entranceList, ...fareLines].flatMap((e) => e.sources))
   return {
     stationId,
+    ...(members ? { memberStationIds: members } : {}),
     name: text(authored.name, 'name'),
     anchor: { lat: authored.frame.anchor.lat, lon: authored.frame.anchor.lon },
     license: 'ODbL-1.0',

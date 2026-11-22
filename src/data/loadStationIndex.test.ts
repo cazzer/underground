@@ -24,3 +24,22 @@ describe('expectStationIndex', () => {
     expect(() => expectStationIndex(raw, URL)).toThrow(URL)
   })
 })
+
+describe('expectStationIndex complex members', () => {
+  const base = { T01: { provenance: 'authored' }, U01: { provenance: 'authored', file: 'T01' } }
+  it('accepts an alias entry naming a listed interior', () => {
+    const raw = { stations: base }
+    expect(expectStationIndex(raw, URL)).toBe(raw)
+  })
+
+  it.each([
+    ['an unlisted target', { U01: { provenance: 'authored', file: 'T09' } }],
+    ['a chain', { ...base, V01: { provenance: 'authored', file: 'U01' } }],
+    ['itself', { T01: { provenance: 'authored', file: 'T01' } }],
+    ['a non-string file', { ...base, U01: { provenance: 'authored', file: 5 } }],
+    ['a path traversal', { ...base, U01: { provenance: 'authored', file: '../x' } }],
+    ['an inherited key', { U01: { provenance: 'authored', file: 'toString' } }],
+  ])('rejects %s', (_name, stations) => {
+    expect(() => expectStationIndex({ stations }, URL)).toThrow(URL)
+  })
+})

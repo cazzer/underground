@@ -107,3 +107,41 @@ export function parseServing(serving: string): Serving {
   if (parts.length > 2) throw new Error(`serving text has more than one " to " (multi-landing machines are unsupported): ${JSON.stringify(serving)}`)
   return { from: sideKind(parts[0]!), to: sideKind(parts[1]!), bothDirections: /both directions/i.test(serving) }
 }
+
+const SODA_VALUE = /^[A-Za-z0-9]+$/
+
+/**
+ * The SODA filter for one field: a single value is the plain equality parameter (so a single-station URL stays what
+ * it was), several are one `$where ... in(...)`. Values go into a SoQL string, so each is checked first.
+ */
+export function sodaFilter(field: string, values: string | readonly string[]): Record<string, string> {
+  const all = [values].flat()
+  if (all.length === 0) throw new Error(`${field}: no values to filter on`)
+  for (const v of all) {
+    if (!SODA_VALUE.test(v)) throw new Error(`${field}: ${JSON.stringify(v)} is not a plain id (letters and digits only)`)
+  }
+  if (all.length === 1) return { [field]: all[0]! }
+  return { $where: `${field} in(${all.map((v) => `'${v}'`).join(',')})` }
+}
+
+/** A point shared by two members' stops appears once per member in the dataset; drop the exact duplicates. */
+export function dedupeEntrances(rows: readonly EntranceRow[]): EntranceRow[] {
+  const seen = new Set<string>()
+  return rows.filter((r) => {
+    const key = JSON.stringify([r.type, r.entry, r.exit, r.lat, r.lon])
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/** One row per equipment code: an identical repeat is dropped, two rows that disagree throw. */
+export function dedupeEquipment(rows: readonly EquipmentRow[]): EquipmentRow[] {
+  const byCode = new Map<string, EquipmentRow>()
+  for (const r of rows) {
+    const prior = byCode.get(r.code)
+    if (prior === undefined) byCode.set(r.code, r)
+    else if (JSON.stringify(prior) !== JSON.stringify(r)) throw new Error(`equipment ${r.code}: two rows disagree (${JSON.stringify(prior)} and ${JSON.stringify(r)})`)
+  }
+  return [...byCode.values()]
+}

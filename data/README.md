@@ -56,6 +56,24 @@ be accurate.
 4. Commit the sources, the authored file, and `public/data/stations/` together. A test fails if the
    committed output is stale.
 
+## Station complexes
+
+One authored file can cover a station complex (a transfer between several GTFS stations). Name the file after the
+lowest-sorted member (`635.authored.json` for Union Sq; the catalog's complex id can collide with a GTFS station id) and
+add these keys, all optional and all written to the output only when authored:
+
+- `memberStationIds`: every member's GTFS station id, sorted, at least 2, `stationId` first. Track `stopId`s may belong to
+  any member; `public/data/station-depths.json` gets one entry per member, and `index.json` maps each other member to the
+  file (`{ provenance, file }`). A generated interior for any member is dropped ("hand-authored wins").
+- `fetch.entrancesGtfsStopId` and `fetch.equipmentStationMrn` become arrays, one value per member. `data:stations:fetch` then
+  asks with one `$where ... in(...)` filter and drops exact duplicate entrance rows and identical repeated equipment codes
+  (two equipment rows that disagree fail the fetch). Values are letters and digits only.
+- `slabs[].paid`: `true` inside fare control; leave it out when not stated.
+- A connector end's `area`: the id of the platform or slab it stands on (an `at` end only, on that end's level). The
+  containment check then tests that area alone, within 0.5 m. Optional on stairs and ramps; never inferred.
+- `kind: "walkway"` connectors join two areas on one non-street level: both ends `at` with an `area`, the two areas
+  different, a plan run of at least 1 m. The lower-below-upper rule does not apply. (Drawing them is not built yet.)
+
 ## Generated stations
 
 `npm run data:stations` also generates an interior for every station the archetype classifier puts in a template
