@@ -119,7 +119,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
   a dim aria-hidden `PartialAccessNote` line, then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only), nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
-  each pick (a "Follow train" button shows while the camera isn't following it, and puts focus back on the heading; its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
+  each pick (one row under the heading: "Following" with a Stop button while the camera follows the train, else a "Follow
+  train" button; the same button node, so toggling keeps focus and the panel's size; its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useStopListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
   notice, then the station, and closing either of the first two returns focus to the station heading or else
   the location button); `LoadStatus.tsx` loading/error panel
@@ -178,7 +179,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `focusMachine.ts` camera-driven focus transitions; `focusDwell.ts` `settled`, the 400 ms stillness auto-focus
     waits for; `focusHold.ts` interrupted-flight release rule; `follow.ts` the train follow's math (`followTargetInto`:
     the ground target that puts a world point on a screen point, exact under perspective at any height; the catch-up
-    ease, the 8 px pan break, the 100 px jump re-fly)
+    ease, the 8 px pan break (16 px on touch), the 100 px jump re-fly, `followDistanceFor`); `followStep.ts` `stepFollow`,
+    one follow frame (pan break, the 0.35 s lag `stepLag`, catch-up), tested on its own
   - `lineBuffers.ts` (positions, colors, `bands`: each segment end's band inputs from `vertexBandInputs` (miter
     vector normal / cosHalf, slot, corridor half-width), and `firstSegment` per shape), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
@@ -394,7 +396,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1100 to 800 m the interior fades in as a flat plan (depth 0.05 to 0.40); 800 to 400 m the levels
   separate and the veil and labels come in; at 400 m everything is full 3D.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
-  focused (focus engages inside 1100 m within 140 m of a station once the view has held still for 400 ms
+  focused or a train is followed (focus engages inside 1100 m within 140 m of a station once the view has held still for 400 ms
   (`ENTER_DWELL_S`: target and distance within 0.2% of the distance, no gesture active, and a gesture's end
   restarts the wait), so a pan across the city opens no panels; it drops at once past 1400 m or 350 m away;
   taps and flights focus immediately; `focusMachine.ts`): |azimuth| is capped by tilt, rising from 0 top-down to π at tiltT 0.67 and a full spin
@@ -422,15 +424,19 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   the follow anchor (with the last frame's band view); -2 CameraRig (the follow's `beforeFlight`, the flight step,
   focus, the polar lock) and the orbit's bounds; -1 drei's `update()`; -0.75 the train follow; -0.5 the orbit's pivot
   and pan clamp; -0.25 the band view; 0 the draws.
-- Selecting a train follows it (`useTrainFollow.ts`): a flight to 400 m (`FOLLOW_DISTANCE`) retargeted each frame to
-  the moving train, then at -0.75 target and camera move by one step so its dot sits mid-free-area (`followTargetInto`,
-  exact under perspective), so wheel zoom (zoom-to-cursor is off while following) and turns keep it there, and a turn
-  pivots on it (the orbit's pivot and pan clamp stand down; turning is armed as if focused). Discontinuities (a
-  flight cut short, a panel resize, a cut in the anchor) become a catch-up offset easing out at 5/s (snapped under
-  reduced motion); a cut over 100 px on screen re-flies at the current zoom. A pan of 8 px in one gesture ends the
-  follow (the train stays selected and its panel offers "Follow train"); Esc, ×, a station pick or search choice
-  (they clear the train) and the location button (`unfollow`) end it too. Auto-focus never enters while following;
-  its exits still apply.
+- Selecting a train follows it (`useTrainFollow.ts`): a flight retargeted each frame to the moving train, at the
+  distance where its consist spans 80% of the free width, held to 400..600 m (`followDistanceFor`; a desktop stays at
+  400), never started over another flight. Then at -0.75 `stepFollow` moves target and camera by one step so its dot
+  sits mid-free-area (`followTargetInto`, exact under perspective) through a critically damped 0.35 s lag that tracks
+  the train's velocity too: steady travel and stops settle exact, a departure or a catch-up glide is rounded off (a few
+  px at most). Wheel zoom (zoom-to-cursor is off while following) and turns keep it there, and a turn pivots on it
+  (the orbit's pivot and pan clamp stand down; turning is armed as if focused, and counts as the first turn).
+  Discontinuities (a flight cut short, a panel resize, a cut in the anchor) become a catch-up offset easing out at 5/s
+  (snapped under reduced motion); a cut over 100 px on screen re-flies at the current zoom. A pan of 8 px in one
+  gesture (16 px on touch, so a pinch's staggered release doesn't count) ends the follow; the train stays selected and
+  keeps the azimuth (a selected train holds it like a focused station; clearing it with no station focused springs
+  back to north-up). Esc, ×, a station pick or search choice (they clear the train), the panel's Stop and the
+  location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,

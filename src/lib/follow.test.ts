@@ -5,6 +5,11 @@ import {
   createFollowView,
   decayCatch,
   FOLLOW_BREAK_PX,
+  FOLLOW_BREAK_PX_TOUCH,
+  FOLLOW_DISTANCE,
+  FOLLOW_FIT,
+  FOLLOW_MAX_DISTANCE,
+  followDistanceFor,
   FOLLOW_CATCH_SNAP_M,
   FOLLOW_JUMP_PX,
   followTargetInto,
@@ -13,6 +18,7 @@ import {
   writeFollowView,
 } from './follow'
 import type { ScreenRect } from './interiorCamera'
+import { consistFor } from './live/consist'
 import { ISO_POLAR } from './tilt'
 
 const FOV = 35
@@ -95,9 +101,11 @@ describe('decayCatch', () => {
 })
 
 describe('thresholds', () => {
-  it('breaks the follow at the pan threshold', () => {
-    expect(panBroke(FOLLOW_BREAK_PX - 0.1)).toBe(false)
-    expect(panBroke(FOLLOW_BREAK_PX)).toBe(true)
+  it('breaks the follow at the pan threshold, larger on touch', () => {
+    expect(panBroke(FOLLOW_BREAK_PX - 0.1, false)).toBe(false)
+    expect(panBroke(FOLLOW_BREAK_PX, false)).toBe(true)
+    expect(panBroke(FOLLOW_BREAK_PX_TOUCH - 0.1, true)).toBe(false)
+    expect(panBroke(FOLLOW_BREAK_PX_TOUCH, true)).toBe(true)
   })
 
   it('flies over a jump bigger than the jump threshold on screen', () => {
@@ -111,5 +119,32 @@ describe('thresholds', () => {
     const a = project(new Vector3(0, 0, 0), new Vector3(), 400, 0.001, 0, 390, 844)
     const b = project(new Vector3(100 * mpp, 0, 0), new Vector3(), 400, 0.001, 0, 390, 844)
     expect(b.x - a.x).toBeCloseTo(100, 1)
+  })
+})
+
+describe('followDistanceFor', () => {
+  const ten = consistFor('A')
+  const tenM = ten.cars * ten.pitchM
+
+  it('keeps the landing distance on a desktop', () => {
+    expect(followDistanceFor(tenM, DESK, DESK_FREE, FOV)).toBe(FOLLOW_DISTANCE)
+  })
+
+  it('pulls back on a phone, to at most the cap', () => {
+    const d = followDistanceFor(tenM, PHONE, PHONE_FREE, FOV)
+    expect(d).toBeGreaterThan(FOLLOW_DISTANCE)
+    expect(d).toBeLessThanOrEqual(FOLLOW_MAX_DISTANCE)
+    expect(followDistanceFor(1000, PHONE, PHONE_FREE, FOV)).toBe(FOLLOW_MAX_DISTANCE)
+  })
+
+  it('fits the train to the fit share of the free width when unclamped', () => {
+    // 120 m fits the phone's free width between the two clamps.
+    const m = 120
+    const d = followDistanceFor(m, PHONE, PHONE_FREE, FOV)
+    expect(d).toBeGreaterThan(FOLLOW_DISTANCE)
+    expect(d).toBeLessThan(FOLLOW_MAX_DISTANCE)
+    const a = project(new Vector3(0, 0, 0), new Vector3(), d, 0.001, 0, PHONE.width, PHONE.height)
+    const b = project(new Vector3(m, 0, 0), new Vector3(), d, 0.001, 0, PHONE.width, PHONE.height)
+    expect(b.x - a.x).toBeCloseTo(FOLLOW_FIT * (PHONE_FREE.right - PHONE_FREE.left), 0)
   })
 })

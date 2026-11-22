@@ -9,6 +9,7 @@ import { nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
+import { consistFor } from '../lib/live/consist'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
@@ -55,7 +56,8 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
   const size = useThree((s) => s.size)
   const maxDistance = frameBounds(network.bounds, size, insets, camera.fov).distance * MAX_ZOOM_OUT
   const { focusedId, dismissedId, flyRequest, updateFromCamera } = useFocus()
-  const { following, selections, unfollow } = useTrainSelection()
+  const { following, selections, unfollow, selectedKey, selectedSummary } = useTrainSelection()
+  const consist = consistFor(selectedSummary?.routeId ?? null)
   // Reused every frame so the per-frame focus check doesn't allocate.
   const input = useRef<FocusInput>({
     focusedId,
@@ -175,7 +177,14 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     },
     [camera],
   )
-  const follow = useTrainFollow({ controls, camera, flight, startFlight, anchor, free, viewport: size, following, selections, unfollow })
+  const trainM = consist.cars * consist.pitchM
+  const follow = useTrainFollow({ controls, camera, flight, startFlight, anchor, free, viewport: size, following, selections, trainM, unfollow })
+  // A selected train holds the azimuth like a focused station, so a pan that ends its follow doesn't spin the map.
+  const trainSelected = useRef(false)
+  useLayoutEffect(() => {
+    trainSelected.current = selectedKey !== null
+  }, [selectedKey])
+  const holdAzimuth = useCallback(() => trainSelected.current, [])
   // While following, the follow owns the target: the orbit neither pivots nor clamps the pan.
   const flying = useCallback(() => flight.current !== null || follow.active(), [follow.active])
   const busy = useCallback(() => flight.current !== null || hold.current !== null || follow.active(), [follow.active])
@@ -189,6 +198,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     flying,
     busy,
     following: follow.active,
+    holdAzimuth,
   })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
@@ -234,7 +244,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       // Cheap pre-check on the reused input; only a real change pays for a copied target and
       // a functional update, which re-runs the rules against the latest state.
       if (nextFocus(cur) !== cur) {
-        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, still)
+        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, cur.settled)
       }
     }
 

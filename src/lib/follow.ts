@@ -3,14 +3,23 @@ import type { Viewport } from './framing'
 import { LANDING_DISTANCE, type ScreenRect } from './interiorCamera'
 import type { Ground } from './projection'
 
-/** A follow flies to the landing distance: fully tilted, cars and depth fully drawn. */
+/** A follow flies to at least the landing distance (fully tilted, cars and depth fully drawn)... */
 export const FOLLOW_DISTANCE = LANDING_DISTANCE
+/** ...and at most this far, so a long train on a narrow screen still fits (followDistanceFor). */
+export const FOLLOW_MAX_DISTANCE = 600
+/** The share of the free area's width a followed train should span. */
+export const FOLLOW_FIT = 0.8
 /** Exponential rate (per second) at which a catch-up offset (a panel resize, a flight cut short) eases out. */
 export const FOLLOW_CATCH_RATE = 5
 /** A catch-up offset under this (meters) snaps to 0, so the follow ends exact. */
 export const FOLLOW_CATCH_SNAP_M = 0.01
 /** A pan of this many CSS px in one gesture ends the follow (smaller drags are absorbed). */
 export const FOLLOW_BREAK_PX = 8
+/**
+ * The same on touch: after a pinch's staggered release the last finger's wobble pans a little (OrbitControls starts a
+ * one-finger pan with it), and that must not end the follow.
+ */
+export const FOLLOW_BREAK_PX_TOUCH = 16
 /** A discontinuity in the train's drawn point bigger than this on screen flies there instead of easing. */
 export const FOLLOW_JUMP_PX = 100
 
@@ -98,9 +107,24 @@ export function decayCatch(c: Ground, dt: number, reducedMotion: boolean): Groun
   return c
 }
 
-/** Whether the pan summed over a gesture (CSS px; MapControls pans one ground metersPerPx per dragged px) ends the follow. */
-export function panBroke(accumPx: number): boolean {
-  return accumPx >= FOLLOW_BREAK_PX
+/**
+ * Whether the pan summed over a gesture (CSS px; MapControls pans one ground metersPerPx per dragged px) ends the
+ * follow: FOLLOW_BREAK_PX, or FOLLOW_BREAK_PX_TOUCH when the gesture is a touch.
+ */
+export function panBroke(accumPx: number, touch: boolean): boolean {
+  return accumPx >= (touch ? FOLLOW_BREAK_PX_TOUCH : FOLLOW_BREAK_PX)
+}
+
+/**
+ * The distance a follow flies to: where a `trainM`-long train spans FOLLOW_FIT of the free area's width, held to
+ * FOLLOW_DISTANCE..FOLLOW_MAX_DISTANCE. A desktop's wide free area keeps the landing distance; a phone's narrow one
+ * pulls back for a long consist.
+ */
+export function followDistanceFor(trainM: number, viewport: Viewport, free: ScreenRect, fovDeg: number): number {
+  const width = Math.max(free.right - free.left, 1)
+  const mpp = trainM / (FOLLOW_FIT * width)
+  const distance = (mpp * viewport.height) / (2 * Math.tan((fovDeg * Math.PI) / 360))
+  return Math.min(Math.max(distance, FOLLOW_DISTANCE), FOLLOW_MAX_DISTANCE)
 }
 
 /** Whether a jump of `movedM` meters in the train's drawn point should fly the camera there rather than ease. */
