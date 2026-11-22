@@ -26,6 +26,7 @@ export function manifestOf(files: readonly string[]): StreetsManifest {
     query: { head: '', perStation: '', tail: '' },
     stations: 1,
     stationsFeedVersion: 'test',
+    stationIds: [],
     shards: files.map((file) => ({ file, ways: 0, nodes: 0 })),
   }
 }

@@ -343,6 +343,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`,
   `PackedDepthsFile` for `public/data/station-depths.json`, and `StationDepthsFile`, its per-track decoded form
 - `public/data/`: preprocessed static JSON (generated; `npm run data`, `npm run data:stations`)
+- `public/data/streets/<stationId>.json`: one file per station (`StationStreets`, `src/data/streetSchema.ts`), built by
+  `scripts/build-streets.ts` (IO only) from the pin and `catalog/entrances.json`. Pure: `scripts/lib/streetsPin.ts`
+  (`loadPin`, `waysNear`), `streetsBuild.ts` (`buildStationStreets`: `clipSpan`, `simplifySpans`, `onewayOf`, packing),
+  `streetsEntrances.ts` (the station's entrances, `joinEntrance` from `entranceStreet.ts` and the join log), with
+  `streetsFixture.ts` the tests' mini pin. Outside the startup budget; own caps in `scripts/lib/budget.ts`
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
@@ -350,18 +355,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
     `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
     downstream), and OSM ways have none either (join by distance)
-- `data/streets/`: the street pin (OSM named roads, plus sidewalks, crossings, steps and paths, within 300 m of any
-  station), written only by `scripts/fetch-streets.ts`; `manifest.json` (license, query, shard list) and `cell-<lat>_<lon>.json`
-  shards, each with its own node table (ways index OSM node ids; coordinates 1e-6 deg). Pure trim and shard layout in
-  `scripts/lib/streetsOsm.ts` and `streetsShard.ts`; `fetchJson.ts` is the retrying fetch both pin scripts share
-- `public/data/streets/<stationId>.json`: one file per station (`StationStreets`, `src/data/streetSchema.ts`), built by
-  `scripts/build-streets.ts` (IO only) from the pin and `catalog/entrances.json`. Pure: `scripts/lib/streetsPin.ts`
-  (`loadPin`, `waysNear`), `streetsBuild.ts` (`buildStationStreets`: `clipSpan`, `simplifySpans`, `onewayOf`, packing),
-  `streetsEntrances.ts` (the station's entrances, `joinEntrance` from `entranceStreet.ts` and the join log), with
-  `streetsFixture.ts` the tests' mini pin. Outside the startup budget; own caps in `scripts/lib/budget.ts`
   - `data/stations/layout-oracle.json` (tuning, 62 layouts and 13 to decline) and `layout-holdout.json` (30, never tune
     on it): platform type, platforms, tracks, mezzanine per station, agent-checked against English Wikipedia
     (CC BY-SA 4.0, facts only, revision ids); scoring only, not shipped
+- `data/streets/`: the street pin (OSM named roads, plus sidewalks, crossings, steps and paths, within 300 m of any
+  station), written only by `scripts/fetch-streets.ts`; `manifest.json` (license, query, the station ids fetched for, shard list) and `cell-<lat>_<lon>.json`
+  shards, each with its own node table (ways index OSM node ids; coordinates 1e-6 deg). Pure trim and shard layout in
+  `scripts/lib/streetsOsm.ts` and `streetsShard.ts`; `fetchJson.ts` is the retrying fetch both pin scripts share
 - `scripts/`: `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge; `lib/stationProvenance.ts` (`markGenerated`: authored to generated, depth sources, archetype and
@@ -673,7 +673,10 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors and street files don't count (street files have their own caps: 16 KB gzipped each, and a total, in `budget.ts`).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
-  generated interiors follow the new shapes and stations), change `public/data`. The workflow runs typecheck, tests, and build before pushing, but the
+  generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow
+  the stations), change `public/data`. A station new to the feed gets a street file from whatever pinned ways lie
+  near it, with a `WARNING:` line in the log (`data:streets` prints it for any station the pin manifest's `stationIds`
+  lacks); it does not block the refresh, and the next `data:streets:fetch` covers it. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).
 - **Station interiors are hand-authored or generated.** Bedford Av (L08) is hand-authored and wins over a generated
   one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".

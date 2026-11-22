@@ -42,7 +42,7 @@ platform track runs and rail height, so the map's tracks can descend to the plat
 the same license and the OSM and MTA credits; it adds an OPEN-NY line only when a rail height
 comes from an E&E rise.
 
-`streets/<id>.json` (one per station) is the OSM streets and walking ways within 300 m of the station point, clipped,
+`streets/<id>.json` (one per station) is the OSM streets (named roadways within 300 m of the station point) and walking ways (footways, steps and paths, within 100 m), clipped,
 simplified and packed (`npm run data:streets`), plus the station's entrances joined to the street they open onto. The
 whole file is a derivative database under the ODbL; the entrance points are MTA data (NY Open Data i9wp-a4ja) under the
 OPEN-NY Terms of Use, not ODbL, and each file's `attribution` says so. The files load on focus and sit outside the
@@ -60,7 +60,8 @@ These datasets carry no license field, so the OPEN-NY Terms of Use (2013-03-08) 
 - Subway entrances and exits (dataset i9wp-a4ja) and the elevator and escalator asset inventory
   (94fv-bak7) feed entrance and elevator positions in `stations/*.json`. These elements have
   `nyopendata` in their `sources` and are MTA data under the OPEN-NY Terms of Use, not ODbL; the
-  interior files' `attribution` carries that note.
+  interior files' `attribution` carries that note. The entrance points in `streets/<id>.json` are the same
+  entrance data, and those files' `attribution` carries the same split.
 
 ## Generated metadata
 

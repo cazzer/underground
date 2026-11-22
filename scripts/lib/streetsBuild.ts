@@ -6,21 +6,20 @@ import type { Station, StationId } from '../../src/data/schema.ts'
 import type { StationStreets, StreetWay } from '../../src/data/streetSchema.ts'
 import { toGround } from '../../src/lib/projection.ts'
 import { isClosedRing } from '../../src/lib/streetClass.ts'
-import { ENTRANCES_OPEN_NY_NOTE } from './stationMerge.ts'
+import { ENTRANCES_OPEN_NY_NOTE, MTA_CREDIT } from './stationMerge.ts'
 import { simplifyIndices } from './simplify.ts'
 import { buildEntrances, type BuildLog, type EntranceInput } from './streetsEntrances.ts'
 import { RADIUS_M, ROAD_CLASSES, type PinNode, type PinWay } from './streetsOsm.ts'
 import { waysNear, type Pin } from './streetsPin.ts'
 
-/** Named roadways are kept this far from the station point: RADIUS_M, the pin's radius. */
-/** Footways, steps and paths (everything but the named roadway classes) are kept this far. The one lever for the
- *  per-file size cap: lower it for every file, never for one. */
+/** Footways, steps and paths (everything but the named roadway classes) are kept this far from the station point;
+ *  named roadways are kept to RADIUS_M, the pin's radius. The one lever for the per-file size cap: lower it for
+ *  every file, never for one. 100 m is the least that fits every file under 16 KB with room (200 m left two over). */
 export const WALK_RADIUS_M = 100
 /** Douglas-Peucker tolerance for dropping vertices, meters. */
 export const SIMPLIFY_TOL_M = 0.5
 
 const OSM_CREDIT = '© OpenStreetMap contributors'
-const MTA_CREDIT = 'Metropolitan Transportation Authority, data.ny.gov'
 const ONEWAY_FORWARD = new Set(['yes', 'true', '1'])
 const ONEWAY_BACKWARD = new Set(['-1', 'reverse'])
 const ONEWAY_NONE = new Set(['no', 'false', '0', 'reversible', 'alternating'])
@@ -151,6 +150,8 @@ export function buildStationStreets(station: Station, pin: Pin, rows: readonly E
     license: 'ODbL-1.0',
     attribution: [OSM_CREDIT, ...(rows.length > 0 ? [MTA_CREDIT, ENTRANCES_OPEN_NY_NOTE] : [])],
     osmTimestamp: pin.baseTimestamp,
+    radiusM: RADIUS_M,
+    walkRadiusM: WALK_RADIUS_M,
     nodeId: deltaEncode(ids),
     x,
     z,

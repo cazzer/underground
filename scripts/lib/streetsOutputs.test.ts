@@ -6,12 +6,13 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
+import { deltaDecode } from '../../src/data/codec.ts'
 import type { StationsFile } from '../../src/data/schema.ts'
 import type { StationStreets } from '../../src/data/streetSchema.ts'
 import { isClosedRing } from '../../src/lib/streetClass.ts'
-import { STREETS_FILE_GZIP_CAP_BYTES } from './budget.ts'
+import { STREETS_FILE_GZIP_CAP_BYTES, STREETS_TOTAL_GZIP_CAP_BYTES } from './budget.ts'
 import { toStableJson } from './stableJson.ts'
-import { buildAllStreets } from './streetsBuild.ts'
+import { buildAllStreets, WALK_RADIUS_M } from './streetsBuild.ts'
 import { entrancesByStation, parseEntranceRows } from './streetsEntrances.ts'
 import { loadPin } from './streetsPin.ts'
 import type { StreetShard, StreetsManifest } from './streetsShard.ts'
@@ -42,10 +43,14 @@ describe('committed street files', () => {
     expect(stale, 'stale street files: run npm run data:streets').toEqual([])
   }, 60_000)
 
-  it('stay under the per-file gzip cap', () => {
+  it('stay under the per-file and total gzip caps', () => {
+    let total = 0
     for (const name of names) {
-      expect(gzipSync(readFileSync(new URL(name, OUT)), { level: 9 }).length, name).toBeLessThanOrEqual(STREETS_FILE_GZIP_CAP_BYTES)
+      const gzip = gzipSync(readFileSync(new URL(name, OUT)), { level: 9 }).length
+      expect(gzip, name).toBeLessThanOrEqual(STREETS_FILE_GZIP_CAP_BYTES)
+      total += gzip
     }
+    expect(total).toBeLessThanOrEqual(STREETS_TOTAL_GZIP_CAP_BYTES)
   })
 
   it('have valid indexes, ascending ids, closed rings as the pin has them, sorted ways and entrances', () => {
@@ -54,6 +59,9 @@ describe('committed street files', () => {
       expect(file.x.length, name).toBe(file.nodeId.length)
       expect(file.z.length, name).toBe(file.nodeId.length)
       expect(file.format).toBe(1)
+      const ids = deltaDecode(file.nodeId)
+      expect(ids.every((id, i) => Number.isSafeInteger(id) && (i === 0 || id > ids[i - 1]!)), `${name} node ids strictly ascending`).toBe(true)
+      expect([file.radiusM, file.walkRadiusM], name).toEqual([manifest.radiusM, WALK_RADIUS_M])
       expect(file.osmTimestamp).toBe(manifest.baseTimestamp)
       expect(file.attribution[0]).toBe('© OpenStreetMap contributors')
       expect(file.attribution.length === 3, name).toBe(file.entrances.length > 0)

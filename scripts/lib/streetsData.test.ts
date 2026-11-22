@@ -1,5 +1,6 @@
-/** Reads the committed data/streets/ pin: the manifest, the shards and public/data/stations.json must agree.
- *  It does not compare feedVersion: stations.json refreshes daily and a new station may need a fetch. */
+/** Reads the committed data/streets/ pin: the manifest and the shards must agree, and every station the manifest lists
+ *  (`stationIds`) must be in public/data/stations.json with a named way near it. It does not compare feedVersion:
+ *  stations.json refreshes daily, and a station added since is only warned about by build-streets.ts. */
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ROAD_CLASSES, STREET_TAGS, UNCOVERED_STATIONS, WALK_CLASSES, stationsWithoutNamedWay } from './streetsOsm.ts'
@@ -28,6 +29,8 @@ describe('the street pin manifest', () => {
     expect(manifest.query.tail).toContain('out geom;')
     expect(manifest.stationsFeedVersion).not.toBe('')
     expect(manifest.stations).toBeGreaterThan(400)
+    expect(manifest.stationIds).toHaveLength(manifest.stations)
+    expect(manifest.stationIds).toEqual([...manifest.stationIds].sort())
   })
   it('lists exactly the shard files on disk, sorted, with their counts', () => {
     const onDisk = readdirSync(dir).filter((f) => f !== 'manifest.json').sort()
@@ -102,8 +105,9 @@ describe('the street pin shards', () => {
     const nodes = new Map<number, PinNode>()
     for (const shard of shards.values()) for (const [id, lat, lon] of shard.nodes) nodes.set(id, [lat, lon])
     const ways = [...shards.values()].flatMap((s) => s.ways)
-    const bare = stationsWithoutNamedWay(stations, ways, nodes, manifest.radiusM).filter((s) => !UNCOVERED_STATIONS.includes(s.id))
-    // A station added since the pin was fetched fails here: rerun `npm run data:streets:fetch` and review the diff.
+    const bare = stationsWithoutNamedWay(stations.filter((s) => manifest.stationIds.includes(s.id)), ways, nodes, manifest.radiusM).filter((s) => !UNCOVERED_STATIONS.includes(s.id))
+    // Only the stations the pin was fetched for: a station added since is warned about by `npm run data:streets`, and
+    // is covered by the next `npm run data:streets:fetch`.
     expect(bare.map((s) => `${s.id} ${s.name}`)).toEqual([])
   })
 })

@@ -110,7 +110,8 @@ Review the diff, then commit; `scripts/lib/streetsData.test.ts` checks the files
 per station. Rerun it after `data`, `data:streets:fetch` or `data:catalog:fetch`; `streetsOutputs.test.ts` fails while the files
 are stale. Each file clips the pinned ways to 300 m (footways, steps and paths to `WALK_RADIUS_M`, 100 m: 200 m left two
 dense downtown stations over the 16 KB cap, 150 m one), simplifies to 0.5 m, rounds to decimeters around the station point, and
-joins every entrance row that lists the station to the street it opens onto. The build prints where the join is doubtful
+joins every entrance row that lists the station to the street it opens onto. The pin's manifest lists the `stationIds` it was fetched for: a station added to `stations.json` since gets a file from whatever
+pinned ways lie near it and a `WARNING:` line from the build (not a failure) until `data:streets:fetch` is rerun. The build prints where the join is doubtful
 (no street within 40 m, near misses for a median, bridge and tunnel ways, entrances near the 300 m edge); read it after a refresh.
 
 ## Access exceptions

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { StreetWay } from '../../src/data/streetSchema.ts'
 import { toLatLon } from '../../src/lib/projection.ts'
 import { buildEntrances, entrancesByStation, median, parseEntranceRows, type EntranceInput, type FileStreets } from './streetsEntrances.ts'
+import { MEDIAN_MAX_M } from './entranceStreet.ts'
 import { STATION } from './streetsFixture.ts'
 
 type P = readonly [number, number]
@@ -67,16 +68,16 @@ describe('buildEntrances', () => {
     expect(buildEntrances(STATION, [], file).log.map((l) => l.kind)).toEqual(['no-entrances'])
   })
 
-  it('logs a near miss for a median: the same street 25 to 40 m away on the other side', () => {
-    const near = buildEntrances(STATION, [row([0, 5])], fileOf([horizontal(1, 'Wide Pkwy', 0), horizontal(2, 'Wide Pkwy', 35)]))
+  it('logs a near miss for a median: the same street just past MEDIAN_MAX_M on the other side', () => {
+    const near = buildEntrances(STATION, [row([0, 5])], fileOf([horizontal(1, 'Wide Pkwy', 0), horizontal(2, 'Wide Pkwy', 5 + MEDIAN_MAX_M + 2)]))
     expect(near.entrances[0]!.side).toBe('south')
     expect(near.log).toHaveLength(1)
     expect(near.log[0]).toMatchObject({ kind: 'near-miss' })
-    expect(near.log[0]!.gapM).toBeCloseTo(30, 0)
-    const median = buildEntrances(STATION, [row([0, 5])], fileOf([horizontal(1, 'Wide Pkwy', 0), horizontal(2, 'Wide Pkwy', 20)]))
+    expect(near.log[0]!.gapM).toBeCloseTo(MEDIAN_MAX_M + 2, 0)
+    const median = buildEntrances(STATION, [row([0, 5])], fileOf([horizontal(1, 'Wide Pkwy', 0), horizontal(2, 'Wide Pkwy', 5 + MEDIAN_MAX_M - 2)]))
     expect(median.entrances[0]!.side).toBe('median')
     expect(median.log).toEqual([])
-    const other = buildEntrances(STATION, [row([0, 5])], fileOf([horizontal(1, 'Wide Pkwy', 0), horizontal(2, 'Other St', 35)]))
+    const other = buildEntrances(STATION, [row([0, 5])], fileOf([horizontal(1, 'Wide Pkwy', 0), horizontal(2, 'Other St', 5 + MEDIAN_MAX_M + 2)]))
     expect(other.log).toEqual([])
   })
 

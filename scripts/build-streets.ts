@@ -35,6 +35,11 @@ function main(): void {
   const unknown = [...rowsOf.keys()].filter((id) => !stationsFile.stations.some((s) => s.id === id))
   if (unknown.length > 0) console.log(`entrances: rows list ${unknown.length} stop id(s) that are not stations (ignored): ${unknown.join(', ')}`)
 
+  // A station added since the pin was fetched still gets a file (from whatever ways of the pin lie near it); say so.
+  const pinned = new Set(manifest.stationIds)
+  for (const s of stationsFile.stations) {
+    if (!pinned.has(s.id)) console.warn(`WARNING: ${s.id} is not in the street pin (rerun npm run data:streets:fetch); its streets file may be partial or empty`)
+  }
   const results = buildAllStreets(stationsFile.stations, pin, rowsOf)
   const files = results.map((r) => renderedFile(`${r.file.stationId}.json`, toStableJson(r.file, 2)))
   for (const f of files) {

@@ -1,5 +1,8 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { checkFileCap, checkIndexCap, checkStreetsTotal, INDEX_GZIP_CAP_BYTES, renderedFile } from './budget.ts'
+import { checkFileCap, checkIndexCap, committedGzip, checkStreetsTotal, INDEX_GZIP_CAP_BYTES, renderedFile } from './budget.ts'
 
 describe('checkIndexCap', () => {
   it('returns the gzip size of an index under the cap', () => {
@@ -27,5 +30,15 @@ describe('street file caps', () => {
     const total = checkStreetsTotal(files, 1_000_000)
     expect(total).toBe(files[0]!.gzip + files[1]!.gzip)
     expect(() => checkStreetsTotal(files, total - 1)).toThrow(/2 street files total/)
+  })
+})
+
+describe('committedGzip', () => {
+  it('counts the top-level *.json only: files in a streets/ or stations/ subdirectory are outside the budget', () => {
+    const dir = mkdtempSync(`${tmpdir()}/budget-`)
+    writeFileSync(`${dir}/stations.json`, '{"a":1}\n')
+    mkdirSync(`${dir}/streets`)
+    writeFileSync(`${dir}/streets/T01.json`, '{"b":2}\n')
+    expect(Object.keys(committedGzip(pathToFileURL(`${dir}/`), new Set()))).toEqual(['stations.json'])
   })
 })

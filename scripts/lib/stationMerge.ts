@@ -13,9 +13,10 @@ import type { AuthoredStation, StationSources } from './stationInputs.ts'
 
 const ROW_TOLERANCE_DEG = 1e-6
 const CONTAINMENT_M = 0.5
+export const MTA_CREDIT = 'Metropolitan Transportation Authority, data.ny.gov'
 const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
   osm: '© OpenStreetMap contributors',
-  nyopendata: 'Metropolitan Transportation Authority, data.ny.gov',
+  nyopendata: MTA_CREDIT,
 }
 
 /** Appended after the MTA credit: the nyopendata elements are not ODbL (user's licensing decision, card 9wc.1.1 option A). */

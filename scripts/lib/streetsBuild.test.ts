@@ -4,6 +4,7 @@ import { toLatLon } from '../../src/lib/projection.ts'
 import { isClosedRing } from '../../src/lib/streetClass.ts'
 import { buildStationStreets, clipSpan, onewayOf, simplifySpans, WALK_RADIUS_M } from './streetsBuild.ts'
 import type { EntranceInput } from './streetsEntrances.ts'
+import { ENTRANCES_OPEN_NY_NOTE, MTA_CREDIT } from './stationMerge.ts'
 import { pinOf, STATION, way, type NodeMeters } from './streetsFixture.ts'
 
 type P = readonly [number, number]
@@ -137,8 +138,9 @@ describe('buildStationStreets', () => {
   it('joins entrances and credits the sources it used', () => {
     expect(file.entrances).toHaveLength(1)
     expect(file.entrances[0]).toMatchObject({ street: 'Main St', cross: null, side: 'north', stopIds: ['T01'] })
-    expect(file.attribution).toEqual(['© OpenStreetMap contributors', 'Metropolitan Transportation Authority, data.ny.gov', 'Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'])
+    expect(file.attribution).toEqual(['© OpenStreetMap contributors', MTA_CREDIT, ENTRANCES_OPEN_NY_NOTE])
     expect(file.license).toBe('ODbL-1.0')
+    expect([file.radiusM, file.walkRadiusM]).toEqual([300, WALK_RADIUS_M])
     expect(file.osmTimestamp).toBe('2026-01-01T00:00:00Z')
   })
 
