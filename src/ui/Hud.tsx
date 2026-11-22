@@ -8,6 +8,7 @@ import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { OutagePanelView } from '../lib/live/eneText'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { markedPlacement } from '../lib/locate'
+import { frontPanel } from '../lib/panelCollapseState'
 import type { Network } from '../lib/network'
 import type { PlacePick } from '../lib/placeLabel'
 import { useTrainSelection } from '../lib/trainSelection'
@@ -29,6 +30,7 @@ import { StationSearch, type StationSearchHandle } from './StationSearch'
 import { TripAnnouncer } from './TripAnnouncer'
 import { TripPanel } from './TripPanel'
 import { usePlaceLine } from './usePlaceLine'
+import { useHudInsets } from './useHudInsets'
 import { useTripPanel } from './useTripPanel'
 
 interface HudProps {
@@ -67,13 +69,15 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const noticeOpen = notice !== null
   const root = useRef<HTMLDivElement>(null)
   const header = useRef<HTMLElement>(null)
-  const bottom = useRef<HTMLDivElement>(null)
+  const footer = useRef<HTMLElement>(null)
   const panel = useRef<HTMLElement>(null)
   const locateButton = useRef<HTMLButtonElement>(null)
   const stationHeading = useRef<HTMLElement>(null)
   const tripHeading = useRef<HTMLElement>(null)
   const searchButton = useRef<HTMLButtonElement>(null)
   const { tripOpen, openTrip, closeTrip, focusRequest } = useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf })
+  // The one rule for which panel the bottom slot shows (panelCollapseState.ts); the trip panel stays mounted under a train or notice.
+  const front = frontPanel({ trainShown: trainOpen, noticeShown: noticeOpen, tripOpen, focusedId })
   // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
   // heading, else the station panel's, else the Search button; the auto-dismissed notice leaves focus alone. It waits one
   // frame so a station panel that auto-focus mounts as the train closes is found and wins; it is read once,
@@ -133,15 +137,8 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     locateButton.current?.focus()
   }, [clear])
 
-  // Measured once, before the scene mounts, for its opening view.
-  useLayoutEffect(() => {
-    if (!root.current || !header.current || !bottom.current) return
-    const r = root.current.getBoundingClientRect()
-    onInsets({
-      top: header.current.getBoundingClientRect().bottom - r.top,
-      bottom: r.bottom - bottom.current.getBoundingClientRect().top,
-    })
-  }, [onInsets])
+  // Measured before the scene mounts, for its opening view, and again when the header, footer or window resizes.
+  useHudInsets({ root, header, footer }, onInsets)
 
   // Tracked while the panel is open, so a station fly-to can frame the view beside it. Resizes
   // move a stacked (phone) panel's top; window resizes move a desktop panel's left edge.
@@ -236,9 +233,9 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
         </div>
       </header>
       {/* DOM order is footer, then panel: matches desktop (left to right); mobile stacks the panel above. */}
-      <div ref={bottom} className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <Attribution />
-        {selectedSummary ? (
+      <div className="flex min-h-0 flex-col-reverse gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <Attribution ref={footer} />
+        {front === 'train' && selectedSummary && (
           <TrainPanel
             network={network}
             summary={selectedSummary}
@@ -252,9 +249,9 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             onClose={closeTrain}
             ref={panel}
           />
-        ) : notice ? (
-          <TrainGonePanel notice={notice} onDismiss={closeNotice} ref={panel} />
-        ) : focusedId && !tripOpen ? (
+        )}
+        {front === 'notice' && notice && <TrainGonePanel notice={notice} onDismiss={closeNotice} ref={panel} />}
+        {front === 'station' && focusedId && (
           <ArrivalsPanel
             network={network}
             stationId={focusedId}
@@ -266,7 +263,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             ref={panel}
             headingRef={stationHeading}
           />
-        ) : null}
+        )}
         {/* Kept mounted (hidden) under a train panel or notice, so its journeys, scroll and focus survive. */}
         {tripOpen && (
           <TripPanel

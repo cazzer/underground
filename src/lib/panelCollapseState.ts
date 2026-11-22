@@ -22,7 +22,8 @@ export type CollapseAction =
 
 /**
  * Which panel is in front, in the order Hud.tsx renders them: a train panel, then a gone notice, then the trip panel
- * (while open), then the station panel (while a station is focused). Keep it in step with Hud's bottom slot.
+ * (while open), then the station panel (while a station is focused). Hud's bottom slot branches on it, so this is the
+ * one rule.
  */
 export function frontPanel(input: { trainShown: boolean; noticeShown: boolean; tripOpen: boolean; focusedId: string | null }): FrontPanel {
   if (input.trainShown) return 'train'
