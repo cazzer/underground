@@ -3,7 +3,7 @@ import type { Connector, StationInterior } from '../data/stationSchema'
 import type { StationStreets, StreetEntrance } from '../data/streetSchema'
 import { entranceTexts } from './entranceText'
 import { quickestExit, type ExitChoice } from './exitChoice'
-import { exitLineView, finalRideStops, streetSpoken } from './exitView'
+import { exitEntranceIndex, exitLineView, finalRideStops, streetSpoken } from './exitView'
 import { fixture } from './interiorFixture'
 import { toGround } from './projection'
 import type { TripJourney, TripLeg } from './route/plan'
@@ -82,7 +82,7 @@ describe('exitLineView', () => {
     expect(view.text).toBe('Quickest way out: Bedford Av & N 7 St')
     expect(view.note).toBe('NE corner')
     expect(view.spoken).toBe('Quickest way out: Bedford Avenue and North 7 Street, northeast corner.')
-    expect(view.mapLabel).toEqual({ stationId: 'X01', index: 0 })
+    expect(exitEntranceIndex(view.mapLabel!, file)).toBe(0)
   })
 
   it('takes a complex member’s label when the first source has no entrance at the exit', () => {
@@ -90,7 +90,12 @@ describe('exitLineView', () => {
     const member = { ...streets(interior, [[9, 10, {}]]), stationId: 'X02' }
     const view = exitLineView(choice, interior, [{ file: empty, labels: [] }, { file: member, labels: entranceTexts(member) }], true)
     expect(view.text).toBe('Quickest way out: Bedford Av & N 7 St')
-    expect(view.mapLabel).toEqual({ stationId: 'X02', index: 0 })
+    // The map label is found in whichever member's file the map shows, by position and type.
+    expect(exitEntranceIndex(view.mapLabel!, member)).toBe(0)
+    expect(exitEntranceIndex(view.mapLabel!, empty)).toBe(-1)
+    const other = { ...streets(interior, [[-30, 0, {}], [9, 10, {}]]), stationId: 'X03' }
+    expect(exitEntranceIndex(view.mapLabel!, other)).toBe(1)
+    expect(exitEntranceIndex({ ...view.mapLabel!, type: 'Elevator' }, other)).toBe(-1)
   })
 
   it('takes a merged twin’s label, and words a point target as Exit at', () => {
@@ -102,8 +107,8 @@ describe('exitLineView', () => {
     const toward: ExitChoice = { ...choice, destination: { x: o.x + 60, z: o.z }, walk: { kind: 'route', points: [], meters: 150, seconds: 130 } }
     const view = exitLineView(toward, interior, [{ file, labels }], true)
     expect(view.text).toBe('Exit at Bedford Av & N 7 St')
-    // The exit is the merged twin (file entrance 1): the map label keys by it, a member of row 0.
-    expect(view.mapLabel).toEqual({ stationId: 'X01', index: 1 })
+    // The exit is the merged twin (file entrance 1): it resolves to that index, a member of row 0.
+    expect(exitEntranceIndex(view.mapLabel!, file)).toBe(1)
     expect(view.note).toBe('NE corner · then 3 min walk')
     expect(view.spoken).toContain('Then a 3 minute walk.')
   })
@@ -112,7 +117,8 @@ describe('exitLineView', () => {
     const view = exitLineView(choice, interior, [], true)
     expect(view.text).toMatch(/^Quickest way out: toward the (east|southeast|northeast)$/)
     expect(view.note).toBeNull()
-    expect(view.mapLabel).toBeNull()
+    const o = toGround(interior.anchor)
+    expect(view.mapLabel).toEqual({ x: o.x + 9, z: o.z + 10, type: 'Stair' })
     const estimate: ExitChoice = { ...choice, destination: { x: 0, z: 0 }, walk: { kind: 'estimate', meters: 900, seconds: 700 } }
     const point = exitLineView(estimate, interior, [], true)
     expect(point.text).toMatch(/^Exit toward the /)

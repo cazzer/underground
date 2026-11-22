@@ -10,7 +10,7 @@ import { isPhoneViewport, streetLabelRadiusM } from '../lib/streetLabelReveal'
 import type { InteriorModel } from './interiorModel'
 import { createLabelPlacement, newView, type LabelPlacement, type PlacementView } from './labelPlacementState'
 import { placeLabels } from './streetLabelPlacement'
-import { theme } from '../theme'
+import { exitPathLook } from './exitPathLook'
 import { LABEL_HALO } from './useLevelLabels'
 
 const WRAPPER_CLASS = 'pointer-events-none absolute inset-0'
@@ -35,7 +35,7 @@ export interface LabelContext {
   depthScale: number
   markerRadiusM: number
   ringRadiusM: number
-  /** The street-file entrance index of the trip's exit label (ranked first, tinted `theme.exitPath`); -1 for none. */
+  /** The street-file entrance index of the trip's exit (its label ranks first, tinted the path's color); -1 for none. */
   priorityEntrance: number
 }
 
@@ -110,13 +110,14 @@ function writeLabels(dom: LabelDom): void {
   }
 }
 
-/** Tints the trip's exit label (`view.priorityEntrance`) in the exit path's color, and only it. */
+/** Tints the trip's exit label (`view.priorityEntrance`) in the exit path's color, and only it. `exitPathLook` so the
+ *  TEMPORARY ?exitColor= retints both; with that flag gone this reads `theme.exitPath`. */
 function tintExit(d: LabelDom): void {
   const row = d.place.entrances.findIndex((e) => e.members.includes(d.view.priorityEntrance))
   const el = row >= 0 ? d.els[row]! : null
   if (el === d.tinted) return
   if (d.tinted) d.tinted.style.color = ''
-  if (el) el.style.color = theme.exitPath
+  if (el) el.style.color = exitPathLook.color
   d.tinted = el
 }
 

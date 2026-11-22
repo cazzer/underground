@@ -6,7 +6,7 @@ import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
 import type { StreetMask } from '../lib/basemap/streetMask'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
-import type { ExitLabel } from '../lib/exitView'
+import { exitEntranceIndex, type ExitLabel } from '../lib/exitView'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { interiorOpacity } from '../lib/interiorReveal'
@@ -44,7 +44,7 @@ interface StationStreetsProps {
   network: Network
   /** Set while a layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
   mask: StreetMask
-  /** The trip's exit label (useTripExit), placed first and tinted when it is this layer's; null for none. */
+  /** The trip's exit entrance (useTripExit): its label in this layer is placed first and tinted; null for none. */
   exitLabel: ExitLabel | null
 }
 
@@ -120,6 +120,8 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     const at = interior && { origin: interior.origin, entrances: interior.entrances }
     return entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, at), ENTRANCE_SIZE_M, MARK_RGB)
   }, [layer, interior, interiorPending])
+  // The trip exit's entrance in this layer's file (any member of a complex shows its own), placed first.
+  const priorityEntrance = useMemo(() => (exitLabel ? exitEntranceIndex(exitLabel, layer.file) : -1), [exitLabel, layer])
   const marks = useLineLayer(markBuffers, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
   useLayoutEffect(() => {
     mask.present = true
@@ -146,7 +148,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     ctx.interior = interior
     ctx.focusRing = interior || interiorPending ? null : focused
     ctx.depthScale = depthScaleY(depth)
-    ctx.priorityEntrance = exitLabel?.stationId === layer.stationId ? exitLabel.index : -1
+    ctx.priorityEntrance = priorityEntrance
     // As Stations.tsx and FocusRing.tsx size them at this distance.
     ctx.markerRadiusM = screenScale(distance, markerRadiusPx(distance), MARKER_MIN_METERS)
     ctx.ringRadiusM = ctx.markerRadiusM * focusScaleFactor(distance, ctx.markerRadiusM)

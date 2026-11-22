@@ -30,7 +30,7 @@ export function finalRideStops(journeys: readonly TripJourney[]): FinalRideStop[
 }
 
 export interface ExitLineView {
-  /** The map's label for the exit, which the street labels place first; null when the line names none. */
+  /** The exit entrance for the map's street labels to place first; null for an exit no entrance lists. */
   mapLabel: ExitLabel | null
   text: string
   /** The dim line under it, parts joined " · "; null when there is nothing to add. */
@@ -53,10 +53,19 @@ export interface StreetSource {
   labels: readonly EntranceText[]
 }
 
-/** Which map label names the exit: the street file's station and a file entrance index among the label's `members`. */
+/**
+ * The exit's entrance, by scene ground position and raw type: whichever station's street file the map shows (any
+ * member of a complex), `exitEntranceIndex` finds it there, and the label that has it among its `members` goes first.
+ */
 export interface ExitLabel {
-  stationId: string
-  index: number
+  x: number
+  z: number
+  type: string
+}
+
+/** The exit entrance's index in `file`'s entrances (within STREET_MATCH_M, same type), or -1 when the file lacks it. */
+export function exitEntranceIndex(exit: ExitLabel, file: StationStreets): number {
+  return streetEntranceIndex(exit, exit.type, file) ?? -1
 }
 
 /**
@@ -64,28 +73,23 @@ export interface ExitLabel {
  * its own, or the same-text twin it merged into), else the nearest label of the same kind within MERGE_M in any source.
  * A complex passes its file's streets and the alighting member's.
  */
-/** A label found for the exit, its file's station and the exit's own file entrance index (one of its `members`). */
-interface Found extends ExitLabel {
-  label: EntranceText
-}
-
-function labelOf(choice: ExitChoice, interior: StationInterior, sources: readonly StreetSource[]): Found | null {
+function labelOf(choice: ExitChoice, interior: StationInterior, sources: readonly StreetSource[]): EntranceText | null {
   if (choice.exit.entranceId === null) return null
   const origin = toGround(interior.anchor)
   const scene = { x: origin.x + choice.exit.point[0], z: origin.z + choice.exit.point[1] }
   const elevator = choice.exit.type === 'Elevator'
-  let best: Found | null = null
+  let best: EntranceText | null = null
   let bestD = MERGE_M + STREET_MATCH_M
   for (const { file, labels } of sources) {
     const i = streetEntranceIndex(scene, choice.exit.type, file)
     // A same-text twin merged into another label is one of that label's members.
     const own = i === null ? undefined : labels.find((l) => l.members.includes(i))
-    if (own) return { label: own, stationId: file.stationId, index: i! }
+    if (own) return own
     const fileOrigin = toGround(file.anchor)
     const [x, z] = [scene.x - fileOrigin.x, scene.z - fileOrigin.z]
     for (const l of labels) {
       const d = Math.hypot(l.x - x, l.z - z)
-      if (l.elevator === elevator && d <= bestD) [best, bestD] = [{ label: l, stationId: file.stationId, index: l.index }, d]
+      if (l.elevator === elevator && d <= bestD) [best, bestD] = [l, d]
     }
   }
   return best
@@ -109,8 +113,7 @@ export function exitLineView(
   sources: readonly StreetSource[],
   closedKnown: boolean,
 ): ExitLineView {
-  const found = labelOf(choice, interior, sources)
-  const label = found?.label ?? null
+  const label = labelOf(choice, interior, sources)
   const head = label ? label.head : `toward ${compassOf(interior, choice.exit.point)}`
   const lead = choice.destination === null ? 'Quickest way out:' : label ? 'Exit at' : 'Exit'
   const unknown = closedKnown ? [] : machinesUsed(choice, interior)
@@ -124,7 +127,9 @@ export function exitLineView(
   if (walk) sentences.push(`${walk.kind === 'route' ? 'Then a' : 'About a'} ${minutes} minute walk.`)
   if (status) sentences.push(`${capitalize(status)}.`)
   if (choice.probable) sentences.push('Probably: the station layout is estimated.')
-  const mapLabel = found && { stationId: found.stationId, index: found.index }
+  const origin = toGround(interior.anchor)
+  const { entranceId, point, type } = choice.exit
+  const mapLabel = entranceId !== null && type !== null ? { x: origin.x + point[0], z: origin.z + point[1], type } : null
   return { mapLabel, text: `${lead} ${head}`, note: note.length > 0 ? note.join(' · ') : null, spoken: sentences.join(' ') }
 }
 

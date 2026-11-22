@@ -1,23 +1,17 @@
 /**
  * The exit path drawn over a station interior: from the platform track a rider steps off, along each connector of an
  * `ExitChoice` exactly where it is drawn (`planEnds`), to its street exit, then along the walk outside. Group-local
- * buffers like the interior's (y × yScale, before the depth factor), split at the trains' roof the way its connectors
- * are, so the part of the path a lifted train stands in front of stays under it. Pure.
+ * buffers like the interior's (y × yScale, before the depth factor), in the interior's stroke bands and cut at each
+ * deck's train roof the way its connectors are, so the part of the path a lifted train stands in front of stays under
+ * it. Pure.
  */
 import type { Connector, LocalPoint, StationInterior } from '../data/stationSchema'
 import type { ExitChoice } from './exitChoice'
-import {
-  drawElevatorShaft,
-  drawElevatorStop,
-  drawEscalator,
-  drawRamp,
-  drawWalkway,
-  planEnds,
-  type ConnectorContext,
-} from './interiorConnectors'
-import { connectorContext, trainRoofY } from './interiorGeometry'
+import { planEnds, type ConnectorContext } from './interiorConnectors'
+import { connectorContext } from './interiorGeometry'
 import { endpointArea } from './interiorGraph'
-import { SegmentWriter, SplitAtY, type Buffers, type Rgb, type SegmentSink, type Vec3 } from './interiorSegments'
+import { bandSinks, dist3, restroke } from './interiorPathStrokes'
+import type { Buffers, Rgb, Vec3 } from './interiorSegments'
 import { nearestOnPolyline, slicePolyline } from './planGeometry'
 import { toGround } from './projection'
 
@@ -33,8 +27,8 @@ export interface ExitPathOptions {
   railDrop: number
   /** The interior's entrance square side, meters: the exit's is redrawn 1 m larger. */
   entranceSize: number
-  /** `trainLevelIndex`, as the interior's layers split; undefined draws everything in `under`. */
-  splitLevel?: number
+  /** The platform decks (`interiorDecks`, deepest first; empty under look C): the path splits into their stroke bands. */
+  decks: readonly number[]
   /** Linear RGB of every stroke. */
   rgb: Rgb
   /** Dash the path inside the station (a generated interior: the path is probable). */
@@ -45,10 +39,9 @@ export interface ExitPathOptions {
 }
 
 export interface ExitPathLayers {
-  /** Drawn with the interior's base layers: the platform level the lifted trains ride and below. */
-  under: Buffers
-  /** Drawn over the lifted trains, with the levels above them. */
-  over: Buffers
+  /** One per stroke band (decks + 1, band 0 first), each drawn over that band's interior strokes and under the next
+   *  deck's lifted trains (`strokeOrders(band, count).exitPath`). */
+  bands: Buffers[]
   /** Some segment is dashed (in `distances`), so the material must be. */
   dashed: boolean
   /** Group-local x, y, z triples of the path's start (its first point, first connector foot and the board marker): the
@@ -135,8 +128,6 @@ function walkOf(interior: StationInterior, choice: ExitChoice, ctx: PlanCtx): Wa
   return { pieces: pieces.filter((p) => p.kind === 'connector' || dist3(p.a, p.b) > 1e-6), track, along, platformLevel }
 }
 
-const dist3 = (a: Vec3, b: Vec3): number => Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])
-
 /** The path's in-station centerline, platform track to street exit: each point and the level it stands on. */
 export function exitPathCenterline(interior: StationInterior, choice: ExitChoice, opts: Pick<ExitPathOptions, 'yScale' | 'stepRise'>): PathPoint[] {
   const ctx = connectorContext(interior, { ...opts, colorOf: () => [0, 0, 0] })
@@ -148,100 +139,17 @@ export function exitPathCenterline(interior: StationInterior, choice: ExitChoice
 }
 
 /**
- * A SegmentWriter whose dashed segments carry one running dash distance, shared with every writer given the same
- * `run`, so the dash phase flows on along the path, across layers and the roof cut. Solid segments are 0, 0.
- */
-class PathWriter extends SegmentWriter {
-  private readonly run: { m: number }
-
-  constructor(run: { m: number }) {
-    super()
-    this.run = run
-  }
-
-  override segment(a: Vec3, b: Vec3, ca: Rgb, cb: Rgb = ca, dashed = false): void {
-    this.positions.push(a[0], a[1], a[2], b[0], b[1], b[2])
-    this.colors.push(ca[0], ca[1], ca[2], cb[0], cb[1], cb[2])
-    if (!dashed) {
-      this.distances.push(0, 0)
-      return
-    }
-    const m = this.run.m
-    this.run.m = m + dist3(a, b)
-    this.distances.push(m, this.run.m)
-  }
-
-  /** A dashed segment with its own phase (0 to its length), outside the path's running one: a restroked walkway side. */
-  ownDash(a: Vec3, b: Vec3, c: Rgb): void {
-    this.segment(a, b, c, c)
-    this.distances.splice(-1, 1, dist3(a, b))
-  }
-}
-
-/**
- * Which of the path's layers level `i` (an index into `interior.levels`) draws in: 0 with the interior's base layers,
- * 1 over the lifted platform trains (a level above `splitLevel`). The one place a level is routed.
- */
-export function layerOfLevel(i: number, splitLevel: number | undefined): number {
-  return splitLevel !== undefined && i < splitLevel ? 1 : 0
-}
-
-/**
- * Drawn heights (group-local, ascending) where a segment from level `lower` up to level `upper` moves from one layer
- * to the next: the trains' roof when it rises from the split level or below to above it, else none. The one place a
- * crossing segment is cut.
- */
-export function cutYsBetween(interior: StationInterior, lower: number, upper: number, opts: Pick<ExitPathOptions, 'splitLevel' | 'railDrop' | 'yScale'>): number[] {
-  const split = opts.splitLevel
-  if (split === undefined || layerOfLevel(lower, split) === layerOfLevel(upper, split)) return []
-  return [trainRoofY(interior.levels[split]!, opts.railDrop, opts.yScale)]
-}
-
-const NO_SINK: SegmentSink = { segment: () => {}, loop: () => {} }
-
-/**
- * Restrokes the connector a path piece takes, in the path color, into the sink(s) its levels draw in. A walkway's sides
- * dash as the interior's do (`walkwayDashed`), each on its own phase; returns whether any stroke dashed.
- */
-function restroke(ctx: PlanCtx, piece: Extract<Piece, { kind: 'connector' }>, sinkFor: (l: number, u: number) => SegmentSink, writerOf: (i: number) => PathWriter, walkwayDashed: boolean): boolean {
-  const { c, lower, upper } = piece
-  const levelSink = writerOf
-  const run: ConnectorContext = { ...ctx, strong: sinkFor(lower, upper), fine: NO_SINK }
-  if (c.kind === 'elevator') {
-    drawElevatorShaft(run, c, lower, upper)
-    for (const i of [lower, upper]) drawElevatorStop({ ...ctx, strong: levelSink(i), fine: NO_SINK }, c, i)
-  } else if (c.kind === 'escalator') drawEscalator(run, c, lower, upper)
-  else if (c.kind === 'walkway') {
-    const w = writerOf(lower)
-    const sides: SegmentSink = { segment: (a, b, ca, _cb, dashed) => (dashed ? w.ownDash(a, b, ca) : w.segment(a, b, ca)), loop: () => {} }
-    drawWalkway({ ...run, strong: sides }, c, lower, walkwayDashed)
-    return walkwayDashed
-  } else drawRamp(run, c, lower, upper)
-  return false
-}
-
-/**
- * The exit path's two layers: the centerline (dashed when `dashInStation`), the board marker (the stretch of track
+ * The exit path, one layer per stroke band: the centerline (dashed when `dashInStation`), the board marker (the stretch of track
  * at rail height where the rider is assumed to stand in the train, `boardHalfM` either side of the start), with
  * `restroke` each connector taken and the exit's entrance square, then the walk outside (solid over the walk graph, a
  * dashed straight line when estimated). Throws when the choice doesn't fit the interior.
  */
 export function exitPathBuffers(interior: StationInterior, choice: ExitChoice, opts: ExitPathOptions): ExitPathLayers {
-  const { rgb, yScale, splitLevel: split } = opts
+  const { rgb, yScale } = opts
   const ctx = connectorContext(interior, { yScale, stepRise: opts.stepRise, colorOf: () => rgb })
   const walk = walkOf(interior, choice, ctx)
-  const run = { m: 0 }
-  const base = new PathWriter(run)
-  const layers = split === undefined ? [base] : [base, new PathWriter(run)]
-  const writerOf = (i: number): PathWriter => layers[layerOfLevel(i, split)]!
-  const levelSink: (i: number) => SegmentSink = writerOf
-  const sinkFor = (lower: number, upper: number): SegmentSink => {
-    const cuts = cutYsBetween(interior, lower, upper, opts)
-    if (cuts.length === 0) return levelSink(upper)
-    // Unreachable with one split; kept for the per-deck bands (2q7.28), which may cut a tall connector twice.
-    if (cuts.length > 1) throw new Error(`Exit path at ${interior.stationId}: a connector crosses ${cuts.length} layer cuts`)
-    return new SplitAtY(layers[layerOfLevel(lower, split)]!, layers[layerOfLevel(upper, split)]!, cuts[0]!)
-  }
+  const sinks = bandSinks(interior, opts.decks, opts.railDrop, yScale)
+  const { sinkFor, writerOf: levelSink } = sinks
   const dash = opts.dashInStation
   let dashed = dash
 
@@ -278,7 +186,7 @@ export function exitPathBuffers(interior: StationInterior, choice: ExitChoice, o
       if (piece.kind !== 'connector') continue
       const ends = [piece.c.lower.area, piece.c.upper.area]
       const walkwayDashed = interior.generated !== undefined || ends.every((a) => a !== undefined && rough.has(a))
-      if (restroke(ctx, piece, sinkFor, writerOf, walkwayDashed)) dashed = true
+      if (restroke(ctx, piece.c, piece.lower, piece.upper, sinks, walkwayDashed)) dashed = true
     }
     const e = choice.exit.entranceId === null ? undefined : interior.entrances.find((k) => k.id === choice.exit.entranceId)
     if (e) {
@@ -292,5 +200,5 @@ export function exitPathBuffers(interior: StationInterior, choice: ExitChoice, o
   const firstConnector = walk.pieces.find((p) => p.kind === 'connector')
   const mid = marker[Math.floor(marker.length / 2)]!
   const keep: Vec3[] = [walk.pieces[0]!.a, ...(firstConnector ? [firstConnector.a] : []), ...[marker[0]!, mid, marker.at(-1)!].map((p): Vec3 => [p[0], railY, p[1]])]
-  return { under: base.build(), over: (layers[1] ?? new SegmentWriter()).build(), dashed, keepOut: new Float32Array(keep.flat()) }
+  return { bands: sinks.writers.map((w) => w.build()), dashed, keepOut: new Float32Array(keep.flat()) }
 }

@@ -7,7 +7,7 @@ import { theme } from '../theme'
  * remove together:
  * - this file: pass the chosen `restroke` and color straight from ExitPath.tsx (and drop `restroke` from
  *   `ExitPathOptions` in interiorPath.ts with its unchosen branch, and its interiorPath tests, if A wins)
- * - ExitPath.tsx: the `exitPathLook` import
+ * - ExitPath.tsx: the `exitPathLook` import; useStreetLabels.ts: its `exitPathLook.color` tint becomes `theme.exitPath`
  * - theme.ts: the `?exitColor=` sentence in the `exitPath` doc (and the token itself if rim or focus wins, with its
  *   theme.test.ts exitPath block)
  * - AGENTS.md: the `?exitPath=` / `?exitColor=` TEMPORARY note in the theme bullets and in the ExitPath.tsx entry

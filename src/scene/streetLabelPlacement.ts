@@ -70,7 +70,7 @@ function frame(p: LabelPlacement, anchor: Ground, view: PlacementView, a: Vector
  * The trip exit's label (`view.priorityEntrance`) may cover other entrances' marks: among a crowded corner's marks it
  * would otherwise find no box, and naming the way out matters more than keeping a neighbour's mark clear.
  */
-function exemptExitFromMarks(p: LabelPlacement, view: PlacementView): void {
+export function exemptExitFromMarks(p: LabelPlacement, view: PlacementView): void {
   if (view.priorityEntrance < 0) return
   for (let i = 0; i < p.entrances.length && i < 32; i++) {
     if (!p.entrances[i]!.members.includes(view.priorityEntrance)) continue

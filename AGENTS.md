@@ -181,16 +181,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
   - `StationInterior.tsx` the focused station's interior (two line layers per stroke band, up to four bands; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, level
     labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
-    drawable model (theme colors, labels, camera target; `STEP_RISE_M`, `splitLevelOf`); `interiorLook.ts` TEMPORARY look overrides;
+    drawable model (theme colors, labels, camera target; `STEP_RISE_M`); `interiorLook.ts` TEMPORARY look overrides;
     `StationInterior` renders its `children` inside the interior group
   - `ExitPath.tsx` the trip's way out at its To station, a child of `StationInterior` (only while that interior is the
-    focused one, in an `ErrorBoundary`): `exitPathBuffers` in two LineMaterial layers, 9.3 (with the base layers, under
-    the lifted trains) and 9.8 (over the levels above them), `theme.exitPathWidth`, dashed (`exitPathDash`/`exitPathGap`)
+    focused one, in an `ErrorBoundary`): `exitPathBuffers` in one LineMaterial layer per stroke band (`model.decks`), at
+    `strokeOrders(band, count).exitPath`: over that band's strokes, under the next deck's lifted trains (9.3 band 0, 9.8
+    the top band, 9.545 / 9.578 Union Sq's mid bands), `theme.exitPathWidth`, dashed (`exitPathDash`/`exitPathGap`)
     when the layout is estimated or the walk outside is; opacity `interiorOpacity`; `exitPathLook.ts` TEMPORARY look flags.
     It hands its start (`ExitPathLayers.keepOut`) to the level labels, which drop just below it on screen
-    (`src/lib/labelKeepOut.ts`). The exit's street label (`TripExit.mapLabel`, a street-file entrance index) goes to
-    `StationStreets` as `exitLabel`: `rankEntrances` (entranceLabelBoxes.ts) ranks it above every other entrance (an 8e9
-    tier over the elevators' 4e9) and `useStreetLabels` tints it `theme.exitPath`
+    (`src/lib/labelKeepOut.ts`). The exit's entrance (`TripExit.mapLabel`: ground x/z and raw type) goes to
+    `StationStreets` as `exitLabel`, which finds it in the street file it shows (`exitEntranceIndex`, within 1.5 m, same
+    type; any complex member's file); the label with it among its `EntranceText.members` (its own index plus each same-text
+    twin merged into it) is the exit label: `rankEntrances` (entranceLabelBoxes.ts) ranks it above every other entrance
+    (an 8e9 tier over the elevators' 4e9), `exemptExitFromMarks` (streetLabelPlacement.ts) lets it cover other entrances'
+    marks (only those; panel, header, footer, station markers, focus ring and level labels still block), and
+    `useStreetLabels` tints it `exitPathLook.color` (the path's)
   - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
     with the reveal and goes with the focus); keyed by station. Its draw order is auto: above the veil (7.5), built from
@@ -377,8 +382,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`planEnds` in interiorConnectors.ts, shared with the drawing; `connectorContext` in interiorGeometry.ts), the street
     walk to the exit, then the walk outside (solid over the graph, one dashed line when estimated), a board marker (the
     track at rail height, `BOARD_HALF_M` 9 either side), and with restroke each connector redrawn and the exit's entrance
-    square 1 m larger; levels route through `layerOfLevel`, crossing segments cut by `cutYsBetween` (the trains' roof);
-    one dash phase runs along the path, across layers); `exitView.ts` (`finalRideStops`, `exitLineView`: the panel's
+    square 1 m larger; `interiorPathStrokes.ts` its writers: one per stroke band (`strokeBandOf`), a connector crossing
+    bands cut at each deck roof it spans (`bandCutYs`, nested SplitAtY like the interior's), the restroke; one dash phase
+    runs along the path, across bands); `exitView.ts` (`finalRideStops`, `exitLineView`: the panel's
     "Quickest way out: Bedford Av & N 7 St" plus a dim note (label tail, "probably", walk, a machine's unknown status),
     and the spoken sentence via `streetSpoken`); `walkFixture.ts` the tests' synthetic walk graphs
   - `searchBucket.ts` which hash bucket a street or intersection entry is filed in and which one a query reads
@@ -801,7 +807,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
   at a multi-deck interior the band between decks 9.53 (fine) and 9.54 (strong) and the next deck's cars 9.55 to
   9.565 (a third deck: 9.57 to 9.595; `strokeOrders`, `spanCarOrders`),
-  the trip's exit path 9.3 (under those cars) and 9.8 (over the levels above them),
+  the trip's exit path over each stroke band, under the next deck's cars (`strokeOrders(...).exitPath`: 9.3 band 0,
+  9.545 and 9.578 the mid bands, 9.8 the top band),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom), and the other members of its complex once the interior that covers them is loaded, draw no marker and no
   station tie: its panel and interior mark it, and it stays pickable.

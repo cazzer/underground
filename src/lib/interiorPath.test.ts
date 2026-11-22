@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Connector, StationInterior } from '../data/stationSchema'
 import { quickestExit, type ExitChoice } from './exitChoice'
-import { connectorContext, trainLevelIndex, trainRoofY } from './interiorGeometry'
+import { interiorDecks, trainRoofY } from './interiorDecks'
+import { connectorContext } from './interiorGeometry'
 import { planEnds } from './interiorConnectors'
 import { fixture } from './interiorFixture'
 import { BOARD_HALF_M, exitPathBuffers, exitPathCenterline, type ExitPathOptions } from './interiorPath'
@@ -37,6 +38,7 @@ const opts = (over: Partial<ExitPathOptions> = {}): ExitPathOptions => ({
   stepRise: 0.18,
   railDrop: 1.1,
   entranceSize: 2.5,
+  decks: [],
   rgb: [1, 0, 0.5],
   dashInStation: false,
   restroke: false,
@@ -123,7 +125,7 @@ describe('exitPathCenterline', () => {
     // Restroked, a walkway's sides dash as the interior's do (on an estimated layout), each from 0.
     const sides = (j: StationInterior) => {
       const l = exitPathBuffers(j, exitOf(j), opts({ restroke: true }))
-      return { dashed: l.dashed, own: segs(l.under).filter((q) => q.d[0] === 0 && q.d[1] > 0 && q.a[1] === -8 && q.b[1] === -8) }
+      return { dashed: l.dashed, own: segs(l.bands[0]!).filter((q) => q.d[0] === 0 && q.d[1] > 0 && q.a[1] === -8 && q.b[1] === -8) }
     }
     expect(sides(i)).toEqual({ dashed: false, own: [] })
     const estimated = sides({ ...i, generated: { archetype: 'cut-cover-mezzanine', confidence: 0.9 } })
@@ -135,17 +137,17 @@ describe('exitPathCenterline', () => {
 describe('exitPathBuffers', () => {
   const interior = station()
   const choice = exitOf(interior)
-  const split = trainLevelIndex(interior)
+  const decks = interiorDecks(interior)
   const centerLength = (() => {
     const pts = exitPathCenterline(interior, choice, opts()).map((q) => q.p)
     return pts.slice(1).reduce((m, p, k) => m + Math.hypot(p[0] - pts[k]![0], p[1] - pts[k]![1], p[2] - pts[k]![2]), 0)
   })()
 
   it('cuts the platform stair at the trains roof: the platform and the stair foot under, the rest over', () => {
-    const layers = exitPathBuffers(interior, choice, opts({ splitLevel: split }))
-    const roof = trainRoofY(interior.levels[split!]!, 1.1, 2)
-    const under = segs(layers.under)
-    const over = segs(layers.over)
+    const layers = exitPathBuffers(interior, choice, opts({ decks }))
+    const roof = trainRoofY(interior.levels[decks[0]!]!, 1.1, 2)
+    const under = segs(layers.bands[0]!)
+    const over = segs(layers.bands[1]!)
     expect(under.some((s) => near(s.b[1], roof))).toBe(true)
     expect(over.some((s) => near(s.a[1], roof))).toBe(true)
     expect(Math.max(...under.flatMap((s) => [s.a[1]!, s.b[1]!]))).toBeCloseTo(roof, 4)
@@ -173,37 +175,37 @@ describe('exitPathBuffers', () => {
       ],
     })
     const c = exitOf(elevated)
-    const layers = exitPathBuffers(elevated, c, opts({ splitLevel: trainLevelIndex(elevated) }))
-    expect(layers.over.positions.length).toBe(0)
+    const layers = exitPathBuffers(elevated, c, opts({ decks: interiorDecks(elevated) }))
+    expect(layers.bands[1]!.positions.length).toBe(0)
     const pts = exitPathCenterline(elevated, c, opts()).map((q) => [...q.p])
     expect(pts[0]).toEqual([-10, 16, -5])
     expect(pts.at(-1)).toEqual([9, 0, 10])
   })
 
   it('carries one dash phase along the path, across the roof cut; solid without dashing and on the restroke', () => {
-    const dashed = exitPathBuffers(interior, choice, opts({ splitLevel: split, dashInStation: true }))
+    const dashed = exitPathBuffers(interior, choice, opts({ decks, dashInStation: true }))
     expect(dashed.dashed).toBe(true)
-    const all = [...segs(dashed.under), ...segs(dashed.over)].sort((p, q) => p.d[0] - q.d[0])
+    const all = [...segs(dashed.bands[0]!), ...segs(dashed.bands[1]!)].sort((p, q) => p.d[0] - q.d[0])
     expect(all[0]!.d[0]).toBe(0)
     for (let k = 0; k < all.length; k++) {
       expect(all[k]!.d[1] - all[k]!.d[0]).toBeCloseTo(len(all[k]!), 4)
       if (k > 0) expect(all[k]!.d[0]).toBeCloseTo(all[k - 1]!.d[1], 4)
     }
-    const solid = exitPathBuffers(interior, choice, opts({ splitLevel: split }))
-    expect([...solid.under.distances, ...solid.over.distances].every((d) => d === 0)).toBe(true)
-    const restroked = exitPathBuffers(interior, choice, opts({ splitLevel: split, dashInStation: true, restroke: true }))
-    const moving = [...segs(restroked.under), ...segs(restroked.over)].filter((s) => s.d[1] !== 0)
+    const solid = exitPathBuffers(interior, choice, opts({ decks }))
+    expect([...solid.bands[0]!.distances, ...solid.bands[1]!.distances].every((d) => d === 0)).toBe(true)
+    const restroked = exitPathBuffers(interior, choice, opts({ decks, dashInStation: true, restroke: true }))
+    const moving = [...segs(restroked.bands[0]!), ...segs(restroked.bands[1]!)].filter((s) => s.d[1] !== 0)
     expect(moving.length).toBe(all.length)
-    expect(restroked.under.positions.length + restroked.over.positions.length).toBeGreaterThan(dashed.under.positions.length + dashed.over.positions.length)
+    expect(restroked.bands[0]!.positions.length + restroked.bands[1]!.positions.length).toBeGreaterThan(dashed.bands[0]!.positions.length + dashed.bands[1]!.positions.length)
   })
 
   it('marks the board point: track at rail height, two half-lengths long, kept on the track at its ends', () => {
-    const marker = segs(exitPathBuffers(interior, choice, opts()).under).filter((s) => near(s.a[1], RAIL_Y) && near(s.b[1], RAIL_Y))
+    const marker = segs(exitPathBuffers(interior, choice, opts()).bands[0]!).filter((s) => near(s.a[1], RAIL_Y) && near(s.b[1], RAIL_Y))
     expect(total(marker)).toBeCloseTo(2 * BOARD_HALF_M, 4)
     expect(marker.every((s) => s.a[2] === -5 && s.b[2] === -5)).toBe(true)
     expect(Math.min(...marker.flatMap((s) => [s.a[0]!, s.b[0]!]))).toBeCloseTo(-10 - BOARD_HALF_M, 4)
     const nearEnd = station([stair('PS1', [-19, 2, 'plat'], [-10, 8, 'mezz']), ST1])
-    const clamped = segs(exitPathBuffers(nearEnd, exitOf(nearEnd), opts()).under).filter((s) => near(s.a[1], RAIL_Y))
+    const clamped = segs(exitPathBuffers(nearEnd, exitOf(nearEnd), opts()).bands[0]!).filter((s) => near(s.a[1], RAIL_Y))
     expect(total(clamped)).toBeCloseTo(2 * BOARD_HALF_M, 4)
     expect(Math.min(...clamped.flatMap((s) => [s.a[0]!, s.b[0]!]))).toBeCloseTo(-25, 4)
   })
@@ -212,8 +214,8 @@ describe('exitPathBuffers', () => {
     const o = toGround(interior.anchor)
     const at = (x: number, z: number) => ({ x: o.x + x, z: o.z + z })
     const routed: ExitChoice = { ...choice, destination: at(50, 20), walk: { kind: 'route', points: [at(9, 10), at(9, 20), at(50, 20)], meters: 51, seconds: 40 } }
-    const layers = exitPathBuffers(interior, routed, opts({ splitLevel: split }))
-    const street = segs(layers.over).filter((s) => s.a[1] === 0 && s.b[1] === 0 && s.b[2]! >= 20 - 1e-6)
+    const layers = exitPathBuffers(interior, routed, opts({ decks }))
+    const street = segs(layers.bands[1]!).filter((s) => s.a[1] === 0 && s.b[1] === 0 && s.b[2]! >= 20 - 1e-6)
     expect(street.length).toBe(2)
     expect(street[1]!.b[0]).toBeCloseTo(50, 6)
     expect(street.every((s) => s.d[0] === 0 && s.d[1] === 0)).toBe(true)
@@ -223,9 +225,9 @@ describe('exitPathBuffers', () => {
   it('draws an estimated walk as one dashed straight line to the destination', () => {
     const o = toGround(interior.anchor)
     const estimated: ExitChoice = { ...choice, destination: { x: o.x + 100, z: o.z }, walk: { kind: 'estimate', meters: 91.5, seconds: 90 } }
-    const layers = exitPathBuffers(interior, estimated, opts({ splitLevel: split }))
+    const layers = exitPathBuffers(interior, estimated, opts({ decks }))
     expect(layers.dashed).toBe(true)
-    const line = segs(layers.over).filter((s) => s.d[1] > 0)
+    const line = segs(layers.bands[1]!).filter((s) => s.d[1] > 0)
     expect(line.length).toBe(1)
     expect(line[0]!.a).toEqual([9, 0, 10])
     expect(line[0]!.b[0]).toBeCloseTo(100, 6)
