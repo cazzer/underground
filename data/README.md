@@ -196,9 +196,33 @@ the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `n
 this directory. `npm run data` builds it from the regular GTFS zip along with the other GTFS files (the
 contract is `src/data/timetableSchema.ts`). Each file loads on demand, outside the 60 KB startup budget,
 under its own gzip cap (`TIMETABLE_FILE_GZIP_CAP_BYTES` in `scripts/lib/budget.ts`); the build fails above it,
-and removes a file for a service the feed no longer has. Never commit the zip. The supplemented feed (dated
-service) comes with 2q7.7. `scripts/lib/timetableOutputs.test.ts` checks the committed files against the rest
-of the data.
+and removes a file for a service the feed no longer has. Never commit a zip. `scripts/lib/timetableOutputs.test.ts`
+checks the committed files against the rest of the data.
+
+### Dated timetables
+
+`public/data/timetable/dated/<YYYYMMDD>.json` plus `dated/index.json` come from the MTA's supplemented GTFS
+(`https://rrgtfsfeeds.s3.amazonaws.com/gtfs_supplemented.zip`, rebuilt hourly, the next seven days with planned
+work applied). `npm run data -- --zip <regular> --supplemented-zip <supplemented>` (or `$GTFS_ZIP` and
+`$GTFS_SUPPLEMENTED_ZIP`; both are downloaded when absent) writes them; the regular zip still builds everything
+else, because about 7,000 supplemented trips have no `shape_id`. A dated file has the same layout as a service
+file plus `date` (equal to its name); its `services` lists that day's active supplemented service ids (the base
+calendars split into chunks, minus chunks removed for work, plus date-only services). It replaces the day's
+service files in the client's router; `index.json` (`{ format, feedVersion, dates }`) lists the dates that have one.
+
+- Window: every date from the first to the last on which a date-only service runs (a `calendar_dates` add that
+  `calendar.txt` doesn't list), gap days included. Nothing reads the clock to choose it. More than 14 days (`DATED_MAX_DAYS`)
+  fails the build; none writes an empty index.
+- Outside the window the supplemented feed equals the regular one, so the client falls back to the per-service
+  files, which are exact there. A window that lapses between refreshes is therefore harmless.
+- Caps: each file under `TIMETABLE_FILE_GZIP_CAP_BYTES` (the largest, a heavy weekday, is about 40.6 KB of 48 KB), the
+  directory under `TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES` (400 KB; the nine measured days total about 238 KB).
+- Fails the whole run, writing nothing (the refresh opens no PR that day): the supplemented download or parse, the
+  window over 14 days, a pattern calling at a stop `stations.json` lacks (the error names the stop and dates), and the
+  checks above. A differing `feed_version` between the two zips, an empty window and a window already over are only
+  `WARNING:` lines.
+- Churn: the files change daily, so each merged refresh adds about 5.7 MB raw (a few hundred KB packed) to git history.
+- `scripts/lib/datedTimetableOutputs.test.ts` and `src/data/datedTimetable.data.test.ts` check the committed files.
 
 The build throws, and writes nothing, when a timetable can't be built safely: a time that isn't a multiple of
 30 s, a departure before its arrival, an arrival before the previous departure, a stop that isn't a child stop

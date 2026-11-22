@@ -1,4 +1,4 @@
-import type { CalendarException, ServiceCalendar, ServiceId } from '../../data/schema'
+import type { CalendarException, ServiceCalendar, ServiceId } from '../../data/schema.ts'
 
 const NY_DATE = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/New_York',

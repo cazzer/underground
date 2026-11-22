@@ -111,8 +111,8 @@ describe('sourcesFor', () => {
     date: '20261127',
     startS: 0,
     frames: [
-      { date: '20261126', services: ['Sunday'], shiftS: -86400 },
-      { date: '20261127', services: ['Weekday'], shiftS: 0 },
+      { date: '20261126', services: ['Sunday'], shiftS: -86400, dated: false },
+      { date: '20261127', services: ['Weekday'], shiftS: 0, dated: false },
     ],
   }
   const sunday = { ...file([]), services: ['Sunday'] }
@@ -128,5 +128,26 @@ describe('sourcesFor', () => {
 
   it('throws for a service with no file', () => {
     expect(() => sourcesFor(window, new Map([['Weekday', weekday]]))).toThrow('no timetable file for service Sunday')
+  })
+
+  it("reads a dated frame from its date's file, as one source labelled <date>:dated", () => {
+    const datedWindow: ServiceWindow = {
+      ...window,
+      frames: [
+        { date: '20261126', services: ['Sunday'], shiftS: -86400, dated: false },
+        { date: '20261127', services: ['Weekday_C1', 'Weekday_C2'], shiftS: 0, dated: true },
+      ],
+    }
+    const day = { ...file([]), date: '20261127', services: ['Weekday_C1', 'X1'] }
+    // No file for Weekday_C1 or Weekday_C2 is needed: the date's file replaces them.
+    expect(sourcesFor(datedWindow, new Map([['Sunday', sunday]]), new Map([['20261127', day]]))).toEqual([
+      { label: '20261126:Sunday', shiftS: -86400, file: sunday },
+      { label: '20261127:dated', shiftS: 0, file: day },
+    ])
+  })
+
+  it('throws for a dated frame with no date file', () => {
+    const datedWindow: ServiceWindow = { ...window, frames: [{ date: '20261127', services: ['Weekday'], shiftS: 0, dated: true }] }
+    expect(() => sourcesFor(datedWindow, new Map([['Weekday', weekday]]))).toThrow('no dated timetable file for 20261127')
   })
 })

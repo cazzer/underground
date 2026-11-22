@@ -64,6 +64,15 @@ If the Worker decodes and serves JSON (§6), the client ships **no protobuf libr
 
 - **Regular feed.** `https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip`, 5,606,305 bytes. `feed_version` is `20261028-fall-2026-pick-with-long-term-supplements`, valid 2026-11-01 to 2027-05-15.
 - **Supplemented feed.** `https://rrgtfsfeeds.s3.amazonaws.com/gtfs_supplemented.zip`, 19,537,376 bytes, updated hourly, covering the next 7 days. 7,785 of its 77,957 trips have an empty `shape_id`.
+  Measured 2026-11-22 (18,225,633 bytes, 72,437 trips, 6,958 with an empty `shape_id`, all on L-prefixed services): same feed_version
+  string, `stops.txt` and `transfers.txt` byte-identical to the regular zip. The three base calendars are split into
+  chunks (Weekday, Weekday_C4/_C5/_C11; Saturday_C1-C3; Sunday_C6-C9) that partition the regular trips exactly; planned work is
+  `calendar_dates`: type 2 removes chunks, type 1 adds date-only services (L0S1..9, L1S1..5, L2S1..3) absent from `calendar.txt`. The
+  window was 20261121..20261129 (nine contiguous days); outside it the feed is hash-identical to the regular one (the
+  following Monday, Saturday and Sunday equal Weekday, Saturday, Sunday). `npm run data` turns the window into
+  `public/data/timetable/dated/<date>.json`: 14.9 to 40.6 KB gzipped each (the heavy weekdays), about 238 KB for the nine days,
+  about 200 ms per date. Only the timetable comes from it; the static network stays on the regular zip. Loading both zips
+  peaks near 2 GB of memory.
 - **Build-time only.** The S3 zips send **no ACAO**, so the browser can't fetch them.
 - **Missing files.** Both zips lack `levels.txt`, `pathways.txt`, and entrances.
 

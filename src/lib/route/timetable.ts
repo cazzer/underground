@@ -15,15 +15,25 @@ export interface TimetableSource {
   file: TimetableFile
 }
 
-/** One source per frame and service of `window`, labelled `<date>:<service>`, shifted by its frame. */
-export function sourcesFor(window: ServiceWindow, filesByService: ReadonlyMap<ServiceId, TimetableFile>): TimetableSource[] {
-  return window.frames.flatMap((frame) =>
-    frame.services.map((id) => {
+/** One source per service of each frame of `window`, labelled `<date>:<service>`, shifted by its frame; a dated frame is
+ *  one source from its date's file, labelled `<date>:dated`. */
+export function sourcesFor(
+  window: ServiceWindow,
+  filesByService: ReadonlyMap<ServiceId, TimetableFile>,
+  filesByDate: ReadonlyMap<string, TimetableFile> = new Map(),
+): TimetableSource[] {
+  return window.frames.flatMap((frame) => {
+    if (frame.dated) {
+      const file = filesByDate.get(frame.date)
+      if (!file) throw new Error(`no dated timetable file for ${frame.date}`)
+      return [{ label: `${frame.date}:dated`, shiftS: frame.shiftS, file }]
+    }
+    return frame.services.map((id) => {
       const file = filesByService.get(id)
       if (!file) throw new Error(`no timetable file for service ${id}`)
       return { label: `${frame.date}:${id}`, shiftS: frame.shiftS, file }
-    }),
-  )
+    })
+  })
 }
 
 /**

@@ -16,14 +16,27 @@ const timetable = (service: string): TimetableFile => ({
   patterns: [{ routeId: 'W', direction: 'N', stops: ['101N', '102N', '103N'], trips: [[960, [4, 4]]] }],
 })
 
-/** Serves the fixture calendar, empty transfers and a timetable per service; the first `failures` timetable fetches 500. */
-function stubFetch(failures = 0): { calls: string[] } {
+const datedTimetable = (date: string): TimetableFile => ({ ...timetable('Weekday_C1'), date, services: ['Weekday_C1', 'X1'] })
+
+/** Serves the fixture calendar, empty transfers, a dated index listing `datedDates` and a timetable per service and
+ *  per dated date; the first `failures` timetable fetches 500, and the dated index 500s `indexFailures` times. */
+function stubFetch(failures = 0, datedDates: string[] = [], indexFailures = 0): { calls: string[] } {
   const calls: string[] = []
   let failed = 0
+  let indexFailed = 0
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
       calls.push(url)
+      if (url.endsWith('data/timetable/dated/index.json')) {
+        if (indexFailed < indexFailures) {
+          indexFailed += 1
+          return new Response('nope', { status: 500 })
+        }
+        return new Response(JSON.stringify({ format: 1, feedVersion: 'test', dates: datedDates }))
+      }
+      const datedOf = /data\/timetable\/dated\/(\d+)\.json$/.exec(url)?.[1]
+      if (datedOf) return new Response(JSON.stringify(datedTimetable(datedOf)))
       const timetableOf = /data\/timetable\/(\w+)\.json$/.exec(url)?.[1]
       if (timetableOf) {
         if (failed < failures) {
@@ -85,6 +98,47 @@ describe('planTrip', () => {
     await expect(loadRouterTimetable(stations, MON_8)).rejects.toThrow('HTTP 500')
     await expect(loadRouterTimetable(stations, MON_8)).resolves.toMatchObject({ window: { date: '20261123' } })
     expect(fetched(calls, 'Weekday.json')).toBe(2)
+  })
+
+  it("reads a date's dated file instead of its service files", async () => {
+    const { calls } = stubFetch(0, ['20261123'])
+    const { loadRouterTimetable } = await load()
+    const built = await loadRouterTimetable(stations, MON_8)
+    expect(built.window.frames).toEqual([{ date: '20261123', services: ['Weekday'], shiftS: 0, dated: true }])
+    expect(fetched(calls, 'dated/20261123.json')).toBe(1)
+    expect(calls.filter((u) => /timetable\/Weekday\.json$/.test(u))).toEqual([])
+  })
+
+  it('falls back to the service files when the index lists no date', async () => {
+    const { calls } = stubFetch(0, [])
+    const { loadRouterTimetable } = await load()
+    await loadRouterTimetable(stations, MON_8)
+    expect(fetched(calls, 'timetable/Weekday.json')).toBe(1)
+    expect(calls.some((u) => u.includes('/dated/2'))).toBe(false)
+  })
+
+  it("mixes yesterday's service file with today's dated file", async () => {
+    const { calls } = stubFetch(0, ['20261123'])
+    const { loadRouterTimetable } = await load()
+    const built = await loadRouterTimetable(stations, MON_2)
+    expect(built.window.frames.map((f) => [f.date, f.dated])).toEqual([['20261122', false], ['20261123', true]])
+    expect(fetched(calls, 'timetable/Sunday.json')).toBe(1)
+    expect(fetched(calls, 'dated/20261123.json')).toBe(1)
+    expect(calls.filter((u) => /timetable\/Weekday\.json$/.test(u))).toEqual([])
+  })
+
+  it('plans on a date only a dated file covers', async () => {
+    stubFetch(0, ['20270601'])
+    const { loadRouterTimetable } = await load()
+    await expect(loadRouterTimetable(stations, PAST_CALENDAR)).resolves.toMatchObject({ window: { date: '20270601' } })
+  })
+
+  it('rejects when the dated index fails, and retries on the next call', async () => {
+    const { calls } = stubFetch(0, [], 1)
+    const { loadRouterTimetable } = await load()
+    await expect(loadRouterTimetable(stations, MON_8)).rejects.toThrow('HTTP 500')
+    await expect(loadRouterTimetable(stations, MON_8)).resolves.toMatchObject({ window: { date: '20261123' } })
+    expect(fetched(calls, 'dated/index.json')).toBe(2)
   })
 
   it('throws NoServiceError when the calendar has no service that day', async () => {

@@ -10,7 +10,7 @@ import {
   type TimetablePattern,
   type TimetableTrip,
 } from '../../src/data/timetableSchema.ts'
-import { compareIds, groupByTrip, parseNum, type GtfsFeed, type StopRow, type StopTimeRow } from './gtfs.ts'
+import { compareIds, groupByTrip, parseNum, type GtfsFeed, type StopRow, type StopTimeRow, type TripRow } from './gtfs.ts'
 
 /** A service id becomes a file name, so it may not carry a path (and no two may differ only by case: macOS and Windows would overwrite one). */
 const SERVICE_ID = /^[A-Za-z0-9_-]+$/
@@ -112,10 +112,42 @@ function lanesOf(group: Group): Run[][] {
   return lanes
 }
 
+/** Non-overtaking patterns for `trips` (any mix of services): trips with fewer than two stop_times are skipped and
+ *  counted; `splitPatterns` counts the extra lanes made for trips that overtake. Throws, naming the trip, on a time
+ *  that is not a whole unit, a negative run, or a stop that is not a child stop of `stops`. Patterns are sorted. */
+export function patternsOf(
+  trips: readonly TripRow[],
+  stopTimes: ReadonlyMap<string, readonly StopTimeRow[]>,
+  stops: ReadonlyMap<StopId, StopRow>,
+): { patterns: TimetablePattern[]; skippedShort: number; splitPatterns: number } {
+  const groups = new Map<string, Group>()
+  let skippedShort = 0
+  for (const trip of trips) {
+    const rows = stopTimes.get(trip.id)
+    if (!rows || rows.length < 2) {
+      skippedShort++
+      continue
+    }
+    const run = readRun(trip.id, rows, stops)
+    const stopIds = rows.map((r) => r.stopId)
+    const key = `${trip.routeId}|${trip.direction}|${stopIds.join(',')}`
+    const group = groups.get(key)
+    if (group) group.runs.push(run)
+    else groups.set(key, { routeId: trip.routeId, direction: trip.direction, stops: stopIds, runs: [run] })
+  }
+  let splitPatterns = 0
+  const patterns: TimetablePattern[] = []
+  for (const group of groups.values()) {
+    const lanes = lanesOf(group)
+    splitPatterns += lanes.length - 1
+    for (const lane of lanes) patterns.push(encodeLane(group, lane))
+  }
+  patterns.sort(comparePatterns)
+  return { patterns, skippedShort, splitPatterns }
+}
+
 /** One file per service id (calendar, calendar_dates or trips); a service with no trips gets no patterns.
- *  Trips with fewer than two stop_times are skipped and counted; `splitPatterns` counts the extra lanes
- *  made for trips that overtake. Throws, naming the trip, on a time that is not a whole unit, a negative
- *  run, or a stop that is not a child stop. */
+ *  See `patternsOf` for the skips, splits and throws. */
 export function buildTimetables(feed: GtfsFeed): {
   files: { serviceId: ServiceId; file: TimetableFile }[]
   skippedShort: number
@@ -137,34 +169,17 @@ export function buildTimetables(feed: GtfsFeed): {
 
   const stops = new Map(feed.stops.map((s) => [s.id, s]))
   const stopTimes = groupByTrip(feed.stopTimes)
-  const groups = new Map<ServiceId, Map<string, Group>>(serviceIds.map((id) => [id, new Map()]))
-  let skippedShort = 0
-  for (const trip of feed.trips) {
-    const rows = stopTimes.get(trip.id)
-    if (!rows || rows.length < 2) {
-      skippedShort++
-      continue
-    }
-    const run = readRun(trip.id, rows, stops)
-    const stopIds = rows.map((r) => r.stopId)
-    const key = `${trip.routeId}|${trip.direction}|${stopIds.join(',')}`
-    const byKey = groups.get(trip.serviceId)!
-    const group = byKey.get(key)
-    if (group) group.runs.push(run)
-    else byKey.set(key, { routeId: trip.routeId, direction: trip.direction, stops: stopIds, runs: [run] })
-  }
+  const tripsByService = new Map<ServiceId, TripRow[]>(serviceIds.map((id) => [id, []]))
+  for (const trip of feed.trips) tripsByService.get(trip.serviceId)!.push(trip)
 
   const changes = buildStationChanges(feed)
+  let skippedShort = 0
   let splitPatterns = 0
   const files = serviceIds.map((serviceId) => {
-    const patterns: TimetablePattern[] = []
-    for (const group of groups.get(serviceId)!.values()) {
-      const lanes = lanesOf(group)
-      splitPatterns += lanes.length - 1
-      for (const lane of lanes) patterns.push(encodeLane(group, lane))
-    }
-    patterns.sort(comparePatterns)
-    const file: TimetableFile = { format: TIMETABLE_FORMAT, feedVersion: feed.feedVersion, services: [serviceId], changes, patterns }
+    const built = patternsOf(tripsByService.get(serviceId)!, stopTimes, stops)
+    skippedShort += built.skippedShort
+    splitPatterns += built.splitPatterns
+    const file: TimetableFile = { format: TIMETABLE_FORMAT, feedVersion: feed.feedVersion, services: [serviceId], changes, patterns: built.patterns }
     return { serviceId, file }
   })
   return { files, skippedShort, splitPatterns }

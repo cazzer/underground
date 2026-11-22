@@ -1,5 +1,5 @@
 import type { StationId, StationsFile } from './schema'
-import { serviceCalendar, timetableFile, transfersFile } from './loadTimetable'
+import { datedTimetableFile, datedTimetableIndex, serviceCalendar, timetableFile, transfersFile } from './loadTimetable'
 import { complexMembers } from '../lib/route/ends'
 import type { RouterTimetable, TripJourney } from '../lib/route/plan'
 import { measureSince } from '../lib/route/measure'
@@ -21,18 +21,26 @@ export class NoServiceError extends Error {
 let last: { key: string; promise: Promise<RouterTimetable> } | undefined
 
 async function build(stations: StationsFile, atS: number): Promise<RouterTimetable> {
-  const { calendar, calendarExceptions } = await serviceCalendar()
-  const window = serviceWindow(atS, calendar, calendarExceptions)
+  // A failed index fetch rejects the plan (and is retried by the next one): planned work must not vanish silently.
+  const [{ calendar, calendarExceptions }, datedIndex] = await Promise.all([serviceCalendar(), datedTimetableIndex()])
+  const window = serviceWindow(atS, calendar, calendarExceptions, new Set(datedIndex.dates))
   if (window.frames.length === 0) throw new NoServiceError(window.date)
   const key = `${stations.feedVersion}|${windowKey(window)}`
   if (last?.key === key) return last.promise
-  const serviceIds = [...new Set(window.frames.flatMap((f) => f.services))]
+  // A dated frame reads its date's file instead of its services' files.
+  const serviceIds = [...new Set(window.frames.filter((f) => !f.dated).flatMap((f) => f.services))]
+  const dates = window.frames.filter((f) => f.dated).map((f) => f.date)
   const fetchStart = performance.now()
-  const promise = Promise.all([transfersFile(), ...serviceIds.map(timetableFile)]).then(([transfers, ...files]) => {
+  const promise = Promise.all([
+    transfersFile(),
+    Promise.all(serviceIds.map(timetableFile)),
+    Promise.all(dates.map(datedTimetableFile)),
+  ]).then(([transfers, files, datedFiles]) => {
     measureSince('trip:fetch', fetchStart)
     const buildStart = performance.now()
     const byService = new Map(serviceIds.map((id, i) => [id, files[i]!]))
-    const timetable = buildRouterTimetable(sourcesFor(window, byService), stations, transfers.transfers)
+    const byDate = new Map(dates.map((date, i) => [date, datedFiles[i]!]))
+    const timetable = buildRouterTimetable(sourcesFor(window, byService, byDate), stations, transfers.transfers)
     measureSince('trip:build', buildStart)
     return { timetable, window }
   })

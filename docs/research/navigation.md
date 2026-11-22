@@ -18,7 +18,7 @@ Door-to-door navigation can mostly run on the device with no new external API:
 
 Three things need the user's decision (cards on underground-2q7): an optional geocoding API for places
 our data lacks, how to get Union Sq's real layout, and whether to add the supplemented GTFS feed for
-planned service changes.
+planned service changes (decided: yes, as dated timetable files; 2q7.7).
 
 ## 1. Trip planning
 
@@ -67,8 +67,10 @@ real departures). The Worker drops `trip_replacement_period` and schedule_relati
 (`worker/proto/subway-rt.proto:9-34`) and arrivals past 30 min (`worker/src/schema.ts:4-5`). A stale or
 erroring feed falls back to the schedule, so gaps aren't invented.
 
-**Planned service changes** (weekend work) are only in the supplemented feed (19.5 MB, hourly, 7 days);
-we build from the regular zip. Adding it is a data-pipeline change (card).
+**Planned service changes** (weekend work) are only in the supplemented feed (19.5 MB, hourly, 7 days). `npm run data`
+reads it for the dated timetable files (`public/data/timetable/dated/`, one per date of its window), and the planner
+uses a date's file when the manifest lists it and the per-service files otherwise (2q7.7). The UI doesn't say yet
+that a trip follows planned work ("planned work through <date>" is a follow-up).
 
 **MVP:** timetable files plus same-station change times in `npm run data`; pure RAPTOR with tests on
 `src/lib/realtime/fixture.ts`; station to station, departing now, schedule only, labelled scheduled;
