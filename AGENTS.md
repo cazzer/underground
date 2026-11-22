@@ -79,6 +79,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
+    `cameraFlight.ts` its fly-to destinations (interior, bare station, point), `flushMotion` and the landing turn;
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
     shapes arrive, then eases them in over 300 ms (`BandView.ease`: offset and split blend linearly from unbanded, so no fold); writes the shared `BandView` (Scene owns it; LiveTrains reads
@@ -132,7 +133,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
   location message
   `OrbitHint.tsx` the header's muted turn hint under the status lines (right- or Shift-drag; two fingers on a
-  coarse pointer), shown while a station is focused until the first turn of the session (`src/lib/orbitTurned.ts`)
+  coarse pointer), shown while a station is focused until the session's first user turn (about 17° of an armed gesture on one focused station; flights, springs and the cap don't count; `src/lib/orbitTurned.ts`)
 - `src/lib/`: pure logic
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths without bands, bounds,
@@ -168,7 +169,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `bandOffset.ts` the band offset formula (`bandShift`, `BandView`, `writeBandView`; pitch fades out 25 to 80 km;
     per point, the direction tracks merge under 6.5 px apart and split by 8.5 px, plus the bundle's width, so they
     split only once both bundles fit); `trackOffset.ts` also exports `miterNormals`;
-    `focusMachine.ts` camera-driven focus transitions; `focusHold.ts` interrupted-flight release rule
+    `focusMachine.ts` camera-driven focus transitions; `focusDwell.ts` `settled`, the 400 ms stillness auto-focus
+    waits for; `focusHold.ts` interrupted-flight release rule
   - `lineBuffers.ts` (positions, colors, `bands`: each segment end's band inputs from `vertexBandInputs` (miter
     vector normal / cosHalf, slot, corridor half-width), and `firstSegment` per shape), `routeColor.ts` (theme mix plus a 3:1 contrast floor), `framing.ts` (fit
     between HUD insets), `markerMatrices.ts` (incl. `writeChordMatrix`, a car pitched along its chord), `pick.ts` (hit radii, nearest station,
@@ -188,9 +190,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     labels (`levelHeightText`: authored levels "−4.3 m"; on a generated interior an `ee-rise` depth is signed to one
     decimal, "+" above the street, and any other is "≈ −9 m", signed whole meters), padded hull; `interiorFade.ts` per-level fade share by distance from the street level;
     `interiorReveal.ts` distance to interior opacity. These have `.ts` imports
-    because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always 180 m,
-    at the current azimuth) in the screen area the header, footer and station panel leave free;
-    `orbitLimits.ts` azimuth cap, short-way spring to north-up, soft pan radius, focus-point pivot;
+    because a scripts/ test loads them. `interiorCamera.ts` centers an interior fly-to (always `LANDING_DISTANCE`, the tilt's
+    near distance) in the screen area the header, footer and station panel leave free, at the current azimuth, or
+    on a portrait free area (`landingAzimuth`, ground height ≥ 1.5× width: phones) turned just enough that the
+    platforms (`stationAxis`, `InteriorModel.axis`) run within 25° of screen-vertical, decided once per flight;
+    `orbitLimits.ts` azimuth cap by tilt, short-way spring to north-up, soft pan radius, focus-point pivot;
     `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`)
   - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
     `stationSearch.ts` ranks stations for a query (exact, prefix, typo-tolerant; a number only prefix-matches as the
@@ -239,10 +243,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     the arrival's clock minute minus the current one (not floor of seconds), so adjacent rows and both
     panels agree
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
-    (dots from 1400 m, cars by 900 m); `consistLayout.ts` `writeConsist`: cars end to end along the shape
+    (dots from 2400 m, cars by 1600 m, so a train is a flat footprint before the camera tips) and `carsReach`; `consistLayout.ts` `writeConsist`: cars end to end along the shape
     (`consistSpanInto`, shared with picking), each on its chord between two track points (pitched on the profile), unfolding from the dot point (spacing and length by mix, section by the slot fade);
-    `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within about 3 camera distances
-    of the view center are laid out; the rest are zeroed once
+    `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within `carsReach` of the view center
+    ((1 + 2 × tilt) camera distances plus 300 m, so 1 top-down and 3 at full tilt) are laid out; the rest are zeroed once
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
@@ -373,20 +377,32 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Camera polar angle is a pure function of zoom distance (`src/lib/tilt.ts`): `ISO_POLAR × tiltT(d)`. The same
   `tiltT` is `depthFactor`, the one parameter for every drawn depth (track profile, car height, ties, interior
   levels, veil, level labels), so depth only shows as the camera tips: 0 top-down, 1 (the authored ×yScale) fully tilted.
+  The zoom stages, by camera distance: above 2400 m dots and station markers; 2400 to 1600 m dots unfold
+  into flat true-length footprints; the tilt runs from 1400 m (top-down) to 400 m (isometric, `nearDistance`);
+  1100 to 800 m the interior fades in as a flat plan (depth 0.05 to 0.40); 800 to 400 m the levels
+  separate and the veil and labels come in; at 400 m everything is full 3D.
   The user may rotate (right-drag, shift/ctrl/meta+drag, two-finger touch) only while a station is
-  focused: a full spin (azimuth bounds ±Infinity inside EXIT_DISTANCE), and the turn pivots on the focus point
-  (the interior's mid-depth center at the middle of the free area, or the view center for a bare station).
+  focused (focus engages inside 1100 m within 140 m of a station once the view has held still for 400 ms
+  (`ENTER_DWELL_S`: target and distance within 0.2% of the distance, no gesture active, and a gesture's end
+  restarts the wait), so a pan across the city opens no panels; it drops at once past 1400 m or 350 m away;
+  taps and flights focus immediately; `focusMachine.ts`): |azimuth| is capped by tilt, rising from 0 top-down to π at tiltT 0.67 and a full spin
+  (azimuth bounds ±Infinity) from there, and the turn pivots on the focus point
+  (the interior's mid-depth center, or a bare station's point, at the middle of the free area).
   The focus point pans within the interior's reach (farthest outline vertex or entrance from its plan
   center) + 20 m (100 m of a bare station; 180 m at most), with a soft edge (`src/lib/orbitLimits.ts`), so
-  on a phone a drag can bring every part of the interior to the free area at any angle. Past EXIT_DISTANCE
-  |azimuth| is capped, falling from π to 0 at the top-down distance (1400 m), and dropping focus (zoom out,
+  on a phone a drag can bring every part of the interior to the free area at any angle. The pan clamp applies
+  only from tiltT 0.5 (further out a pan is free), and arms only once the view is inside the radius. Dropping focus (zoom out,
   close the panel) springs the view back to north-up the short way round (an exponential ease capped at
   180°/s; under prefers-reduced-motion it snaps to north-up at once), so the city and top-down views
   are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it
-  mid-gesture applies a stale rotate start), and `rotateSpeed` is 0 while unfocused so drift can't replay
-  when the bounds open. Markers and dots rescale with distance
+  mid-gesture applies a stale rotate start). A gesture turns the view only if it was armed at its start
+  (`rotateArmed`: focused and tiltT ≥ 0.5, set by `onStart`, cleared by `onEnd`); otherwise `rotateSpeed` is 0
+  for all of it, so an unarmed gesture never turns the view: a pinch that starts unfocused or nearly top-down
+  doesn't, whatever its fingers do. Each new contact (a second finger down fires `onStart` again) re-checks the
+  arming. A bare station pivots on its own point while that point is within its 100 m pan radius of the free
+  area's middle, else on that middle, so a far-off or held station can't swing the view away. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
-- Every `on*` handler passed to `MapControls` (today `onStart`) stays referentially
+- Every `on*` handler passed to `MapControls` (today `onStart` and `onEnd`) stays referentially
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
   which can lock them mid-drag. Set control limits imperatively in `useFrame` (priority -2, before
   drei's `update()` at -1; the pivot and pan clamp at -0.5; the band view at -0.25), not as changing props. Never use a
@@ -456,7 +472,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   level up, so upper levels paint over lower ones; levels farther from the street (in level count; deeper, or
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
-  in between 320 m and 180 m (full tilt). A background-colored veil (render order 7) dims every street
+  in between 1100 m and 800 m (`interiorReveal.ts`), as a flat plan while the camera is still nearly top-down. A background-colored veil (render order 7) dims every street
   layer, live trains included, in one draw call, at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
   level labels show by `labelOpacity` (gated between depth 0.3 and 0.6); the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
@@ -474,7 +490,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (the route lines' alpha times 1 − weight × reveal in the band line shader, the weight easing back to 0 over the
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
-  beside the station panel at 180 m (a partial fit on small screens).
+  beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
+  up the screen); a bare station lands at the same distance with its point in the free area above the panel. Both
+  retarget mid-flight when the interior or the panel's final size arrives (an interior arriving after 90% of
+  the flight adds no turn). Under prefers-reduced-motion station and point flights snap, with no turn; a snapped station whose interior
+  loads afterwards is reframed once onto it (snapped, no turn) unless a gesture started since. The
+  location button frames its fix at ENTER_DISTANCE × 1.1 (about 1210 m) or farther.
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.
 
 ## Station interior format

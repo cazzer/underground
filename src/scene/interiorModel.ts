@@ -1,5 +1,6 @@
 import { Color } from 'three'
 import type { Level, LocalPoint, StationInterior } from '../data/stationSchema'
+import { stationAxis } from '../lib/interiorAxis'
 import { levelFadeShares } from '../lib/interiorFade'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { buildInteriorBuffers, RAIL_DROP_M, trainLevelIndex, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
@@ -26,6 +27,8 @@ export interface InteriorModel {
   labels: LevelLabel[]
   /** Plan center and the toward-camera shift that puts it at mid-height mid-screen, seen isometrically. */
   focusAnchor: FocusAnchor
+  /** Plan direction of the longest platform (stationAxis): a portrait landing turns it to run up the screen. */
+  axis: LocalPoint
   /** Look B's cutaway outline (group-local), or null. */
   hull: LocalPoint[] | null
   yScale: number
@@ -123,6 +126,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     approximate,
     labels: levelLabels(interior, yScale),
     focusAnchor: interiorFocusAnchor(origin, interior, yScale, Math.tan(ISO_POLAR)),
+    axis: stationAxis(interior),
     hull,
     yScale,
   }

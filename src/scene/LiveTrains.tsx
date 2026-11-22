@@ -4,7 +4,7 @@ import { CircleGeometry, Color, DynamicDrawUsage, type Group, type InstancedMesh
 import type { StationId } from '../data/schema'
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
-import { carMix } from '../lib/live/consist'
+import { carMix, carsReach } from '../lib/live/consist'
 import type { BandView } from '../lib/bandOffset'
 import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
 import type { TrainPickSource } from '../lib/live/trainPick'
@@ -16,6 +16,7 @@ import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
 import { hopDistance } from '../lib/realtime/position'
 import { routeLineColor } from '../lib/routeColor'
+import { tiltT } from '../lib/tilt'
 import { useTrainSelection } from '../lib/trainSelection'
 import { theme } from '../theme'
 import { cameraDistance, getControls, screenScale } from './cameraDistance'
@@ -31,8 +32,6 @@ const DOT_MIN_METERS = 2.5
 const HALO_RATIO = 1.5
 const DOT_Y = 0.5
 const SEGMENTS = 16
-/** Cars are laid out only for trains within this many camera distances (plus 300 m slack) of the view center. */
-const CARS_WITHIN = { distances: 3, plusM: 300 }
 /** The selected train's dot (and its background halo, the gap) draws this much larger, with a rim of RIM_PX outside. */
 const SELECTED_GROWTH = 1.6
 const RIM_PX = 2.5
@@ -177,7 +176,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     const carsOn = mix > 0
     if (carsOn) cars.beginFrame(camera, view.depth)
     const center = getControls(state)?.target
-    const reach = camera * CARS_WITHIN.distances + CARS_WITHIN.plusM
+    const reach = carsReach(camera, tiltT(camera))
     const out = d.instanceMatrix.array as Float32Array
     const sel = selectedSlot.current
     let dotScale = 0

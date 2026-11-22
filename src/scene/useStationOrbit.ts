@@ -1,6 +1,6 @@
 import type { MapControls } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef, type ComponentRef, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, type ComponentRef, type RefObject } from 'react'
 import type { PerspectiveCamera } from 'three'
 import type { Viewport } from '../lib/framing'
 import { freeCenterShift, type ScreenRect, type ScreenShift } from '../lib/interiorCamera'
@@ -10,6 +10,8 @@ import {
   panClampArmed,
   panRadius,
   pivotShift,
+  rotateArmed,
+  screenOffsetTo,
   softClampToRadius,
   wrapAngle,
   type AzimuthBounds,
@@ -17,15 +19,15 @@ import {
 } from '../lib/orbitLimits'
 import { markTurned } from '../lib/orbitTurned'
 import type { Ground } from '../lib/projection'
-import { depthFactor, ISO_POLAR } from '../lib/tilt'
+import { depthFactor, ISO_POLAR, tiltT } from '../lib/tilt'
 import type { InteriorModel } from './interiorModel'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
 const TAN_ISO = Math.tan(ISO_POLAR)
 /**
- * Turn (radians, summed while focused) that counts as the visitor's first turn and retires the hint:
- * about 17°, past what a drifting pinch adds.
+ * Turn (radians, summed over armed gestures on one focused station) that counts as the visitor's first
+ * turn and retires the hint: about 17°.
  */
 const TURN_SEEN = 0.3
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -46,39 +48,65 @@ interface StationOrbitOptions {
   busy: () => boolean
 }
 
-/** What the view orbits and pans around: the interior's plan (pivoting on the free area's middle) or the bare station. */
+/** Gesture hooks for the controls' start and end events; both stay referentially stable. */
+export interface StationOrbitGestures {
+  onGestureStart: () => void
+  onGestureEnd: () => void
+}
+
+/**
+ * What the view orbits and pans around. The pan clamp holds the free area's middle within `radius` of
+ * `center`. An interior pivots on that middle too (where its fly-to puts it); a bare station pivots on its
+ * own point, wherever it sits on screen.
+ */
 interface OrbitFocus {
   center: Ground
   radius: number
   /** Interior depth term at ISO_POLAR and full depth (FocusAnchor.towardCamera); 0 for a bare station. */
   towardCamera: number
-  /** Pivot on the free area's middle (where an interior fly-to puts it) rather than the view center. */
-  useFree: boolean
+  bare: boolean
 }
 
 /**
- * Station orbit: a full spin while focused (a spring to north-up otherwise), a turn that pivots on the
- * focus point, and a soft pan radius. It also flags the session's first turn for the HUD hint. All
- * frames write the controls imperatively: passing these as props or on* handlers would re-run drei's
- * connect effect and could lock the controls (underground-by0). Nothing here allocates per frame.
+ * Station orbit: a turn window that opens with the tilt to a full spin while focused (a spring to
+ * north-up otherwise), a turn that pivots on the focus point, and a soft pan radius once tilted. Only a
+ * gesture armed at its start (rotateArmed) turns the view, and only its turning counts toward the HUD
+ * hint. All frames write the controls imperatively: passing these as props or changing on* handlers would
+ * re-run drei's connect effect and could lock the controls (underground-by0). Nothing here allocates per frame.
  */
-export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, flying, busy }: StationOrbitOptions): void {
-  const input = useRef<AzimuthInput>({ theta: 0, focused: false, distance: 0, dt: 0, reducedMotion: false })
+export function useStationOrbit({ controls, camera, focusPos, interior, viewport, free, flying, busy }: StationOrbitOptions): StationOrbitGestures {
+  const input = useRef<AzimuthInput>({ theta: 0, focused: false, tilt: 0, dt: 0, reducedMotion: false })
   const bounds = useRef<AzimuthBounds>({ min: 0, max: 0 })
   const lastTheta = useRef(0)
   const shift = useRef<ScreenShift>({ right: 0, toward: 0 })
+  const pivot = useRef<ScreenShift>({ right: 0, toward: 0 })
   const move = useRef<Ground>({ x: 0, z: 0 })
   const point = useRef<Ground>({ x: 0, z: 0 })
   const clamped = useRef<Ground>({ x: 0, z: 0 })
   const armed = useRef(false)
   const armedFor = useRef<Ground | null>(null)
   const turnedBy = useRef(0)
+  const turnedFor = useRef<Ground | null>(null)
+  const wasFlying = useRef(false)
+  const rotating = useRef(false)
+  const focusRef = useRef(focusPos)
+  useLayoutEffect(() => {
+    focusRef.current = focusPos
+  }, [focusPos])
+
+  const onGestureStart = useCallback(() => {
+    const c = controls.current
+    rotating.current = c !== null && rotateArmed(focusRef.current !== null, tiltT(camera.position.distanceTo(c.target)))
+  }, [controls, camera])
+  const onGestureEnd = useCallback(() => {
+    rotating.current = false
+  }, [])
 
   const focus = useMemo<OrbitFocus | null>(() => {
     if (!focusPos) return null
-    if (!interior) return { center: focusPos, radius: panRadius(null), towardCamera: 0, useFree: false }
+    if (!interior) return { center: focusPos, radius: panRadius(null), towardCamera: 0, bare: true }
     const a = interior.focusAnchor
-    return { center: a.center, radius: panRadius(a.reach), towardCamera: a.towardCamera, useFree: true }
+    return { center: a.center, radius: panRadius(a.reach), towardCamera: a.towardCamera, bare: false }
   }, [focusPos, interior])
 
   // Before drei's controls.update() (priority -1), beside the polar lock in CameraRig.
@@ -88,18 +116,17 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const inp = input.current
     inp.theta = c.getAzimuthalAngle()
     inp.focused = focusPos !== null
-    inp.distance = camera.position.distanceTo(c.target)
+    inp.tilt = tiltT(camera.position.distanceTo(c.target))
     inp.dt = delta
     inp.reducedMotion = reduceMotion.matches
     const b = azimuthBounds(inp, bounds.current)
     // enableRotate stays on: OrbitControls seeds a rotate only when it is on at gesture start, so
     // toggling it mid-gesture applied a stale start (a pinch into a station swung the view). The
-    // window alone holds the angle when unfocused (min = max) and top-down (0); focused and close
-    // it is ±Infinity, which the controls leave unclamped (a full spin).
-    // Safe mid-gesture: OrbitControls updates rotateStart on every move whatever the speed, so no
-    // stale start; and at 0 no sphericalDelta accumulates while the window is shut, so a drifting
-    // pinch can't replay as a turn once focus opens the window.
-    c.rotateSpeed = inp.focused ? 1 : 0
+    // window holds the angle when unfocused (min = max) and top-down (0); focused it opens with the
+    // tilt, to ±Infinity (a full spin, which the controls leave unclamped) from FULL_SPIN_TILT.
+    // rotateSpeed scales every move's delta, so a gesture not armed at its start (onGestureStart)
+    // turns nothing however its fingers drift, even after focus opens the window part-way through.
+    c.rotateSpeed = inp.focused && rotating.current ? 1 : 0
     c.minAzimuthAngle = b.min
     c.maxAzimuthAngle = b.max
   }, -2)
@@ -114,26 +141,42 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const f = focus
     if (!f) {
       armed.current = false
+      turnedFor.current = null
       return
+    }
+    if (turnedFor.current !== focusPos) {
+      turnedFor.current = focusPos
+      turnedBy.current = 0
     }
     const isBusy = busy()
     const isFlying = flying()
     const s = shift.current
-    if (f.useFree) {
-      const polar = c.getPolarAngle()
-      const distance = camera.position.distanceTo(c.target)
-      freeCenterShift(viewport, free, camera.fov, distance, polar, s)
-      // The interior's mid-depth is drawn at the depth factor (StationInterior's scale.y), so its pivot shift is too.
-      s.toward += (f.towardCamera * depthFactor(distance) * Math.tan(polar)) / TAN_ISO
-    } else {
-      s.right = 0
-      s.toward = 0
-    }
+    const distance = camera.position.distanceTo(c.target)
+    const polar = c.getPolarAngle()
+    freeCenterShift(viewport, free, camera.fov, distance, polar, s)
+    // The interior's mid-depth is drawn at the depth factor (StationInterior's scale.y), so its pivot shift is too.
+    s.toward += (f.towardCamera * depthFactor(distance) * Math.tan(polar)) / TAN_ISO
     // The controls turned about the target; slide target and camera so the turn pivots on the focus point.
-    if (!isFlying && theta !== theta0) {
-      turnedBy.current += Math.abs(wrapAngle(theta - theta0))
-      if (turnedBy.current > TURN_SEEN) markTurned()
-      const m = pivotShift(s.right, s.toward, theta0, theta, move.current)
+    // Not on a flight's landing frame either: its last step turned the camera (cameraFlight's turnOffset),
+    // and pivoting that would slide the landed view off its framing.
+    const landed = wasFlying.current
+    wasFlying.current = isFlying
+    if (!isFlying && !landed && theta !== theta0) {
+      // A bare station pivots on its own point while it is within its pan radius of the free area's middle;
+      // farther off (a held flight, a station focused at the edge) on that middle, so a turn can't swing the view away.
+      let ps = s
+      if (f.bare) {
+        const mid = focusPoint(c.target, s.right, s.toward, theta0, point.current)
+        if (Math.hypot(mid.x - f.center.x, mid.z - f.center.z) <= f.radius) {
+          screenOffsetTo(c.target, f.center, theta0, pivot.current)
+          ps = pivot.current
+        }
+      }
+      if (rotating.current) {
+        turnedBy.current += Math.abs(wrapAngle(theta - theta0))
+        if (turnedBy.current > TURN_SEEN) markTurned()
+      }
+      const m = pivotShift(ps.right, ps.toward, theta0, theta, move.current)
       c.target.x += m.x
       c.target.z += m.z
       camera.position.x += m.x
@@ -141,7 +184,7 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     }
     const p = focusPoint(c.target, s.right, s.toward, theta, point.current)
     const inside = Math.hypot(p.x - f.center.x, p.z - f.center.z) <= f.radius
-    armed.current = panClampArmed(armed.current, armedFor.current === f.center, isBusy, inside)
+    armed.current = panClampArmed(armed.current, armedFor.current === f.center, isBusy, tiltT(distance), inside)
     armedFor.current = f.center
     if (!armed.current) return
     const out = clamped.current
@@ -151,4 +194,6 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     camera.position.x += out.x - p.x
     camera.position.z += out.z - p.z
   }, -0.5)
+
+  return { onGestureStart, onGestureEnd }
 }

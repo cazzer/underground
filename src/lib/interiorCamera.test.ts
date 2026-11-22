@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { PerspectiveCamera, Vector3 } from 'three'
-import { frameInterior, interiorFreeRect, type InteriorFrameInput } from './interiorCamera'
-import { ENTER_RADIUS, EXIT_DISTANCE } from './focusMachine'
+import {
+  frameInterior,
+  interiorFreeRect,
+  LANDING_AXIS_OFF_VERTICAL,
+  LANDING_DISTANCE,
+  landingAzimuth,
+  LATE_TURN_PROGRESS,
+  retargetTurn,
+  type InteriorFrameInput,
+} from './interiorCamera'
+import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_RADIUS } from './focusMachine'
 import { interiorOpacity } from './interiorReveal'
-import { ISO_POLAR } from './tilt'
+import { DEFAULT_TILT, ISO_POLAR, tiltT } from './tilt'
 
 const viewport = { width: 1440, height: 900 }
 const insets = { top: 70, bottom: 90 }
@@ -48,29 +57,37 @@ describe('frameInterior', () => {
     ['a tiny free rect', { center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 70, right: 40, bottom: 90 } }],
   ]
 
-  it.each(cases)('%s: stays at full reveal and keeps the station focused', (_, input) => {
+  it("lands at the tilt's near distance, inside the focus range", () => {
+    expect(LANDING_DISTANCE).toBe(DEFAULT_TILT.nearDistance)
+    expect(LANDING_DISTANCE).toBeLessThan(ENTER_DISTANCE)
+  })
+
+  it.each(cases)('%s: lands in full 3D at full reveal and keeps the station focused', (name, input) => {
     const { distance, target } = frameInterior(input)
-    expect(distance).toBeLessThanOrEqual(180)
+    expect(distance).toBe(LANDING_DISTANCE)
+    expect(tiltT(distance)).toBe(1)
     expect(interiorOpacity(distance)).toBe(1)
-    expect(distance).toBeLessThan(EXIT_DISTANCE)
-    // The view center stays close enough that the camera-driven focus keeps this station.
-    expect(Math.hypot(target.x - center.x, target.z - center.z)).toBeLessThan(ENTER_RADIUS)
+    // The view center stays close enough that the camera-driven focus keeps this station: within the
+    // enter radius on a real layout (no neighbour can take over), and inside the exit radius even when
+    // the free rect is a sliver.
+    const off = Math.hypot(target.x - center.x, target.z - center.z)
+    expect(off).toBeLessThan(name === 'a tiny free rect' ? EXIT_RADIUS : ENTER_RADIUS)
   })
 
   it('keeps the center when the free rect is the whole viewport', () => {
     const free = { left: 0, top: 0, right: 1440, bottom: 900 }
-    expect(frameInterior({ center, ...north, viewport, free, fovDeg: 35 })).toEqual({ distance: 180, target: center })
+    expect(frameInterior({ center, ...north, viewport, free, fovDeg: 35 })).toEqual({ distance: LANDING_DISTANCE, target: center })
   })
 
   it('shifts the target east when the free rect is left of center, so the interior moves left', () => {
     const { target } = frameInterior({ center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 0, right: 1120, bottom: 900 } })
-    expect(target.x).toBeCloseTo(1000 + 160 * mpp(180, 900))
+    expect(target.x).toBeCloseTo(1000 + 160 * mpp(LANDING_DISTANCE, 900))
     expect(target.z).toBe(2000)
   })
 
   it('shifts the target north when the free band is below center, like frameBounds', () => {
     const { target } = frameInterior({ center, ...north, viewport, fovDeg: 35, free: { left: 0, top: 100, right: 1440, bottom: 900 } })
-    expect(target.z).toBeCloseTo(2000 - (50 * mpp(180, 900)) / Math.cos(ISO_POLAR))
+    expect(target.z).toBeCloseTo(2000 - (50 * mpp(LANDING_DISTANCE, 900)) / Math.cos(ISO_POLAR))
   })
 })
 
@@ -103,5 +120,61 @@ describe('frameInterior at any azimuth', () => {
     const flat = project(0)
     expect(rotated.x).toBeCloseTo(flat.x, 3)
     expect(rotated.y).toBeCloseTo(flat.y, 3)
+  })
+})
+
+describe('landingAzimuth', () => {
+  const phoneFree = interiorFreeRect({ width: 390, height: 844 }, { top: 96, bottom: 70 }, { left: 16, top: 525, right: 374, bottom: 770 })
+  const deskFree = interiorFreeRect(viewport, insets, { left: 1136, top: 628, right: 1424, bottom: 884 })
+  const alpha = LANDING_AXIS_OFF_VERTICAL
+  /** The axis's angle off screen-vertical at azimuth θ, in [0, 90°]. */
+  const offVertical = (v: readonly [number, number], theta: number) => {
+    const right = v[0] * Math.cos(theta) - v[1] * Math.sin(theta)
+    return Math.asin(Math.min(1, Math.abs(right)))
+  }
+  const turnOf = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))
+
+  it('allows 25 degrees off vertical: the largest that keeps every sz7 station framed on a phone (J20 needs it)', () => {
+    expect(LANDING_AXIS_OFF_VERTICAL).toBeCloseTo((25 * Math.PI) / 180, 12)
+  })
+
+  it('keeps the azimuth when the free area is wider than tall in ground terms (desktop)', () => {
+    expect(landingAzimuth([1, 0], 0.3, deskFree)).toBe(0.3)
+  })
+
+  it('on a phone turns an east-west platform to LANDING_AXIS_OFF_VERTICAL, the short way', () => {
+    const az = landingAzimuth([1, 0], 0, phoneFree)
+    expect(turnOf(az, 0)).toBeCloseTo(Math.PI / 2 - alpha, 9)
+    expect(offVertical([1, 0], az)).toBeCloseTo(alpha, 9)
+  })
+
+  it('keeps the azimuth when the axis is already within LANDING_AXIS_OFF_VERTICAL of vertical', () => {
+    expect(landingAzimuth([0, 1], 0, phoneFree)).toBe(0)
+    const a = Math.PI / 2 - alpha + 0.01
+    expect(landingAzimuth([Math.cos(a), Math.sin(a)], 0, phoneFree)).toBe(0)
+  })
+
+  it('turns at most 90° less the allowance and lands the axis at most that far off vertical', () => {
+    for (const a of [0, 0.4, 1.2, 2, -0.7]) {
+      const axis = [Math.cos(a), Math.sin(a)] as const
+      for (const current of [0, 1, -2, 3]) {
+        const az = landingAzimuth(axis, current, phoneFree)
+        expect(turnOf(az, current)).toBeLessThanOrEqual(Math.PI / 2 - alpha + 1e-9)
+        expect(offVertical(axis, az)).toBeLessThanOrEqual(alpha + 1e-9)
+      }
+    }
+  })
+})
+
+describe('retargetTurn', () => {
+  it('keeps a decided turn at any progress, so a retarget never re-picks it', () => {
+    expect(retargetTurn(true, 0)).toBe('keep')
+    expect(retargetTurn(true, 0.99)).toBe('keep')
+  })
+
+  it('decides when the interior arrives up to LATE_TURN_PROGRESS, and lands without a turn after it', () => {
+    expect(retargetTurn(false, 0.2)).toBe('decide')
+    expect(retargetTurn(false, LATE_TURN_PROGRESS)).toBe('decide')
+    expect(retargetTurn(false, LATE_TURN_PROGRESS + 0.01)).toBe('none')
   })
 })

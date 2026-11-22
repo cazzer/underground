@@ -59,16 +59,25 @@ export function consistCenter(lengthM: number, shown: number, trainM: number): n
 }
 
 /**
- * Dots from this camera distance out, cars from CARS_AT in. DOTS_FROM_M matches where the camera starts
- * to tilt (DEFAULT_TILT.farDistance in tilt.ts), so the view is top-down while a train first unfolds and
- * its body height doesn't show; writeConsist also ramps the height in, in case the two ever move apart.
+ * Dots from this camera distance out, cars from CARS_AT in. DOTS_FROM_M sits well outside where the camera
+ * starts to tilt (DEFAULT_TILT.farDistance, 1400 m), so a train unfolds into a flat, true-length footprint
+ * while the view is top-down; its height then grows with the depth factor as the camera tips (writeConsist).
  */
-export const DOTS_FROM_M = 1400
-export const CARS_AT_M = 900
+export const DOTS_FROM_M = 2400
+export const CARS_AT_M = 1600
 
 /** 0 draws dots, 1 draws cars; a smoothstep in log distance between, so zooming at a steady rate feels even. */
 export function carMix(distance: number): number {
   const x = Math.log(DOTS_FROM_M / distance) / Math.log(DOTS_FROM_M / CARS_AT_M)
   const t = Math.min(Math.max(x, 0), 1)
   return t * t * (3 - 2 * t)
+}
+
+/**
+ * How far from the view center (meters, on the ground) cars are laid out: three camera distances at full
+ * tilt, one at top-down (the view reaches the horizon only when tipped), plus 300 m of slack. `tilt` is
+ * tiltT(d); the rest of the trains stay dots or zeroed.
+ */
+export function carsReach(distance: number, tilt: number): number {
+  return (1 + 2 * tilt) * distance + 300
 }

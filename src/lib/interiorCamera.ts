@@ -1,9 +1,14 @@
 /** Pure camera framing for a station interior beside the HUD. */
 import type { Insets, Viewport } from './framing'
-import { REVEAL_NEAR } from './interiorReveal'
-import { rotateScreenOffset } from './orbitLimits'
+import { rotateScreenOffset, wrapAngle } from './orbitLimits'
 import type { Ground } from './projection'
-import { ISO_POLAR } from './tilt'
+import { DEFAULT_TILT, ISO_POLAR } from './tilt'
+
+/**
+ * Camera distance a station click lands at, with or without an interior: the tilt's near distance, where
+ * the view is exactly isometric and every depth fully drawn.
+ */
+export const LANDING_DISTANCE = DEFAULT_TILT.nearDistance
 
 /** Screen rectangle in CSS px, viewport-relative. */
 export interface ScreenRect {
@@ -64,14 +69,64 @@ export function freeCenterShift(
 }
 
 /**
- * Camera distance and ground target for an interior fly-to. The distance is always REVEAL_NEAR,
+ * How much more ground the free area must cover top to bottom than across before a landing turns the
+ * view. A phone with its panel stacked below is about 1.8; a desktop beside its panel about 1.15, which
+ * keeps its azimuth.
+ */
+export const PORTRAIT_GROUND_RATIO = 1.5
+
+/** An interior arriving after this much of its flight (eased progress) lands without a turn. */
+export const LATE_TURN_PROGRESS = 0.9
+
+/** How a mid-flight retarget handles the landing turn. */
+export type RetargetTurn = 'keep' | 'decide' | 'none'
+
+/**
+ * The landing turn on a retarget onto an interior, at eased progress `e0`: keep the turn already decided (once
+ * per flight, so it can't stop halfway or whip), decide it now if the interior just arrived, or land without
+ * one when it arrived after LATE_TURN_PROGRESS.
+ */
+export function retargetTurn(decided: boolean, e0: number): RetargetTurn {
+  if (decided) return 'keep'
+  return e0 <= LATE_TURN_PROGRESS ? 'decide' : 'none'
+}
+
+/**
+ * How far off screen-vertical a portrait landing leaves the platform axis, radians (25°): most of the fit
+ * gain of a straight-up axis, while the levels still read apart in the isometric view.
+ */
+export const LANDING_AXIS_OFF_VERTICAL = (25 * Math.PI) / 180
+
+/**
+ * Camera azimuth for landing on an interior whose platforms run along `axis` (unit plan vector, x east,
+ * z south). When the free area is portrait in ground terms (PORTRAIT_GROUND_RATIO; screen-vertical ground
+ * spans 1 / cos(ISO_POLAR) times the pixels a horizontal one does), the view turns just far enough that the
+ * axis runs within LANDING_AXIS_OFF_VERTICAL of screen-vertical, so a long station fits along the free
+ * area's long side; already within it, or on a landscape free area, the view keeps `current`.
+ */
+export function landingAzimuth(axis: readonly [number, number], current: number, free: ScreenRect): number {
+  const across = free.right - free.left
+  const upDown = (free.bottom - free.top) / Math.cos(ISO_POLAR)
+  if (upDown < across * PORTRAIT_GROUND_RATIO) return current
+  // At azimuth θ the camera sits along (sin θ, cos θ) from the target, which is screen-vertical on the ground.
+  const along = Math.atan2(axis[0], axis[1])
+  // The axis's angle off vertical at `current`, folded into (-90°, 90°]: the axis has no head or tail.
+  let off = wrapAngle(current - along)
+  if (off > Math.PI / 2) off -= Math.PI
+  else if (off <= -Math.PI / 2) off += Math.PI
+  if (Math.abs(off) <= LANDING_AXIS_OFF_VERTICAL) return current
+  return wrapAngle(current - off + Math.sign(off) * LANDING_AXIS_OFF_VERTICAL)
+}
+
+/**
+ * Camera distance and ground target for an interior fly-to. The distance is always LANDING_DISTANCE,
  * where the view is exactly isometric and the interior fully revealed: pulling back to fit a small
- * screen would fade it out and drop the focus, so a big interior gets a partial fit instead. The
+ * screen would flatten it, so a big interior gets a partial fit instead. The
  * target only shifts (freeCenterShift plus the depth term, turned by the camera azimuth into ground
  * x/z), so the interior's mid-depth center lands mid-`free`.
  */
 export function frameInterior({ center, towardCamera, azimuth, viewport, free, fovDeg }: InteriorFrameInput): { distance: number; target: Ground } {
-  const distance = REVEAL_NEAR
+  const distance = LANDING_DISTANCE
   const s = freeCenterShift(viewport, free, fovDeg, distance, ISO_POLAR, { right: 0, toward: 0 })
   const shift = rotateScreenOffset(s.right, s.toward + towardCamera, azimuth)
   return { distance, target: { x: center.x + shift.x, z: center.z + shift.z } }

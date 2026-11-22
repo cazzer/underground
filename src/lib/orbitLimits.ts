@@ -1,18 +1,47 @@
-/** Pure limits for the station orbit: full spin while focused, spring back to north-up, pan radius, pivot. */
-import { EXIT_DISTANCE } from './focusMachine'
+/** Pure limits for the station orbit: a turn window that opens with the tilt, spring back to north-up, pan radius, pivot. */
 import type { Ground } from './projection'
-import { DEFAULT_TILT } from './tilt'
 
 /** Pan radius around a station with no interior loaded: the station stays near the view center. */
 export const PAN_RADIUS_BARE = 100
 /** Slack past an interior's reach, so its farthest point can be brought to the middle with room to spare. */
 export const PAN_MARGIN = 20
 /**
- * Largest pan radius. With PAN_GIVE it leaves room inside EXIT_RADIUS (300) for the view center's
- * offset from the focus point (free-area shift plus depth; the test sizes it at EXIT_DISTANCE on a
- * phone), so panning never drops focus.
+ * Largest pan radius. With PAN_GIVE it leaves room inside EXIT_RADIUS (350) for the view center's
+ * offset from the focus point (free-area shift plus depth; the test sizes it on a phone out to the
+ * farthest distance the clamp applies at, PAN_CLAMP_TILT), so panning never drops focus.
  */
 export const PAN_RADIUS_MAX = 180
+/**
+ * Tilt progress (tiltT) from which the pan clamp applies. Further out the view is nearly flat and the
+ * station small on screen, so a pan is free (focus still drops at EXIT_RADIUS).
+ */
+export const PAN_CLAMP_TILT = 0.5
+/** Tilt progress (tiltT) from which a focused view may spin a full turn. */
+export const FULL_SPIN_TILT = 0.67
+/** Tilt progress (tiltT) a gesture must start at to turn the view (rotateArmed). */
+export const ROTATE_ARM_TILT = 0.5
+
+/**
+ * Whether a gesture may turn the view, decided once when it starts: only one begun on a focused station
+ * with the view already tipped (ROTATE_ARM_TILT). A pinch that starts out unfocused or nearly top-down
+ * never turns, even after focus engages part-way through it and its fingers drift sideways.
+ */
+export function rotateArmed(focused: boolean, tilt: number): boolean {
+  return focused && tilt >= ROTATE_ARM_TILT
+}
+
+/**
+ * The screen-frame offset (`right`, `toward`, written into `out`) of the view center from `point` at azimuth
+ * `theta`: the inverse of rotateScreenOffset, so focusPoint(target, right, toward, theta) is `point` again.
+ */
+export function screenOffsetTo(target: Ground, point: Ground, theta: number, out: { right: number; toward: number }): void {
+  const x = target.x - point.x
+  const z = target.z - point.z
+  const s = Math.sin(theta)
+  const c = Math.cos(theta)
+  out.right = x * c - z * s
+  out.toward = x * s + z * c
+}
 /** How far past the radius a drag may stretch before a hard stop. */
 export const PAN_GIVE = 30
 /** Exponential rate (per second) at which a stretch past the radius eases back. */
@@ -47,14 +76,15 @@ export function wrapAngle(theta: number): number {
 }
 
 /**
- * Largest |azimuth| allowed at camera `distance`: unlimited up to EXIT_DISTANCE (where focus drops),
- * then falling linearly from π to 0 at the tilt's top-down distance, so top-down is never rotated.
+ * Largest |azimuth| allowed at tilt progress `tilt` (tiltT): 0 top-down, so top-down is never rotated,
+ * rising linearly to π at FULL_SPIN_TILT and unlimited from there. It is continuous (π just below
+ * FULL_SPIN_TILT, and the controls' azimuth never leaves (-π, π]), so zooming out of a turned view
+ * winds it back with the cap instead of snapping.
  */
-export function azimuthCap(distance: number): number {
-  const far = DEFAULT_TILT.farDistance
-  if (distance >= far) return 0
-  if (distance <= EXIT_DISTANCE) return Infinity
-  return (Math.PI * (far - distance)) / (far - EXIT_DISTANCE)
+export function azimuthCap(tilt: number): number {
+  if (!(tilt > 0)) return 0
+  if (tilt >= FULL_SPIN_TILT) return Infinity
+  return (Math.PI * tilt) / FULL_SPIN_TILT
 }
 
 export interface AzimuthBounds {
@@ -66,8 +96,8 @@ export interface AzimuthInput {
   /** Current azimuth (OrbitControls getAzimuthalAngle), radians; 0 = camera south of the target. */
   theta: number
   focused: boolean
-  /** Camera distance to its target. */
-  distance: number
+  /** Tilt progress at the camera's distance (tiltT). */
+  tilt: number
   dt: number
   /** prefers-reduced-motion: a dropped focus snaps to north-up instead of turning back. */
   reducedMotion: boolean
@@ -87,12 +117,12 @@ export function springToNorth(theta: number, dt: number, reducedMotion: boolean)
 
 /**
  * The azimuth window for this frame, written into `out` (called every frame, so no allocation).
- * Focused: ±azimuthCap, so ±Infinity (a full spin, which the controls leave unclamped) while close.
+ * Focused: ±azimuthCap, so ±Infinity (a full spin, which the controls leave unclamped) from FULL_SPIN_TILT.
  * Otherwise min = max follows springToNorth, held within the cap; the controls clamp to it, so the
  * view turns back to north-up, is north-up by the top-down distance, and a rotate gesture can't turn it.
  */
-export function azimuthBounds({ theta, focused, distance, dt, reducedMotion }: AzimuthInput, out: AzimuthBounds): AzimuthBounds {
-  const cap = azimuthCap(distance)
+export function azimuthBounds({ theta, focused, tilt, dt, reducedMotion }: AzimuthInput, out: AzimuthBounds): AzimuthBounds {
+  const cap = azimuthCap(tilt)
   if (focused) {
     out.min = -cap
     out.max = cap
@@ -105,12 +135,13 @@ export function azimuthBounds({ theta, focused, distance, dt, reducedMotion }: A
 }
 
 /**
- * Whether the pan clamp applies this frame. Never while a flight or focus hold owns the camera, and
- * after one (or a new focus center) only once the view has come inside the radius by itself: a
- * view released outside it is left alone rather than pulled in.
+ * Whether the pan clamp applies this frame. Never while a flight or focus hold owns the camera or the
+ * tilt is below PAN_CLAMP_TILT, and after one of those (or a new focus center) only once the view has
+ * come inside the radius by itself: a view released, or zoomed in, outside it is left alone rather
+ * than pulled in.
  */
-export function panClampArmed(armed: boolean, sameCenter: boolean, busy: boolean, inside: boolean): boolean {
-  if (busy) return false
+export function panClampArmed(armed: boolean, sameCenter: boolean, busy: boolean, tilt: number, inside: boolean): boolean {
+  if (busy || !(tilt >= PAN_CLAMP_TILT)) return false
   return (armed && sameCenter) || inside
 }
 
