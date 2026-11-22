@@ -172,7 +172,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     awaiting its priority frame (`kind: 'frame'`, `nextAwaiting`, `frameReadyFor`; the trip's path, then the machines out of service): its arrival, a change to it or a panel move reframes onto it, no turn, until a gesture, a focus change, a follow or the panel closing; with the trip panel closed the landing (which frames the machines out, as known by then, the late-interior reframe included) is final, so a later /ene poll, an outage list expanded or the trip panel opened never moves the camera (on a phone the expanded list leaves about 32 px above the panel, too little to frame anyway); a reframe with nothing to move is skipped; while a panel toggle settles, `CameraRig`'s `collapse` ref, every check waits and `useCollapseReframe` asks again after);
     `useCollapseReframe.ts` the collapse reframe: only a user collapse or expand of the panel in front (`usePanelCollapse().seq`; never
     `collapsed`, a panel size change, an /ene poll or arrival rows; the one exception is a bare station's resize within 2 s of its
-    landing, once per landing, below) arms it, unless a flight is under way (its retarget takes the new
+    landing, at most one move per landing, below) arms it, unless a flight is under way (its retarget takes the new
     panel) or a train is followed; once the panel's rect holds still 150 ms (at most 600 ms after the toggle; `lib/collapseReframe.ts`,
     pure: `collapseDueIn`, `reframeGains`, `collapseAction`) a 0.6-1 s eased flight, no turn, onto the focused interior's priority frame
     (`interiorFlight` with the frame: trip path, then machines out of service), an interior's usual landing when it has no priority
