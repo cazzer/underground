@@ -1,26 +1,31 @@
 /**
  * Which stretches of a street piece run under a drawn route line, so the street layers can leave them out: a 1 px
  * street centerline inside a route bundle reads as one more track (ost.10). A street piece is cut where it runs
- * within ROUTE_NEAR_M of a track and within CLIP_MAX_DEG of its direction; crossings and streets beside a bundle
+ * within ROUTE_CLIP_M of a track and within CLIP_MAX_DEG of its direction; crossings and streets beside a bundle
  * stay. Tracks are the unbanded ground paths (`network.shapes` points) the band shader shifts. Pure; the grid is
  * built once, and `keptPieces` allocates nothing once its output array has grown.
  */
 import { buildSegmentGrid, type SegmentGrid } from './corridorHash'
 import type { Ground } from './projection'
-import { ROUTE_NEAR_M } from './routeBundles'
 
+/** A street piece this close to a track (and along it) is cut, meters; routeBundles' wider ROUTE_NEAR_M is for labels. */
+export const ROUTE_CLIP_M = 5
 /** A street runs along a track only within this angle of it, degrees. */
 export const CLIP_MAX_DEG = 15
 const CLIP_MIN_COS = Math.cos((CLIP_MAX_DEG * Math.PI) / 180)
-/** The grid's cell, meters; a street is sampled every half cell to find the cells it passes. */
-export const CLIP_CELL_M = 50
-/**
- * How far from a track segment its cells reach: a street point is at most a quarter cell from its nearest sample,
- * and a covered point at most hypot(ROUTE_NEAR_M, CLIP_END_PAD_M) from the segment; half a cell leaves margin.
- */
-const CLIP_REACH_M = ROUTE_NEAR_M + CLIP_CELL_M / 2
 /** A track segment covers the street this far past either of its ends, so a bend leaves no sliver. */
 export const CLIP_END_PAD_M = 3
+/** The farthest a covered street point can be from its track segment (across by ROUTE_CLIP_M, past an end by the pad). */
+export const CLIP_TRACK_REACH_M = Math.hypot(ROUTE_CLIP_M, CLIP_END_PAD_M)
+/** The grid's cell, meters. */
+export const CLIP_CELL_M = 100
+/** A street is sampled this often to find the cells it passes, meters. */
+const CLIP_SAMPLE_M = CLIP_CELL_M / 2
+/**
+ * How far from a track segment its cells reach: every street point is within half the sampling of a sample, and a
+ * covered point within CLIP_TRACK_REACH_M of its segment, so the sample's cell lists that segment.
+ */
+const CLIP_REACH_M = CLIP_TRACK_REACH_M + CLIP_SAMPLE_M / 2
 /** A kept stretch shorter than this, left by a cut, is dropped too. */
 export const CLIP_MIN_PIECE_M = 2
 
@@ -79,7 +84,7 @@ function addCover(clip: RouteClip, s: number, ax: number, az: number, dx: number
   range[1] = 1
   // Across the track (its left normal) and along it, both linear in t.
   const half = (g.len[s]! + 2 * CLIP_END_PAD_M) / 2
-  if (!within(px * -uz + pz * ux, dx * -uz + dz * ux, ROUTE_NEAR_M, range)) return n
+  if (!within(px * -uz + pz * ux, dx * -uz + dz * ux, ROUTE_CLIP_M, range)) return n
   if (!within(px * ux + pz * uz - g.len[s]! / 2, dx * ux + dz * uz, half, range)) return n
   if (2 * n + 2 > clip.covered.length) {
     const grown = new Float64Array(clip.covered.length * 2)
@@ -115,7 +120,7 @@ export function keptPieces(clip: RouteClip, ax: number, az: number, bx: number, 
   }
   const g = clip.grid
   const call = ++clip.call
-  const steps = Math.ceil(len / (CLIP_CELL_M / 2))
+  const steps = Math.ceil(len / CLIP_SAMPLE_M)
   let n = 0
   let lastCell = -1
   for (let k = 0; k <= steps; k++) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { localTracks, packTracks, unpackTracks } from './routeTracks'
+import { distinctTracks, localTracks, packTracks, unpackTracks } from './routeTracks'
 
 const shape = (...xz: [number, number][]) => ({ points: xz.map(([x, z]) => ({ x, z })) })
 
@@ -7,6 +7,18 @@ describe('packTracks', () => {
   it('round-trips through unpackTracks, empty tracks included', () => {
     const shapes = [shape([0, 0], [10.5, -3]), shape(), shape([100, 200], [101, 201], [102, 203])]
     expect(unpackTracks(packTracks(shapes))).toEqual(shapes.map((s) => s.points))
+  })
+
+  it('packs each ground path once', () => {
+    const a = shape([0, 0], [10, 0])
+    const packed = packTracks([a, shape([0, 0], [10, 0]), shape([0, 0], [10, 1]), a])
+    expect(unpackTracks(packed)).toEqual([a.points, [{ x: 0, z: 0 }, { x: 10, z: 1 }]])
+    expect(distinctTracks([a, shape([0, 0], [10, 0])])).toEqual([a])
+  })
+
+  it('rejects a non-finite coordinate', () => {
+    expect(() => unpackTracks({ xz: new Float32Array([0, 0, NaN, 1]), starts: new Int32Array([0, 2]) })).toThrow(/coordinate 2 is NaN/)
+    expect(() => unpackTracks({ xz: new Float32Array([0, Infinity]), starts: new Int32Array([0, 1]) })).toThrow(/coordinate 1/)
   })
 
   it('rejects a pack whose starts do not match its points', () => {

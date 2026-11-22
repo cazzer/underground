@@ -14,7 +14,6 @@ import type { Network } from '../lib/network'
 import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
-import { packTracks } from '../lib/routeTracks'
 import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { Basemap } from './Basemap'
@@ -69,8 +68,6 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const anchor = useMemo(createFollowAnchor, [])
   /** Written by StationStreets, read by Basemap: the basemap's roads give way to the focused station's streets. */
   const streetMask = useMemo(createStreetMask, [])
-  /** The unbanded track lines the basemap's roads are cut under (the band shader shifts these). */
-  const tracks = useMemo(() => packTracks(network.shapes), [network])
   /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
   const interiorSpans = useMemo(
     () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),
@@ -121,7 +118,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
-          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} tracks={tracks} />
+          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} />
         </ErrorBoundary>
       )}
     </Canvas>

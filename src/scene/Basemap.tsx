@@ -16,9 +16,9 @@ import { BASEMAP_CLASSES, isRoadClass, type BasemapClass } from '../lib/basemap/
 import { isNoOutline, networkHull } from '../lib/basemap/networkHull'
 import { maskInner, type StreetMask } from '../lib/basemap/streetMask'
 import { planPool } from '../lib/basemap/tilePool'
-import type { Station } from '../lib/network'
+import type { ShapePath, Station } from '../lib/network'
 import { interiorOpacity } from '../lib/interiorReveal'
-import type { PackedTracks } from '../lib/routeTracks'
+import { packTracks } from '../lib/routeTracks'
 import { theme } from '../theme'
 import { createExtentUniforms, createMaskUniforms } from './basemapLineMaterial'
 import { createClassLayer, type ClassLayer } from './basemapLayer'
@@ -55,11 +55,13 @@ interface BasemapProps {
   stations: readonly Station[]
   /** Written by StationStreets while a station street layer is mounted. */
   mask: StreetMask
-  /** The drawn route lines (packTracks of network.shapes): roads running under them are left out. */
-  tracks: PackedTracks
+  /** The network's shapes, unbanded (the band shader shifts these): roads running under them are left out. */
+  shapes: readonly ShapePath[]
 }
 
-export function Basemap({ config, stations, mask, tracks }: BasemapProps) {
+export function Basemap({ config, stations, mask, shapes }: BasemapProps) {
+  // Packed here, so with the basemap off nothing is.
+  const tracks = useMemo(() => packTracks(shapes), [shapes])
   const store = useBasemapTiles(config, tracks)
   const maskUniforms = useMemo(createMaskUniforms, [])
   const background = useMemo(() => new Color(theme.background), [])

@@ -1,6 +1,7 @@
 /**
  * The drawn tracks a street clip (routeClip.ts) tests against: packed flat for the basemap worker, or cut to the
- * runs near one station for its street layer. Pure.
+ * runs near one station for its street layer. Shapes with the same ground path (a route's variants, routes sharing
+ * one) count once. Pure.
  */
 import type { Ground } from './projection'
 
@@ -14,7 +15,26 @@ interface TrackShape {
   points: readonly Ground[]
 }
 
-export function packTracks(shapes: readonly TrackShape[]): PackedTracks {
+const samePoints = (a: readonly Ground[], b: readonly Ground[]) => a.length === b.length && a.every((p, i) => p.x === b[i]!.x && p.z === b[i]!.z)
+
+/** The shapes with distinct ground paths, first of each kept, in order. */
+export function distinctTracks<T extends TrackShape>(shapes: readonly T[]): T[] {
+  // Bucketed by length and ends, so only likely twins are compared point by point.
+  const buckets = new Map<string, T[]>()
+  return shapes.filter((s) => {
+    const a = s.points[0]
+    const b = s.points[s.points.length - 1]
+    const key = `${s.points.length} ${a?.x} ${a?.z} ${b?.x} ${b?.z}`
+    const bucket = buckets.get(key)
+    if (bucket?.some((t) => samePoints(t.points, s.points))) return false
+    if (bucket) bucket.push(s)
+    else buckets.set(key, [s])
+    return true
+  })
+}
+
+export function packTracks(all: readonly TrackShape[]): PackedTracks {
+  const shapes = distinctTracks(all)
   const starts = new Int32Array(shapes.length + 1)
   shapes.forEach((s, i) => (starts[i + 1] = starts[i]! + s.points.length))
   const xz = new Float32Array(starts[shapes.length]! * 2)
@@ -33,6 +53,9 @@ export function unpackTracks({ xz, starts }: PackedTracks): Ground[][] {
   const points = xz.length / 2
   if (!Number.isInteger(points) || starts.length < 1 || starts[0] !== 0 || starts[starts.length - 1] !== points) {
     throw new Error(`Packed tracks: ${starts.length - 1} tracks over ${starts[starts.length - 1]} points, but ${xz.length} floats`)
+  }
+  for (let i = 0; i < xz.length; i++) {
+    if (!Number.isFinite(xz[i]!)) throw new Error(`Packed tracks: coordinate ${i} is ${xz[i]}`)
   }
   const out: Ground[][] = []
   for (let i = 1; i < starts.length; i++) {
@@ -61,7 +84,7 @@ function originDistance(ax: number, az: number, bx: number, bz: number): number 
  */
 export function localTracks(shapes: readonly TrackShape[], anchor: Ground, reachM: number): Ground[][] {
   const out: Ground[][] = []
-  for (const { points } of shapes) {
+  for (const { points } of distinctTracks(shapes)) {
     let run: Ground[] | null = null
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1]!

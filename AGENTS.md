@@ -181,7 +181,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
     with the reveal and goes with the focus); keyed by station. Street pieces running under a route line are left out
-    (`clipLineBuffers.ts` over a `routeClip.ts` clip of `localTracks`, the shapes' runs within the file's radius + 12 m),
+    (the route clip, see `src/lib/routeClip.ts` below, over `localTracks`: the runs within the file's radius + its reach),
     so no 1 px centerline reads as one more track in a bundle; the labels still name the street. Not while the station
     has an interior (loaded or loading): its tracks sink under it, so the streets above stay whole. Its draw order is auto: above the veil (7.5), built from
     `StreetLayer.veiledBuffers` (the 1.9:1 stroke, fading to the background like the others; material color stays
@@ -506,9 +506,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   dropped, an LRU (24 MB / 128), what to draw meanwhile (`drawn`, `version`), the location zoom cap (`capZoom`), one
   log line per failure reason per session; no worker or a crashed one turns the basemap off (logged).
   `basemapWorker.ts` fetches, inflates a gzip body (`lib/basemap/inflate.ts`) and decodes (`basemapProtocol.ts` the
-  messages; `init` carries the layers and the drawn tracks, `packTracks(network.shapes)` from Scene, about 470 KB, cloned
-  not transferred, from which the worker builds its road clip once, about 20-35 ms; a throw there fails the worker, so the
-  basemap goes off, logged); `basemapConfig.ts` `BASEMAP` (the build-time `__BASEMAP__`: bbox, maxzoom, layers, the tile pin's
+  messages; `init` carries the layers and the drawn tracks, `packTracks(network.shapes)` from Basemap (167 distinct paths,
+  about 290 KB), cloned not transferred, from which the worker builds its road clip once (8-18 ms in node, about 3 MB
+  kept); a throw there fails the worker, so the basemap goes off, logged); `basemapConfig.ts` `BASEMAP` (the build-time `__BASEMAP__`: bbox, maxzoom, layers, the tile pin's
   release as version; null for a legacy or absent pin; under `vite serve`, `VITE_BASEMAP_DEV=1` in `.env.local` loads
   the local `public/basemap/tiles` with version "dev") and `tileUrl` (`basemap/tiles/{z}/{x}/{y}.mvt?v=<release>`).
   `src/scene/useBasemapTiles.ts` runs it (starts after the first frame and an idle callback; feeds the location cap,
@@ -524,8 +524,19 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   ferry, earth and points dropped), `areaFilter.ts` (`keepRing`: park and water rings under 1 ha only in z14+ tiles,
   about 7 km in; under 5 ha only in z13+, about 14 km in; a ring reaching the tile edge always stays),
   `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip;
-  road classes (`isRoadClass`) are cut by the worker's route clip, water and parks never),
+  road classes (`isRoadClass`) in z13+ tiles are cut by the worker's route clip; z12 and coarser, water and parks never),
   `mvtFixture.ts` (tests' MVT writer). `projection.ts` exports `groundX`/`groundZ` for per-vertex use
+- `src/lib/routeClip.ts`: the route clip both street layers share (pure; ost.10), so no street centerline reads as one
+  more track inside a bundle. `buildRouteClip` grids the tracks (corridorHash, 100 m cells, streets sampled every 50 m,
+  reach hypot(clip, pad) + 25 m); `keptPieces` cuts a street piece within `ROUTE_CLIP_M` (5 m; routeBundles' 12 m
+  `ROUTE_NEAR_M` is for labels only) and 15° of a track, projected inside the track segment ± 3 m, drops a stretch under
+  2 m left by a cut, and allocates nothing per call. 5 m is the narrowest that still cuts every
+  centerline between two direction tracks (4.7 m off each) and leaves most of a dual carriageway beside a bundle
+  (Broadway at 96 St; `docs/evidence/ost.10/diff-*`). `src/lib/routeTracks.ts`: `distinctTracks` (one per ground path),
+  `packTracks`/`unpackTracks` (finite-checked) for the basemap worker, `localTracks` for one station.
+  `src/lib/clipLineBuffers.ts` cuts a plain layer's buffers, positions and colors interpolated at the cuts. The clip reads
+  ground paths only, not depth, so the station layer skips it at a station with an interior (the basemap's roads,
+  masked there, stay cut)
 - `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,
   one request at a time, a hidden tab aborts and stops, backoff via `lib/live/enePoll.ts`; `eneFetch.ts` validates one body
   (`realtimeFetch.ts`'s timeout, errors and `parseRetryAfter` are reused). Pure joins in `lib/live/`: `eneJoin.ts`
@@ -586,12 +597,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   startup) into a cached `StreetLayer`: `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways
   (`src/lib/streetClass.ts`, which also holds `streetKey`, shared with the entrance join), decimeters to meters,
   mixing to the background over the last 70 m of `radiusM` (`edgeFade`; segments are split at the ramp's ends), plus
-  the route clip both street layers share (pure): `src/lib/routeClip.ts` (`buildRouteClip` over a corridorHash grid,
-  50 m cells; `keptPieces`: a street piece within 12 m (`ROUTE_NEAR_M`) and 15° of a track, projected inside the track
-  segment ± 3 m, is cut, stretches under 2 m left by a cut dropped, no allocation per call), `src/lib/routeTracks.ts`
-  (`packTracks`/`unpackTracks` for the worker, `localTracks` for one station) and `src/lib/clipLineBuffers.ts` (cuts a
-  plain layer's buffers, positions and colors interpolated at the cuts); the clip reads the ground paths only, not
-  depth, so the station layer skips it at a station with an interior (the basemap's roads, masked there, stay cut), plus
   the label sources: `src/lib/streetRuns.ts` (`streetLabelSources`: street ways grouped by `streetKey`, chained into
   runs at shared end nodes while the street turns under 60°, so a dual carriageway is two runs of one label;
   candidates every 40 m, nearest the station first), `src/lib/streetName.ts` (`abbreviateStreet`, MTA style "W 96 St",

@@ -41,7 +41,13 @@ function keepRingOf(
   return keepRing(ringArea(xz), z, false)
 }
 
-/** `clip` (scene meters) cuts the roads under the route lines; null draws them whole. */
+/**
+ * Tiles at this zoom or coarser are not cut: they are drawn from about 14 km out on a phone (10 m a pixel), where a
+ * bundle is a pixel or two wide, and their roads are generalized by more than the clip's distance.
+ */
+export const CLIP_MAX_UNCUT_Z = 12
+
+/** `clip` (scene meters) cuts the roads under the route lines in tiles finer than CLIP_MAX_UNCUT_Z; null draws them whole. */
 export function decodeTile(
   bytes: Uint8Array,
   z: number,
@@ -67,7 +73,7 @@ export function decodeTile(
       if (cls === null) continue
       const out = (acc[cls] ??= [])
       const ring = f.type === 3
-      const cut = clip !== null && isRoadClass(cls) ? clip : null
+      const cut = clip !== null && z > CLIP_MAX_UNCUT_Z && isRoadClass(cls) ? clip : null
       for (const line of f.loadGeometry()) {
         if (ring && !keepRingOf(line, extent, z, sx, sz)) continue
         for (let j = 1; j < line.length; j++) {

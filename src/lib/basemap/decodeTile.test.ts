@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { groundX, groundZ } from '../projection'
 import { buildRouteClip } from '../routeClip'
-import { decodeTile, isMvtBytes } from './decodeTile'
+import { CLIP_MAX_UNCUT_Z, decodeTile, isMvtBytes } from './decodeTile'
 import { writeMvt } from './mvtFixture'
 import { tileXToLon, tileYToLat } from './tileMath'
 
@@ -94,6 +94,19 @@ describe('decodeTile', () => {
     expectSegments(whole.minor, [[...at(...along[0]!), ...at(...along[1]!)], [...at(...crossing[0]!), ...at(...crossing[1]!)]])
     expect(clipped.water).toEqual(whole.water)
     expect(whole.water).toHaveLength(4 * 6)
+  })
+
+  it('leaves roads whole in a tile at CLIP_MAX_UNCUT_Z or coarser', () => {
+    // A z12 tile (about 1.8 m a unit) with a road 1 unit off a track along it.
+    const [z, x, y] = [CLIP_MAX_UNCUT_Z, X >> 3, Y >> 3]
+    const atZ = (u: number, v: number) => ({ x: groundX(tileXToLon(x + u / E, z)), z: groundZ(tileYToLat(y + v / E, z)) })
+    const clip = buildRouteClip([[atZ(100, 1000), atZ(3000, 1000)]])
+    const bytes = writeMvt([{ name: 'roads', features: [{ type: 2, props: { kind: 'major_road' }, parts: [[[100, 1001], [3000, 1001]]] }] }])
+    expect(decodeTile(bytes, z, x, y, LAYERS, clip).major).toHaveLength(6)
+    // The same road one zoom finer is cut.
+    const fine = (u: number, v: number) => ({ x: groundX(tileXToLon(2 * x + u / E, z + 1)), z: groundZ(tileYToLat(2 * y + v / E, z + 1)) })
+    const fineClip = buildRouteClip([[fine(100, 1000), fine(3000, 1000)]])
+    expect(decodeTile(bytes, z + 1, 2 * x, 2 * y, LAYERS, fineClip).major).toBeUndefined()
   })
 
   it('decodes an empty tile to nothing', () => {

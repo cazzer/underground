@@ -82,6 +82,18 @@ describe('keptPieces', () => {
     })
   })
 
+  it('unions the cover of 40 near-coincident tracks, past its first list size', () => {
+    // A trunk of 40 tracks a centimeter apart, starting a meter apart: 40 cover intervals for one street piece.
+    const tracks = Array.from({ length: 40 }, (_, i) => line([-50 + i, 0.01 * i], [400, 0.01 * i]))
+    const clip = buildRouteClip(tracks)
+    expect(kept(clip, [0, 1], [300, 1])).toEqual([])
+    expect(clip.covered.length).toBeGreaterThan(64)
+    // The grown list still keeps a stretch past the trunk's end.
+    const got = kept(clip, [300, 1], [500, 1])
+    expect(got).toHaveLength(1)
+    expect(got[0]![0]).toBeCloseTo(100 + CLIP_END_PAD_M, 6)
+  })
+
   it('returns a street far from every track whole, and with no tracks at all', () => {
     expect(kept(buildRouteClip(PAIR), [5000, 5000], [5100, 5000])).toEqual([[0, 100]])
     expect(kept(buildRouteClip([]), [0, 0], [300, 0])).toEqual([[0, 300]])
