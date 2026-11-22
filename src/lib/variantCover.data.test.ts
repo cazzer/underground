@@ -144,7 +144,7 @@ describe('real public/data: variant cover', () => {
     expect(worstPx, worst).toBeLessThan(0.05)
   })
 
-  it('draws every segment inside a platform span of its primary, where the primary fades', () => {
+  it('skips no segment inside a platform span of its primary, where the primary fades', () => {
     let inSpans = 0
     let checked = 0
     for (const s of variants) {

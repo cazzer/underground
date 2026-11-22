@@ -122,6 +122,8 @@ export function coverVariants(
   shapes: readonly ShapePath[],
   spans: ReadonlyMap<StationId, ReadonlyMap<ShapeId, PlatformSpan>>,
 ): ShapePath[] {
+  // One primary per route and direction (tripLookup picks it); if the data ever had two, the last wins, and
+  // `cover.primaryId` still names the shape actually matched.
   const primaries = new Map<string, { path: ShapePath; cells: VertexCells }>()
   for (const s of shapes) if (s.primary) primaries.set(`${s.routeId}\u0000${s.direction}`, { path: s, cells: vertexCells(s) })
   const byShape = spansByShape(spans)

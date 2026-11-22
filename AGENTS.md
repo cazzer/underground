@@ -148,7 +148,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     the banded shapes (`BandedShapes`) and sets each variant's `cover`, `bandNetwork` runs the search too (tests, the worker fallback);
     `variantCover.ts` `coverVariants`: a variant's segments with the same ends, y and band inputs as one of its route
     and direction's primary's (1 mm, 1e-4), outside the primary's platform spans (its fade would show the variant
-    under it), so the lines skip them (about 26.7k of the variants' 51.5k segments; trains keep every shape whole;
+    under it), so the lines skip them (about half of the variant segments; trains keep every shape whole;
     `variantCover.data.test.ts` checks the skipped ones draw within 0.05 px of the primary at six views);
     `trackLine.ts` a shape's drawn track (decode, project, `dropSpurs` removes out-and-back tips of
     160°+ turns, then offset); `trackOffset.ts` `offsetPolyline` (miter joins, capped at 2× on sharp
