@@ -1,19 +1,22 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BasemapStats } from '../data/basemapTypes'
 import { nextFocus, NO_FOCUS_GROUP, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'
 import type { TouchLock } from './touchOrbit'
 
+/** Who asked for a point flight: the location button, or a searched place. A place flight lifts the basemap's location zoom cap. */
+export type PointSource = 'locate' | 'place'
+
 /** A camera flight: to a station (focusing it), or to a ground point with `radiusM` in view (drops focus). */
 export type FlyRequest =
   | {
       kind: 'station'
       stationId: string
-      /** Changes on every request so re-selecting the same station flies again. */
+      /** Increases with every request (stations and points share one counter) so re-selecting the same station flies again. */
       nonce: number
     }
-  | { kind: 'point'; center: Ground; radiusM: number; nonce: number }
+  | { kind: 'point'; center: Ground; radiusM: number; source: PointSource; nonce: number }
 
 interface FocusValue {
   focusedId: string | null
@@ -24,9 +27,14 @@ interface FocusValue {
   select: (stationId: string) => void
   /**
    * Fly the camera to a ground point showing `radiusM` around it. Drops focus without dismissing it, so
-   * the orbit's azimuth springs back to north-up during the flight (the framing assumes north-up).
+   * the orbit's azimuth springs back to north-up during the flight (the framing assumes north-up). Returns the
+   * request's nonce, so a caller can tell whether its flight is still the latest.
    */
-  flyToPoint: (center: Ground, radiusM: number) => void
+  flyToPoint: (center: Ground, radiusM: number, source: PointSource) => number
+  /** The camera target on the ground right now, or null before the scene registers one. Read on demand: it never re-renders. */
+  viewCenter: () => Ground | null
+  /** The scene's camera target getter (ViewCenterSource); null on unmount. */
+  setViewCenterSource: (get: (() => Ground) | null) => void
   /** User closed the panel: unfocus and remember the station so the camera doesn't refocus it. */
   dismiss: () => void
   /**
@@ -112,17 +120,24 @@ export function FocusProvider({ children }: FocusProviderProps) {
   const [state, setState] = useState<FocusState>({ focusedId: null, dismissedId: null })
   const [flyRequest, setFlyRequest] = useState<FlyRequest | null>(null)
 
+  // One counter for both kinds of flight, so a caller holding a nonce can tell later flights from its own.
+  const lastNonce = useRef(0)
   const select = useCallback((stationId: string) => {
+    const nonce = ++lastNonce.current
     setState({ focusedId: stationId, dismissedId: null })
-    setFlyRequest((prev) => ({ kind: 'station', stationId, nonce: (prev?.nonce ?? 0) + 1 }))
+    setFlyRequest({ kind: 'station', stationId, nonce })
   }, [])
-  const flyToPoint = useCallback(
-    (center: Ground, radiusM: number) => {
-      setState((s) => (s.focusedId === null ? s : { focusedId: null, dismissedId: s.dismissedId }))
-      setFlyRequest((prev) => ({ kind: 'point', center, radiusM, nonce: (prev?.nonce ?? 0) + 1 }))
-    },
-    [],
-  )
+  const flyToPoint = useCallback((center: Ground, radiusM: number, source: PointSource) => {
+    const nonce = ++lastNonce.current
+    setState((s) => (s.focusedId === null ? s : { focusedId: null, dismissedId: s.dismissedId }))
+    setFlyRequest({ kind: 'point', center, radiusM, source, nonce })
+    return nonce
+  }, [])
+  const viewSource = useRef<(() => Ground) | null>(null)
+  const viewCenter = useCallback(() => viewSource.current?.() ?? null, [])
+  const setViewCenterSource = useCallback((get: (() => Ground) | null) => {
+    viewSource.current = get
+  }, [])
   const dismiss = useCallback(
     () => setState((s) => (s.focusedId === null ? s : { focusedId: null, dismissedId: s.focusedId })),
     [],
@@ -149,8 +164,8 @@ export function FocusProvider({ children }: FocusProviderProps) {
 
   const { focusedId, dismissedId } = state
   const value = useMemo<FocusValue>(
-    () => ({ focusedId, dismissedId, flyRequest, select, flyToPoint, dismiss, updateFromCamera }),
-    [focusedId, dismissedId, flyRequest, select, flyToPoint, dismiss, updateFromCamera],
+    () => ({ focusedId, dismissedId, flyRequest, select, flyToPoint, viewCenter, setViewCenterSource, dismiss, updateFromCamera }),
+    [focusedId, dismissedId, flyRequest, select, flyToPoint, viewCenter, setViewCenterSource, dismiss, updateFromCamera],
   )
   return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>
 }

@@ -23,7 +23,7 @@ export interface LocateControls {
  * The user's location, asked for on press only (one `getCurrentPosition`, never watched). The fix
  * lives in React state and nowhere else: no storage, URL, request or log carries it.
  */
-export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM: number) => void): LocateControls {
+export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM: number, source: 'locate') => unknown): LocateControls {
   const [state, setState] = useState<LocateState>({ status: 'idle' })
   // Read at callback time so `locate` and `clear` keep one identity.
   const latest = useRef({ network, flyToPoint })
@@ -72,7 +72,7 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
           return
         }
         settle(id, () => ({ status: 'located', placement }))
-        if (placement.kind !== 'outside') latest.current.flyToPoint(placement.viewCenter, placement.viewRadiusM)
+        if (placement.kind !== 'outside') latest.current.flyToPoint(placement.viewCenter, placement.viewRadiusM, 'locate')
       },
       (err) => {
         // Code and message only: never the position.

@@ -1,8 +1,16 @@
-import { useId, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react'
+import { useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react'
+import { GEOCODE_URL } from '../data/realtime'
+import { useGeocode } from '../data/useGeocode'
+import { useFocus } from '../lib/focus'
+import { geocodeFocus } from '../lib/geocodeFocus'
+import { geocodeAnnouncement, searchEmptyText } from '../lib/geocodeView'
 import { multiBoroughNames } from '../lib/labels'
-import type { Network } from '../lib/network'
+import type { MarkedPlacement } from '../lib/locate'
+import type { Network, Station } from '../lib/network'
+import { placePick, type PlacePick } from '../lib/placeLabel'
+import { activeIndex, searchItems, type SearchItem } from '../lib/searchItems'
 import { buildSearchIndex, SEARCH_LIMIT, searchStations } from '../lib/stationSearch'
-import { SearchResult } from './SearchResult'
+import { SearchResults } from './SearchResults'
 import { useKeyboardInset } from './useKeyboardInset'
 
 export interface StationSearchHandle {
@@ -16,11 +24,18 @@ export interface StationSearchHandle {
 interface StationSearchProps {
   network: Network
   onChoose: (stationId: string) => void
+  /**
+   * Given, with the Worker configured, the search also finds addresses and places and calls this for one. Without
+   * it (or without `VITE_RT_URL`) the dialog finds stations only and sends nothing anywhere.
+   */
+  onChoosePlace?: (pick: PlacePick) => void
+  /** The marked location fix: read only to keep the search's bias away from it, never sent. */
+  fix?: MarkedPlacement | null
   /** The dialog closed (Esc, the Android back gesture, Cancel, or a choice); mirrors the native close event. */
   onClose?: () => void
-  /** The dialog's name and the input's label; a second instance says what it picks. Default "Search stations". */
+  /** The dialog's name and the input's label; a second instance says what it picks. Default "Search stations and places", or "Search stations" with places off. */
   label?: string
-  /** The input's placeholder. Default "Station name". */
+  /** The input's placeholder. Default "Station, address or place", or "Station name" with places off. */
   placeholder?: string
   ref: Ref<StationSearchHandle>
 }
@@ -39,61 +54,94 @@ function statusText(typed: boolean, count: number): string {
  * highlighted result. Closing hands focus back to whatever had it when the dialog opened. Esc closes it and goes no
  * further: the dialog stops the keydown, so a window-level Esc handler (the HUD's panels) never also acts on it.
  */
-export function StationSearch({ network, onChoose, onClose, label = 'Search stations', placeholder = 'Station name', ref }: StationSearchProps) {
+export function StationSearch({ network, onChoose, onChoosePlace, fix = null, onClose, label, placeholder, ref }: StationSearchProps) {
+  const placesOn = GEOCODE_URL !== null && onChoosePlace !== undefined
+  label ??= placesOn ? 'Search stations and places' : 'Search stations'
+  placeholder ??= placesOn ? 'Station, address or place' : 'Station name'
   const dialog = useRef<HTMLDialogElement>(null)
   const input = useRef<HTMLInputElement>(null)
-  const list = useRef<HTMLUListElement>(null)
   const id = useId()
   const listId = `${id}-list`
   const hintId = `${id}-hint`
+  const disclosureId = `${id}-disclosure`
   const index = useMemo(() => buildSearchIndex(network.stations), [network])
   const multiBorough = useMemo(() => multiBoroughNames(network.stations), [network])
   const keyboardInset = useKeyboardInset()
   const [query, setQuery] = useState('')
-  const [active, setActive] = useState(0)
+  const [open, setOpen] = useState(false)
+  const [activeKey, setActiveKey] = useState<string | null>(null)
   const results = useMemo(() => searchStations(index, query), [index, query])
-  const current = Math.min(active, results.length - 1)
-  const optionId = (stationId: string) => `${listId}-${stationId}`
-  const activeOption = results[current]
+  // The bias is read when a request goes out, not per render.
+  const { focusedId, viewCenter, flyRequest } = useFocus()
+  const latest = useRef({ focusedId, flyRequest, fix })
+  useEffect(() => {
+    latest.current = { focusedId, flyRequest, fix }
+  })
+  const focusFn = () =>
+    geocodeFocus({
+      station: network.stationById.get(latest.current.focusedId ?? '')?.pos ?? null,
+      view: viewCenter(),
+      fix: latest.current.fix,
+      lastFly: latest.current.flyRequest,
+    })
+  const geo = useGeocode(placesOn ? GEOCODE_URL : null, query, open, focusFn)
+  const items = useMemo(
+    () => searchItems(results, geo.status === 'ready' || geo.status === 'pending' ? geo.places : []),
+    [results, geo],
+  )
+  const current = activeIndex(items, activeKey)
+  const optionId = (key: string) => `${listId}-${key}`
+  const activeOption = items[current]
   const typed = query.trim() !== ''
 
   const reset = (text: string) => {
     setQuery(text)
-    setActive(0)
+    setActiveKey(null)
   }
   useImperativeHandle(ref, () => ({
     open: () => {
       reset('')
+      setOpen(true)
       dialog.current?.showModal()
       input.current?.focus()
     },
   }))
   const close = () => dialog.current?.close()
-  const choose = (stationId: string) => {
-    onChoose(stationId)
+  const choose = (item: SearchItem<Station>) => {
+    if (item.kind === 'station') onChoose(item.station.id)
+    else {
+      const pick = placePick(item.result, item.text, network.stations)
+      if (!pick || !onChoosePlace) throw new Error('A place was picked with no station to name or nobody to tell')
+      onChoosePlace(pick)
+    }
     close()
   }
   const move = (next: number) => {
-    setActive(next)
-    list.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    const item = items[next]
+    if (!item) return
+    setActiveKey(item.key)
+    document.getElementById(optionId(item.key))?.scrollIntoView({ block: 'nearest' })
   }
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      move(Math.min(current + 1, results.length - 1))
+      move(Math.min(current + 1, items.length - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       move(Math.max(current - 1, 0))
     } else if (e.key === 'Enter' && activeOption && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      choose(activeOption.id)
+      choose(activeOption)
     }
   }
 
   return (
     <dialog
       ref={dialog}
-      onClose={onClose}
+      onClose={() => {
+        setOpen(false)
+        onClose?.()
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') e.stopPropagation()
       }}
@@ -111,11 +159,11 @@ export function StationSearch({ network, onChoose, onClose, label = 'Search stat
               id={`${id}-q`}
               type="text"
               role="combobox"
-              aria-expanded={results.length > 0}
-              aria-controls={results.length > 0 ? listId : undefined}
+              aria-expanded={items.length > 0}
+              aria-controls={items.length > 0 ? listId : undefined}
               aria-autocomplete="list"
-              aria-activedescendant={activeOption ? optionId(activeOption.id) : undefined}
-              aria-describedby={typed ? undefined : hintId}
+              aria-activedescendant={activeOption ? optionId(activeOption.key) : undefined}
+              aria-describedby={[placesOn && disclosureId, !typed && hintId].filter(Boolean).join(' ') || undefined}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="none"
@@ -149,42 +197,38 @@ export function StationSearch({ network, onChoose, onClose, label = 'Search stat
             Cancel
           </button>
         </div>
+        {placesOn && (
+          <p id={disclosureId} className="px-3 pt-2 text-xs text-ink-dim">
+            Addresses and places are looked up through our server; your location is never sent.
+          </p>
+        )}
         <p role="status" className="sr-only">
           {statusText(typed, results.length)}
         </p>
+        <p role="status" className="sr-only">
+          {geocodeAnnouncement(geo)}
+        </p>
         {!typed && (
           <p id={hintId} className="p-3 text-sm text-ink-dim">
-            Try a name like 14 st, bedford or times sq.
+            {placesOn ? 'Try 14 st, 120 broadway or empire state.' : 'Try a name like 14 st, bedford or times sq.'}
           </p>
         )}
-        {typed && results.length === 0 && (
-          <p className="p-3 text-sm text-ink-dim" aria-hidden="true">
-            No stations match.
-          </p>
-        )}
-        {results.length > 0 && (
-          <ul
-            ref={list}
-            id={listId}
-            role="listbox"
-            aria-label="Stations"
-            style={{ paddingBottom: keyboardInset }}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-          >
-            {results.map((station, i) => (
-              <SearchResult
-                key={station.id}
-                id={optionId(station.id)}
-                network={network}
-                station={station}
-                showBorough={multiBorough.has(station.name)}
-                active={i === current}
-                onChoose={() => choose(station.id)}
-                onActive={() => setActive(i)}
-              />
-            ))}
-          </ul>
-        )}
+        <SearchResults
+          network={network}
+          listId={listId}
+          items={items}
+          current={current}
+          optionId={optionId}
+          multiBorough={multiBorough}
+          view={geo}
+          emptyText={searchEmptyText(typed, results.length, geo)}
+          keyboardInset={keyboardInset}
+          onChoose={choose}
+          onActive={(i) => {
+            const item = items[i]
+            if (item) setActiveKey(item.key)
+          }}
+        />
       </div>
     </dialog>
   )

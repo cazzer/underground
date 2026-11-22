@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type Ref, type RefObject } from 'react'
+import { GEOCODE_URL } from '../data/realtime'
 import type { LocateControls } from '../data/useLocate'
 import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
@@ -43,7 +44,7 @@ interface TripPanelProps {
  * `TripAnnouncer`; the visible message under the ends is hidden from assistive tech to match.
  */
 export function TripPanel({ network, arrivals, locate, covered, headingRef, exits, transfers, focusSiblings, ref }: TripPanelProps) {
-  const { ends, plan, showLoading, setEnd, swap, retry } = useTrip()
+  const { ends, places, plan, showLoading, setEnd, swap, retry } = useTrip()
   const { focusedId, select } = useFocus()
   const { selectTrain } = useTrainSelection()
   const fromSearch = useRef<StationSearchHandle>(null)
@@ -109,6 +110,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, exit
           <TripEnds
             network={network}
             ends={ends}
+            places={places}
             focusedId={focusedId}
             focusSiblings={focusSiblings}
             nearestId={placement?.nearest.id ?? null}
@@ -141,8 +143,25 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, exit
         </div>
       </div>
       {more && !collapsed && <div aria-hidden="true" className="pointer-events-none sticky bottom-0 -mx-4 -mb-8 h-8 bg-linear-to-t from-panel to-transparent" />}
-      <StationSearch ref={fromSearch} network={network} label="Trip from: search stations" placeholder="From station" onChoose={(id) => setEnd('from', id)} />
-      <StationSearch ref={toSearch} network={network} label="Trip to: search stations" placeholder="To station" onChoose={(id) => setEnd('to', id)} />
+      {/* A place picked here sets the end to its nearest station and flies nowhere, like a station picked here. */}
+      <StationSearch
+        ref={fromSearch}
+        network={network}
+        fix={placement}
+        label={GEOCODE_URL ? 'Trip from: search stations and places' : 'Trip from: search stations'}
+        placeholder={GEOCODE_URL ? 'From station or address' : 'From station'}
+        onChoose={(id) => setEnd('from', id)}
+        onChoosePlace={(p) => setEnd('from', p.nearest.id, p.name)}
+      />
+      <StationSearch
+        ref={toSearch}
+        network={network}
+        fix={placement}
+        label={GEOCODE_URL ? 'Trip to: search stations and places' : 'Trip to: search stations'}
+        placeholder={GEOCODE_URL ? 'To station or address' : 'To station'}
+        onChoose={(id) => setEnd('to', id)}
+        onChoosePlace={(p) => setEnd('to', p.nearest.id, p.name)}
+      />
     </aside>
   )
 }

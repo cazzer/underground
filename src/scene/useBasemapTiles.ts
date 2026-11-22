@@ -64,8 +64,9 @@ export function useBasemapTiles(config: BasemapConfig, tracks: PackedTracks): Ba
     const req = latestFly.current
     if (req === handledFly.current) return
     handledFly.current = req
-    if (req?.kind === 'point') stepCap(cap.current, store, { type: 'pointFlight' })
-    else if (req?.kind === 'station') stepCap(cap.current, store, { type: 'station' })
+    // A searched place is the user's pick, like a station: only a location flight sets the cap.
+    if (req?.kind === 'point' && req.source === 'locate') stepCap(cap.current, store, { type: 'pointFlight' })
+    else if (req) stepCap(cap.current, store, { type: 'station' })
   }, [store])
 
   useLayoutEffect(() => {

@@ -32,6 +32,7 @@ import { StationStreets } from './StationStreets'
 import { StationTies } from './StationTies'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
+import { ViewCenterSource } from './ViewCenterSource'
 import { YouAreHere } from './YouAreHere'
 
 /** TEMPORARY `?basemap=off` (basemapLook.ts) draws no basemap and loads no tiles. */
@@ -155,6 +156,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         frame={priorityFrame}
         tripOpen={tripOpen}
       />
+      <ViewCenterSource />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
