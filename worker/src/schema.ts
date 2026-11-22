@@ -42,3 +42,20 @@ export interface RealtimeSnapshot {
   generatedAt: number             // epoch s, set by the Worker after the fetches settle
   feeds: Record<FeedId, FeedSnapshot>
 }
+
+/** Bump on incompatible shape changes to the /ene body; also part of its edge cache key. */
+export const ENE_SCHEMA_VERSION = 1
+
+export interface EneOutage {
+  code: string            // equipment code ("EL358"), join key to interior Connector.id
+  reason: string | null   // trimmed, capped at 100 chars; empty or non-string -> null
+  since: number           // outagedate, epoch s
+  returnAt: number | null // estimatedreturntoservice, epoch s; empty or unparseable -> null (may be past: overdue)
+}
+
+export interface EneSnapshot {
+  version: typeof ENE_SCHEMA_VERSION
+  generatedAt: number     // epoch s, set by the Worker after the fetch settles
+  dropped: number         // malformed rows skipped
+  outages: EneOutage[]    // in effect at generatedAt, one per code, sorted by code
+}

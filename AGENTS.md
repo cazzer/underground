@@ -425,14 +425,19 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     flagged); `lib/pathwaysTopology.ts`, `layoutOracle.ts`, `archetypeScore.ts` score it;
     `score-archetypes.ts <feedDir> [--oracle file]` prints the report to stdout and writes nothing. The 2021 draft NYCT
     pathways feed it reads must never be committed, shipped, or used as a source; it refuses a dir inside any git work tree
-- `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`
-  - `src/schema.ts` the JSON contract (types and consts only); the client re-exports it
-  - `src/index.ts` routing, memo + Cache API (15 s), CORS; `cache.ts` pure memo/herd-guard
-    decision; `upstream.ts` feed fetches
-  - `src/transform.ts` pure decode-to-snapshot logic; `cors.ts` allowed origins
+- `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt` and the trimmed E&E outage
+  list at `/ene` (equipment code, reason, since, returnAt; the client re-export is 2q7.21)
+  - `src/schema.ts` the JSON contracts (types and consts only); the client re-exports the `/rt` one
+  - `src/index.ts` routing (a `Map` of path to `CachedRoute`: `/rt` 15 s, `/ene` 120 s), CORS;
+    `serveCached.ts` the per-route memo, Cache API layer and herd guard (`serveCached`, with a 15 s backoff after a failed
+    refresh; its `x-rt-cache` and `x-rt-expires` header names are shared by both routes); `cache.ts` pure memo/herd-guard
+    decision and the per-route TTLs; `upstream.ts` feed and outage fetches (`fetchBytes`: 5 s timeout, 2 MB cap)
+  - `src/transform.ts` pure decode-to-snapshot logic; `ene.ts` pure E&E transform (`parseNyTime`,
+    `transformEne`; the feed's `isupcomingoutage` is unreliable, so it is ignored: a row is skipped only if it has
+    not started yet); `cors.ts` allowed origins
   - `src/gen/` generated protobufjs decoder (`npm run gen`); never hand-edit
   - `proto/subway-rt.proto` trimmed subset of gtfs-realtime + nyct-subway
-  - `fixtures/` recorded feeds for tests (see its README)
+  - `fixtures/` recorded feeds for tests (see its README; `ene.json` is the E&E sample)
 - `docs/research/`: research notes (`data-sources.md`)
 
 ## Hard rules
@@ -695,7 +700,7 @@ Reviews with nits only can be fixed in-loop without filing.
 Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **The client never fetches MTA servers directly.** The MTA terms require serving
   through a non-MTA host, even though the feeds send ACAO `*`. Realtime goes through
-  the `worker/` proxy, which returns decoded JSON with a 15 s edge cache.
+  the `worker/` proxy, which returns decoded JSON with a 15 s edge cache (outages at `/ene`: 120 s).
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
   `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
