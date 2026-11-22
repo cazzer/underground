@@ -1,12 +1,11 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { isPhoneViewport } from '../lib/streetLabelReveal'
 
 /** Most rows the list shows at once on a phone, and the most of the screen it may take (a share of the height). */
 const MAX_ROWS = 5
 const MAX_SHARE = 0.25
 /** Never cap below the three collapsed rows. */
 const MIN_ROWS = 3
-/** Tailwind's `sm` breakpoint is 640 px; below it the panel sits over the map and must leave the train in view. */
-const NARROW = '(max-width: 639px)'
 
 export interface ListScroll<L extends HTMLElement = HTMLOListElement> {
   scroller: RefObject<HTMLDivElement | null>
@@ -43,7 +42,7 @@ export function useListScroll<L extends HTMLElement = HTMLOListElement>(rowCount
     if (!ol) return
     const rows = [...ol.children]
     let cap: number | null = null
-    if (window.matchMedia(NARROW).matches && rows.length > MIN_ROWS) {
+    if (isPhoneViewport({ width: window.innerWidth, height: window.innerHeight }) && rows.length > MIN_ROWS) {
       const top = ol.getBoundingClientRect().top
       const limit = window.innerHeight * MAX_SHARE
       let fit = MIN_ROWS

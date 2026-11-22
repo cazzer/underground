@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EntranceText } from './entranceText'
-import { entranceCountSpoken, entranceRows, entranceTotal, rowParts } from './entranceList'
+import { entranceCountSpoken, entranceRows, entranceTotal, glueStreetNumbers, NOWRAP_MAX, rowParts } from './entranceList'
 
 function text(index: number, head: string, tail: string, o: Partial<EntranceText> = {}): EntranceText {
   return {
@@ -52,15 +52,31 @@ describe('entranceRows', () => {
 describe('rowParts', () => {
   it('splits at the label’s separators and keeps a relation on the street part’s line', () => {
     expect(rowParts('Bedford Av & N 7 St', 'NE corner · elevator').map((p) => [p.sep, p.text])).toEqual([
-      ['', 'Bedford Av & N 7 St'],
-      ['\u00a0· ', 'NE corner'],
-      ['\u00a0· ', 'elevator'],
+      ['', 'Bedford Av & N 7 St'],
+      [' · ', 'NE corner'],
+      [' · ', 'elevator'],
     ])
     expect(rowParts('Broadway median', 'at W 95 St').map((p) => [p.sep, p.text])).toEqual([
       ['', 'Broadway median'],
-      [' ', 'at W 95 St'],
+      [' ', 'at W 95 St'],
     ])
-    expect(rowParts('Broadway', '')).toEqual([{ sep: '', text: 'Broadway' }])
+    expect(rowParts('Broadway', '')).toEqual([{ sep: '', text: 'Broadway', keep: true }])
+  })
+
+  it('keeps a street number with its direction and type word', () => {
+    expect(glueStreetNumbers('W 116 St & 7 Av')).toBe('W 116 St & 7 Av')
+    expect(glueStreetNumbers('Broadway median')).toBe('Broadway median')
+  })
+
+  it('keeps a part whole with its dot only up to NOWRAP_MAX; a longer one may wrap between words', () => {
+    const tail = `${'x'.repeat(NOWRAP_MAX - 2)} · ${'y'.repeat(NOWRAP_MAX - 1)}`
+    const [a, b, c] = rowParts('Prospect Park W & 9 St', tail)
+    expect([a!.keep, b!.keep, c!.keep]).toEqual([true, true, true])
+    const long = rowParts('Prospect Park Southwest & Bartel Pritchard Sq', 'NE corner')
+    expect(long[0]!.keep).toBe(false)
+    expect(long[0]!.text).toContain(' ')
+    expect(long[1]!.keep).toBe(true)
+    expect(rowParts('Short', 'z'.repeat(NOWRAP_MAX - 1) + ' · b')[1]!.keep).toBe(false)
   })
 
   it('reads back as the label’s own text', () => {

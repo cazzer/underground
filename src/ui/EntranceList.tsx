@@ -19,10 +19,15 @@ function Row({ row }: RowProps) {
         {row.parts.map((part, i) => (
           <span key={i}>
             {part.sep}
-            <span className="whitespace-nowrap">{part.text}</span>
+            <span className={part.keep ? 'whitespace-nowrap' : undefined}>{part.text}</span>
           </span>
         ))}
-        {row.count > 1 && <span className="whitespace-nowrap text-ink-dim"> ({row.count})</span>}
+        {row.count > 1 && (
+          <>
+            {' '}
+            <span className="whitespace-nowrap text-ink-dim">({row.count})</span>
+          </>
+        )}
       </span>
       <span className="sr-only">{row.spoken}</span>
     </li>
