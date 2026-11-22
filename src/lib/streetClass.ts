@@ -1,6 +1,7 @@
-/** Which OSM ways the street layer treats as streets. Pure, no imports: the street-file build (scripts/) and the
+/** Which OSM ways the street layer treats as streets. Pure: the street-file build (scripts/) and the
  *  client share it, so the entrance join and the drawn streets agree on what a street is.
- *  Loaded by a scripts/ test, so keep imports out or give them explicit `.ts` paths. */
+ *  Loaded by a scripts/ test, so imports use explicit `.ts` paths. */
+import { searchTokens } from './searchText.ts'
 
 /** The `highway=` classes a car or pedestrian street can have, drawn and eligible for an entrance's street.
  *  `pedestrian` is here on purpose: a pedestrianised street (Fulton Mall, Stone St) is a street when it is a line.
@@ -38,7 +39,10 @@ export function isArea(way: WayTags, closed: boolean): boolean {
   return closed && way.highway === 'pedestrian'
 }
 
-/** A way an entrance can open onto and the map draws as a street: named, a roadway class, not an area. */
+/** A way an entrance can open onto and the map draws as a street: named (a name that reduces to no search tokens,
+ *  like "..." or "The", is no name, since the join keys streets by those tokens), a roadway class, not an area. */
 export function isStreet(way: WayTags, closed: boolean): boolean {
-  return way.name !== null && way.name.trim() !== '' && ROADWAY_HIGHWAYS.has(way.highway) && !isArea(way, closed)
+  return (
+    way.name !== null && searchTokens(way.name).length > 0 && ROADWAY_HIGHWAYS.has(way.highway) && !isArea(way, closed)
+  )
 }

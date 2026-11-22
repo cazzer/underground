@@ -5,8 +5,8 @@ import { joinEntrance, streetKey, type JoinWay } from './entranceStreet.ts'
 
 const NO_STREET = { street: null, wayId: null, cross: null, crossWayId: null, side: null, plaza: null }
 
-function way(id: number, name: string | null, points: LocalPoint[], highway = 'residential'): JoinWay {
-  return { id, highway, name, points }
+function way(id: number, name: string | null, points: LocalPoint[], highway = 'residential', closed = false): JoinWay {
+  return { id, highway, name, closed, points }
 }
 
 /** A street running north-south along x (z grows southward). */
@@ -66,25 +66,61 @@ describe('joinEntrance', () => {
     expect(joinEntrance([100, 0], [vertical(1, 'Main St', 0)])).toEqual(NO_STREET)
   })
 
-  it('does not count a second way of the same name as a corner', () => {
-    const ways = [vertical(1, 'Main St', 0, -100, 0), vertical(2, 'Main St', 0, 0, 100)]
-    const join = joinEntrance([6, 0], ways)
-    expect(join).toEqual({ ...NO_STREET, street: 'Main St', wayId: 1, side: 'east' })
+  it('does not count a second way of the same name as a corner, even at a bend', () => {
+    // An L: the two ways meet at (0,0) at a right angle, so only the name says they are one street.
+    const ways = [vertical(1, 'Main St', 0, -100, 0), horizontal(2, 'Main St', 0, 0, 100)]
+    expect(joinEntrance([6, -6], ways)).toEqual({ ...NO_STREET, street: 'Main St', wayId: 1, side: 'east' })
   })
 
-  it('treats differently spelled names of one street as one street', () => {
-    const ways = [horizontal(1, 'N 7th St', 0, -100, 0), horizontal(2, 'North 7th Street', 0, 0, 100)]
-    const join = joinEntrance([0, 6], ways)
-    expect(join.cross).toBeNull()
-    expect(join.street).toBe('N 7th St')
-    expect(join.side).toBe('south')
+  it('treats differently spelled names of one street as one street, even at a bend', () => {
+    const ways = [vertical(1, 'N 7th St', 0, -100, 0), horizontal(2, 'North 7th Street', 0, 0, 100)]
+    expect(joinEntrance([6, -6], ways)).toEqual({ ...NO_STREET, street: 'N 7th St', wayId: 1, side: 'east' })
   })
 
   it('puts an entrance between two carriageways in the median, and outside on the near one', () => {
-    const ways = [vertical(1, 'Park Av', -10), vertical(2, 'Park Av', 10)]
+    // The southbound carriageway is drawn reversed, as OSM draws opposite one-ways.
+    const ways = [vertical(1, 'Park Av', -10), vertical(2, 'Park Av', 10, 100, -100)]
     expect(joinEntrance([0, 0], ways).side).toBe('median')
     expect(joinEntrance([-14, 0], ways)).toEqual({ ...NO_STREET, street: 'Park Av', wayId: 1, side: 'west' })
     expect(joinEntrance([14, 0], ways)).toEqual({ ...NO_STREET, street: 'Park Av', wayId: 2, side: 'east' })
+  })
+
+  it('keeps the cross street of a median entrance at an intersection', () => {
+    const ways = [vertical(1, 'Broadway', -10), vertical(2, 'Broadway', 10, 100, -100), horizontal(3, 'W 72nd St', 0)]
+    for (const x of [2, -2]) {
+      expect(joinEntrance([x, -8], ways)).toMatchObject({
+        street: 'Broadway',
+        cross: 'W 72nd St',
+        crossWayId: 3,
+        side: 'median',
+      })
+    }
+  })
+
+  it('does not take the stem of a T-junction or a dead end short of the street as a corner', () => {
+    const stem = horizontal(2, 'Cross St', 0, -100, 0)
+    expect(joinEntrance([6, -2], [vertical(1, 'Main St', 0), stem])).toEqual({
+      ...NO_STREET,
+      street: 'Main St',
+      wayId: 1,
+      side: 'east',
+    })
+    const deadEnd = horizontal(2, 'Cross St', 0, -100, -9)
+    expect(joinEntrance([3, -2], [vertical(1, 'Main St', 0), deadEnd]).cross).toBeNull()
+    // The same street still makes a corner on the stem's own side of the junction.
+    expect(joinEntrance([-6, -2], [vertical(1, 'Main St', 0), stem])).toMatchObject({
+      street: 'Cross St',
+      cross: 'Main St',
+      side: 'NW',
+    })
+  })
+
+  it('gives the same side at a bend whichever way the way is drawn', () => {
+    const bend: LocalPoint[] = [[0, -100], [0, 0], [100, 0]]
+    const forward = joinEntrance([-0.5, 5], [way(1, 'Main St', bend)])
+    const reversed = joinEntrance([-0.5, 5], [way(1, 'Main St', [...bend].reverse())])
+    expect(forward).toEqual({ ...NO_STREET, street: 'Main St', wayId: 1, side: 'south' })
+    expect(reversed).toEqual(forward)
   })
 
   it('ignores a parallel, differently named service road', () => {
@@ -109,7 +145,7 @@ describe('joinEntrance', () => {
 
   it('sets plaza inside a named pedestrian area and never takes the area as the street', () => {
     const ring: LocalPoint[] = [[-20, -20], [20, -20], [20, 20], [-20, 20], [-20, -20]]
-    const ways = [way(1, 'Fulton Mall', ring, 'pedestrian')]
+    const ways = [way(1, 'Fulton Mall', ring, 'pedestrian', true)]
     expect(joinEntrance([0, 0], ways)).toEqual({ ...NO_STREET, plaza: 'Fulton Mall' })
     expect(joinEntrance([30, 0], ways)).toEqual(NO_STREET)
   })
@@ -141,7 +177,7 @@ describe('joinEntrance', () => {
 
   it('fits a stored entrance', () => {
     const join = joinEntrance([6, -6], [vertical(1, 'Main St', 0), horizontal(2, 'Cross St', 0)])
-    const entrance: StreetEntrance = { x: 60, z: -60, type: 'Stair', entry: true, exit: true, stopIds: ['L08N'], ...join }
+    const entrance = { x: 60, z: -60, type: 'Stair', entry: true, exit: true, stopIds: ['L08N'], ...join } satisfies StreetEntrance
     expect(entrance.cross).toBe('Cross St')
   })
 })

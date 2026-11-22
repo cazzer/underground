@@ -20,6 +20,8 @@ describe('isStreet', () => {
   it('skips unnamed ways, motorways and footpaths', () => {
     expect(isStreet({ highway: 'residential', name: null }, false)).toBe(false)
     expect(isStreet({ highway: 'residential', name: '  ' }, false)).toBe(false)
+    expect(isStreet({ highway: 'residential', name: '...' }, false)).toBe(false)
+    expect(isStreet({ highway: 'residential', name: 'The' }, false)).toBe(false)
     for (const highway of ['motorway', 'motorway_link', 'footway', 'steps', 'path', 'cycleway']) {
       expect(isStreet({ highway, name: 'Main St' }, false), highway).toBe(false)
     }

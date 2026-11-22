@@ -7,6 +7,9 @@
  *    differs (L08's is about (-11.80, -10.90) m from it), so entrances are matched to an interior's by scene ground position.
  *  - Every `nodeId` is a real OSM node id. Ways index into the node table, so a junction is stored once.
  *  - Clipping to the radius keeps whole vertices: a way is cut at the first vertex past the radius, never inside a segment.
+ *    A way that leaves and re-enters the radius is kept as one span, from the last vertex before its first entry to
+ *    the first vertex after its last exit, one entry per id. A closed way is kept whole or dropped, never opened by
+ *    clipping, so `isClosedRing(nodes)` stays true exactly for the OSM-closed ways.
  *  - Simplification (dropping collinear vertices) never drops a node used by two or more ways or any way's end node.
  *  - Coordinates are integer decimeters. The entrance join runs on these same decimeter coordinates (as meters),
  *    so what the file says and what the join saw are one thing.
@@ -35,7 +38,9 @@ export interface StreetWay {
   footway?: string
   /** The OSM `name`, verbatim; null when unnamed. */
   name: string | null
-  /** 1 travel runs along the node order, -1 against it, 0 both ways or not a one-way (normalized from OSM `oneway`). */
+  /** The vehicle one-way tag, normalized from OSM `oneway`: 1 travel runs along the node order, -1 against it, 0 both
+   *  ways or not a one-way. A walk graph must ignore it (pedestrians walk both ways) unless `oneway:foot` says
+   *  otherwise; that tag is not stored. */
   oneway: 0 | 1 | -1
   /** Indexes into the file's node table, in way order. A closed way repeats its first index at the end. */
   nodes: number[]
