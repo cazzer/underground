@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
@@ -10,64 +10,22 @@ import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
 import { useTrainSelection } from '../lib/trainSelection'
 import type { LocateControls } from '../data/useLocate'
-import { PartialAccessNote, StationName } from './AccessIcon'
-import { ArrivalsList } from './ArrivalsList'
+import { ArrivalsPanel } from './ArrivalsPanel'
 import { Attribution } from './Attribution'
 import { FocusAnnouncer } from './FocusAnnouncer'
 import { LiveStatus } from './LiveStatus'
-import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
+import type { InteriorStatusInfo } from './InteriorStatus'
 import { LinkNotice } from './LinkNotice'
 import { LocateButton } from './LocateButton'
 import { LocateStatus } from './LocateStatus'
 import { OrbitHint } from './OrbitHint'
-import { OutageStatus } from './OutageStatus'
 import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
-
-interface ArrivalsPanelProps {
-  network: Network
-  stationId: string
-  live: LiveStatusValue
-  arrivals: ArrivalsSource | null
-  onClose: () => void
-  interior: InteriorStatusInfo
-  /** Elevators and escalators out of service at the focused station. */
-  outages: OutagePanelView
-  ref: Ref<HTMLElement>
-  /** Takes focus when a panel that covered this one closes, or after the visitor picks this station from search. */
-  headingRef: RefObject<HTMLHeadingElement | null>
-}
-
-function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, outages, ref, headingRef }: ArrivalsPanelProps) {
-  const station = network.stationById.get(stationId)
-  if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
-  return (
-    <aside
-      ref={ref}
-      aria-label={`Arrivals at ${station.name}`}
-      className="pointer-events-auto max-h-full min-h-0 w-72 max-w-full overflow-auto border border-edge bg-panel p-4 text-ink backdrop-blur-sm sm:shrink-0"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <h2 ref={headingRef} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
-          <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} />
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close station panel"
-          className="-m-2 flex min-h-11 min-w-11 cursor-pointer items-center justify-center p-2 text-ink-dim hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
-        >
-          ×
-        </button>
-      </div>
-      <PartialAccessNote access={station.access} />
-      <InteriorStatus info={interior} />
-      <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
-      <ArrivalsList network={network} station={station} source={arrivals} status={live} />
-    </aside>
-  )
-}
+import { TripAnnouncer } from './TripAnnouncer'
+import { TripButton } from './TripButton'
+import { TripPanel } from './TripPanel'
+import { useTripPanel } from './useTripPanel'
 
 interface HudProps {
   network: Network
@@ -101,14 +59,17 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const panel = useRef<HTMLElement>(null)
   const locateButton = useRef<HTMLButtonElement>(null)
   const stationHeading = useRef<HTMLHeadingElement>(null)
-  // Closing the train panel or the notice (× or Esc) hands focus to the station panel's heading when that
-  // panel is underneath, else to the Search button; the auto-dismissed notice leaves focus alone. It waits one
+  const tripHeading = useRef<HTMLHeadingElement>(null)
+  const tripButton = useRef<HTMLButtonElement>(null)
+  const { tripOpen, tripShown, toggleTrip, closeTrip } = useTripPanel({ locate, panel, stationHeading, tripHeading, tripButton })
+  // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
+  // heading, else the station panel's, else the Search button; the auto-dismissed notice leaves focus alone. It waits one
   // frame so a station panel that auto-focus mounts as the train closes is found and wins; it is read once,
   // so a later auto-focus is not chased.
   const [focusReturns, setFocusReturns] = useState(0)
   useEffect(() => {
     if (focusReturns === 0) return
-    const frame = requestAnimationFrame(() => (stationHeading.current ?? searchButton.current)?.focus({ preventScroll: true }))
+    const frame = requestAnimationFrame(() => (tripHeading.current ?? stationHeading.current ?? searchButton.current)?.focus({ preventScroll: true }))
     return () => cancelAnimationFrame(frame)
   }, [focusReturns])
   const closeTrain = useCallback(() => {
@@ -189,21 +150,23 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
       observer.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [focusedId, trainOpen, noticeOpen, onPanel])
+  }, [focusedId, trainOpen, noticeOpen, tripOpen, onPanel])
 
-  // Esc closes what covers the station panel first (the train panel, then the notice), then the station's.
+  // Esc closes the front panel: the train panel, then the notice, then the trip panel, then the station's.
   useEffect(() => {
     // While search is open, Esc belongs to it: one press must not also dismiss a panel.
-    if ((!focusedId && !trainOpen && !noticeOpen) || searchOpen) return
+    if ((!focusedId && !trainOpen && !noticeOpen && !tripOpen) || searchOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      // A modal dialog (a trip search, even with focus on the body) owns Esc: its own close is the press.
+      if (e.key !== 'Escape' || document.querySelector('dialog:modal')) return
       if (trainOpen) closeTrain()
       else if (noticeOpen) closeNotice()
+      else if (tripOpen) closeTrip()
       else closeStation()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedId, trainOpen, noticeOpen, searchOpen, closeStation, closeTrain, closeNotice])
+  }, [focusedId, trainOpen, noticeOpen, tripOpen, searchOpen, closeStation, closeTrain, closeNotice, closeTrip])
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
@@ -221,7 +184,8 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
           <p role="status" aria-live="polite" className="sr-only">
             {notice ?? ''}
           </p>
-          <FocusAnnouncer network={network} covered={trainOpen || noticeOpen} panel={panel} />
+          <FocusAnnouncer network={network} covered={trainOpen || noticeOpen || tripOpen} panel={panel} />
+          <TripAnnouncer network={network} arrivals={arrivals} covered={trainOpen || noticeOpen} />
           <LinkNotice
             show={linkNotice.show}
             onDismiss={linkNotice.onDismiss}
@@ -233,6 +197,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
         </div>
         <div className="flex shrink-0 gap-2">
           <SearchButton ref={searchButton} onOpen={openSearch} />
+          <TripButton ref={tripButton} open={tripShown} onToggle={toggleTrip} />
           <LocateButton
             ref={locateButton}
             onLocate={locate.locate}
@@ -261,7 +226,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
           />
         ) : notice ? (
           <TrainGonePanel notice={notice} onDismiss={closeNotice} ref={panel} />
-        ) : focusedId ? (
+        ) : focusedId && !tripOpen ? (
           <ArrivalsPanel
             network={network}
             stationId={focusedId}
@@ -274,6 +239,18 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             headingRef={stationHeading}
           />
         ) : null}
+        {/* Kept mounted (hidden) under a train panel or notice, so its journeys, scroll and focus survive. */}
+        {tripOpen && (
+          <TripPanel
+            network={network}
+            arrivals={arrivals}
+            locate={locate}
+            onClose={closeTrip}
+            headingRef={tripHeading}
+            covered={trainOpen || noticeOpen}
+            ref={trainOpen || noticeOpen ? null : panel}
+          />
+        )}
       </div>
       <StationSearch ref={search} network={network} onChoose={onSearchChoose} onClose={onSearchClosed} />
     </div>

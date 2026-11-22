@@ -1,5 +1,6 @@
 import type { StationId, StationsFile } from './schema'
 import { serviceCalendar, timetableFile, transfersFile } from './loadTimetable'
+import { complexMembers } from '../lib/route/ends'
 import { planOn, type RouterTimetable, type TripJourney } from '../lib/route/plan'
 import { serviceWindow, windowKey } from '../lib/route/serviceDay'
 import { buildRouterTimetable, sourcesFor } from '../lib/route/timetable'
@@ -15,6 +16,11 @@ export class NoServiceError extends Error {
   }
 }
 
+/** A User Timing measure from `start` (a `performance.now()` value) to now; `?debug` and devtools read it. */
+function measureSince(name: string, start: number): void {
+  performance.measure(name, { start, end: performance.now() })
+}
+
 let last: { key: string; promise: Promise<RouterTimetable> } | undefined
 
 async function build(stations: StationsFile, atS: number): Promise<RouterTimetable> {
@@ -24,9 +30,14 @@ async function build(stations: StationsFile, atS: number): Promise<RouterTimetab
   const key = `${stations.feedVersion}|${windowKey(window)}`
   if (last?.key === key) return last.promise
   const serviceIds = [...new Set(window.frames.flatMap((f) => f.services))]
+  const fetchStart = performance.now()
   const promise = Promise.all([transfersFile(), ...serviceIds.map(timetableFile)]).then(([transfers, ...files]) => {
+    measureSince('trip:fetch', fetchStart)
+    const buildStart = performance.now()
     const byService = new Map(serviceIds.map((id, i) => [id, files[i]!]))
-    return { timetable: buildRouterTimetable(sourcesFor(window, byService), stations, transfers.transfers), window }
+    const timetable = buildRouterTimetable(sourcesFor(window, byService), stations, transfers.transfers)
+    measureSince('trip:build', buildStart)
+    return { timetable, window }
   })
   const entry = { key, promise }
   last = entry
@@ -50,5 +61,28 @@ export async function planTrip(
   atS: number,
   opts?: RouteOptions,
 ): Promise<TripJourney[]> {
-  return planOn(await loadRouterTimetable(stations, atS), from, to, atS, opts)
+  const rt = await loadRouterTimetable(stations, atS)
+  const start = performance.now()
+  const journeys = planOn(rt, from, to, atS, opts)
+  measureSince('trip:route', start)
+  return journeys
+}
+
+/**
+ * Journeys between two stations the visitor chose, each standing for its complex (same-named stations linked by
+ * transfers), so a trip never begins or ends with a walk to a station of the same name. Two ends in one complex are
+ * one place: no journeys, and `sameStation` says why.
+ */
+export async function planTripBetween(
+  stations: StationsFile,
+  from: StationId,
+  to: StationId,
+  atS: number,
+  opts?: RouteOptions,
+): Promise<{ journeys: TripJourney[]; sameStation: boolean }> {
+  const { transfers } = await transfersFile()
+  const fromSet = complexMembers(stations.stations, from, transfers)
+  const toSet = complexMembers(stations.stations, to, transfers)
+  if (fromSet.some((id) => toSet.includes(id))) return { journeys: [], sameStation: true }
+  return { journeys: await planTrip(stations, fromSet, toSet, atS, opts), sameStation: false }
 }
