@@ -39,6 +39,33 @@ export function groundFootprint(rays: FrustumRays, out: Float64Array): void {
   }
 }
 
+/**
+ * Whether every corner of footprint `cur` lies within `margin` meters of the quad `sel` (both as groundFootprint
+ * writes them; `sel` taken as convex). Allocation-free: the per-frame check for a view that slid out of its tiles.
+ */
+export function footprintInside(cur: Float64Array, sel: Float64Array, margin: number): boolean {
+  let area = 0
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4
+    area += sel[i * 2]! * sel[j * 2 + 1]! - sel[j * 2]! * sel[i * 2 + 1]!
+  }
+  const sign = area >= 0 ? 1 : -1
+  for (let i = 0; i < 4; i++) {
+    const ax = sel[i * 2]!
+    const az = sel[i * 2 + 1]!
+    const ex = sel[((i + 1) % 4) * 2]! - ax
+    const ez = sel[((i + 1) % 4) * 2 + 1]! - az
+    const len = Math.hypot(ex, ez)
+    if (len === 0) continue
+    for (let k = 0; k < 4; k++) {
+      // Signed distance of the corner from this edge's line, positive on the quad's side.
+      const inside = (sign * (ex * (cur[k * 2 + 1]! - az) - ez * (cur[k * 2]! - ax))) / len
+      if (inside < -margin) return false
+    }
+  }
+  return true
+}
+
 export interface WantedTile {
   key: number
   z: number

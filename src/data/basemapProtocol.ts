@@ -1,10 +1,13 @@
-/** Messages between basemapTiles.ts (main thread) and basemapWorker.ts. Tiles are named by tileKey. */
+/**
+ * Messages between basemapTiles.ts (main thread) and basemapWorker.ts. Tiles are named by tileKey; every load
+ * carries a sequence number its reply echoes, so a reply to a load since cancelled or repeated is told apart.
+ */
 import type { ClassBuffers } from '../lib/basemap/decodeTile'
 
 export type BasemapRequest =
   /** Sent once, first: the spec's kept layers, the only ones decoded. */
   | { type: 'init'; layers: string[] }
-  | { type: 'load'; key: number; url: string; z: number; x: number; y: number }
+  | { type: 'load'; key: number; seq: number; url: string; z: number; x: number; y: number }
   /** Aborts the fetch; a cancelled tile is never decoded or answered. */
   | { type: 'cancel'; key: number }
 
@@ -13,7 +16,7 @@ export type EmptyReason = 'missing' | 'not-mvt'
 
 export type BasemapReply =
   /** The buffers are transferred. `bodyBytes` is the response body's length (after any HTTP decompression). */
-  | { type: 'tile'; key: number; classes: ClassBuffers; decodeMs: number; bodyBytes: number }
-  | { type: 'empty'; key: number; reason: EmptyReason; detail: string }
+  | { type: 'tile'; key: number; seq: number; classes: ClassBuffers; decodeMs: number; bodyBytes: number }
+  | { type: 'empty'; key: number; seq: number; reason: EmptyReason; detail: string }
   /** A network failure or an unexpected status: worth a retry later. */
-  | { type: 'error'; key: number; message: string }
+  | { type: 'error'; key: number; seq: number; message: string }

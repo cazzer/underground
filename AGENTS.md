@@ -394,20 +394,25 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `RT_URL` is set), `useRealtimeFeed` (one request at a time; a hidden tab aborts and stops polling, becoming
   visible polls at once), `prepareTrips` once per snapshot, and `deriveLiveStatus`. `realtimeFetch.ts` fetches and
   validates one snapshot (the Worker doesn't expose `Retry-After`/`X-Rt-Cache` cross-origin yet; the client copes)
-- `src/data/basemapTiles.ts` the basemap tile store (no React; `createBasemapTiles`): reselects tiles only on a
-  meaningful view change (`lib/basemap/reselect.ts`), at most 6 in flight nearest the view center first, unwanted ones
-  cancelled, an LRU (24 MB / 128), what to draw meanwhile (`drawn`, `version`), one log line per failure reason per
-  session; no worker or a crashed one turns the basemap off (logged). `basemapWorker.ts` fetches and decodes
-  (`basemapProtocol.ts` the messages); `basemapConfig.ts` `BASEMAP` (the build-time `__BASEMAP__`: bbox, maxzoom,
-  layers, the pin's release as version; null while no tile directory is served) and `tileUrl`
-  (`basemap/tiles/{z}/{x}/{y}.mvt?v=<release>`). `src/scene/useBasemapTiles.ts` runs it (starts after the first frame
-  and an idle callback; the privacy hold, see Data); `BasemapProbe.tsx` mounts it only under `?debug` in dev until
-  ost.9.3 draws, with `__underground.basemap()` for its counters and decode times
+- `src/data/basemapTiles.ts` the basemap tile store (no React; `createBasemapTiles`, types in `basemapTypes.ts`; the
+  worker is injected, so `basemapTiles.test.ts` drives it with a fake): reselects tiles on a meaningful view change or
+  once the footprint leaves the last chosen one plus its margin (`lib/basemap/reselect.ts`), at most 6 in flight
+  nearest the view center first, unwanted ones cancelled, each load's sequence number echoed so a stale reply is
+  dropped, an LRU (24 MB / 128), what to draw meanwhile (`drawn`, `version`), the location zoom cap (`capZoom`), one
+  log line per failure reason per session; no worker or a crashed one turns the basemap off (logged).
+  `basemapWorker.ts` fetches, inflates a gzip body (`lib/basemap/inflate.ts`) and decodes (`basemapProtocol.ts` the
+  messages); `basemapConfig.ts` `BASEMAP` (the build-time `__BASEMAP__`: bbox, maxzoom, layers, the tile pin's
+  release as version; null for a legacy or absent pin; under `vite serve`, `VITE_BASEMAP_DEV=1` in `.env.local` loads
+  the local `public/basemap/tiles` with version "dev") and `tileUrl` (`basemap/tiles/{z}/{x}/{y}.mvt?v=<release>`).
+  `src/scene/useBasemapTiles.ts` runs it (starts after the first frame and an idle callback; feeds the location cap,
+  see Data); `BasemapProbe.tsx` mounts it only under `?debug` in dev until ost.9.3 draws, with
+  `__underground.basemap()` for its counters, decode times and the request log
 - `src/lib/basemap/`: pure basemap helpers, tests colocated: `tileMath.ts` (Web Mercator tiles, numeric `tileKey`,
   `zoomFor` with 512 px tiles clamped to [`MIN_Z` 9, maxzoom]), `footprint.ts` (`groundFootprint` from the frustum's
   corner rays, misses stopped at 4 camera distances; `selectTiles`, a 0.1 × distance margin, at most 24, stepping the
-  zoom down), `reselect.ts`, `tileCover.ts` (`drawnTiles`: ready, else nearest ready ancestor, else previous
-  children), `tileLru.ts`, `clip.ts` (Liang–Barsky; a ring's cut along a tile edge dropped), `featureClass.ts`
+  zoom down; `footprintInside`), `reselect.ts`, `tileCover.ts` (`drawnTiles`: ready, else previous children that
+  cover it, else nearest ready ancestor, else partial previous children), `tileLru.ts`, `locationCap.ts` (the
+  location zoom cap's state machine), `clip.ts` (Liang–Barsky; a ring's cut along a tile edge dropped), `featureClass.ts`
   (`classOf`: highway, major, minor, path, water, park; tunnels, rail, ferry, earth and points dropped),
   `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip),
   `mvtFixture.ts` (tests' MVT writer). `projection.ts` exports `groundX`/`groundZ` for per-vertex use
@@ -807,8 +812,10 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   of a fix); no request carries the fix or the destination, and routing runs on the device.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
   `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it. Basemap tiles
-  follow the camera, never the fix, and after a location fly-to no new tile is requested until the user's own gesture
-  (the controls' `start`) or a station flight (`useBasemapTiles.ts`); tiles already loaded still draw.
+  follow the camera, never the fix. After a location fly-to, tiles load no finer than z12 (several km a tile) until
+  the user moves the view (a drag past the 6 px mouse / 10 px touch slop, a wheel step, a second finger) or picks a
+  station (tap, panel, search); a tap that doesn't move, or the controls' `start` alone, keeps the cap
+  (`lib/basemap/locationCap.ts`, fed by `useBasemapTiles.ts`). Tiles already loaded still draw.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip

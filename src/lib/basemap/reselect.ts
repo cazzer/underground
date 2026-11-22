@@ -76,12 +76,16 @@ export function newReselect(): ReselectState {
   return { selected: null, selectedAt: -Infinity, prev: newPose(), movedAt: -Infinity }
 }
 
-/** Call once per frame; true when the tiles should be chosen again now (then call `markSelected`). */
-export function reselectDue(state: ReselectState, pose: ViewPose, nowMs: number): boolean {
+/**
+ * Call once per frame; true when the tiles should be chosen again now (then call `markSelected`). `slidOut`: the
+ * view's footprint has left the last chosen one plus its margin (footprintInside), which a tilted or turned view
+ * can do before any of the pose thresholds trips.
+ */
+export function reselectDue(state: ReselectState, pose: ViewPose, nowMs: number, slidOut = false): boolean {
   if (differs(state.prev, pose, 1e-3, 1e-3, 1e-3)) state.movedAt = nowMs
   copyPose(pose, state.prev)
   if (state.selected === null) return true
-  if (!meaningfulChange(state.selected, pose)) return false
+  if (!slidOut && !meaningfulChange(state.selected, pose)) return false
   return nowMs - state.movedAt >= STILL_MS || nowMs - state.selectedAt >= MOVING_MS
 }
 

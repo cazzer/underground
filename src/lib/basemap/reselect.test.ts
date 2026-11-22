@@ -55,4 +55,12 @@ describe('reselectDue', () => {
     markSelected(s, pose(), 0)
     for (let t = 16; t < 3000; t += 16) expect(reselectDue(s, pose(), t)).toBe(false)
   })
+
+  it('fires when the footprint slid out though the pose barely changed', () => {
+    const s = newReselect()
+    reselectDue(s, pose(), 0)
+    markSelected(s, pose(), 0)
+    expect(reselectDue(s, pose({ tx: 10 }), 1000)).toBe(false)
+    expect(reselectDue(s, pose({ tx: 10 }), 1200, true)).toBe(true)
+  })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { groundX, groundZ } from '../projection'
-import { groundFootprint, MAX_REACH, MAX_TILES, selectTiles, type FrustumRays } from './footprint'
+import { footprintInside, groundFootprint, MAX_REACH, MAX_TILES, selectTiles, type FrustumRays } from './footprint'
 import { keyZ, latToTileY, lonToTileX, MIN_Z, tileKey } from './tileMath'
 
 const NYC: [number, number, number, number] = [-74.2591, 40.4774, -73.7004, 40.9176]
@@ -105,5 +105,32 @@ describe('selectTiles', () => {
     const ys = tiles.map((t) => t.y)
     // North (smaller y) is up the screen at azimuth 0: the footprint reaches further north than south.
     expect(12320 - Math.min(...ys)).toBeGreaterThanOrEqual(Math.max(...ys) - 12320)
+  })
+})
+
+describe('footprintInside', () => {
+  const tilted = Math.atan(Math.SQRT2)
+
+  it('holds for the same view and a view within the margin', () => {
+    const sel = foot(rays(0, 0, 400, tilted))
+    expect(footprintInside(sel, sel, 0)).toBe(true)
+    expect(footprintInside(foot(rays(30, 0, 400, tilted)), sel, 40)).toBe(true)
+  })
+
+  it('fails once a corner slides past the margin', () => {
+    const sel = foot(rays(0, 0, 400, tilted))
+    expect(footprintInside(foot(rays(50, 0, 400, tilted)), sel, 40)).toBe(false)
+  })
+
+  it('catches a turn that moves the far corners out while the target holds still', () => {
+    const sel = foot(rays(0, 0, 400, tilted))
+    expect(footprintInside(foot(rays(0, 0, 400, tilted, 0.15)), sel, 40)).toBe(false)
+  })
+
+  it('works whichever way round the quad winds', () => {
+    const sel = foot(rays(0, 0, 400, 0))
+    const flipped = new Float64Array([sel[6]!, sel[7]!, sel[4]!, sel[5]!, sel[2]!, sel[3]!, sel[0]!, sel[1]!])
+    expect(footprintInside(foot(rays(10, 0, 400, 0)), flipped, 40)).toBe(true)
+    expect(footprintInside(foot(rays(100, 0, 400, 0)), flipped, 40)).toBe(false)
   })
 })

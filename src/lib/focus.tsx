@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { BasemapStats } from '../data/basemapTiles'
+import type { BasemapStats } from '../data/basemapTypes'
 import { nextFocus, NO_FOCUS_GROUP, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'

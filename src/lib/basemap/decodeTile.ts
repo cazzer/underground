@@ -14,7 +14,7 @@ export type ClassBuffers = Partial<Record<BasemapClass, Float32Array>>
 
 /**
  * Raw MVT, as far as one byte can tell: an empty tile, or a Tile message starting with field 3 (layers). An HTML
- * page (`<`, a dev server's index.html fallback) or gzip (1f 8b, a tile stored compressed) is not.
+ * page (`<`) or gzip (1f 8b; the worker inflates that first, inflate.ts) is not.
  */
 export function isMvtBytes(bytes: Uint8Array): boolean {
   return bytes.length === 0 || bytes[0] === 0x1a

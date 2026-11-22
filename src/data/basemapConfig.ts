@@ -13,7 +13,10 @@ export interface BasemapConfig {
 
 export const BASEMAP: BasemapConfig | null = __BASEMAP__
 
-/** Same-origin tile URL: `public/basemap/tiles/` in dev, the Pages artifact's `basemap/tiles/` when deployed. */
+/**
+ * Same-origin tile path: `public/basemap/tiles/` in dev, the Pages artifact's `basemap/tiles/` when deployed. The
+ * worker resolves it against its own (same-origin) URL.
+ */
 export function tileUrl(config: BasemapConfig, z: number, x: number, y: number): string {
-  return new URL(`${import.meta.env.BASE_URL}basemap/tiles/${z}/${x}/${y}.mvt?v=${encodeURIComponent(config.version)}`, window.location.origin).href
+  return `${import.meta.env.BASE_URL}basemap/tiles/${z}/${x}/${y}.mvt?v=${encodeURIComponent(config.version)}`
 }
