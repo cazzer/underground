@@ -38,7 +38,6 @@ function trip(key: string, over: { shapeId?: string; arriveAt?: number; fixed?: 
     minFraction: 0,
     departsInS: null,
     capped: false,
-    eased: false,
     rampShare: 0,
   }
   const shapeId = over.shapeId ?? 'S1'

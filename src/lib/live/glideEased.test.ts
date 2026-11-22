@@ -31,7 +31,6 @@ function trip(arriveAt: number): LiveTrip {
     minFraction: 0,
     departsInS: null,
     capped: false,
-    eased: true,
     rampShare: RUN_RAMP_SHARE,
   }
   return { key: 'a', shapeId: 'S', plan, geometry } as unknown as LiveTrip
