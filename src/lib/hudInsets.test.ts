@@ -4,13 +4,8 @@ import { hudInsets, sameInsets } from './hudInsets'
 describe('hudInsets', () => {
   const root = { top: 0, bottom: 844 }
 
-  it('measures the header from the root top and the footer to the root bottom', () => {
+  it('measures the header from the root top and only the footer to the root bottom (a panel never counts)', () => {
     expect(hudInsets(root, { top: 16, bottom: 92 }, { top: 752, bottom: 828 })).toEqual({ top: 92, bottom: 92 })
-  })
-
-  it('ignores a panel above the footer: only the footer sets the bottom band', () => {
-    const footer = { top: 752, bottom: 828 }
-    expect(hudInsets(root, { top: 16, bottom: 92 }, footer).bottom).toBe(92)
   })
 
   it('follows a root that does not start at the viewport top', () => {
