@@ -75,6 +75,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
   const id = useId()
   const hintId = `${id}-hint`
   const disclosureId = `${id}-disclosure`
+  const enterId = `${id}-enter`
   const index = useMemo(() => buildSearchIndex(network.stations), [network])
   const multiBorough = useMemo(() => multiBoroughNames(network.stations), [network])
   const keyboardInset = useKeyboardInset()
@@ -188,7 +189,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
               ref={input}
               id={`${id}-q`}
               type="text"
-              aria-describedby={[placesOn && disclosureId, !typed && hintId].filter(Boolean).join(' ') || undefined}
+              aria-describedby={[placesOn && disclosureId, !typed && hintId, enterId].filter(Boolean).join(' ')}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="none"
@@ -224,6 +225,10 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
             Cancel
           </button>
         </div>
+        {/* The input's description, read when it takes focus, not on every keystroke. */}
+        <p id={enterId} className="sr-only">
+          Press Enter to choose the first result.
+        </p>
         {placesOn && (
           <p id={disclosureId} className="px-3 pt-2 text-xs text-ink-dim">
             Addresses and places are looked up through our server; your location is never sent.

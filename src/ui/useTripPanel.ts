@@ -15,8 +15,8 @@ interface TripPanelArgs {
   stationHeading: RefObject<HTMLElement | null>
   /** Where focus goes when the trip panel closes with no station panel under it. */
   searchButton: RefObject<HTMLElement | null>
-  /** The focused station's complex siblings (siblingIdsOf): a directions pick never fills the other end from one of the target's complex. */
-  focusSiblings: readonly string[]
+  /** Any station's complex siblings (siblingIdsOf): a directions pick never fills the other end from the target's complex. */
+  siblingsOf: (stationId: string) => readonly string[]
 }
 
 /** The latest directions pick's focus target for the trip panel: its heading, or the row of the end left empty. `n` makes each pick a new request. */
@@ -44,7 +44,7 @@ export interface TripPanelControls {
  * (`focusRequest`, read by `TripPanel`); closing removes the focused element, so when focus was inside the panel,
  * one frame later (a station panel underneath has mounted by then) it goes to the station heading, else to Search.
  */
-export function useTripPanel({ locate, panel, stationHeading, searchButton, focusSiblings }: TripPanelArgs): TripPanelControls {
+export function useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf }: TripPanelArgs): TripPanelControls {
   const { open, ends, places, setOpen, start } = useTrip()
   const { focusedId } = useFocus()
   const { selectedSummary, notice, clearTrain, dismissNotice } = useTrainSelection()
@@ -53,14 +53,14 @@ export function useTripPanel({ locate, panel, stationHeading, searchButton, focu
   const fix = markedPlacement(locate.state)
   const openTrip = useCallback(
     (end: TripEnd, target: DirectionsTarget) => {
-      const next = directionsTrip({ end, target, current: ends, currentPlaces: places, focusedId, focusSiblings, fix })
+      const next = directionsTrip({ end, target, current: ends, currentPlaces: places, focusedId, siblingsOf, fix })
       if (selectedSummary !== null) clearTrain()
       if (notice !== null) dismissNotice()
       tripRequested()
       start(next.ends, next.places)
       setFocusRequest((r) => ({ target: next.empty ?? 'heading', n: (r?.n ?? 0) + 1 }))
     },
-    [ends, places, focusedId, focusSiblings, fix, selectedSummary, notice, clearTrain, dismissNotice, tripRequested, start],
+    [ends, places, focusedId, siblingsOf, fix, selectedSummary, notice, clearTrain, dismissNotice, tripRequested, start],
   )
   const closeTrip = useCallback(() => {
     const hadFocus = panel.current?.contains(document.activeElement) ?? false

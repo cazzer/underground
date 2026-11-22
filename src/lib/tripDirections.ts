@@ -1,7 +1,6 @@
 /** Which ends a directions pick gives the trip. Pure; no React, fetch or storage. */
 import type { MarkedPlacement } from './locate'
 import type { TripEnd, TripPlaces } from './trip'
-import { isTripEnd } from './tripEnds'
 import type { TripEnds } from './tripView'
 
 /** What a directions pick names: a station, or a searched place's nearest station plus the place's name. */
@@ -17,8 +16,8 @@ export interface DirectionsInput {
   current: TripEnds
   currentPlaces: TripPlaces
   focusedId: string | null
-  /** The focused station's complex siblings (siblingIdsOf). */
-  focusSiblings: readonly string[]
+  /** Any station's complex siblings (siblingIdsOf): no candidate may be the target or one of them. */
+  siblingsOf: (stationId: string) => readonly string[]
   /** The marked location fix (markedPlacement), read here and kept nowhere. */
   fix: MarkedPlacement | null
 }
@@ -42,21 +41,22 @@ function pair<T>(end: TripEnd, picked: T, other: T): { from: T; to: T } {
 
 /**
  * The trip a directions pick opens. The picked end is the target (a place keeps its note). The other end is the
- * first of: the marked fix's nearest station (From only: a fix is where you start), the focused station (unless it
- * is the target or shares its complex), the trip's earlier other end, the trip's earlier picked end (so "Directions
- * from B" on A to B gives the way back, B to A). An earlier end keeps its note; nothing else carries one. The two
- * ends are never the same station.
+ * first of: the trip's earlier other end (an end already chosen stays), the marked fix's nearest station (From
+ * only: a fix is where you start), the focused station, the trip's earlier picked end (so "Directions from B" on A
+ * to B gives the way back, B to A). Each must be neither the target nor in its complex. An earlier end keeps its
+ * note; nothing else carries one. The two ends are never the same station, nor two of one complex.
  */
-export function directionsTrip({ end, target, current, currentPlaces, focusedId, focusSiblings, fix }: DirectionsInput): DirectionsTrip {
+export function directionsTrip({ end, target, current, currentPlaces, focusedId, siblingsOf, fix }: DirectionsInput): DirectionsTrip {
   const x = target.stationId
   const other: TripEnd = end === 'from' ? 'to' : 'from'
+  const siblings = siblingsOf(x)
   const candidates: Candidate[] = [
-    { id: other === 'from' ? (fix?.nearest.id ?? null) : null, note: null },
-    { id: focusedId !== null && !isTripEnd(focusedId, focusSiblings, { from: x, to: null }) ? focusedId : null, note: null },
     { id: current[other], note: currentPlaces[other] },
+    { id: other === 'from' ? (fix?.nearest.id ?? null) : null, note: null },
+    { id: focusedId, note: null },
     { id: current[end], note: currentPlaces[end] },
   ]
-  const winner = candidates.find((c) => c.id !== null && c.id !== x)
+  const winner = candidates.find((c) => c.id !== null && c.id !== x && !siblings.includes(c.id))
   return {
     ends: pair(end, x, winner?.id ?? null),
     places: pair(end, target.place, winner?.note ?? null),

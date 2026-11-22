@@ -13,13 +13,16 @@ const fixAt = (id: string): MarkedPlacement =>
     viewRadiusM: 300,
   }) as MarkedPlacement
 
+/** X is in a complex with S and T. */
+const siblingsOf = (id: string): readonly string[] => ({ X: ['S', 'T'], S: ['X', 'T'], T: ['X', 'S'] })[id] ?? []
+
 const base: DirectionsInput = {
   end: 'to',
   target: { stationId: 'X', place: null },
   current: { from: null, to: null },
   currentPlaces: { from: null, to: null },
   focusedId: null,
-  focusSiblings: [],
+  siblingsOf,
   fix: null,
 }
 const run = (over: Partial<DirectionsInput>) => directionsTrip({ ...base, ...over })
@@ -41,7 +44,14 @@ describe('directionsTrip', () => {
 
   it('skips a focused station that is the target or shares its complex', () => {
     expect(run({ focusedId: 'X' }).empty).toBe('from')
-    expect(run({ focusedId: 'R20', focusSiblings: ['X'] }).empty).toBe('from')
+    expect(run({ focusedId: 'S' }).empty).toBe('from')
+  })
+
+  it('never pairs the target with its own complex, from any source', () => {
+    expect(run({ fix: fixAt('S') }).empty).toBe('from')
+    expect(run({ current: { from: 'T', to: null } }).empty).toBe('from')
+    expect(run({ end: 'from', current: { from: null, to: 'S' } }).empty).toBe('to')
+    expect(run({ current: { from: 'S', to: 'T' }, focusedId: 'S', fix: fixAt('T') }).empty).toBe('from')
   })
 
   it('leaves the other end empty when nothing fills it', () => {
@@ -54,6 +64,11 @@ describe('directionsTrip', () => {
     expect(t).toEqual({ ends: { from: 'A', to: 'X' }, places: { from: '120 Broadway', to: null }, empty: null })
   })
 
+  it('keeps an earlier end over the fix and the focused station', () => {
+    expect(run({ current: { from: 'A', to: 'B' }, focusedId: 'C', fix: fixAt('L08') }).ends).toEqual({ from: 'A', to: 'X' })
+    expect(run({ target: { stationId: 'D', place: null }, current: { from: 'A', to: 'B' }, focusedId: 'C' }).ends).toEqual({ from: 'A', to: 'D' })
+  })
+
   it('goes the way back: directions from the old To', () => {
     const t = run({ end: 'from', target: { stationId: 'B', place: null }, current: { from: 'A', to: 'B' }, currentPlaces: { from: 'Home', to: 'Work' } })
     expect(t).toEqual({ ends: { from: 'B', to: 'A' }, places: { from: null, to: 'Home' }, empty: null })
@@ -64,8 +79,8 @@ describe('directionsTrip', () => {
     expect(t.ends).toEqual({ from: 'B', to: 'A' })
   })
 
-  it('the focused station beats an earlier end', () => {
-    expect(run({ focusedId: 'F', current: { from: 'A', to: 'B' } }).ends).toEqual({ from: 'F', to: 'X' })
+  it('uses the focused station when the earlier ends are gone, before the way back', () => {
+    expect(run({ target: { stationId: 'B', place: null }, end: 'from', current: { from: 'A', to: 'B' }, focusedId: 'F' }).ends).toEqual({ from: 'B', to: 'F' })
   })
 
   it('sets the target place note, and a station pick clears the end note', () => {
@@ -73,17 +88,17 @@ describe('directionsTrip', () => {
     expect(run({ current: { from: 'A', to: 'X' }, currentPlaces: { from: null, to: 'Old place' } }).places.to).toBeNull()
   })
 
-  it('never makes the two ends one station, and flags exactly the unset end', () => {
-    const ids = [null, 'A', 'B', 'X']
+  it('never makes the two ends one station or one complex, and flags exactly the unset end', () => {
+    const ids = [null, 'A', 'B', 'X', 'S']
     for (const end of ['from', 'to'] as const)
       for (const from of ids)
         for (const to of ids)
           for (const focusedId of ids)
-            for (const fix of [null, fixAt('A'), fixAt('X')]) {
+            for (const fix of [null, fixAt('A'), fixAt('X'), fixAt('S')]) {
               const t = run({ end, current: { from, to }, focusedId, fix })
-              expect(t.ends.from === null || t.ends.from !== t.ends.to).toBe(true)
-              const unset = t.ends.from === null ? 'from' : t.ends.to === null ? 'to' : null
-              expect(t.empty).toBe(unset)
+              const other = t.ends[end === 'from' ? 'to' : 'from']
+              expect(other === null || (other !== 'X' && other !== 'S')).toBe(true)
+              expect(t.empty).toBe(other === null ? (end === 'from' ? 'to' : 'from') : null)
               expect(t.ends[end]).toBe('X')
             }
   })

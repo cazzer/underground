@@ -55,9 +55,11 @@ interface HudProps {
   tripTransfers: ReadonlyMap<string, TransferLineView> | null
   /** The focused station's complex siblings (siblingIdsOf): the trip panel treats them as the focused station. */
   focusSiblings: readonly string[]
+  /** Any station's complex siblings (siblingIdsOf): a directions pick never pairs a station with its own complex. */
+  siblingsOf: (stationId: string) => readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers, focusSiblings }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
@@ -71,7 +73,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const stationHeading = useRef<HTMLElement>(null)
   const tripHeading = useRef<HTMLElement>(null)
   const searchButton = useRef<HTMLButtonElement>(null)
-  const { tripOpen, openTrip, closeTrip, focusRequest } = useTripPanel({ locate, panel, stationHeading, searchButton, focusSiblings })
+  const { tripOpen, openTrip, closeTrip, focusRequest } = useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf })
   // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
   // heading, else the station panel's, else the Search button; the auto-dismissed notice leaves focus alone. It waits one
   // frame so a station panel that auto-focus mounts as the train closes is found and wins; it is read once,
