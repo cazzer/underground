@@ -146,6 +146,18 @@ be partial or empty, not a failure). It prints stations with no walkable way, th
 stations whose largest connected piece holds under 90% of the walkable length (dead-end underground footways and
 gaps in OSM; check that list after a refresh) and the totals.
 
+`npm run data:search:streets` (offline) turns the same pin and `public/data/stations.json` into the citywide street and
+intersection search index, 64 hash-bucket shards under `public/data/search/streets/` (`src/data/searchSchema.ts`,
+`src/lib/searchBucket.ts`). Rerun it after `data`, `data:streets:fetch`, a change to the `searchText.ts` synonyms, `GENERIC_TOKENS`
+or `isStreet`; `streetIndexOutputs.test.ts` fails while the files are stale. It keeps the ways `isStreet` accepts (named
+roadways, service ways included, no plazas): one record per borough and street key ("North 7th Street" and "N 7th St" are "N 7 St"),
+with a site per station the street runs nearest to, and one intersection per pair of differently named streets that share a node
+(shared nodes within 100 m count once, so a divided street's two carriageways are one crossing). The borough is the nearest
+`stations.json` station's, which can be wrong on a land border (the build counts the street vertices near one). Coverage is
+the pin's: streets within 300 m of a station point. Caps are in `scripts/lib/budget.ts` (36 KB per shard, 660 KB total gzipped),
+outside the startup budget; the build also fails if the startup total moves. A shard over its cap means 128 buckets, not
+dropped content.
+
 ## Access exceptions
 
 `stations/access-exceptions.json` is hand-written and empty today:
@@ -193,6 +205,8 @@ bump `TIMETABLE_FORMAT`) or the cap in one reviewed PR; don't loosen a check to 
   The street files built from it (`public/data/streets/`) are ODbL derivatives; their entrance points are MTA data (i9wp-a4ja)
   under the OPEN-NY Terms of Use, which each file's `attribution` says. The walk files (`public/data/walk/`) are ODbL derivatives
   of the same pin and carry the OSM credit only: the anchor is the station's `stations.json` point (MTA GTFS), everything else is OSM.
+  The street search shards (`public/data/search/streets/`) are ODbL derivatives too and carry the OSM credit only; their borough
+  labels and the station id on each site come from `stations.json` (MTA GTFS), the rest is OSM.
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.

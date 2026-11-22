@@ -5,7 +5,7 @@ name: Refresh GTFS data
 # to create and approve pull requests".
 #
 # Two jobs so the write token never sits next to npm:
-#   generate  read-only; runs npm (data, data:stations, data:streets, data:walk, typecheck, test, build); uploads public/data
+#   generate  read-only; runs npm (data, data:stations, data:streets, data:walk, data:search:streets, typecheck, test, build); uploads public/data
 #   publish   write token; never runs npm; commits the artifact and opens/updates the PR
 #
 # GitHub disables scheduled workflows after 60 days without repo activity; re-enable
@@ -87,6 +87,11 @@ jobs:
           grep -E '^(WARNING|walk/:|walk: [0-9]+ (way/station|stations)|public/data startup)' "$RUNNER_TEMP/walk.log" | tee -a "$RUNNER_TEMP/data.log" || true
           if [ "$status" -ne 0 ]; then tail -n 40 "$RUNNER_TEMP/walk.log" | tee -a "$RUNNER_TEMP/data.log"; fi
           exit "$status"
+
+      # The street search shards follow the stations (each street's borough and site stations) and the pin; also writes
+      # only under public/data/.
+      - name: Regenerate street search shards
+        run: npm run data:search:streets 2>&1 | tee -a "$RUNNER_TEMP/data.log"
 
       - name: Check for changes
         id: diff

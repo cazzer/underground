@@ -20,6 +20,12 @@ export const STREETS_TOTAL_GZIP_CAP_BYTES = 1_800_000
 export const WALK_FILE_GZIP_CAP_BYTES = 64_000
 /** ...and the directory this one: the measured total (3,629,681 B) plus about a quarter, rounded up. */
 export const WALK_TOTAL_GZIP_CAP_BYTES = 4_600_000
+/** public/data/search/streets/<bucket>.json (64 hash buckets) loads on demand, outside the budget above; each file has
+ *  this cap: the largest committed shard (27,547 B, node zlib level 9, fall 2026) plus about three tenths. A shard over
+ *  it means 128 buckets (STREET_BUCKETS, a format bump), not dropping content... */
+export const SEARCH_STREETS_FILE_GZIP_CAP_BYTES = 36_000
+/** ...and the directory this one: the measured total (525,133 B) plus about a quarter, rounded up. */
+export const SEARCH_STREETS_TOTAL_GZIP_CAP_BYTES = 660_000
 /** public/data/timetable/<serviceId>.json loads on demand, outside the budget above; each file has this cap:
  *  the committed Weekday file (39,662 B, node zlib level 9, fall 2026) plus about a fifth. */
 export const TIMETABLE_FILE_GZIP_CAP_BYTES = 48_000
@@ -86,5 +92,12 @@ export function checkStreetsTotal(files: readonly RenderedFile[], capBytes: numb
 export function checkWalkTotal(files: readonly RenderedFile[], capBytes: number = WALK_TOTAL_GZIP_CAP_BYTES): number {
   const total = files.reduce((sum, f) => sum + f.gzip, 0)
   if (total > capBytes) throw new Error(`The ${files.length} walk files total ${total} B gzipped, over the ${capBytes} B cap. Nothing written.`)
+  return total
+}
+
+/** The street search shards together must fit their total cap; returns their gzip total. */
+export function checkStreetIndexTotal(files: readonly RenderedFile[], capBytes: number = SEARCH_STREETS_TOTAL_GZIP_CAP_BYTES): number {
+  const total = files.reduce((sum, f) => sum + f.gzip, 0)
+  if (total > capBytes) throw new Error(`The ${files.length} street search shards total ${total} B gzipped, over the ${capBytes} B cap. Nothing written.`)
   return total
 }

@@ -50,7 +50,7 @@ so dev and preview serve under that path.
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
 - `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
   within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
-  `streetsData.test.ts` checks it. Rerun `data:streets` and `data:walk` after it.
+  `streetsData.test.ts` checks it. Rerun `data:streets`, `data:walk` and `data:search:streets` after it.
 - `npm run data:streets`: offline; builds `public/data/streets/<stationId>.json` for every `stations.json` station from
   the street pin and the catalog entrances (clip to 300 m, simplify, project to decimeters, join each entrance to its street).
   Rerun it after `data`, `data:streets:fetch`, `data:catalog:fetch` or a change to the `searchText.ts` synonyms (street join
@@ -67,6 +67,12 @@ so dev and preview serve under that path.
   300 m, junctions shared, OSM node ids, x/z in dm around the stations.json point, edges with kind and length; oneway ignored)
   for every station from the street pin. Rerun after `data` or `data:streets:fetch`; `walkOutputs.test.ts` fails while stale.
   Caps in `budget.ts` (64 KB per file, 4.6 MB total), outside the startup budget.
+- `npm run data:search:streets`: offline; builds the citywide street and intersection search index from the street pin and
+  `stations.json` into 64 hash-bucket shards, `public/data/search/streets/00.json` to `3f.json` (`src/data/searchSchema.ts`;
+  about 3,200 streets with a site per nearby station, 11,500 intersections; the borough is the nearest station's). Rerun after
+  `data`, `data:streets:fetch`, a change to the `searchText.ts` synonyms, `GENERIC_TOKENS` (`src/lib/searchBucket.ts`) or
+  `isStreet`; `streetIndexOutputs.test.ts` fails while stale. Caps in `budget.ts` (36 KB per shard, 660 KB total); a shard over
+  its cap means 128 buckets, not dropped content. Outside the startup budget, and nothing loads it yet (2q7.14).
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -251,7 +257,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`); `turnMeter.ts` the
     hint's max net turn (signed, wrapped steps); `reducedMotion.ts` `prefersReducedMotion()`, one live query shared by
     the camera, live and line code
-  - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
+  - `searchBucket.ts` which hash bucket a street or intersection entry is filed in and which one a query reads
+    (`entryBucketKeys`, `queryBucketKey`, FNV-1a over the first two characters of the first distinctive token; `.ts` imports,
+    scripts share it); `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
     `stationSearch.ts` ranks stations for a query (exact, prefix, typo-tolerant; a number only prefix-matches as the
     last word and never with an explicit ordinal, so "14 st" and "14th" skip 145 St; half-typed long forms and ordinals
     like "14 stre" and "14t" keep matching). `stationHash.ts` parses and builds `#station=<id>`
@@ -405,6 +413,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `public/data/walk/<stationId>.json`: one walk graph per station (`StationWalk`, `src/data/walkSchema.ts`), built by
   `scripts/build-walk.ts` (IO only) from the pin through `scripts/lib/walkGraph.ts` (pure; reuses `clipSpan`/`simplifySpans`/`waysNear`).
   Not loaded by the client yet (2q7.11).
+- `public/data/search/streets/<bucket>.json`: 64 street and intersection search shards (`StreetSearchShard`,
+  `src/data/searchSchema.ts`), built by `scripts/build-street-index.ts` (IO only) through `scripts/lib/streetIndex.ts` (pure:
+  `buildStreetIndex`, `displayStreetName`; reads the pin with `loadPin`, `isStreet` and `streetKey`) and `streetIndexShards.ts`
+  (`bucketStreetShards`). Not loaded by the client yet (2q7.14).
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
@@ -743,11 +755,11 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
-  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, and 48 KB per `public/data/timetable/` file).
+  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file, and 36 KB per `public/data/search/streets/` shard with a total).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow
-  the stations), then `npm run data:walk`, change `public/data`. A station new to the feed gets a street file from whatever pinned ways lie
+  the stations), then `npm run data:walk`, then `npm run data:search:streets`, change `public/data`. A station new to the feed gets a street file from whatever pinned ways lie
   near it, with a `WARNING:` line in the log (`data:streets` prints it for any station the pin manifest's `stationIds`
   lacks); it does not block the refresh, and the next `data:streets:fetch` covers it. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).

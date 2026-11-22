@@ -144,12 +144,21 @@ beats LION (one centerline per street). Citywide, the 800 m circles cover 358 km
 5-7 MB in total (UNVERIFIED), but a user fetches one shard per station. A binary-heap A* is about 100
 lines and should take milliseconds on 4k nodes (not benchmarked).
 
+**Street and intersection index (built, 2q7.13):** `npm run data:search:streets` files 3,222 street records (a street per
+borough, a site per nearby station) and 11,512 intersections from the street pin, within 300 m of a station, into 64 FNV-1a
+hash-bucket shards: 525 KB gzipped in total (3.6 MB raw), 27.5 KB the largest shard, median about 7 KB. A name is filed under the
+first two characters of each distinctive token (not st, av, a compass letter and the like), spelled as published, canonical and as a long form, so
+one fetch finds it at any prefix of that token. The borough is the nearest station's, wrong on a few land-border streets.
+
 **Address index:** Manhattan (63,245 points, 872 streets) is 264 KB gzipped at 1 m; citywide about 4 MB
 (UNVERIFIED), in hash-bucket shards.
 
 **Privacy.**
 - Static shards still reveal a little to GitHub Pages: walk shards are keyed by the station the user
-  picked or focused, never by the fix; address shards by hash bucket, not street name. Routing runs on
+  picked or focused, never by the fix; address shards by hash bucket, not street name. A street shard
+  covers about 5 of the 312 two-character prefixes (the index has 32 one-character keys too), so a request
+  says only which of 64 buckets holds the first distinctive token typed (its one-character then two-character
+  bucket as the user types); the query text never leaves the device. Routing runs on
   the fix in memory, so the rule that no request carries the location holds.
 - Any hosted routing API needs the origin, which breaks that rule; it would need the user to change it,
   plus consent on every request. Not recommended.
