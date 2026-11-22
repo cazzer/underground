@@ -5,8 +5,8 @@ import { Vector3, type PerspectiveCamera } from 'three'
 import { interiorCovers } from '../data/interiorLoad'
 import { useFocus } from '../lib/focus'
 import { newDwell, settled } from '../lib/focusDwell'
-import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
-import { nextFocus, type FocusInput } from '../lib/focusMachine'
+import { groupPositions, shouldReleaseHold, type FocusHold } from '../lib/focusHold'
+import { focusGroupFor, NO_FOCUS_GROUP, nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
@@ -65,7 +65,13 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     target: { x: 0, z: 0 },
     stations: network.stations,
     settled: false,
+    focusGroup: NO_FOCUS_GROUP,
   })
+  // The focused complex's members (none for a lone station), set when the interior or focus changes, never per frame.
+  const focusGroup = useRef(NO_FOCUS_GROUP)
+  useLayoutEffect(() => {
+    focusGroup.current = input.current.focusGroup = focusGroupFor(interior, focusedId)
+  }, [interior, focusedId])
   // Auto-focus enters only once the view has held still (focusDwell.ts); a gesture in progress never has.
   const dwell = useRef(newDwell())
   const gesture = useRef(false)
@@ -235,7 +241,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       // Cheap pre-check on the reused input; only a real change pays for a copied target and
       // a functional update, which re-runs the rules against the latest state.
       if (nextFocus(cur) !== cur) {
-        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, cur.settled)
+        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, cur.settled, cur.focusGroup)
       }
     }
 
@@ -258,6 +264,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
         station: station.pos,
         distance: camera.position.distanceTo(c.target),
         target: { x: c.target.x, z: c.target.z },
+        members: groupPositions(focusGroup.current, latest.current.network.stationById),
       }
     }
     flight.current = null

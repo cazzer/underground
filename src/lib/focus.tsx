@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { nextFocus, type FocusState } from './focusMachine'
+import { nextFocus, NO_FOCUS_GROUP, type FocusState } from './focusMachine'
 import type { Station } from './network'
 import type { Ground } from './projection'
 
@@ -31,7 +31,13 @@ interface FocusValue {
    * Re-evaluate focus for the camera's position; no fly. Applied against the latest state, so
    * it can't overwrite a select or dismiss that landed in between.
    */
-  updateFromCamera: (distance: number, target: Ground, stations: readonly Station[], settled: boolean) => void
+  updateFromCamera: (
+    distance: number,
+    target: Ground,
+    stations: readonly Station[],
+    settled: boolean,
+    focusGroup?: ReadonlySet<string>,
+  ) => void
 }
 
 interface FocusProviderProps {
@@ -75,9 +81,9 @@ export function FocusProvider({ children }: FocusProviderProps) {
     [],
   )
   const updateFromCamera = useCallback(
-    (distance: number, target: Ground, stations: readonly Station[], settled: boolean) =>
+    (distance: number, target: Ground, stations: readonly Station[], settled: boolean, focusGroup: ReadonlySet<string> = NO_FOCUS_GROUP) =>
       setState((prev) => {
-        const next = nextFocus({ ...prev, distance, target, stations, settled })
+        const next = nextFocus({ ...prev, distance, target, stations, settled, focusGroup })
         return next.focusedId === prev.focusedId && next.dismissedId === prev.dismissedId
           ? prev
           : { focusedId: next.focusedId, dismissedId: next.dismissedId }

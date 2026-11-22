@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { PerspectiveCamera } from 'three'
-import { interiorCovers } from '../data/interiorLoad'
 import type { Insets, Viewport } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
-import { reframeAction, reframeDuration, type AwaitingInterior } from '../lib/interiorReframe'
+import { interiorReadyFor, reframeAction, reframeDuration, type AwaitingInterior } from '../lib/interiorReframe'
 import { wrapAngle } from '../lib/orbitLimits'
 import { flushMotion, interiorFlight, newFlight, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
@@ -56,7 +55,7 @@ export function useInteriorReframe({
       flying: flight.current !== null,
       following: following(),
       focusedId: focused.current,
-      interiorReady: a !== null && interiorCovers(l.interior, a.stationId),
+      interiorReady: interiorReadyFor(a, l.interior),
     })
     if (action === 'none' || action === 'wait') return
     awaiting.current = null

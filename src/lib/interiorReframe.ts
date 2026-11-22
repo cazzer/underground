@@ -1,3 +1,4 @@
+import { interiorCovers } from '../data/interiorLoad'
 /**
  * The "landed, awaiting interior" rule: a station flight that set off before its interior was known, and couldn't
  * frame it in flight (it arrived after LATE_TURN_PROGRESS, or after landing), reframes onto it once it is known and
@@ -9,6 +10,14 @@ export interface AwaitingInterior {
   stationId: string
   /** Under reduced motion the reframe snaps, without a landing turn. */
   reduced: boolean
+}
+
+/** Whether the loaded interior (or none) covers the awaited station, a complex member included: `ReframeInput.interiorReady`. */
+export function interiorReadyFor(
+  awaiting: AwaitingInterior | null,
+  interior: { stationId: string; memberStationIds?: readonly string[] } | null,
+): boolean {
+  return awaiting !== null && interiorCovers(interior, awaiting.stationId)
 }
 
 export interface ReframeInput {

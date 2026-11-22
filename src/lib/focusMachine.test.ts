@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_DISTANCE, EXIT_RADIUS, nextFocus, type FocusState } from './focusMachine'
+import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_DISTANCE, EXIT_RADIUS, focusGroupFor, NO_FOCUS_GROUP, nextFocus, type FocusState } from './focusMachine'
 import type { Station } from './network'
 
 const station = (id: string, x: number, z: number): Station => ({ id, name: id, pos: { x, z }, routeIds: [], stops: [], access: { status: 'none' } })
@@ -19,8 +19,9 @@ function run(
   z: number,
   stations: readonly Station[] = [A],
   settled = true,
+  focusGroup: ReadonlySet<string> = NO_FOCUS_GROUP,
 ) {
-  const input = { ...state, distance, target: { x, z }, stations, settled }
+  const input = { ...state, distance, target: { x, z }, stations, settled, focusGroup }
   return { input, next: nextFocus(input) }
 }
 
@@ -125,5 +126,61 @@ describe('nextFocus', () => {
   it('does nothing without stations', () => {
     const { input, next } = run(NONE, 100, 0, 0, [])
     expect(next).toBe(input)
+  })
+})
+
+describe('nextFocus in a station complex', () => {
+  // Fulton-like: two members 300 m apart; the interior flight lands on the hull centre between them.
+  const M1 = station('M1', 0, 0)
+  const M2 = station('M2', 300, 0)
+  const X = station('X', 0, 600)
+  const group = new Set(['M1', 'M2'])
+  const all = [M1, M2, X]
+
+  it('keeps the focused member when the view sits on the hull centre or over a sibling', () => {
+    const centre = run(focused('M1'), 400, 150, 0, all, true, group)
+    expect(centre.next).toBe(centre.input)
+    // 40 m from M2, 260 m from M1: without the group the nearer station takes the focus.
+    const over = run(focused('M1'), 400, 260, 0, all, true, group)
+    expect(over.next).toBe(over.input)
+    expect(run(focused('M1'), 400, 260, 0, all).next).toEqual(focused('M2'))
+  })
+
+  it('does not drop a member when the view is past EXIT_RADIUS from it but near a sibling', () => {
+    const far = 300 + ENTER_RADIUS - 40
+    const { input, next } = run(focused('M1'), 400, far, 0, all, true, group)
+    expect(next).toBe(input)
+    expect(run(focused('M1'), 400, far, 0, [M1, M2]).next).toEqual(focused('M2'))
+  })
+
+  it('drops focus once the view is past EXIT_RADIUS from every member, or zoomed out', () => {
+    expect(run(focused('M1'), 400, 150, 800, [M1, M2], true, group).next).toEqual(NONE)
+    expect(run(focused('M1'), EXIT_DISTANCE + 10, 150, 0, all, true, group).next).toEqual(NONE)
+  })
+
+  it('still lets a station outside the group take the focus', () => {
+    expect(run(focused('M1'), 400, 0, 600, all, true, group).next).toEqual(focused('X'))
+    expect(run(focused('M1'), 400, 0, 600 - ENTER_RADIUS - 10, all, true, group).next).toEqual(NONE)
+  })
+
+  it('ignores a group that does not hold the focused station, and an empty group is the old rule', () => {
+    expect(run(focused('X'), 400, 260, 0, all, true, group).next).toEqual(focused('M2'))
+    expect(run(NONE, 200, 50, 0, [M1, M2], true, group).next).toEqual(focused('M1'))
+  })
+})
+
+describe('focusGroupFor', () => {
+  const complex = { stationId: 'M1', memberStationIds: ['M1', 'M2'] }
+
+  it('is the members of the interior covering the focused station, from any member', () => {
+    expect(focusGroupFor(complex, 'M2')).toEqual(new Set(['M1', 'M2']))
+    expect(focusGroupFor(complex, 'M1')).toEqual(new Set(['M1', 'M2']))
+  })
+
+  it('is the shared empty group for a lone station, an uncovered station, or no interior', () => {
+    expect(focusGroupFor({ stationId: 'L08' }, 'L08')).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupFor(complex, 'X')).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupFor(complex, null)).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupFor(null, 'M1')).toBe(NO_FOCUS_GROUP)
   })
 })

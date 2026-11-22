@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { reframeAction, reframeDuration, REFRAME_MAX_S, REFRAME_MIN_S, type ReframeInput } from './interiorReframe'
+import { interiorReadyFor, reframeAction, reframeDuration, REFRAME_MAX_S, REFRAME_MIN_S, type ReframeInput } from './interiorReframe'
 
 const landed: ReframeInput = { flying: false, following: false, focusedId: 'L08', interiorReady: true }
 const awaiting = { stationId: 'L08', reduced: false }
@@ -49,5 +49,20 @@ describe('reframeDuration', () => {
     expect(reframeDuration(0, -Math.PI / 4)).toBeCloseTo(0.8)
     expect(reframeDuration(40, Math.PI / 2)).toBe(REFRAME_MAX_S)
     expect(reframeDuration(500, 3)).toBe(REFRAME_MAX_S)
+  })
+})
+
+describe('interiorReadyFor', () => {
+  const complex = { stationId: 'T01', memberStationIds: ['T01', 'U01'] }
+
+  it('is ready when the loaded interior covers the awaited station, whichever member it was', () => {
+    expect(interiorReadyFor({ stationId: 'U01', reduced: false }, complex)).toBe(true)
+    expect(interiorReadyFor({ stationId: 'L08', reduced: false }, { stationId: 'L08' })).toBe(true)
+  })
+
+  it('is not ready for no awaiting flight, no interior, or the interior of another station', () => {
+    expect(interiorReadyFor(null, complex)).toBe(false)
+    expect(interiorReadyFor({ stationId: 'U01', reduced: false }, null)).toBe(false)
+    expect(interiorReadyFor({ stationId: 'L08', reduced: false }, complex)).toBe(false)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldReleaseHold, type FocusHold } from './focusHold'
+import { groupPositions, shouldReleaseHold, type FocusHold } from './focusHold'
 import { EXIT_DISTANCE, EXIT_RADIUS } from './focusMachine'
 
 // Cancelled beyond EXIT_DISTANCE (1450 m), where a hold matters: inside it the focus rules take over anyway.
@@ -40,5 +40,29 @@ describe('shouldReleaseHold', () => {
     // 600 m is under 0.3 x 3000 m but over 0.3 x 1500 m (still beyond EXIT_DISTANCE).
     expect(shouldReleaseHold(HOLD, 3000, { x: 700, z: 100 })).toBe(false)
     expect(shouldReleaseHold(HOLD, 1500, { x: 700, z: 100 })).toBe(true)
+  })
+})
+
+describe('a hold on a complex member', () => {
+  // A flight to a member lands on the hull centre; the hold measures from the nearest member.
+  const midPan: FocusHold = { stationId: 'M1', station: { x: 0, z: 0 }, distance: 1000, target: { x: 600, z: 100 } }
+  const members = [{ x: 0, z: 0 }, { x: 300, z: 0 }]
+
+  it('releases where a sibling keeps the focus, which the held member alone would not', () => {
+    expect(shouldReleaseHold(midPan, 1000, { x: 600, z: 100 })).toBe(false)
+    expect(shouldReleaseHold({ ...midPan, members }, 1000, { x: 600, z: 100 })).toBe(true)
+  })
+
+  it('still keeps holding when the view is past the exit radius from every member', () => {
+    expect(shouldReleaseHold({ ...midPan, members }, 1000, { x: 800, z: 100 })).toBe(false)
+  })
+})
+
+describe('groupPositions', () => {
+  const stations = new Map([['M1', { pos: { x: 0, z: 0 } }], ['M2', { pos: { x: 300, z: 0 } }]])
+
+  it('lists the positions of the members, skipping an id the map lacks, and nothing for no group', () => {
+    expect(groupPositions(new Set(['M1', 'M2', 'Z9']), stations)).toEqual([{ x: 0, z: 0 }, { x: 300, z: 0 }])
+    expect(groupPositions(new Set(), stations)).toBeUndefined()
   })
 })
