@@ -175,7 +175,16 @@ never calls either service directly. The station search dialog queries it after 
 characters, about 250 ms debounce, stale requests aborted) and says so in one line: "Addresses and places are looked up through
 our server; your location is never sent." `focus` is the map center or the chosen station, never the location fix.
 
+Built in 2q7.33 (`worker/src/serveGeocode.ts`; the client is 2q7.16): `/geocode` refuses a request with no allowed Origin (403), rounds `focus` to 2
+decimals and drops it outside the NYC bbox, skips Photon for a house-number query GeoSearch answered with an address, drops Photon's
+transit rows and rows outside New York state, keeps upstream casing in labels (the client decides display), answers `Cache-Control: no-store` always
+(the 1 h cache is server-side, so no typed query lands in a device's disk cache) with no `x-rt-cache` header, backs a source off
+only when it looks to be struggling (timeout, network failure, 429, 5xx), and keeps every query out of its logs (Workers Logs
+invocation logs are off, query strings redacted, traces off; `wrangler tail` may still show full URLs to whoever tails production).
+
 **Privacy.**
+- `/geocode` answers carry no cache-state header, but response timing still hints whether a query was recently searched in
+  that isolate (a memory hit is faster than an upstream call).
 - Static shards still reveal a little to GitHub Pages: walk shards are keyed by the station the user
   picked or focused, never by the fix. A street shard
   holds about 5 of the 315 keys (283 two-character prefixes and 32 one-character keys; 1 to 10 per bucket), so

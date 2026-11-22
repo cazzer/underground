@@ -6,5 +6,15 @@
   // on a custom domain/route (tracked in 8x4.5). Until then the per-isolate memo and the
   // upstream cf.cacheTtl are what limit upstream fetches.
   "workers_dev": true,
-  "observability": { "enabled": true }
+  // /geocode's URL carries the user's query, so nothing the platform records may hold it: invocation
+  // logs ("Fetch GET <url>") are off, query strings are redacted anyway, and traces (which record
+  // subrequest URLs) are off. Our own console logs (rt-miss, ene-miss, geocode-miss: counts and fixed
+  // codes, never a query) stay on. `wrangler tail` and the dashboard's live logs may still show full
+  // URLs to whoever tails production. src/wrangler.test.ts pins these settings.
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": false },
+    "traces": { "enabled": false }
+  }
 }

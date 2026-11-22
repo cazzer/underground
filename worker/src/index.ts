@@ -2,7 +2,9 @@ import { ENE_TTL_MS, RT_TTL_MS } from './cache'
 import { PREFLIGHT_HEADERS, corsHeaders } from './cors'
 import { transformEne } from './ene'
 import { ENE_SCHEMA_VERSION, RT_SCHEMA_VERSION, FEED_IDS, type FeedId, type RealtimeSnapshot } from './schema'
+import { fetchGeoSearch, fetchPhoton } from './geocodeUpstream'
 import { serveCached, type CachedRoute } from './serveCached'
+import { createGeocodeState, serveGeocode } from './serveGeocode'
 import { buildSnapshot, type FeedOutcome } from './transform'
 import { fetchAllFeeds, fetchEne } from './upstream'
 
@@ -60,15 +62,20 @@ const eneRoute: CachedRoute = {
   state: { memo: null, refreshingSince: null, failedUntil: null },
 }
 
-const ROUTES = new Map<string, CachedRoute>([
-  ['/rt', rtRoute],
-  ['/ene', eneRoute],
+type Handler = (request: Request, ctx: ExecutionContext, origin: string | null) => Promise<Response>
+
+const geocodeDeps = { fetchGeoSearch, fetchPhoton, state: createGeocodeState(Date.now()) }
+
+const HANDLERS = new Map<string, Handler>([
+  ['/rt', (request, ctx, origin) => serveCached(rtRoute, request, ctx, origin, caches.default)],
+  ['/ene', (request, ctx, origin) => serveCached(eneRoute, request, ctx, origin, caches.default)],
+  ['/geocode', (request, ctx, origin) => serveGeocode(request, ctx, origin, caches.default, geocodeDeps)],
 ])
 
 export default {
   async fetch(request, _env, ctx): Promise<Response> {
-    const route = ROUTES.get(new URL(request.url).pathname)
-    if (!route) return new Response('Not found', { status: 404 })
+    const handler = HANDLERS.get(new URL(request.url).pathname)
+    if (!handler) return new Response('Not found', { status: 404 })
     const origin = request.headers.get('Origin')
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: { ...corsHeaders(origin), ...PREFLIGHT_HEADERS } })
@@ -77,8 +84,9 @@ export default {
       return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, OPTIONS' } })
     }
     try {
-      return await serveCached(route, request, ctx, origin, caches.default)
+      return await handler(request, ctx, origin)
     } catch (e) {
+      // serveGeocode never throws, so no geocode error (whose text could hold the query) reaches this log.
       console.error(e)
       return new Response('{"error":"internal"}', {
         status: 500,

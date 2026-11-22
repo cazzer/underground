@@ -24,8 +24,8 @@ function describe(e: unknown): string {
   return (e instanceof Error ? e.message : String(e)).slice(0, 200)
 }
 
-/** Reads at most MAX_BYTES; a missing or wrong content-length cannot bypass the cap. */
-async function readBody(res: Response): Promise<Uint8Array | string> {
+/** Reads at most `maxBytes`; a missing or wrong content-length cannot bypass the cap. */
+export async function readBody(res: Response, maxBytes: number): Promise<Uint8Array | string> {
   if (!res.body) return 'empty body'
   const reader = res.body.getReader()
   const chunks: Uint8Array[] = []
@@ -34,9 +34,9 @@ async function readBody(res: Response): Promise<Uint8Array | string> {
     const { done, value } = await reader.read()
     if (done) break
     total += value.byteLength
-    if (total > MAX_BYTES) {
+    if (total > maxBytes) {
       await reader.cancel()
-      return `body too large (over ${MAX_BYTES} bytes)`
+      return `body too large (over ${maxBytes} bytes)`
     }
     chunks.push(value)
   }
@@ -67,7 +67,7 @@ async function fetchBytes(path: string, cacheTtlS: number): Promise<BytesOutcome
       await res.body?.cancel()
       return { ok: false, error: `HTTP ${res.status}`, cacheStatus }
     }
-    bytes = await readBody(res)
+    bytes = await readBody(res, MAX_BYTES)
   } catch (e) {
     if ((e as { name?: unknown } | null)?.name === 'TimeoutError') return { ok: false, error: `timeout after ${TIMEOUT_MS} ms`, cacheStatus }
     return { ok: false, error: `fetch failed: ${describe(e)}`, cacheStatus }

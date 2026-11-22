@@ -1,6 +1,9 @@
-/** Memo and edge lifetimes per route: /rt and /ene. */
+/** Memo and edge lifetimes per route: /rt and /ene; /geocode per key (its own LRU and edge entries). */
 export const RT_TTL_MS = 15_000
 export const ENE_TTL_MS = 120_000
+export const GEOCODE_TTL_MS = 3_600_000
+/** After a /geocode source fails, its calls are skipped this long (the answer is then incomplete). */
+export const GEOCODE_SOURCE_BACKOFF_MS = 30_000
 /** A refresh older than this is presumed dead (upstream fetches time out at 5 s). */
 export const REFRESH_GRACE_MS = 6_000
 /** After a failed refresh, serve the old body (or 503) this long before trying upstream again. */

@@ -99,7 +99,8 @@ Run typecheck, test, and build before reporting work done. Pushing to `main` dep
 via `.github/workflows/deploy.yml` (Actions to Pages).
 
 Worker (its own package and lockfile; run `npm --prefix worker ci` once):
-- `npm --prefix worker run dev`: `wrangler dev` on `http://localhost:8787/rt`
+- `npm --prefix worker run dev`: `wrangler dev` serves `/rt`, `/ene` and `/geocode` on `http://localhost:8787`
+  (`/geocode` answers only an allowed Origin: `curl -H 'Origin: http://localhost:5173' 'http://localhost:8787/geocode?q=120%20Broadway'`)
 - `npm --prefix worker run typecheck` / `test` / `gen`: `gen` regenerates `src/gen/`
   from `proto/subway-rt.proto`
 - Root `npm test` does not run worker tests; the `worker` CI job does.
@@ -109,7 +110,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Agents never run `wrangler deploy` or `wrangler login` themselves; merging to `main` is the deploy.
 - The Pages build reads the repo variable `VITE_RT_URL` (the deployed Worker's `/rt` URL).
 - The Worker's Cache API layer is a no-op on workers.dev; edge caching needs a custom
-  domain (tracked in 8x4.5). The per-isolate memo and upstream `cf.cacheTtl` still apply.
+  domain (tracked in 8x4.5). The per-isolate memo and upstream `cf.cacheTtl` still apply; `/geocode` likewise keeps a
+  per-isolate 1 h LRU (500 entries) and upstream `cf` caching.
+- `worker/wrangler.jsonc` sets `observability.logs.invocation_logs` to false, `observability.redact_query_string` to true and
+  `observability.traces.enabled` to false (`src/wrangler.test.ts` pins all three): Workers Logs invocation logs record the full
+  request URL, and `/geocode`'s carries the user's query; traces record subrequest URLs. Our own `console.log` lines stay on
+  (so the `*-miss` lines still show). `wrangler tail` and the dashboard's live logs may still show full URLs to whoever tails
+  production. Never enable traces.
 - The client finds the Worker through `VITE_RT_URL` (copy `.env.example` to `.env.local`).
 
 ## Directory map
@@ -772,19 +779,35 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     flagged); `lib/pathwaysTopology.ts`, `layoutOracle.ts`, `archetypeScore.ts` score it;
     `score-archetypes.ts <feedDir> [--oracle file]` prints the report to stdout and writes nothing. The 2021 draft NYCT
     pathways feed it reads must never be committed, shipped, or used as a source; it refuses a dir inside any git work tree
-- `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt` and the trimmed E&E outage
-  list at `/ene` (equipment code, reason, since, returnAt; the client re-export is 2q7.21)
-  - `src/schema.ts` the JSON contracts (types and consts only); the client re-exports the `/rt` one
-  - `src/index.ts` routing (a `Map` of path to `CachedRoute`: `/rt` 15 s, `/ene` 120 s), CORS;
+- `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`, the trimmed E&E outage
+  list at `/ene` (equipment code, reason, since, returnAt; the client re-export is 2q7.21), and `/geocode` (NYC GeoSearch
+  then Photon, merged, at most 8 `{label, kind, lat, lon, source}`)
+  - `src/schema.ts` the JSON contracts (types and consts only); the client re-exports the `/rt` one (`src/data/realtime.ts`
+    will re-export the `/geocode` types in 2q7.16, not yet)
+  - `src/index.ts` routing (a `Map` of path to handler: `/rt` and `/ene` are `CachedRoute`s through `serveCached`, `/geocode`
+    goes to `serveGeocode`; `/rt` 15 s, `/ene` 120 s), CORS;
     `serveCached.ts` the per-route memo, Cache API layer and herd guard (`serveCached`, with a 15 s backoff after a failed
     refresh; its `x-rt-cache` and `x-rt-expires` header names are shared by both routes); `cache.ts` pure memo/herd-guard
-    decision and the per-route TTLs; `upstream.ts` feed and outage fetches (`fetchBytes`: 5 s timeout, 2 MB cap)
+    decision and the per-route TTLs; `upstream.ts` feed and outage fetches (`fetchBytes`: 5 s timeout, 2 MB cap; `readBody`
+    takes its cap); `edgeCache.ts` the Cache API read and write both routes share (`EdgeCache`, `readEdge`, `writeEdge`)
+  - `/geocode`: `serveGeocode.ts` (IO orchestration, never throws: 403 unless an allowed Origin, 400, the per-isolate LRU, the
+    edge cache, then the sources: GeoSearch first and Photon only when it had no place-like hit (an address hit satisfies a
+    house-number query), or both at once for a query that looks like a business; only complete answers are cached, a source
+    that timed out, failed to connect or answered 429 or 5xx is skipped for 30 s, 503 `busy` (with `retry-after`, exposed to CORS)
+    when nothing may be called; one `geocode-miss` log line, counts and fixed codes
+    only, never `q`, the focus or a label); `geocodeQuery.ts` / `geocodeText.ts` (parse, normalize, key, heuristics);
+    `geosearch.ts` / `photon.ts` (the pure trims; Photon rows for transit, another state or country dropped) over
+    `geocodeCandidate.ts`; `geocodeMerge.ts` (dedupe: PAD aliases, cross-source twins; rank); `geocodeOutcome.ts` (status,
+    attribution, `incomplete`, the log line); `rateLimit.ts` (per-isolate token buckets: 20 at 2/s overall, 5 at 0.5/s for
+    Photon); `lru.ts` (`TtlLru`, 500 entries, 1 h); `geocodeUpstream.ts` (3 s timeout, 256 KB cap, descriptive User-Agent,
+    fixed error codes only: a fetch error's text can hold the query)
   - `src/transform.ts` pure decode-to-snapshot logic; `ene.ts` pure E&E transform (`parseNyTime`,
     `transformEne`; the feed's `isupcomingoutage` is unreliable, so it is ignored: a row is skipped only if it has
     not started yet); `cors.ts` allowed origins
   - `src/gen/` generated protobufjs decoder (`npm run gen`); never hand-edit
   - `proto/subway-rt.proto` trimmed subset of gtfs-realtime + nyct-subway
-  - `fixtures/` recorded feeds for tests (see its README; `ene.json` is the E&E sample)
+  - `fixtures/` recorded feeds for tests (see its README; `ene.json` is the E&E sample, `geocode.json` the GeoSearch and
+    Photon answers)
 - `docs/research/`: research notes (`data-sources.md`)
 
 ## Hard rules
@@ -1090,6 +1113,13 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **The client never fetches MTA servers directly.** The MTA terms require serving
   through a non-MTA host, even though the feeds send ACAO `*`. Realtime goes through
   the `worker/` proxy, which returns decoded JSON with a 15 s edge cache (outages at `/ene`: 120 s).
+- **The client never fetches GeoSearch or Photon directly; addresses and places go through the Worker's `/geocode`.**
+  `q` is never logged (custom logs carry counts only, invocation logs are off, query strings are redacted, never enable
+  traces). Its responses are `Cache-Control: no-store` (the 1 h cache is server-side only, so no typed query reaches a
+  device's disk cache) and carry no `x-rt-cache` header (it would be a cross-user oracle for recent searches). `focus` is the map
+  centre or a chosen station, never the location fix; the Worker rounds it to 2 decimals and drops it outside the NYC bbox.
+  Answers carry `attribution`, which the UI must show beside the results (2q7.16). Upstreams see the Worker, never the
+  client's IP or headers. `/geocode` refuses a request with no allowed Origin (403).
 - **Walk shards are fetched only on a user action.** `data/walk/<id>.json` reveals its station id to the static host, so
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
   of a fix); no request carries the fix or the destination, and routing runs on the device.
@@ -1152,4 +1182,6 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   dashed mezzanines, "Estimated layout") are hand-authored and win over a generated one; 253 more are generated from archetype templates (`scripts/lib/generate.ts`) and labelled "Estimated layout".
   Both are merged with OSM platform polygons, NY Open Data entrances, and E&E elevator/escalator data.
 - **Attribution.** Credit MTA and show "© OpenStreetMap contributors". Include a
-  "may not be real time" notice. Don't use the MTA logo, route bullets, or the map.
+  "may not be real time" notice. Don't use the MTA logo, route bullets, or the map. A `/geocode` answer's `attribution`
+  ("NYC GeoSearch, NYC Department of City Planning" for address results; "© OpenStreetMap contributors, via komoot Photon"
+  for Photon rows) is shown beside the results.
