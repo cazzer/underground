@@ -10,6 +10,7 @@ import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { createLabelBlockers } from '../lib/labelBlockers'
+import type { ExitChoice } from '../lib/exitChoice'
 import type { Network } from '../lib/network'
 import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
@@ -19,6 +20,7 @@ import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { Basemap } from './Basemap'
 import { basemapLook } from './basemapLook'
 import { CameraRig } from './CameraRig'
+import { ExitPath } from './ExitPath'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
 import { MapGrid } from './MapGrid'
@@ -58,9 +60,11 @@ interface SceneProps {
   panel: ScreenRect | null
   /** The user's location, once found inside the covered area; null draws no marker. */
   here: { ground: Ground; accuracyM: number } | null
+  /** The trip's way out at its To station; drawn only while that station's interior is the focused one. */
+  exitPath: { interiorId: string; choice: ExitChoice } | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, exitPath }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -113,7 +117,15 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         network={network}
         mask={streetMask}
       />
-      {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} labelBlockers={labelBlockers} />}
+      {interior && (
+        <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} labelBlockers={labelBlockers}>
+          {exitPath?.interiorId === interior.stationId && (
+            <ErrorBoundary key={`${exitPath.choice.stopId}>${exitPath.choice.exit.entranceId ?? ''}`} fallback={null}>
+              <ExitPath model={interior} choice={exitPath.choice} />
+            </ErrorBoundary>
+          )}
+        </StationInterior>
+      )}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.

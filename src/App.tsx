@@ -7,6 +7,7 @@ import { useNetwork } from './data/useNetwork'
 import { useLocate } from './data/useLocate'
 import { useStationHash } from './data/useStationHash'
 import { useStationInterior } from './data/useStationInterior'
+import { useTripExit } from './data/useTripExit'
 import { FocusProvider, useFocus } from './lib/focus'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
 import { outagePanelView } from './lib/live/eneText'
@@ -17,7 +18,7 @@ import type { ScreenRect } from './lib/interiorCamera'
 import type { Network } from './lib/network'
 import type { BandedShapes } from './lib/networkBands'
 import { TrainSelectionProvider } from './lib/trainSelection'
-import { TripProvider } from './lib/trip'
+import { TripProvider, useTrip } from './lib/trip'
 import { Scene } from './scene/Scene'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { Hud } from './ui/Hud'
@@ -50,6 +51,9 @@ function MapView({ network, bands, live }: MapViewProps) {
   const ene = useEne(ENE_URL)
   const nowS = eneNowS(live.arrivals?.offsetS ?? null, performance.now(), Date.now())
   const outages = joinStationOutages(model?.interior ?? null, ene, nowS)
+  const trip = useTrip()
+  // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
+  const tripExit = useTripExit({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS })
   const accessible = focusedId !== null && (network.stationById.get(focusedId)?.access.status ?? 'none') !== 'none'
   const outKey = outages.outIds.join(',')
   const unknownStatus = outages.closed === null
@@ -76,6 +80,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             siblings={interior.siblings}
             index={interior.index}
             here={here}
+            exitPath={tripExit?.drawn ? { interiorId: tripExit.interiorId, choice: tripExit.drawn } : null}
           />
         )}
       </ErrorBoundary>
@@ -90,6 +95,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           linkNotice={{ show: stationHash.linkNotice, onDismiss: stationHash.dismissLinkNotice }}
           interior={{ load: interior.load, onRetry: interior.retry }}
           outages={outagePanelView(outages, nowS, noStepFree)}
+          tripExits={tripExit?.lines ?? null}
         />
       </ErrorBoundary>
       <LiveDebug debug={live.debug} technical={live.technical} />

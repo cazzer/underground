@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, type ReactNode } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
 import { interiorStationIds } from '../data/interiorLoad'
 import type { LabelBlockers } from '../lib/labelBlockers'
@@ -24,6 +24,8 @@ interface StationInteriorProps {
   outOfService: readonly string[]
   /** Where the level labels write their screen rects, for the street labels to keep clear of. */
   labelBlockers: LabelBlockers
+  /** Drawn inside the interior's group (its anchor, depth factor and visibility): the trip's exit path. */
+  children?: ReactNode
 }
 
 /**
@@ -33,7 +35,7 @@ interface StationInteriorProps {
  * veil and DOM level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
-export function StationInterior({ model, network, outOfService, labelBlockers }: StationInteriorProps) {
+export function StationInterior({ model, network, outOfService, labelBlockers, children }: StationInteriorProps) {
   // Every station the interior covers must be on the map: its spans, markers and camera all look them up.
   for (const id of interiorStationIds(model)) {
     if (!network.stationById.has(id)) throw new Error(`Interior ${model.stationId} covers unknown station "${id}"`)
@@ -115,6 +117,7 @@ export function StationInterior({ model, network, outOfService, labelBlockers }:
       {mid1Strong && <primitive object={mid1Strong} />}
       {overFine && <primitive object={overFine} />}
       {overStrong && <primitive object={overStrong} />}
+      {children}
       </group>
     </>
   )

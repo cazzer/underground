@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import type { RoutesFile } from './data/schema'
-import { colorDistance, oklabDistance } from './lib/colorMetrics'
+import { colorDistance, CVD, MIN_CVD_DISTANCE, oklabDistance, simulateCvd } from './lib/colorMetrics'
 import { contrastRatio, mixHex, routeLineColor } from './lib/routeColor'
 
 async function themes() {
@@ -147,42 +147,6 @@ describe('trainSelectedRim', () => {
   })
 })
 
-/**
- * Machado, Oliveira and Fernandes (2009) dichromacy matrices at severity 1, applied in linear sRGB:
- * deuteranopia and protanopia, the common red-green color blindness.
- */
-const CVD = {
-  deuteranopia: [
-    [0.367322, 0.860646, -0.227968],
-    [0.280085, 0.672501, 0.047413],
-    [-0.01182, 0.04294, 0.968881],
-  ],
-  protanopia: [
-    [0.152286, 1.052583, -0.204868],
-    [0.114503, 0.786281, 0.099216],
-    [-0.003882, -0.048116, 1.051998],
-  ],
-} as const
-
-/** '#rrggbb' as a dichromat sees it, per `CVD`. */
-function simulateCvd(hex: string, m: (typeof CVD)[keyof typeof CVD]): string {
-  const n = parseInt(hex.slice(1), 16)
-  const lin = [n >> 16, (n >> 8) & 255, n & 255].map((v) => {
-    const c = v / 255
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-  })
-  const out = m.map((row) => Math.min(1, Math.max(0, row[0] * lin[0]! + row[1] * lin[1]! + row[2] * lin[2]!)))
-  const srgb = out.map((c) => Math.round((c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055) * 255))
-  return `#${srgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`
-}
-
-/**
- * OKLab distance a machine color keeps from the stroke, track and entrance colors under simulated
- * red-green color blindness. Lower than the 0.1 used for normal vision: dichromacy collapses a whole
- * axis of color, and the line shapes (no step hatch, shafts) carry the rest.
- */
-const MIN_CVD_DISTANCE = 0.06
-
 describe('interior machine tokens', () => {
   it('read at 3:1 on the background on the deepest level, after their share of the depth fade', async () => {
     const { MACHINE_DEPTH_FADE_SHARE } = await import('./theme')
@@ -253,6 +217,54 @@ describe('interiorOutage', () => {
         for (const [mode, m] of Object.entries(CVD)) {
           const d = oklabDistance(simulateCvd(t.interiorOutage, m), simulateCvd(color, m))
           expect(d, `${t.name} ${mode} vs ${other} ${color}`).toBeGreaterThanOrEqual(MIN_CVD_DISTANCE)
+        }
+      }
+    }
+  })
+})
+
+describe('exitPath', () => {
+  const routes = (JSON.parse(readFileSync('public/data/routes.json', 'utf8')) as RoutesFile).routes
+
+  it('reads at 3:1 on the background', async () => {
+    for (const t of Object.values(await themes())) expect(contrastRatio(t.exitPath, t.background), t.name).toBeGreaterThanOrEqual(3)
+  })
+
+  it('stands apart from every interior token, the focus and location colors and every drawn route color', async () => {
+    for (const t of Object.values(await themes())) {
+      const lines = routes.map((r) => [`route ${r.id}`, routeLineColor(`#${r.color}`, t.routeLineMix, t.background)] as const)
+      const others = [
+        ['stroke', t.interiorStroke],
+        ['track', t.interiorTrack],
+        ['entrance', t.interiorEntrance],
+        ['fine', t.interiorFine],
+        ['elevator', t.interiorElevator],
+        ['escalator', t.interiorEscalator],
+        ['outage', t.interiorOutage],
+        ['here', t.here],
+        ['focus', t.stationFocus],
+        ...lines,
+      ] as const
+      for (const [name, color] of others) {
+        expect(oklabDistance(t.exitPath, color), `${t.name} exitPath ${t.exitPath} vs ${name} ${color}`).toBeGreaterThanOrEqual(0.1)
+      }
+    }
+  })
+
+  it('stays apart from the interior structure and machines under simulated deuteranopia and protanopia', async () => {
+    for (const t of Object.values(await themes())) {
+      const others = [
+        ['stroke', t.interiorStroke],
+        ['track', t.interiorTrack],
+        ['entrance', t.interiorEntrance],
+        ['elevator', t.interiorElevator],
+        ['escalator', t.interiorEscalator],
+        ['outage', t.interiorOutage],
+      ] as const
+      for (const [mode, m] of Object.entries(CVD)) {
+        for (const [name, color] of others) {
+          const d = oklabDistance(simulateCvd(t.exitPath, m), simulateCvd(color, m))
+          expect(d, `${t.name} ${mode} exitPath vs ${name} ${color}`).toBeGreaterThanOrEqual(MIN_CVD_DISTANCE)
         }
       }
     }

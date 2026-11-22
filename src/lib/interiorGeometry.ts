@@ -80,6 +80,30 @@ export interface InteriorLayers {
   overFine: Buffers
 }
 
+/** What `connectorContext` reads: the buffer options that shape connectors. */
+export type ConnectorContextOptions = Pick<InteriorBufferOptions, 'yScale' | 'stepRise' | 'colorOf' | 'outOfService'>
+
+/**
+ * Everything the connector writers read but their sinks: level heights, the street level, the station axis and plan
+ * center, and each zero-run escalator's bank anchor. Also throws for an interior with nothing to draw (interiorBounds),
+ * so it becomes an error load.
+ */
+export function connectorContext(interior: StationInterior, opts: ConnectorContextOptions): Omit<ConnectorContext, 'strong' | 'fine'> {
+  const bounds = interiorBounds(interior)
+  const anchors = spreadBanks(interior.connectors, interior.entrances)
+  return {
+    realY: (i) => interior.levels[i]!.y,
+    streetIndex: interior.levels.findIndex((l) => l.kind === 'street'),
+    yScale: opts.yScale,
+    stepRise: opts.stepRise,
+    colorOf: opts.colorOf,
+    outOfService: opts.outOfService ?? (() => false),
+    axis: stationAxis(interior),
+    center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
+    anchorOf: (id) => anchors.get(id),
+  }
+}
+
 /**
  * Merged layers for one station interior, emitted from the deepest level up to the street.
  * Interior layers draw with depthTest off, so buffer order is the overlap rule: upper levels
@@ -93,8 +117,6 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
     if (i === undefined) throw new Error(`Unknown level "${levelId}" in ${elementId}`)
     return i
   }
-  const realY = (i: number) => interior.levels[i]!.y
-  const streetIndex = interior.levels.findIndex((l) => l.kind === 'street')
   const decks = opts.decks ?? []
   const bands = Array.from({ length: decks.length + 1 }, () => ({ strong: new SegmentWriter(), fine: new SegmentWriter() }))
   const bandOf = (i: number) => strokeBandOf(i, decks)
@@ -103,20 +125,8 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
   const approximateSlabs = new Set(interior.slabs.filter((s) => s.approximate === true).map((s) => s.id))
   const walkwayDash = (c: Connector) => dash || [c.lower.area, c.upper.area].every((a) => a !== undefined && approximateSlabs.has(a))
 
-  // Also throws for an interior with nothing to draw, so it becomes an error load.
-  const bounds = interiorBounds(interior)
-  const anchors = spreadBanks(interior.connectors, interior.entrances)
-  const shared: Omit<ConnectorContext, 'strong' | 'fine'> = {
-    realY,
-    streetIndex,
-    yScale,
-    stepRise: opts.stepRise,
-    colorOf,
-    outOfService: opts.outOfService ?? (() => false),
-    axis: stationAxis(interior),
-    center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
-    anchorOf: (id) => anchors.get(id),
-  }
+  const shared = connectorContext(interior, { yScale, stepRise: opts.stepRise, colorOf, outOfService: opts.outOfService })
+  const { streetIndex } = shared
   const cuts = bandCutYs(interior, decks, opts.railDrop, yScale)
   /** Band `from`'s writer, cutting at each deck roof up to band `to`: a SplitAtY chain, nested a band at a time. */
   const chain = (role: 'strong' | 'fine', from: number, to: number): SegmentSink =>
