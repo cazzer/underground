@@ -144,7 +144,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1 px, so width marks only the subway) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
   TEMPORARY: `?basemap=off` draws no basemap and loads no tiles until ost.9.3's look is signed off; the removal list is
   in `src/scene/basemapLook.ts`
-  2q7.25 landing-turn card is decided (default off: the usual landing turn); the removal list is in `src/scene/landingLook.ts`
   TEMPORARY: `?twist=both` lets a two-finger touch that locked to rotate keep zooming (a twist and a pinch at once) until the
   pah.6 twist card is decided (default `lock`: a rotate lock holds zoom until the lift); the removal list is in `src/scene/twistLook.ts`
   Exit tokens `exitPath` (pink, 3:1, held apart from the interior, focus, location and route colors, also under simulated
