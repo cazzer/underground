@@ -32,6 +32,14 @@ function expectLandingsContained(interior: StationInterior): void {
   }
 }
 
+/** Every platform with a track has a connector end on its level within the merge's 0.5 m of its outline. */
+function expectEveryPlatformConnected(interior: StationInterior): void {
+  for (const p of interior.platforms.filter((x) => x.tracks.length > 0)) {
+    const ends = interior.connectors.flatMap((c) => [c.lower, c.upper]).filter((e) => e.level === p.level)
+    expect(Math.min(...ends.map((e) => distanceToRing([e.x, e.z], p.outline))), `platform ${p.id} has a connector`).toBeLessThanOrEqual(0.5)
+  }
+}
+
 /** A lat/lon in the generated station's [u, v] frame (inverse of makeFrame's fromUV, which is a rotation). */
 function latLonToUV(g: GeneratedStation, [lat, lon]: [number, number]): [number, number] {
   const frame = makeFrame(g.authored.frame)
@@ -196,6 +204,7 @@ describe('shallow side-platform template', () => {
       expect(top.connectors).toEqual([c.id])
     }
     expectLandingsContained(interior)
+    expectEveryPlatformConnected(interior)
   })
 
   it('sends a street elevator to the platform its serving text names (the northbound one here)', () => {
@@ -203,6 +212,48 @@ describe('shallow side-platform template', () => {
     const el5 = g.authored.equipment.find((e) => e.code === 'EL5')!
     expect(Math.sign(el5.at![1])).toBe(Math.sign(trackV(g, 'T20N')))
     expect(el5.entrance).toMatch(/^ent-/)
+  })
+
+  describe('platform coverage', () => {
+    const withEntrance = (at: [number, number]): FixtureSpec => {
+      const spec = sideShallow()
+      spec.entrances[1] = { type: 'Stair', at }
+      return spec
+    }
+    const stairIds = (g: GeneratedStation): string[] => g.authored.connectors.map((c) => c.id)
+
+    it('lands a stair on the near edge of a platform whose centerline is out of reach', () => {
+      const { g, interior } = generate(withEntrance([60, 33]))
+      expect(stairIds(g)).toContain('st-ent-03')
+      const stair = g.authored.connectors.find((c) => c.id === 'st-ent-03')!
+      expect(stair.lower).toEqual({ level: 'platform', at: [60, 13.5] })
+      expect(g.authored.notes ?? '').not.toContain('finds no free landing')
+      expectEveryPlatformConnected(interior)
+    })
+
+    it('adds a second stair from an entrance that already has one when the other platform has none', () => {
+      const { g, interior } = generate(withEntrance([60, -1]))
+      const ent = interior.entrances.find((e) => e.connectors.includes('st-ent-03'))!
+      expect(ent.connectors).toEqual(['st-ent-03', 'st-ent-03-p2'])
+      expect(stairIds(g)).toContain('st-ent-03-p2')
+      expectEveryPlatformConnected(interior)
+    })
+
+    it('skips the station when no entrance that does not cross a platform reaches one of them', () => {
+      const { catalog, lines } = fixtureCatalog(withEntrance([60, 40]))
+      const result = generateStations(catalog, lines)
+      expect(result.stations).toEqual([])
+      expect(result.skipped).toEqual([{ stationId: 'T20', reason: 'platform 2: no street stair reaches it within 20 m' }])
+    })
+
+    it('counts a platform a street elevator lands on as reached, so it gets no stair', () => {
+      const spec = sideShallow()
+      spec.entrances.splice(1, 1)
+      spec.equipment = [{ ...spec.equipment[0]!, serving: 'Main St (SE corner) to Brooklyn-bound platform' }]
+      const { g, interior } = generate(spec)
+      expect(g.authored.connectors.filter((c) => c.id.startsWith('st-'))).toHaveLength(1)
+      expectEveryPlatformConnected(interior)
+    })
   })
 })
 

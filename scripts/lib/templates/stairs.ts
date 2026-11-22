@@ -1,9 +1,11 @@
 /** Stairs: one from each street entrance down (or up, at an elevated station) to its slab or, without a
- *  mezzanine, to the nearer platform; and one from each slab to each platform. Pure. Ends are ordered by level
+ *  mezzanine, to the nearer platform (then a coverage pass gives any platform no stair or machine reaches one
+ *  from the nearest entrance that doesn't cross another platform); and one from each slab to each platform. Pure. Ends are ordered by level
  *  height, so the same plan positions serve a subway (street on top) and an elevated station (street at the bottom). */
 import type { Level } from '../../../src/data/stationSchema.ts'
+import { distanceToRing } from '../stationGeometry.ts'
 import type { AuthoredConnector, AuthoredEnd, FramePoint } from '../stationInputs.ts'
-import { centerAt, dist, onPlatform, roundUV, searchCenterline } from './context.ts'
+import { centerAt, dist, nearestOnPlatform, onPlatform, roundUV, searchCenterline } from './context.ts'
 import type { PlatformGeom, TemplateCtx } from './context.ts'
 import { MACHINE_ENTRANCE_TYPES } from './machines.ts'
 import type { PlanEntrance } from './machines.ts'
@@ -77,16 +79,20 @@ export const nearerPlatform = (ctx: TemplateCtx, at: FramePoint): PlatformGeom =
 
 /** One stair (a ramp for a Ramp row) per entrance that is not an elevator or escalator entrance, landing on the
  *  nearest slab (or the nearer platform) no farther than maxStreetRun, never on another stair's landing.
- *  Entrances with nowhere to land are returned in `unplaced`; runs over LONG_RUN_M go to `log`. */
+ *  Entrances with nowhere to land are returned in `unplaced`; runs over LONG_RUN_M go to `log`.
+ *  Without a mezzanine every platform must end up reached, by one of these stairs or by a machine
+ *  (`machinePlatforms`): `coverPlatforms` adds the missing ones and throws when it can't. */
 export function streetStairs(
   ctx: TemplateCtx,
   entrances: readonly PlanEntrance[],
   slabs: readonly SlabPlan[],
   levels: StairLevels,
   log: string[],
+  machinePlatforms: ReadonlySet<number>,
 ): { connectors: AuthoredConnector[]; unplaced: PlanEntrance[] } {
   const taken: FramePoint[] = []
   const unplaced: PlanEntrance[] = []
+  const reached = new Set(machinePlatforms)
   const free = (p: FramePoint): boolean => taken.every((q) => dist(p, q) >= LANDING_GAP_M)
   const connectors = entrances.flatMap((e): AuthoredConnector[] => {
     if (MACHINE_ENTRANCE_TYPES.has(e.row.type)) return []
@@ -105,6 +111,7 @@ export function streetStairs(
       const mid = (platform.uRange[0] + platform.uRange[1]) / 2
       const ok = (p: FramePoint): boolean => dist(p, e.at) >= MIN_RUN_M && dist(p, e.at) <= maxRun && free(p)
       landing = searchCenterline(platform, e.at[0] + Math.sign(mid - e.at[0]) * minRun, ok)
+      if (landing) reached.add(platform.index)
     }
     if (!landing) {
       unplaced.push(e)
@@ -115,7 +122,58 @@ export function streetStairs(
     if (run > LONG_RUN_M) log.push(`${ctx.stationId} ${e.id}: street stair runs ${run.toFixed(0)} m`)
     return [connector(`st-${e.id}`, kind, STREET_STAIR_WIDTH_M, street, { end: { level: level.id, at: landing }, y: level.y })]
   })
+  if (!levels.mezzanine) connectors.push(...coverPlatforms(ctx, entrances, levels.platform, reached, unplaced, { taken, free }, log))
   return { connectors, unplaced }
+}
+
+/** A stair to each platform in ctx that is not in `reached`, from the nearest non-machine entrance (even one the
+ *  main pass left unplaced) that does not cross another platform: no other platform's center line lies strictly
+ *  between the entrance and this platform's. It lands on the platform's centerline, else at its nearest edge point
+ *  moved 0.5 m in. A rescued entrance leaves `unplaced` and keeps the `st-<id>` id; an entrance that already has a
+ *  stair gets `st-<id>-p<n>`. Throws when no entrance lands. */
+function coverPlatforms(
+  ctx: TemplateCtx,
+  entrances: readonly PlanEntrance[],
+  level: Level,
+  reached: ReadonlySet<number>,
+  unplaced: PlanEntrance[],
+  landings: { taken: FramePoint[]; free: (p: FramePoint) => boolean },
+  log: string[],
+): AuthoredConnector[] {
+  const minRun = Math.max(MIN_RUN_M, RUN_PER_RISE * Math.abs(level.y))
+  const maxRun = maxStreetRun(level.y)
+  const out: AuthoredConnector[] = []
+  for (const platform of ctx.platforms) {
+    if (reached.has(platform.index)) continue
+    const crosses = (at: FramePoint): boolean => ctx.platforms.some((q) => q !== platform && (q.centerV - at[1]) * (q.centerV - platform.centerV) < 0)
+    const toRing = (at: FramePoint): number => Math.min(...platform.ways.map((w) => distanceToRing(at, w.ring)))
+    const pool = entrances
+      .filter((e) => !MACHINE_ENTRANCE_TYPES.has(e.row.type) && !crosses(e.at))
+      .map((e) => ({ e, away: toRing(e.at) }))
+      .sort((a, b) => a.away - b.away || (a.e.id < b.e.id ? -1 : 1))
+    const mid = (platform.uRange[0] + platform.uRange[1]) / 2
+    const landed = pool.flatMap(({ e }) => {
+      const ok = (p: FramePoint): boolean => dist(p, e.at) >= MIN_RUN_M && dist(p, e.at) <= maxRun && landings.free(p)
+      const landing = searchCenterline(platform, e.at[0] + Math.sign(mid - e.at[0]) * minRun, ok) ?? edgeLanding(platform, e.at, ok)
+      return landing ? [{ e, landing }] : []
+    })[0]
+    if (!landed) throw new Error(`platform ${platform.index + 1}: no street stair reaches it within ${maxRun.toFixed(0)} m`)
+    const { e, landing } = landed
+    landings.taken.push(landing)
+    const rescued = unplaced.indexOf(e)
+    if (rescued >= 0) unplaced.splice(rescued, 1)
+    const id = rescued >= 0 ? `st-${e.id}` : `st-${e.id}-p${platform.index + 1}`
+    log.push(`${ctx.stationId} ${id}: added so platform ${platform.index + 1} has a stair`)
+    const kind = e.row.type === 'Ramp' ? 'ramp' : 'stair'
+    out.push(connector(id, kind, STREET_STAIR_WIDTH_M, { end: { entrance: e.id }, y: 0 }, { end: { level: level.id, at: landing }, y: level.y }))
+  }
+  return out
+}
+
+/** The platform's nearest edge point to the entrance, moved 0.5 m in, when `ok` takes it. */
+function edgeLanding(platform: PlatformGeom, from: FramePoint, ok: (p: FramePoint) => boolean): FramePoint | null {
+  const edge = nearestOnPlatform(platform, from)
+  return edge && ok(edge) ? roundUV(edge) : null
 }
 
 /** Plan ends of a slab-to-platform stair: the slab end just inside the slab edge facing direction `d`,

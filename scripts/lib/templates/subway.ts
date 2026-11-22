@@ -24,7 +24,8 @@ export function cutCover(ctx: TemplateCtx, inputs: TemplateInputs, log: string[]
   return buildFromTemplate(ctx, subwayLevels(ctx, ctx.params.hasMezzanine), inputs, log)
 }
 
-/** No mezzanine: every street stair lands on the nearer side platform. */
+/** No mezzanine: a street stair lands on the nearer side platform; a platform no stair reaches gets one from the
+ *  nearest entrance that does not cross another platform, else the station is skipped. */
 export function shallow(ctx: TemplateCtx, inputs: TemplateInputs, log: string[]): GeneratedStation {
   return buildFromTemplate(ctx, subwayLevels(ctx, false), inputs, log)
 }

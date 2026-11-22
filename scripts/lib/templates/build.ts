@@ -97,8 +97,8 @@ function planLayout(
   })
   const plans = machines.plans.map((p) => (p.entrance === undefined ? p : { ...p, entrance: keptIndex.get(p.entrance)! }))
   const slabs = levels.mezzanine ? mezzanineSlabs(ctx, entrances.map((e) => e.at)) : []
-  const { overrides: equipment, notes: machineNotes } = machineOverrides(ctx, plans, entrances, { slabs, platformFor, levelY: levelHeights(levels) })
-  const street = streetStairs(ctx, entrances, slabs, levels, log)
+  const { overrides: equipment, notes: machineNotes, platforms: machinePlatforms } = machineOverrides(ctx, plans, entrances, { slabs, platformFor, levelY: levelHeights(levels) })
+  const street = streetStairs(ctx, entrances, slabs, levels, log, machinePlatforms)
   const connectors = [...street.connectors, ...(levels.mezzanine ? levelStairs(ctx, slabs, levels.mezzanine, levels.platform) : [])]
   return { dropped, entrances, plans, slabs, equipment, machineNotes, connectors, unplaced: street.unplaced }
 }

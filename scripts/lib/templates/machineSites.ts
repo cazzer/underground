@@ -3,7 +3,7 @@
 import { ELEVATOR_WIDTH_M, ESCALATOR_WIDTH_M } from '../stationEquipment.ts'
 import type { LevelKind } from '../../../src/data/stationSchema.ts'
 import type { EquipmentOverride, FramePoint } from '../stationInputs.ts'
-import { centerAt, dist, onPlatform, roundUV, searchCenterline } from './context.ts'
+import { dist, nearestOnPlatform, onPlatform, roundUV, searchCenterline } from './context.ts'
 import type { PlatformGeom, TemplateCtx } from './context.ts'
 import { placeRun, unitToward } from './escalatorRuns.ts'
 import type { RunSite } from './escalatorRuns.ts'
@@ -24,30 +24,6 @@ export interface MachineSites {
   platformFor: Record<'N' | 'S', PlatformGeom>
   /** Height of the station's level of each kind. */
   levelY: Partial<Record<LevelKind, number>>
-}
-
-/** `p` when it is on the platform; else the nearest polygon edge point moved 0.5 m in toward the centerline;
- *  else a centerline search from p's u. */
-function nearestOnPlatform(platform: PlatformGeom, p: FramePoint): FramePoint | null {
-  if (onPlatform(platform, p)) return p
-  let best: FramePoint | null = null
-  for (const w of platform.ways) {
-    for (let i = 0; i < w.ring.length; i++) {
-      const a = w.ring[i]!
-      const b = w.ring[(i + 1) % w.ring.length]!
-      const [du, dv] = [b[0] - a[0], b[1] - a[1]]
-      const len2 = du * du + dv * dv
-      const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * du + (p[1] - a[1]) * dv) / len2))
-      const q: FramePoint = [a[0] + t * du, a[1] + t * dv]
-      if (!best || dist(q, p) < dist(best, p)) best = q
-    }
-  }
-  const mid = best ? centerAt(platform, best[0]) : null
-  if (best && mid !== null) {
-    const inward: FramePoint = [best[0], best[1] + Math.sign(mid - best[1]) * INSET_M]
-    if (onPlatform(platform, inward)) return inward
-  }
-  return searchCenterline(platform, p[0])
 }
 
 interface Site {
@@ -78,14 +54,16 @@ function slotOffsets(step: number): FramePoint[] {
  * An escalator gets its own plan run instead (`ends`, escalatorRuns.ts): from its entrance (or its slab end) about
  * 30 degrees at the drawn rise, its bank side by side across the run.
  * Template-placed escalators carry `generated`, not `authored`, so the client would also bank any that touch
- * (escalatorBanks.ts); spacing them here keeps them apart. `notes` names machines drawn far from their entrance.
+ * (escalatorBanks.ts); spacing them here keeps them apart. `notes` names machines drawn far from their entrance;
+ * `platforms` holds the index of every platform a machine lands on.
  */
 export function machineOverrides(
   ctx: TemplateCtx,
   plans: readonly MachinePlan[],
   entrances: readonly PlanEntrance[],
   sites: MachineSites,
-): { overrides: EquipmentOverride[]; notes: string[] } {
+): { overrides: EquipmentOverride[]; notes: string[]; platforms: Set<number> } {
+  const reachedPlatforms = new Set<number>()
   const order: PlatformGeom[] = sites.platformFor.N === sites.platformFor.S ? [sites.platformFor.N] : [sites.platformFor.N, sites.platformFor.S]
   let alternate = 0
   const platformOf = (p: MachinePlan): PlatformGeom => (p.direction ? sites.platformFor[p.direction] : order[alternate++ % order.length]!)
@@ -104,6 +82,7 @@ export function machineOverrides(
       return { key: `${pair}@${entrance?.id ?? slab.id}`, base, onEntrance: inside && entrance !== undefined, fits, run: { a: entrance ? from : base, aKind: 'street', bKind: 'mezzanine', aFits: () => true, bFits: fits, dirs } }
     }
     const platform = platformOf(plan)
+    reachedPlatforms.add(platform.index)
     if (toStreet) {
       const from = entrance?.at ?? ee
       const base = nearestOnPlatform(platform, from)
@@ -155,5 +134,5 @@ export function machineOverrides(
     if (site.onEntrance && offset[0] === 0 && offset[1] === 0) return { code: row.code, ...link }
     return { code: row.code, at: roundUV(at), ...link }
   })
-  return { overrides, notes }
+  return { overrides, notes, platforms: reachedPlatforms }
 }
