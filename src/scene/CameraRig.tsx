@@ -107,7 +107,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
   }, [interior, panel, size, insets, maxDistance, network, streets, index, frame, tripOpen])
 
   usePathProbe(frame, insets, panel)
-  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets, index, frame })
+  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets, index, frame, tookOver })
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])

@@ -10,6 +10,7 @@ import { LATE_TURN_PROGRESS, retargetTurn, type ScreenRect } from '../lib/interi
 import type { PriorityFrame } from '../lib/pathFrame'
 import { classifyAwaiting, nextAwaiting, stationIsBare, streetsReadyFor, type AwaitingInterior } from '../lib/interiorReframe'
 import type { Network } from '../lib/network'
+import { shouldResnapPoint, type PointLanding } from '../lib/pointResnap'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import {
   bareStationPoints,
@@ -19,6 +20,7 @@ import {
   pointFlight,
   rebaseFlight,
   stationFlight,
+  type Destination,
   type Flight,
   type MapControlsImpl,
   type PointRequest,
@@ -50,6 +52,20 @@ interface StationFlightsOptions {
   index: IndexLoad
   /** The loaded interior's priority frame (the trip's path, the machines out of service): an interior flight frames it once it arrives. */
   frame: PriorityFrame | null
+  /** A gesture has begun since the last landing (CameraRig's): a just-landed point flight is then the user's view. */
+  tookOver: RefObject<boolean>
+}
+
+/** The last point flight this hook started: its request, and where it lands (for the reduced-motion re-snap). */
+interface PointFlight {
+  flight: Flight
+  request: PointRequest
+  reduced: boolean
+  landing: PointLanding
+}
+
+function landingOf(dest: Destination, at: number): PointLanding {
+  return { at, target: { x: dest.target.x, z: dest.target.z }, distance: dest.distance }
 }
 
 /**
@@ -74,9 +90,10 @@ export function useStationFlights({
   streets,
   index,
   frame,
+  tookOver,
 }: StationFlightsOptions): void {
-  /** The point flight this hook started and its request, while that flight may still be in `flight` (matched by identity). */
-  const point = useRef<{ flight: Flight; request: PointRequest } | null>(null)
+  /** The point flight this hook started (matched to `flight` by identity), until a size or inset change has been handled. */
+  const point = useRef<PointFlight | null>(null)
 
   // Layout effect, not a passive one: a frame between the select and a passive effect would see
   // the new focus with no flight and drop it again (the camera is still far out).
@@ -90,8 +107,9 @@ export function useStationFlights({
       awaiting.current = null
       const l = layout.current
       const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
-      flight.current = newFlight(dest, c, camera, prefersReducedMotion())
-      point.current = { flight: flight.current, request: flyRequest }
+      const reduced = prefersReducedMotion()
+      flight.current = newFlight(dest, c, camera, reduced)
+      point.current = { flight: flight.current, request: flyRequest, reduced, landing: landingOf(dest, performance.now()) }
       return
     }
     point.current = null
@@ -154,18 +172,26 @@ export function useStationFlights({
   }, [interior, panel, size, insets, streets, index, frame, camera, network, controls, flight, awaiting, layout])
 
   // A point flight (a place, the location button) frames its point in the free rect it set off with; the header can grow
-  // in the same commit (a place's status line) and the viewport can resize mid-flight: reframe it in the new one at the
-  // same pace. Only the flight this hook started: a follow, a reframe or a gesture replaced it (and landing cleared it).
+  // in the same commit (a place's status line) and the viewport can resize mid-flight: reframe it in the new one (its
+  // distance too) at the same pace. Only the flight this hook started: a follow, a reframe or a gesture replaces it.
+  // Under reduced motion it snapped in its first frame, usually before the header's new insets arrive: a change just
+  // after that snaps it once more, unless the camera moved since (pointResnap.ts). Never more than once.
   useEffect(() => {
     const p = point.current
-    const f = flight.current
     const c = controls.current
     if (!p || !c) return
-    if (f !== p.flight) {
-      point.current = null
+    const f = flight.current
+    const dest = pointFlight(p.request, size, insets, camera.fov, layout.current.maxDistance)
+    if (f === p.flight) {
+      rebaseFlight(f, dest, c, camera, c.getAzimuthalAngle(), flightProgress(f.elapsed, f.duration))
+      p.landing = landingOf(dest, p.landing.at)
       return
     }
-    const dest = pointFlight(p.request, size, insets, camera.fov, layout.current.maxDistance)
-    rebaseFlight(f, dest, c, camera, c.getAzimuthalAngle(), flightProgress(f.elapsed, f.duration))
-  }, [size, insets, camera, controls, flight, layout])
+    point.current = null
+    if (!p.reduced) return
+    const now = { now: performance.now(), flying: f !== null, tookOver: tookOver.current, target: c.target, distance: camera.position.distanceTo(c.target) }
+    if (!shouldResnapPoint(p.landing, now)) return
+    flushMotion(c, camera)
+    flight.current = newFlight(dest, c, camera, true)
+  }, [size, insets, camera, controls, flight, layout, tookOver])
 }
