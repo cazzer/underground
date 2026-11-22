@@ -168,7 +168,7 @@ export function buildStationInterior(authored: AuthoredStation, sources: Station
   const fareLines = buildFareLines(authored, ctx)
   const entrances = buildEntrances(authored, sources, ctx)
   const areas = new Map<string, Platform | Slab>([...platforms, ...slabs].map((a) => [a.id, a]))
-  const connectors = [...buildAuthoredConnectors(authored, ctx, entrances, areas), ...buildMachines(authored, sources, ctx, entrances)]
+  const connectors = [...buildAuthoredConnectors(authored, sources, ctx, entrances, areas), ...buildMachines(authored, sources, ctx, entrances)]
   checkEntranceLinks(entrances, connectors)
   checkContainment(connectors, [...platforms, ...slabs], ctx)
 

@@ -44,7 +44,8 @@ so dev and preview serve under that path.
   interior tracks no drawn line rides (packed as no track, so the client stays quiet about them), and fails if any
   track packs more than 2 m off its runs. Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
-  pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`. A complex's `fetch` lists
+  pinned `data/stations/L08.sources.json` (an authored `fetch.osmLines` / `osmNodes` also pins open ways and nodes,
+  which connectors and machines cite by `osmRef`; see `data/README.md`). Review the diff, then rerun `data:stations`. A complex's `fetch` lists
   one GTFS stop id and one station MRN per member (arrays; one `$where ... in(...)` filter, duplicates dropped).
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
   `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors
@@ -759,7 +760,7 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
 - `connectors` (stair, escalator, elevator, ramp, walkway) have `lower`/`upper` endpoints `{x, z, level}` and a
   `width`. An authored `at` end may carry `area`, the id of the platform or slab it stands on (checked against that
   area alone; never on a street end). A walkway (authored only) joins two different areas on one non-street level:
-  both ends `at` with an `area`, a plan run of 1 m or more, and no lower-below-upper rule. A walkway draws as two flat sides (`drawWalkway`). Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
+  both ends `at` with an `area`, a plan run of 1 m or more, and no lower-below-upper rule. A walkway draws as two flat sides (`drawWalkway`). An authored connector may carry `osmRef` ("way/N" or "node/N"; the merge checks an authored end within 1 m of that pinned element and adds `osm` to its sources; the client ignores it). Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
   outages. Elevators, and escalators from the E&E inventory, have identical x/z at both ends (the renderer
   gives such an escalator a 30 degree run; when an entrance lists it and it sits there, its street end is pinned
   at the entrance: the upper end below ground, the lower end at an elevated station). An escalator override's

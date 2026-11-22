@@ -5,7 +5,8 @@ import { finite, list, oneOf, pair, record, text } from './check.ts'
 import type { Ctx } from './stationCtx.ts'
 import { entranceOf, levelOf, srcs } from './stationCtx.ts'
 import { distanceToRing } from './stationGeometry.ts'
-import type { AuthoredStation } from './stationInputs.ts'
+import type { AuthoredStation, StationSources } from './stationInputs.ts'
+import { checkOsmRef } from './stationOsmRef.ts'
 
 const CONTAINMENT_M = 0.5
 /** A walkway shorter than this has no direction to draw. */
@@ -53,7 +54,7 @@ function checkWalkway(ctx: Ctx, id: string, at: string, lower: Endpoint, upper: 
 }
 
 export function buildAuthoredConnectors(
-  authored: AuthoredStation, ctx: Ctx, entrances: Map<string, Entrance>, areas: ReadonlyMap<string, Area>,
+  authored: AuthoredStation, sources: StationSources, ctx: Ctx, entrances: Map<string, Entrance>, areas: ReadonlyMap<string, Area>,
 ): Connector[] {
   return list(authored.connectors, 'connectors').map((c, i): Connector => {
     const at = `connectors[${i}]`
@@ -73,13 +74,17 @@ export function buildAuthoredConnectors(
     } else if (ctx.levels.get(lower.end.level)!.y >= ctx.levels.get(upper.end.level)!.y) {
       throw new Error(`${at} (${id}): lower end must be below the upper end`)
     }
+    const osmRef = r.osmRef === undefined ? undefined : checkOsmRef(
+      ctx, sources, r.osmRef, [lower, upper].filter((e) => e.viaEntrance === undefined).map((e): [number, number] => [e.end.x, e.end.z]), `${at}.osmRef`,
+    )
     return {
       id,
       kind,
       lower: lower.end,
       upper: upper.end,
       width,
-      sources: srcs('authored', ...(viaEntrance ? (['nyopendata'] as const) : [])),
+      ...(osmRef === undefined ? {} : { osmRef }),
+      sources: srcs('authored', ...(viaEntrance ? (['nyopendata'] as const) : []), ...(osmRef === undefined ? [] : (['osm'] as const))),
     }
   })
 }

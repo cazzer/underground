@@ -15,7 +15,15 @@ export interface AuthoredStation {
   notes: string[]
   frame: { anchor: LatLon; bearingDeg: number }
   /** What fetch-station-sources pulls; a complex lists one value per member. */
-  fetch: { osmWays: number[]; entrancesGtfsStopId: string | string[]; equipmentStationMrn: string | string[] }
+  fetch: {
+    osmWays: number[]
+    /** Open or closed OSM ways to pin as lines (stairs, escalator ways), cited by `osmRef` ("way/N"). Absent for most stations. */
+    osmLines?: number[]
+    /** OSM nodes to pin as points (a street elevator), cited by `osmRef` ("node/N"). */
+    osmNodes?: number[]
+    entrancesGtfsStopId: string | string[]
+    equipmentStationMrn: string | string[]
+  }
   levels: Level[]
   platforms: { id: string; level: LevelId; osmWay: number; tracks: { stopId: string; path: FramePoint[] }[] }[]
   slabs: { id: string; level: LevelId; name: string; outline: FramePoint[]; paid?: boolean }[]
@@ -36,6 +44,9 @@ export interface AuthoredConnector {
   width: number
   lower: AuthoredEnd
   upper: AuthoredEnd
+  /** "way/N" or "node/N" of a pinned OSM line, way or node this connector follows (adds 'osm' to sources and writes
+   *  `osmRef`). At least one `at` end (not an entrance end) must lie within 1 m of it. */
+  osmRef?: string
 }
 export interface EquipmentOverride {
   code: string
@@ -50,6 +61,9 @@ export interface EquipmentOverride {
   /** Required when the station has two levels of the same kind (e.g. Hudson Yards). */
   levels?: { lower: LevelId; upper: LevelId }
   width?: number
+  /** "way/N" or "node/N" of a pinned OSM element this machine sits on (adds 'osm' to sources and writes `osmRef`).
+   *  Needs `at` or `ends`; one authored point must lie within 1 m of the element. */
+  osmRef?: string
 }
 
 /** What a template generator knows about a station beyond its authored-shaped geometry. */
@@ -76,6 +90,10 @@ export interface StationSources {
     query: string
     baseTimestamp: string
     ways: OsmWay[]
+    /** Pinned open or closed ways, only for stations whose `fetch` lists `osmLines`. */
+    lines?: OsmLine[]
+    /** Pinned nodes, only for stations whose `fetch` lists `osmNodes`. */
+    nodes?: OsmNode[]
   }
   entrances: { dataset: 'i9wp-a4ja'; url: string; rowsUpdatedAt: string; rows: EntranceRow[] }
   equipment: { dataset: '94fv-bak7'; url: string; rowsUpdatedAt: string; rows: EquipmentRow[] }
@@ -87,6 +105,22 @@ export interface OsmWay {
   timestamp?: string
   tags: Record<string, string>
   ring: [lat: number, lon: number][]
+}
+/** A way pinned as a polyline (at least 2 points; closed when the first point equals the last). Meta is always present. */
+export interface OsmLine {
+  id: number
+  version: number
+  timestamp: string
+  tags: Record<string, string>
+  points: [lat: number, lon: number][]
+}
+export interface OsmNode {
+  id: number
+  version: number
+  timestamp: string
+  tags: Record<string, string>
+  lat: number
+  lon: number
 }
 /** Sorted by lat, lon. */
 export interface EntranceRow {
@@ -102,5 +136,6 @@ export interface EquipmentRow {
   kind: 'elevator' | 'escalator'
   lat: number
   lon: number
-  serving: string
+  /** The E&E notes text; null when the row has none (the merge then needs a `levels` override). */
+  serving: string | null
 }

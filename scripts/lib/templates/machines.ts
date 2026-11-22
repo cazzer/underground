@@ -54,6 +54,11 @@ export function planMachines(
   const dropped: string[] = []
   const used = new Set<number>()
   for (const row of rows) {
+    // slice.ts already drops rows with no serving text; this is type narrowing only.
+    if (row.serving === null) {
+      dropped.push(`${row.code}: no serving text`)
+      continue
+    }
     let kinds: [LevelKind, LevelKind]
     try {
       const s = parseServing(row.serving)
