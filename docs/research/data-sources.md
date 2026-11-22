@@ -336,9 +336,10 @@ needs no release for the switch and the two formats can coexist during it. The n
 the browser decode anything. In the scripts, `node:zlib` inflates (`tileProbe.ts` `readTile`, capped at 2 MiB a tile, as `inflate.ts` is). The pin's
 `tileBytes` is the stored size (the sum of the gzip files); the workflow report, release notes and probe line also give the
 inflated size.
-Wire size of the live Midtown tile `15/9649/12314.mvt`: before (plain, deploy 44991770994) 12,993 B. After: to be recorded
-once the gzip release is published and deployed (`verify-basemap`'s summary lists the served bytes of each probe tile, and the
-tile-directory report of the workflow run lists both sizes). The
+Wire size of the live Midtown tile `15/9649/12314.mvt`: before (plain, deploy 44991770994) 12,993 B; after (gzip release
+`basemap-20261121-928e2782`, deploy 45000419770) 9,204 B, 29% smaller, served `200`, `content-type:
+application/vnd.mapbox-vector-tile`, `content-length: 9204`, no `content-encoding` with gzip offered, body starting `1f 8b`.
+The whole tree: 33,016,688 B stored against 44,878,229 B inflated (26% smaller; z15 alone 14.7 MB against 19.9 MB). The
 Pages artifact limit is
 1 GB (the deploy fails above 900 MB and prints the artifact's size and file count); the tiles add 45 MB to it. The artifact is
 uploaded as a single tar, so the 3,820 files should not slow `upload-pages-artifact` (the job summary times it).
@@ -439,8 +440,8 @@ browser decodes transparently. There is no Range dependency anywhere now (`scrip
   compress this type), `cache-control: max-age=600`. So a tile's wire size is its raw size. A tile the pack lacks (z15, x 0,
   y 0) answers `404` with `text/html`, which the client treats as an empty tile. Each deploy's `verify-basemap` job records
   these headers in its summary. (ost.9.5 ships the tiles pre-gzipped for this reason; Pages then sends the stored bytes with the
-  same headers, so the worker inflates them. Whether Pages adds a `content-encoding` to a gzip-bodied `.mvt` is checked by the
-  first `verify-basemap` run on the gzip release, which fails if the served body is not the stored gzip file.)
+  same headers, so the worker inflates them. Measured on the gzip release (deploy 45000419770): Pages
+  serves the stored gzip bytes with no `content-encoding`, and `verify-basemap --gzip` passed.)
 - That deploy's artifact: 69.75 MB in 5,149 files; `upload-pages-artifact` took 4 s; the basemap download 0.9 s and the unpack
   1.1 s.
 - Vite dev (sirv) serves `public/basemap/tiles/...` uncompressed with an empty content type, and a small dev-only middleware in
