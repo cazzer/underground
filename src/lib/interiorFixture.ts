@@ -2,7 +2,7 @@
 import type { Connector, StationInterior } from '../data/stationSchema'
 import type { Buffers, InteriorBufferOptions, InteriorRole } from './interiorGeometry'
 
-export const ROLES: InteriorRole[] = ['outline', 'track', 'stair', 'elevator', 'entrance', 'step', 'guide', 'fare', 'escalator']
+export const ROLES: InteriorRole[] = ['outline', 'track', 'stair', 'elevator', 'entrance', 'step', 'guide', 'fare', 'escalator', 'outage']
 
 export const STAIR: Connector = {
   id: 'ST1',

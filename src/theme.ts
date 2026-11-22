@@ -55,11 +55,16 @@ export interface Theme {
   /**
    * Station interior machines: elevators and escalators. Each stays at least 3:1 on the background on the
    * deepest level (faded by `interiorDepthFade × MACHINE_DEPTH_FADE_SHARE`), and apart from the other interior
-   * tokens and statusError (which 9wc.5 will use for outages), also under simulated red-green color
-   * blindness (theme.test.ts).
+   * tokens, also under simulated red-green color blindness (theme.test.ts).
    */
   interiorElevator: string
   interiorEscalator: string
+  /**
+   * An out-of-service elevator or escalator (drawn with an X): 3:1 on the background at the deepest machine
+   * fade, and apart from every other interior token, also under simulated deuteranopia and protanopia
+   * (theme.test.ts). The same value as statusError, which marks the same thing in the station panel.
+   */
+  interiorOutage: string
   /** Interior line widths in screen pixels (strong and fine strokes). */
   interiorLineWidth: number
   interiorFineWidth: number
@@ -86,6 +91,8 @@ export interface Theme {
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
 export const MACHINE_DEPTH_FADE_SHARE = 0.5
 
+/** Shared by the status color and the interior's out-of-service machines, which mark the same thing. */
+const statusError = '#ff6b6b'
 const mono = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
 
 export const THEMES = {
@@ -111,7 +118,7 @@ export const THEMES = {
     trainCarEndShade: 0.75,
     statusLive: '#7cf5a6',
     statusWarn: '#ffd166',
-    statusError: '#ff6b6b',
+    statusError,
     ink: '#e6f6ff',
     inkDim: '#8fb4de',
     panel: 'rgba(11, 33, 71, 0.82)',
@@ -124,6 +131,7 @@ export const THEMES = {
     interiorFine: '#8fb4de',
     interiorElevator: '#c38cff',
     interiorEscalator: '#7cf5a6',
+    interiorOutage: statusError,
     interiorLineWidth: 1.5,
     interiorFineWidth: 1,
     interiorDepthFade: 0.5,

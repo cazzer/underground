@@ -49,6 +49,11 @@ export interface InteriorBufferOptions {
    * rest goes over. Undefined puts everything in the base layers.
    */
   splitLevel?: number
+  /**
+   * Machines (elevators, escalators) that are out of service, by connector id: drawn in the `outage` role with an
+   * X. Default none.
+   */
+  outOfService?: (connectorId: string) => boolean
   /** Linear RGB for a role on the level at `levelIndex`, an index into `interior.levels` (highest first, so the
    *  street is 0 below ground and the last level at an elevated station). */
   colorOf: (role: InteriorRole, levelIndex: number) => Rgb
@@ -131,6 +136,7 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
     stepRise: opts.stepRise,
     colorOf,
     dash,
+    outOfService: opts.outOfService ?? (() => false),
     axis: stationAxis(interior),
     center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
     anchorOf: (id) => anchors.get(id),

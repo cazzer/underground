@@ -41,6 +41,8 @@ interface SceneProps {
   onLiveError: (error: Error) => void
   /** The focused station's interior, once loaded. */
   interior: InteriorModel | null
+  /** Ids of the interior's machines that are out of service, sorted. */
+  outOfService: readonly string[]
   /** The focused station draws its own street marker and tie: it has no interior, or its load failed. */
   focusedMarker: boolean
   /** The focused station's complex siblings from the index (empty for a lone station); hidden once the interior that covers them is loaded. */
@@ -53,7 +55,7 @@ interface SceneProps {
   here: { ground: Ground; accuracyM: number } | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, focusedMarker, siblings, index, panel, here }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -89,7 +91,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, fo
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
       <StationStreets />
-      {interior && <StationInterior key={interior.stationId} model={interior} network={network} />}
+      {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
       {basemapProbe && <BasemapProbe config={basemapProbe} />}
     </Canvas>

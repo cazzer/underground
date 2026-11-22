@@ -9,8 +9,19 @@ export type Rgb = readonly [number, number, number]
 /**
  * Strong strokes: outline, track, stair, escalator, elevator, entrance. Fine strokes: step, guide, fare,
  * and the lighter parts of escalators and elevators (handrails, cabs).
+ * `outage` takes the place of `escalator` or `elevator` on a machine that is out of service, strong and fine alike.
  */
-export type InteriorRole = 'outline' | 'track' | 'stair' | 'escalator' | 'elevator' | 'entrance' | 'step' | 'guide' | 'fare'
+export type InteriorRole =
+  | 'outline'
+  | 'track'
+  | 'stair'
+  | 'escalator'
+  | 'elevator'
+  | 'entrance'
+  | 'step'
+  | 'guide'
+  | 'fare'
+  | 'outage'
 export type Vec3 = readonly [number, number, number]
 
 /** lineBuffers.ts's LineBuffers (not imported: that module has extensionless imports) plus dash distances. */
