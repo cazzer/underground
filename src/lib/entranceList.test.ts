@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EntranceText } from './entranceText'
-import { entranceCountSpoken, entranceRows } from './entranceList'
+import { entranceCountSpoken, entranceRows, entranceTotal, rowParts } from './entranceList'
 
 function text(index: number, head: string, tail: string, o: Partial<EntranceText> = {}): EntranceText {
   return {
@@ -10,6 +10,7 @@ function text(index: number, head: string, tail: string, o: Partial<EntranceText
     head,
     tail,
     text: tail === '' ? head : `${head} · ${tail}`,
+    spoken: tail === '' ? head : `${head}, ${tail}`,
     elevator: false,
     unique: true,
     keys: [],
@@ -31,9 +32,13 @@ describe('entranceRows', () => {
     expect(rows.map((r) => r.key)).toEqual(['4', '3', '1', '2', '0'])
   })
 
-  it('keeps the count and text of a merged label', () => {
-    const [row] = entranceRows([text(7, 'Broadway', 'west side', { count: 3 })])
-    expect(row).toEqual({ key: '7', text: 'Broadway · west side', elevator: false, count: 3 })
+  it('says the spoken text with the count of a merged label', () => {
+    const rows = entranceRows([text(7, 'Broadway', 'west side', { count: 3, spoken: 'Broadway, west side' }), text(8, 'Z', '')])
+    expect(rows.map((r) => [r.spoken, r.count])).toEqual([
+      ['Broadway, west side, 3 entrances', 3],
+      ['Z', 1],
+    ])
+    expect(entranceTotal(rows)).toBe(4)
   })
 
   it('does not mutate its input and handles none', () => {
@@ -44,9 +49,31 @@ describe('entranceRows', () => {
   })
 })
 
+describe('rowParts', () => {
+  it('splits at the label’s separators and keeps a relation on the street part’s line', () => {
+    expect(rowParts('Bedford Av & N 7 St', 'NE corner · elevator').map((p) => [p.sep, p.text])).toEqual([
+      ['', 'Bedford Av & N 7 St'],
+      ['\u00a0· ', 'NE corner'],
+      ['\u00a0· ', 'elevator'],
+    ])
+    expect(rowParts('Broadway median', 'at W 95 St').map((p) => [p.sep, p.text])).toEqual([
+      ['', 'Broadway median'],
+      [' ', 'at W 95 St'],
+    ])
+    expect(rowParts('Broadway', '')).toEqual([{ sep: '', text: 'Broadway' }])
+  })
+
+  it('reads back as the label’s own text', () => {
+    const joined = rowParts('7 Av', 'east side at W 42 St · exit only')
+      .map((p) => p.sep + p.text)
+      .join('')
+    expect(joined.replaceAll('\u00a0', ' ')).toBe('7 Av · east side at W 42 St · exit only')
+  })
+})
+
 describe('entranceCountSpoken', () => {
   it('says nothing for one entrance', () => {
     expect(entranceCountSpoken(1)).toBe('')
-    expect(entranceCountSpoken(2)).toBe('2 entrances')
+    expect(entranceCountSpoken(2)).toBe(', 2 entrances')
   })
 })

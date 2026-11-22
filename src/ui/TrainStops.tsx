@@ -13,7 +13,7 @@ import {
 } from '../lib/live/trainStops'
 import type { Network } from '../lib/network'
 import type { LiveTrip } from '../lib/realtime/prepareTrips'
-import { useStopListScroll } from './useStopListScroll'
+import { useListScroll } from './useListScroll'
 
 /** How often the times are recomputed from the live clock; a new poll updates them sooner. */
 const TICK_MS = 15_000
@@ -121,7 +121,7 @@ export function TrainStops({ network, trip, source, status }: TrainStopsProps) {
   const showToggle = all.length > COLLAPSED_ROWS
   // The cut-off note belongs under the last known stop, so only once that row is on screen.
   const cutShort = rows.length === all.length && isCutShort(all, terminal)
-  const { scroller, list, capPx, overflows, atEnd, onScroll } = useStopListScroll(rows.length)
+  const { scroller, list, capPx, overflows, atEnd, onScroll } = useListScroll(rows.length)
   return (
     <section className="mt-3">
       <h3
@@ -143,7 +143,7 @@ export function TrainStops({ network, trip, source, status }: TrainStopsProps) {
       {rows.length > 0 && (
         <div className="relative mt-1">
           {/* On a phone the list is capped at whole rows so the train stays in view above the panel (see
-              useStopListScroll); it is a focusable region only while it actually scrolls. */}
+              useListScroll); it is a focusable region only while it actually scrolls. */}
           <div
             ref={scroller}
             onScroll={onScroll}

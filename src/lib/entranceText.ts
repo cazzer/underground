@@ -4,7 +4,7 @@
  *  as it is (the join and the files are left alone). */
 import type { StationStreets } from '../data/streetSchema'
 import { isClosedRing, isStreet, streetKey } from './streetClass'
-import { abbreviateStreet, entranceLabel, entranceParts, joinParts, type EntranceWording } from './streetName'
+import { abbreviateStreet, entranceLabel, entranceParts, entranceSpoken, joinParts, type EntranceWording } from './streetName'
 
 /** The file's coordinates are integer decimeters. */
 const DM_PER_M = 10
@@ -22,6 +22,8 @@ export interface EntranceText {
   head: string
   tail: string
   text: string
+  /** The label as a screen reader says it (full street names, corners spelled out). */
+  spoken: string
   elevator: boolean
   /** No other entrance of the station has this text. */
   unique: boolean
@@ -177,6 +179,7 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
       head: parts.head,
       tail: parts.tail,
       text,
+      spoken: entranceSpoken(d.e, d.w)!,
       elevator: d.e.type === 'Elevator',
       unique: true,
       keys: d.keys,

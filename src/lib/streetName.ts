@@ -100,6 +100,15 @@ const SIDE_WORDS: Readonly<Record<Exclude<StreetSide, 'median'>, string>> = {
   NW: 'NW corner',
 }
 
+/** The sides as said aloud: the corners spelled out. */
+const SPOKEN_SIDE_WORDS: Readonly<Record<Exclude<StreetSide, 'median'>, string>> = {
+  ...SIDE_WORDS,
+  NE: 'northeast corner',
+  SE: 'southeast corner',
+  SW: 'southwest corner',
+  NW: 'northwest corner',
+}
+
 /** What the entrance label needs from a street file's entrance. */
 export type LabelledEntrance = Pick<StreetEntrance, 'street' | 'cross' | 'side' | 'plaza' | 'type' | 'entry' | 'exit'>
 
@@ -134,36 +143,45 @@ export function streetPair(a: string, b: string): string {
   return `${x.join(' ')} & ${y.join(' ')}`
 }
 
-/**
- * The text beside an entrance mark, street first: "Bedford Av & N 7 St" / "NE corner", "Broadway median" / "at W 95
- * St" (or "between W 95 & W 96 St", "near W 95 St"), "Broadway" / "west side at W 94 St" (or "east side · north of
- * N 7 St" when two would match), the street (and cross street) alone when no side is known, or the plaza's name when
- * no street is in range. "elevator" for an elevator entrance, "exit only" when it can't be entered, "entry only"
- * when it can't be left by. Null when the entrance has neither a street nor a plaza.
- */
-export function entranceParts(e: LabelledEntrance, w: EntranceWording = {}): EntranceParts | null {
+/** How `wording` names things: the label's abbreviated, ampersanded style, or the full names the file holds, said aloud. */
+interface Style {
+  name: (street: string) => string
+  pair: (a: string, b: string) => string
+  and: string
+  sides: Readonly<Record<Exclude<StreetSide, 'median'>, string>>
+}
+
+const LABEL_STYLE: Style = { name: abbreviateStreet, pair: streetPair, and: ' & ', sides: SIDE_WORDS }
+const SPOKEN_STYLE: Style = {
+  name: (street) => street.trim(),
+  pair: (a, b) => `${a.trim()} and ${b.trim()}`,
+  and: ' and ',
+  sides: SPOKEN_SIDE_WORDS,
+}
+
+function wording(e: LabelledEntrance, w: EntranceWording, st: Style): { head: string; tail: string[] } | null {
   let head: string
   const tail: string[] = []
   if (e.street === null) {
     if (e.plaza === null) return null
     head = e.plaza
   } else {
-    const street = abbreviateStreet(e.street)
-    const cross = e.cross === null ? null : abbreviateStreet(e.cross)
-    const near = w.near === undefined ? null : abbreviateStreet(w.near)
+    const street = st.name(e.street)
+    const cross = e.cross === null ? null : st.name(e.cross)
+    const near = w.near === undefined ? null : st.name(w.near)
     const of = near !== null && w.of ? `${COMPASS_WORDS[w.of]} of ${near}` : null
     if (e.side === 'median') {
       head = `${street} median`
       if (cross) tail.push(`at ${cross}`)
       else if (of) tail.push(of)
-      else if (w.between) tail.push(`between ${streetPair(...w.between)}`)
+      else if (w.between) tail.push(`between ${st.pair(...w.between)}`)
       else if (near) tail.push(`near ${near}`)
     } else if (cross) {
-      head = w.swap ? `${cross} & ${street}` : `${street} & ${cross}`
-      if (e.side !== null) tail.push(SIDE_WORDS[e.side])
+      head = w.swap ? `${cross}${st.and}${street}` : `${street}${st.and}${cross}`
+      if (e.side !== null) tail.push(st.sides[e.side])
     } else {
       head = street
-      const side = e.side === null ? null : SIDE_WORDS[e.side]
+      const side = e.side === null ? null : st.sides[e.side]
       if (of) tail.push(...(side ? [side, of] : [of]))
       else if (near) tail.push(side ? `${side} at ${near}` : `at ${near}`)
       else if (side) tail.push(side)
@@ -172,15 +190,42 @@ export function entranceParts(e: LabelledEntrance, w: EntranceWording = {}): Ent
   if (e.type === 'Elevator') tail.push('elevator')
   if (!e.entry) tail.push('exit only')
   else if (!e.exit) tail.push('entry only')
-  return { head, tail: tail.join(' · ') }
+  return { head, tail }
+}
+
+/**
+ * The text beside an entrance mark, street first: "Bedford Av & N 7 St" / "NE corner", "Broadway median" / "at W 95
+ * St" (or "between W 95 & W 96 St", "near W 95 St"), "Broadway" / "west side at W 94 St" (or "east side · north of
+ * N 7 St" when two would match), the street (and cross street) alone when no side is known, or the plaza's name when
+ * no street is in range. "elevator" for an elevator entrance, "exit only" when it can't be entered, "entry only"
+ * when it can't be left by. Null when the entrance has neither a street nor a plaza.
+ */
+export function entranceParts(e: LabelledEntrance, w: EntranceWording = {}): EntranceParts | null {
+  const p = wording(e, w, LABEL_STYLE)
+  return p && { head: p.head, tail: p.tail.join(' · ') }
+}
+
+/**
+ * The same entrance as a screen reader should say it: the file's own full street names (never a re-expansion of the
+ * abbreviations), "and" for "&", corners spelled out, the parts joined with commas: "Bedford Avenue and North 7th
+ * Street, northeast corner, elevator". The same wording choices `w` as the label, so the two always agree.
+ */
+export function entranceSpoken(e: LabelledEntrance, w: EntranceWording = {}): string | null {
+  const p = wording(e, w, SPOKEN_STYLE)
+  return p && [p.head, ...p.tail].join(', ')
 }
 
 const RELATION = /^(at|near|between|(north|south|east|west) of) /
 
+/** What goes between a label's head and its tail: a space before a relation ("at W 95 St"), else " · ". */
+export function partsSeparator(tail: string): string {
+  return RELATION.test(tail) ? ' ' : ' · '
+}
+
 /** The parts on one line: "Broadway median at W 95 St", "Bedford Av & N 7 St · NE corner · elevator". */
 export function joinParts(p: EntranceParts): string {
   if (p.tail === '') return p.head
-  return `${p.head}${RELATION.test(p.tail) ? ' ' : ' · '}${p.tail}`
+  return `${p.head}${partsSeparator(p.tail)}${p.tail}`
 }
 
 /** `entranceParts` on one line. */
