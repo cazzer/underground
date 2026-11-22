@@ -72,7 +72,8 @@ export class SegmentWriter implements SegmentSink {
 
 /**
  * Writes the part of each segment at or below `y` to `below` and the rest to `above`, cutting a segment that crosses
- * it there (colors interpolated). A dashed segment's two parts each start on a dash.
+ * it there (colors interpolated). Only solid connector strokes go through it today; a dashed caller's two parts would
+ * each restart on a dash (the phase isn't carried across the cut).
  */
 export class SplitAtY implements SegmentSink {
   private readonly below: SegmentWriter

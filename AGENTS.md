@@ -466,7 +466,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   level above it goes over; a stair, escalator or elevator shaft from it (or below) up to a level above it is cut
   at the trains' roof (`trainRoofY`: rail ×yScale plus the car's floor and body height from `src/lib/carDims.ts`,
   not exaggerated; `SplitAtY` in `interiorSegments.ts`), so a car in front of a stair foot hides it and the
-  stair above the roof draws over the car (an elevator's stop stays with its level). At most four interior line layers; look C doesn't split. Every car within
+  stair above the roof draws over the car (an elevator's stop stays with its level). The cut is by height alone, so a
+  foot behind a car is hidden too. One platform level is assumed: a two-deck interior logs a warning (none ships). At most four interior line layers; look C doesn't split. Every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
   toward the background after shading by `veilTint` (veil opacity × veilWeight × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal

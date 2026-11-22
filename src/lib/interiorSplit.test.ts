@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Connector, StationInterior as Interior } from '../data/stationSchema'
 import { CAR_FLOOR_M, CAR_HEIGHT_M } from './carDims'
 import { buildInteriorBuffers, trainLevelIndex, trainRoofY, type Buffers } from './interiorGeometry'
@@ -60,7 +60,10 @@ describe('trainLevelIndex', () => {
     expect(trainLevelIndex(fixture())).toBe(2)
     const twoDecks = fixture()
     twoDecks.platforms.push({ ...twoDecks.platforms[0]!, id: 'P2', level: 'mezz' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(trainLevelIndex(twoDecks)).toBe(2)
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
   })
 
   it('is undefined when no platform has a track', () => {

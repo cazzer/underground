@@ -64,7 +64,9 @@ export interface InteriorLayers {
 /**
  * Drawn y (group-local, before the depth factor) of a lifted train's roof on the platform at `level`: its rail
  * (`yScale` exaggerated like the interior) plus the car's floor and body height (real meters: cars aren't
- * exaggerated). At full tilt and crossScale 1, as at the interior's zoom.
+ * exaggerated). At full tilt and crossScale 1, as at the interior's zoom, for an unselected car: the selected one
+ * (widened, lifted 0.2 m) rises about 0.5 m above it, so a stair foot can touch its roof by a pixel or two. A stair foot
+ * on the camera side of a car is hidden by it too: strokes have no depth test, so the cut is by height alone.
  */
 export function trainRoofY(level: { y: number }, railDrop: number, yScale: number): number {
   return (level.y - railDrop) * yScale + CAR_FLOOR_M + CAR_HEIGHT_M
@@ -73,13 +75,27 @@ export function trainRoofY(level: { y: number }, railDrop: number, yScale: numbe
 /**
  * Index of the deepest level with a platform track (levels run highest first, so the last such index): where the
  * deepest lifted platform trains ride. Undefined when no platform has a track.
+ * Assumes one platform level: on a two-deck station the upper deck's own strokes would go over its trains, so that
+ * case logs once (no such station ships today) rather than regressing silently.
  */
 export function trainLevelIndex(interior: StationInterior): number | undefined {
   let deepest: number | undefined
+  let decks = 0
   interior.levels.forEach((level, i) => {
-    if (interior.platforms.some((p) => p.level === level.id && p.tracks.length > 0)) deepest = i
+    if (interior.platforms.some((p) => p.level === level.id && p.tracks.length > 0)) {
+      deepest = i
+      decks++
+    }
   })
+  if (decks > 1) warnTwoDecks(interior.stationId)
   return deepest
+}
+
+const warnedDecks = new Set<string>()
+function warnTwoDecks(id: string): void {
+  if (warnedDecks.has(id)) return
+  warnedDecks.add(id)
+  console.warn(`Interior ${id} has platform tracks on more than one level; its upper deck draws over its own trains`)
 }
 
 /**
