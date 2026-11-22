@@ -8,7 +8,7 @@ import { defaultEnds } from '../lib/tripView'
 
 interface TripPanelArgs {
   locate: LocateControls
-  /** The bottom panel's element (the trip panel's when it is in front): × and Esc move focus only from inside it. */
+  /** The bottom panel's element (the trip panel's when it is in front): Esc moves focus only from inside it. */
   panel: RefObject<HTMLElement | null>
   /** The trip panel's heading: brought into focus when the button brings a covered panel to the front. */
   tripHeading: RefObject<HTMLElement | null>
@@ -27,12 +27,12 @@ export interface TripPanelControls {
    * says is what is on screen. Open but covered: brings it to the front the same way. Shown: closes it.
    */
   toggleTrip: () => void
-  /** The panel's × and Esc. */
+  /** The panel's Esc. */
   closeTrip: () => void
 }
 
 /**
- * Opening and closing the trip panel with the focus rules: the button toggles and keeps focus; × and Esc remove
+ * Opening and closing the trip panel with the focus rules: the button toggles and keeps focus; Esc removes
  * the focused element, so when focus was inside the panel, one frame later (a station panel underneath has
  * mounted by then) it goes to the station heading, else back to the button that opened the panel.
  */
