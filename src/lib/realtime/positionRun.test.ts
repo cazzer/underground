@@ -1,4 +1,4 @@
-// The run between stops after the dwell: eased (runEase.ts) by default, constant speed with `easedRuns: false`.
+// The run between stops after the dwell: eased (runEase.ts).
 import { describe, expect, it } from 'vitest'
 import { buildPolyline } from './polyline'
 import { hopDistance, planHop } from './position'
@@ -20,8 +20,8 @@ const northbound: ShapeGeometry = {
 const SEGMENTS = { '101N>102N': 100, '102N>103N': 100 }
 
 describe('the run after the dwell', () => {
-  const plan = (easedRuns?: boolean) => {
-    const p = planHop({ geometry: northbound, status: 'IN_TRANSIT_TO', stopId: '102N', arrivals: [['102N', NOW + 100]], segments: SEGMENTS, now: NOW, easedRuns })
+  const plan = () => {
+    const p = planHop({ geometry: northbound, status: 'IN_TRANSIT_TO', stopId: '102N', arrivals: [['102N', NOW + 100]], segments: SEGMENTS, now: NOW })
     if ('ok' in p) throw new Error(`unexpected ${p.reason}`)
     return p
   }
@@ -29,7 +29,7 @@ describe('the run after the dwell', () => {
 
   it('pulls away from rest, cruises at 1.25x the average, brakes to rest and arrives on time', () => {
     const p = plan()
-    expect(p.eased).toBe(true)
+    expect(p.rampShare).toBeCloseTo(0.2)
     // 1000 m over the 70 s after the 30 s dwell: 14.3 m/s on average.
     const average = 1000 / 70
     let prev = 0
@@ -48,14 +48,6 @@ describe('the run after the dwell', () => {
     expect(speed(30)).toBeLessThan(0.05)
     expect(speed(100 - DT)).toBeLessThan(0.05)
     expect(speed(65)).toBeCloseTo(1.25 * average, 3)
-  })
-
-  it('runs at constant speed with easedRuns false', () => {
-    const p = plan(false)
-    expect(p.eased).toBe(false)
-    for (const [t, d] of [[30, 0], [37, 100], [65, 500], [93, 900], [100, 1000]]) {
-      expect(hopDistance(p, northbound, NOW + t!), `+${t}`).toBeCloseTo(d!)
-    }
   })
 
   it('cruises no faster than 25 m/s on a fast hop, with shorter ramps, and still arrives on time', () => {

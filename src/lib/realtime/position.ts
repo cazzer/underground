@@ -33,8 +33,6 @@ export interface PositionInput {
   visit?: StopVisit | null
   /** The trip's own first stop, where it lays over; defaults to the shape's first stop. */
   origin?: StopId | null
-  /** TEMPORARY (`?runs=`, see src/data/runsLook.ts): false runs at constant speed after the dwell. Default true. */
-  easedRuns?: boolean
 }
 
 export type PositionResult =
@@ -86,8 +84,6 @@ export interface HopPlan {
   departsInS: number | null
   /** `arriveAt` comes from the visit to the last stop (stopVisit.ts), not the feed's prediction; counted in `?debug`. */
   capped: boolean
-  /** The run after the dwell follows `easeRun` (accelerate, cruise, brake); false: constant speed. TEMPORARY (`?runs=`). */
-  eased: boolean
   /** The eased run's ramp share (`rampShareFor`): 0.2, less on a hop fast enough to cruise above 25 m/s. */
   rampShare: number
 }
@@ -176,7 +172,6 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
     minFraction: hop.fraction === undefined && status === 'INCOMING_AT' ? INCOMING_MIN_FRACTION : 0,
     departsInS: hop.departsInS,
     capped: arriveAt !== hop.arriveAt,
-    eased: input.easedRuns ?? true,
     rampShare: rampShareFor(D[hop.to]! - D[hop.from]!, runS - dwellS),
   }
 }
@@ -186,7 +181,6 @@ export function hopFraction(plan: HopPlan, now: number): number {
   if (plan.fixedFraction !== null) return plan.fixedFraction
   // The train holds at `from` until `runS - dwellS` before arriving, then runs for the rest of the hop.
   const u = clamp01(1 - (plan.arriveAt! - now) / (plan.runS - plan.dwellS))
-  if (!plan.eased) return Math.max(plan.minFraction, u)
   // An INCOMING_AT floor eases over the rest of the hop, so the floored train still pulls away and brakes. It is
   // never behind the plain ease (a status flip only moves the target forward) and still arrives at u = 1.
   const m = plan.minFraction
