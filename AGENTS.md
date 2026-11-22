@@ -391,8 +391,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   are always north-up. `enableRotate` stays on; the azimuth bounds alone stop a turn (toggling it
   mid-gesture applies a stale rotate start). A gesture turns the view only if it was armed at its start
   (`rotateArmed`: focused and tiltT ≥ 0.5, set by `onStart`, cleared by `onEnd`); otherwise `rotateSpeed` is 0
-  for all of it, so a pinch that starts unfocused or nearly top-down never turns, whatever its fingers do.
-  A bare station pivots on its own point. Markers and dots rescale with distance
+  for all of it, so an unarmed gesture never turns the view: a pinch that starts unfocused or nearly top-down
+  doesn't, whatever its fingers do. Each new contact (a second finger down fires `onStart` again) re-checks the
+  arming. A bare station pivots on its own point while that point is within its 100 m pan radius of the free
+  area's middle, else on that middle, so a far-off or held station can't swing the view away. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
 - Every `on*` handler passed to `MapControls` (today `onStart` and `onEnd`) stays referentially
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
@@ -476,7 +478,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
   up the screen); a bare station lands at the same distance with its point in the free area above the panel. Both
   retarget mid-flight when the interior or the panel's final size arrives (an interior arriving after 90% of
-  the flight adds no turn). Under prefers-reduced-motion station and point flights snap, with no turn. The
+  the flight adds no turn). Under prefers-reduced-motion station and point flights snap, with no turn; a snapped station whose interior
+  loads afterwards is reframed once onto it (snapped, no turn) unless a gesture started since. The
   location button frames its fix at ENTER_DISTANCE × 1.1 (about 1210 m) or farther.
   drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.
 

@@ -141,6 +141,7 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const f = focus
     if (!f) {
       armed.current = false
+      turnedFor.current = null
       return
     }
     if (turnedFor.current !== focusPos) {
@@ -161,8 +162,16 @@ export function useStationOrbit({ controls, camera, focusPos, interior, viewport
     const landed = wasFlying.current
     wasFlying.current = isFlying
     if (!isFlying && !landed && theta !== theta0) {
-      const ps = f.bare ? pivot.current : s
-      if (f.bare) screenOffsetTo(c.target, f.center, theta0, ps)
+      // A bare station pivots on its own point while it is within its pan radius of the free area's middle;
+      // farther off (a held flight, a station focused at the edge) on that middle, so a turn can't swing the view away.
+      let ps = s
+      if (f.bare) {
+        const mid = focusPoint(c.target, s.right, s.toward, theta0, point.current)
+        if (Math.hypot(mid.x - f.center.x, mid.z - f.center.z) <= f.radius) {
+          screenOffsetTo(c.target, f.center, theta0, pivot.current)
+          ps = pivot.current
+        }
+      }
       if (rotating.current) {
         turnedBy.current += Math.abs(wrapAngle(theta - theta0))
         if (turnedBy.current > TURN_SEEN) markTurned()

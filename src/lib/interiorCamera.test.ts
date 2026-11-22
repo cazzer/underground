@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { PerspectiveCamera, Vector3 } from 'three'
-import { frameInterior, interiorFreeRect, LANDING_AXIS_OFF_VERTICAL, LANDING_DISTANCE, landingAzimuth, type InteriorFrameInput } from './interiorCamera'
+import {
+  frameInterior,
+  interiorFreeRect,
+  LANDING_AXIS_OFF_VERTICAL,
+  LANDING_DISTANCE,
+  landingAzimuth,
+  LATE_TURN_PROGRESS,
+  retargetTurn,
+  type InteriorFrameInput,
+} from './interiorCamera'
 import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_RADIUS } from './focusMachine'
 import { interiorOpacity } from './interiorReveal'
 import { DEFAULT_TILT, ISO_POLAR, tiltT } from './tilt'
@@ -154,5 +163,18 @@ describe('landingAzimuth', () => {
         expect(offVertical(axis, az)).toBeLessThanOrEqual(alpha + 1e-9)
       }
     }
+  })
+})
+
+describe('retargetTurn', () => {
+  it('keeps a decided turn at any progress, so a retarget never re-picks it', () => {
+    expect(retargetTurn(true, 0)).toBe('keep')
+    expect(retargetTurn(true, 0.99)).toBe('keep')
+  })
+
+  it('decides when the interior arrives up to LATE_TURN_PROGRESS, and lands without a turn after it', () => {
+    expect(retargetTurn(false, 0.2)).toBe('decide')
+    expect(retargetTurn(false, LATE_TURN_PROGRESS)).toBe('decide')
+    expect(retargetTurn(false, LATE_TURN_PROGRESS + 0.01)).toBe('none')
   })
 })

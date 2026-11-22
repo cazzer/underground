@@ -75,6 +75,22 @@ export function freeCenterShift(
  */
 export const PORTRAIT_GROUND_RATIO = 1.5
 
+/** An interior arriving after this much of its flight (eased progress) lands without a turn. */
+export const LATE_TURN_PROGRESS = 0.9
+
+/** How a mid-flight retarget handles the landing turn. */
+export type RetargetTurn = 'keep' | 'decide' | 'none'
+
+/**
+ * The landing turn on a retarget onto an interior, at eased progress `e0`: keep the turn already decided (once
+ * per flight, so it can't stop halfway or whip), decide it now if the interior just arrived, or land without
+ * one when it arrived after LATE_TURN_PROGRESS.
+ */
+export function retargetTurn(decided: boolean, e0: number): RetargetTurn {
+  if (decided) return 'keep'
+  return e0 <= LATE_TURN_PROGRESS ? 'decide' : 'none'
+}
+
 /**
  * How far off screen-vertical a portrait landing leaves the platform axis, radians (25°): most of the fit
  * gain of a straight-up axis, while the levels still read apart in the isometric view.

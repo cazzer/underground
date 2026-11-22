@@ -8,7 +8,7 @@ import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
 import { nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightDuration, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
-import { interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
+import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
 import { tiltForDistance } from '../lib/tilt'
 import {
@@ -25,8 +25,6 @@ import type { InteriorModel } from './interiorModel'
 import { useStationOrbit } from './useStationOrbit'
 
 const MIN_DISTANCE = 40
-/** An interior arriving after this much of the flight (eased progress) lands without a turn. */
-const LATE_TURN_PROGRESS = 0.9
 /** How far past the fitted city overview the user may zoom out. */
 const MAX_ZOOM_OUT = 1.3
 
@@ -64,6 +62,8 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   const gesture = useRef(false)
   /** A gesture ended since the last frame: that frame restarts the wait too, however long frames take. */
   const gestureEnded = useRef(false)
+  /** Station a reduced-motion flight snapped to before its interior loaded; reframed once when it arrives. */
+  const snapped = useRef<string | null>(null)
 
   // Fit the whole city once; resizing later keeps the user's view.
   useLayoutEffect(() => {
@@ -95,6 +95,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       if (!c) throw new Error('Fly request before the map controls mounted')
       hold.current = null
       flushMotion(c, camera)
+      snapped.current = null
       const l = latest.current
       const dest = pointFlight(flyRequest, l.size, l.insets, camera.fov, l.maxDistance)
       const fromDistance = camera.position.distanceTo(c.target)
@@ -120,6 +121,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     flushMotion(c, camera)
     const reduced = prefersReducedMotion()
     const known = l.interior?.stationId === station.id ? l.interior : null
+    snapped.current = reduced && !known ? station.id : null
     const dest = known
       ? interiorFlight(known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
       : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
@@ -143,6 +145,16 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
   useEffect(() => {
     const f = flight.current
     const c = controls.current
+    if (c && !f && interior && snapped.current === interior.stationId) {
+      // A reduced-motion flight already snapped to the bare station: snap once more onto the interior, no turn.
+      snapped.current = null
+      const az = c.getAzimuthalAngle()
+      const dest = interiorFlight(interior, size, insets, panel, camera.fov, az, false)
+      const fromDistance = camera.position.distanceTo(c.target)
+      const from = c.target.clone()
+      flight.current = { ...dest, from, fromDistance, fromAzimuth: az, turnDecided: true, elapsed: 0, duration: 0, e0: 0 }
+      return
+    }
     if (!c || !f || f.stationId === null) return
     const station = network.stationById.get(f.stationId)
     if (!station) return
@@ -151,13 +163,11 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
     let dest
     if (interior?.stationId !== f.stationId) {
       dest = stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
-    } else if (f.turnDecided) {
-      // Frame for the azimuth already chosen (the landing turn, or the current one when there is none).
-      dest = interiorFlight(interior, size, insets, panel, camera.fov, f.azimuth ?? az, false)
-      dest.azimuth = f.azimuth
     } else {
-      // The interior arrived mid-flight: decide the turn now, unless the flight is nearly down.
-      dest = interiorFlight(interior, size, insets, panel, camera.fov, az, e0 <= LATE_TURN_PROGRESS)
+      const turn = retargetTurn(f.turnDecided, e0)
+      // Keep: frame for the azimuth already chosen (the landing turn, or the current one when there is none).
+      dest = interiorFlight(interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide')
+      if (turn === 'keep') dest.azimuth = f.azimuth
       f.turnDecided = true
     }
     f.from.copy(c.target)
@@ -251,6 +261,7 @@ export function CameraRig({ network, insets, interior, panel }: CameraRigProps) 
       }
     }
     flight.current = null
+    snapped.current = null
     gesture.current = true
     onGestureStart()
   }, [camera, onGestureStart])
