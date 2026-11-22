@@ -4,7 +4,7 @@
  * about a borough) until the user moves the view themselves or picks a station:
  *   - a pointer drag past the click slop (6 px mouse, 10 px touch, as ScenePicker), a second finger down (a pinch),
  *     or any wheel step;
- *   - a station pick (tap, panel row or search result: any station flight).
+ *   - a station pick (tap, panel row or search result: any station flight), or a searched place (a `'place'` point flight).
  * A tap that doesn't move, or the controls' `start` alone, does not lift it. Allocation-free per pointer move.
  */
 

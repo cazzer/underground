@@ -9,6 +9,7 @@ import type { OutagePanelView } from '../lib/live/eneText'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
+import type { PlacePick } from '../lib/placeLabel'
 import { useTrainSelection } from '../lib/trainSelection'
 import type { TransferLineView } from '../lib/transferView'
 import type { LocateControls } from '../data/useLocate'
@@ -21,12 +22,14 @@ import { LinkNotice } from './LinkNotice'
 import { LocateButton } from './LocateButton'
 import { LocateStatus } from './LocateStatus'
 import { OrbitHint } from './OrbitHint'
+import { PlaceStatus } from './PlaceStatus'
 import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
 import { TripAnnouncer } from './TripAnnouncer'
 import { TripButton } from './TripButton'
 import { TripPanel } from './TripPanel'
+import { usePlaceLine } from './usePlaceLine'
 import { useTripPanel } from './useTripPanel'
 
 interface HudProps {
@@ -96,11 +99,13 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     if (hadFocus) searchButton.current?.focus({ preventScroll: true })
   }, [dismiss])
   const search = useRef<StationSearchHandle>(null)
+  const place = usePlaceLine()
   // Mirrors the dialog's native open state (set on open and on its close event); the Esc guard reads it.
   const [searchOpen, setSearchOpen] = useState(false)
   // Cancel and Esc leave focus to the dialog, which hands it back to the button that was focused when it
-  // opened. A choice instead moves it to the new station's panel, once the dialog has closed.
-  const focusPanelOnClose = useRef(false)
+  // opened. A station choice instead moves it to the new station's panel heading, a place choice to the place
+  // line, once the dialog has closed.
+  const focusOnClose = useRef<'station' | 'place' | null>(null)
   const openSearch = () => {
     // A tap doesn't focus a button on iOS; the dialog restores focus to whatever had it when it opened.
     searchButton.current?.focus()
@@ -109,13 +114,17 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   }
   const onSearchClosed = () => {
     setSearchOpen(false)
-    if (!focusPanelOnClose.current) return
-    focusPanelOnClose.current = false
-    stationHeading.current?.focus()
+    const target = focusOnClose.current
+    focusOnClose.current = null
+    if (target) (target === 'place' ? place.lineRef : stationHeading).current?.focus()
   }
   const onSearchChoose = (stationId: string) => {
-    focusPanelOnClose.current = true
+    focusOnClose.current = 'station'
     select(stationId)
+  }
+  const onSearchChoosePlace = (pick: PlacePick) => {
+    focusOnClose.current = 'place'
+    place.show(pick)
   }
   // Clearing removes the × the user just pressed; focus goes back to the button that started it.
   const { clear } = locate
@@ -188,6 +197,18 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             <LiveStatus status={live} />
           </p>
           <LocateStatus state={locate.state} onClear={onClearLocation} />
+          <PlaceStatus
+            ref={place.lineRef}
+            place={place.shown}
+            onGo={(id) => {
+              select(id)
+              setFocusReturns((n) => n + 1)
+            }}
+            onClear={() => {
+              place.clear()
+              searchButton.current?.focus({ preventScroll: true })
+            }}
+          />
           <OrbitHint />
           <p role="status" aria-live="polite" className="sr-only">
             {notice ?? ''}
@@ -261,7 +282,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
           />
         )}
       </div>
-      <StationSearch ref={search} network={network} onChoose={onSearchChoose} onClose={onSearchClosed} />
+      <StationSearch ref={search} network={network} fix={markedPlacement(locate.state)} onChoose={onSearchChoose} onChoosePlace={onSearchChoosePlace} onClose={onSearchClosed} />
     </div>
   )
 }

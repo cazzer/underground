@@ -15,6 +15,7 @@ about 250 more stations have generated ones (labelled "Estimated layout"), shown
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
+With the Worker configured the search dialog also finds addresses and places through `/geocode` (2q7.16; none of it without `VITE_RT_URL`).
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -330,8 +331,28 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   listbox of `SearchResult.tsx` rows (name and access icon, the borough on a dim line only for names whose stations span boroughs
   (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart); choosing a result
   calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). Optional `label`
-  (dialog name and input label, default "Search stations"), `placeholder` and `onClose` props let the trip panel mount two more
-  instances (From, To). The dialog's keydown stops Escape (the native cancel still closes it), so the HUD's window Esc
+  (dialog name and input label, default "Search stations and places", or "Search stations" with places off), `placeholder` and `onClose` props let the trip panel mount two more
+  instances (From, To). Places are on only when `GEOCODE_URL` (`realtime.ts`, from `VITE_RT_URL`) is set and the instance gets `onChoosePlace`:
+  then the stations still rank synchronously and unchanged, and `useGeocode.ts` (one per dialog, only while it is open) adds
+  addresses and places under them through `/geocode`: `lib/geocodeSearch.ts` the pure debounce and abort machine (250 ms after the
+  last keystroke, 3 to 100 code points of `normalizeQuery` text, a stale request aborted and its late answer ignored, `answerKey`
+  and `rememberAnswer`: a session memory cache of complete answers only, 50 entries), `data/geocodeFetch.ts` (`geocodeRequestUrl`,
+  `parseGeocodeResponse` checking every row at the boundary, `fetchGeocode`: `cache: 'no-store'`, `credentials: 'omit'`, 8 s timeout,
+  failures as `GeocodeAnswer` kinds, never an error's message), `lib/geocodeView.ts` (what shows and what the polite region says: one
+  sentence per settled query, "Still searching" only after 2 s, the unavailable sentence once per dialog session (`nextErrorSpoken`); the Worker's `street` rows are dropped, 2q7.14 owns streets),
+  `lib/searchItems.ts` (stations then places as one keyed list; the active option is tracked by key, so a late answer never moves it),
+  `lib/placeLabel.ts` (`displayCase`: GeoSearch names are UPPERCASE, so an all-caps segment is re-cased; `placeText`, `distanceText`,
+  `placePick`: the place's ground point and nearest station). `SearchResults.tsx` renders them: stations alone as the old flat
+  listbox, with places searched the APG grouped listbox from the first row (a "Stations" group, an "Addresses and places" group, present only with rows, of `PlaceResult.tsx` options, each named
+  by one spoken sentence "120 Broadway, Manhattan, address"), the "Searching" and error notes (aria-hidden; the two status
+  regions speak them), and the credit for the sources of the rows shown ("Address and place data: " and the contract's `GEOCODE_ATTRIBUTION` strings). A 503 or 429 answer reads as unavailable and is never retried (the next keystroke's request is the only retry). The dialog says "Addresses and places are looked up
+  through our server; your location is never sent." (the input's description). Picking a place in the HUD's search is a point
+  flight, not a station pick (`flyToPoint(…, 'place')`, 250 m radius, which lands at the 1450 m floor, top-down; it neither expands
+  a collapsed station panel nor bumps the collapse seq, and like any point flight it ends a train follow) and shows `PlaceStatus.tsx`
+  (`usePlaceLine.ts`): the place's label and "Go to <nearest station> · about 250 m", focus moved onto the sentence, gone with
+  the next flight of any kind or the ×; no pin is drawn at the place. In a trip's From or To search a place sets that end to
+  its nearest station and keeps a "near <place>" note (`TripProvider`'s `places`, shown under the end's name and in its spoken text;
+  any station pick, swap aside, clears it); it flies nowhere, and the place is not an exit walking destination. The dialog's keydown stops Escape (the native cancel still closes it), so the HUD's window Esc
   handler never also closes a panel; the HUD's `searchOpen` guard stays. `useKeyboardInset.ts`
   pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
   location message
@@ -472,7 +493,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `usePanelCollapseControls()` is the panels' (`usePanelToggle`). The trip flag resets silently when the trip panel closes (opening Trip
     is a request to plan, so it opens expanded). `tripBar.ts` `tripBarText`: the trip bar's "A → B", "From A", "To B" or "Trip" and its spoken form
   - `focus.tsx` focused/dismissed-station React context (not pure); it also carries point flights
-    (`flyToPoint`, used by the location button; drops focus, so an orbited view springs back north-up during the flight). In dev only it exposes
+    (`flyToPoint(center, radiusM, source)`, `source` `'locate'` or `'place'`, returns the request's nonce; used by the location button and a
+    searched place; drops focus, so an orbited view springs back north-up during the flight; `select` and `flyToPoint` share one nonce counter,
+    so `usePlaceLine` can tell whether its flight is still the latest) and `viewCenter()`, the camera target read on demand (registered by
+    `scene/ViewCenterSource.tsx`, which re-renders nothing; the address search's bias). In dev only it exposes
     `window.__underground.select(stationId)` for screenshots and Playwright checks
   - `locate.ts` a geolocation fix to a placement (near a station: frame the fix; inside the network but far:
     frame the fix and its nearest station; outside: nearest station only, no marker), failure codes, and the
@@ -695,7 +719,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   it when a train or notice covers the panel (or the panel is closed) closes that cover first. Esc moves focus only from inside the
   panel. The trip panel stays mounted (hidden, inert) under a train panel or notice, so its journeys, scroll and focus survive and a
   notice's auto-dismiss never moves focus; only an explicit open, the button, or a deliberate train/notice close focuses its heading.
-  The HUD's window Esc handler skips while any `dialog:modal` is open. Nothing typed or located is sent
+  The HUD's window Esc handler skips while any `dialog:modal` is open. The trip's two searches are the same dialog as the HUD's (a place
+  picked there sets the end to its nearest station, see `StationSearch`). Nothing located is sent anywhere. What is typed in a search
+  dialog goes to the Worker's `/geocode` alone, and only with the Worker configured (see Data, "Address search"); the trip itself
+  sends nothing.
 - `src/data/loadStationIndex.ts` fetches and validates `public/data/stations/index.json` (the ids that have an
   interior; generated by `data:stations`, so nothing is hand-kept; `scripts/lib/stationOutputs.test.ts` checks it
   against the files; authored and generated entries count alike); `loadStationInterior.ts` fetch and outer-shape check; `interiorCache.ts` one promise per id, failures
@@ -730,7 +757,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `timetable/dated/<date>.json` (patterns by stop sequence, 30 s units, same-station change rows; its header lists
   the rules a client may rely on; `DatedTimetableIndex` for `dated/index.json`) and
   `timetableCodec.ts` `decodePatternTimes` (pure, `.ts` imports): a pattern's trips to arrival and departure seconds
-- `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`; no fetching
+- `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`, the `/geocode` contract and the Worker's
+  `normalizeQuery` / `NYC_BBOX` (so the client's minimum length and cache key agree with the Worker's), `ENE_URL` and `GEOCODE_URL`
+  (siblings of `RT_URL`; an MTA host gives null); no fetching
 - `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`,
   `PackedDepthsFile` for `public/data/station-depths.json`, and `StationDepthsFile`, its per-track decoded form
 - `public/data/`: preprocessed static JSON (generated; `npm run data`, `npm run data:stations`)
@@ -813,8 +842,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`, the trimmed E&E outage
   list at `/ene` (equipment code, reason, since, returnAt; the client re-export is 2q7.21), and `/geocode` (NYC GeoSearch
   then Photon, merged, at most 8 `{label, kind, lat, lon, source}`)
-  - `src/schema.ts` the JSON contracts (types and consts only); the client re-exports the `/rt` one (`src/data/realtime.ts`
-    will re-export the `/geocode` types in 2q7.16, not yet)
+  - `src/schema.ts` the JSON contracts (types and consts only); the client re-exports them (`src/data/realtime.ts`)
   - `src/index.ts` routing (a `Map` of path to handler: `/rt` and `/ene` are `CachedRoute`s through `serveCached`, `/geocode`
     goes to `serveGeocode`; `/rt` 15 s, `/ene` 120 s), CORS;
     `serveCached.ts` the per-route memo, Cache API layer and herd guard (`serveCached`, with a 15 s backoff after a failed
@@ -1165,8 +1193,17 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   traces). Its responses are `Cache-Control: no-store` (the 1 h cache is server-side only, so no typed query reaches a
   device's disk cache) and carry no `x-rt-cache` header (it would be a cross-user oracle for recent searches). `focus` is the map
   centre or a chosen station, never the location fix; the Worker rounds it to 2 decimals and drops it outside the NYC bbox.
-  Answers carry `attribution`, which the UI must show beside the results (2q7.16). Upstreams see the Worker, never the
+  Answers carry `attribution`; the search dialog shows each source's credit under the results that use it (2q7.16). Upstreams see the Worker, never the
   client's IP or headers. `/geocode` refuses a request with no allowed Origin (403).
+- **Address search (2q7.16).** Only `/geocode` carries what the user types in a search dialog, and only with `VITE_RT_URL` set
+  (without it the dialog finds stations only, shows no disclosure and sends nothing). A request goes 250 ms after the last keystroke,
+  for 3 to 100 code points of normalized text, the stale one aborted, with `cache: 'no-store'` and `credentials: 'omit'`; complete
+  answers are remembered in memory for the session (no storage, URL or history). The query is never in the page URL, history, storage
+  or a console line (failures log a fixed kind and status). `focus` is the focused station, else the camera target, rounded to
+  2 decimals, and is left out whenever it lies within 2 km (or twice the framing radius) of a shown location fix, or of the last
+  location flight's center, or is the station nearest the fix (`lib/geocodeFocus.ts`; `lib/locateMemory.ts` remembers the flight's circle
+  and nearest station id in memory, through later flights and a cleared fix, until the camera target is farther from it than the guard,
+  when it is forgotten; the fix is only read there, to exclude, and no URL builder takes it). The dialog states this on screen.
 - **Walk shards are fetched only on a user action.** `data/walk/<id>.json` reveals its station id to the static host, so
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
   of a fix); no request carries the fix or the destination, and routing runs on the device.
@@ -1185,10 +1222,11 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   interior, the first journey's change there (none when it is across one platform). The router's change time stays transfers.json's (180 s at
   Union Sq). Revisit fetching all of them above about 8 authored files.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
-  `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it. Basemap tiles
+  `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it (the address search's `focus` is
+  the map's, kept away from the fix). Basemap tiles
   follow the camera, never the fix. After a location fly-to, tiles load no finer than z12 (several km a tile) until
   the user moves the view (a drag past the 6 px mouse / 10 px touch slop, a wheel step, a second finger) or picks a
-  station (tap, panel, search); a tap that doesn't move, or the controls' `start` alone, keeps the cap
+  station or a searched place (tap, panel, search; only a `'locate'` point flight sets the cap); a tap that doesn't move, or the controls' `start` alone, keeps the cap
   (`lib/basemap/locationCap.ts`, fed by `useBasemapTiles.ts`, which sets the cap in a layout effect, so it is in force
   before any frame of the flight, even a reduced-motion one). Following a train or keyboard input doesn't lift it.
   Tiles already loaded still draw.
@@ -1231,4 +1269,4 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Attribution.** Credit MTA and show "© OpenStreetMap contributors". Include a
   "may not be real time" notice. Don't use the MTA logo, route bullets, or the map. A `/geocode` answer's `attribution`
   ("NYC GeoSearch, NYC Department of City Planning" for address results; "© OpenStreetMap contributors, via komoot Photon"
-  for Photon rows) is shown beside the results.
+  for Photon rows) is shown under the results that use them, in the search dialog.

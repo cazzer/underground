@@ -66,8 +66,11 @@ export function lastPlacement(state: LocateState): Placement | null {
   }
 }
 
-/** The placement that gets a map marker (not "outside"), if any. */
-export function markedPlacement(state: LocateState): Extract<Placement, { kind: 'near' | 'far' }> | null {
+/** A placement that gets a map marker (not "outside"). */
+export type MarkedPlacement = Extract<Placement, { kind: 'near' | 'far' }>
+
+/** The placement that gets a map marker, if any. */
+export function markedPlacement(state: LocateState): MarkedPlacement | null {
   const p = lastPlacement(state)
   return p && p.kind !== 'outside' ? p : null
 }

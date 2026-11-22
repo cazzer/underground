@@ -1,5 +1,5 @@
 import { useRef, type Ref } from 'react'
-import type { TripEnd } from '../lib/trip'
+import type { TripEnd, TripPlaces } from '../lib/trip'
 import type { TripEnds as Ends } from '../lib/tripView'
 import type { Network } from '../lib/network'
 import { isTripEnd } from '../lib/tripEnds'
@@ -7,6 +7,8 @@ import { isTripEnd } from '../lib/tripEnds'
 interface TripEndsProps {
   network: Network
   ends: Ends
+  /** A searched place an end is the nearest station to, shown under its name. */
+  places: TripPlaces
   /** The station under the camera, offered as an end while it is neither. */
   focusedId: string | null
   /** The focused station's complex siblings (siblingIdsOf): while one is an end, the focused station isn't offered either. */
@@ -25,11 +27,13 @@ const LINK =
 interface EndRowProps {
   label: string
   name: string | null
+  /** The searched place this end is the nearest station to. */
+  near: string | null
   onPress: (button: HTMLButtonElement) => void
   ref: Ref<HTMLButtonElement>
 }
 
-function EndRow({ label, name, onPress, ref }: EndRowProps) {
+function EndRow({ label, name, near, onPress, ref }: EndRowProps) {
   return (
     <button
       ref={ref}
@@ -44,13 +48,14 @@ function EndRow({ label, name, onPress, ref }: EndRowProps) {
       {name ? (
         <span aria-hidden="true" className="min-w-0 py-1">
           {name}
+          {near && <span className="block text-xs text-ink-dim">near {near}</span>}
         </span>
       ) : (
         <span aria-hidden="true" className="text-ink-dim">
           Choose a station
         </span>
       )}
-      <span className="sr-only">{name ? `${label}: ${name}` : `${label}: choose a station`}</span>
+      <span className="sr-only">{name ? `${label}: ${name}${near ? `, nearest station to ${near}` : ''}` : `${label}: choose a station`}</span>
     </button>
   )
 }
@@ -61,7 +66,7 @@ function EndRow({ label, name, onPress, ref }: EndRowProps) {
  * doesn't focus a tapped button, and the dialog hands focus back to what had it). A shortcut disappears when it
  * is used, so focus moves to the row it filled, one frame later (after the row's new name has rendered).
  */
-export function TripEnds({ network, ends, focusedId, focusSiblings, nearestId, onPick, onSet, onSwap }: TripEndsProps) {
+export function TripEnds({ network, ends, places, focusedId, focusSiblings, nearestId, onPick, onSet, onSwap }: TripEndsProps) {
   const rows = { from: useRef<HTMLButtonElement>(null), to: useRef<HTMLButtonElement>(null) }
   const nameOf = (id: string | null) => (id ? (network.stationById.get(id)?.name ?? null) : null)
   const press = (end: TripEnd) => (button: HTMLButtonElement) => {
@@ -79,8 +84,8 @@ export function TripEnds({ network, ends, focusedId, focusSiblings, nearestId, o
     <div className="mt-2">
       <div className="flex items-center gap-1">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <EndRow ref={rows.from} label="From" name={nameOf(ends.from)} onPress={press('from')} />
-          <EndRow ref={rows.to} label="To" name={nameOf(ends.to)} onPress={press('to')} />
+          <EndRow ref={rows.from} label="From" name={nameOf(ends.from)} near={places.from} onPress={press('from')} />
+          <EndRow ref={rows.to} label="To" name={nameOf(ends.to)} near={places.to} onPress={press('to')} />
         </div>
         <button
           type="button"
