@@ -61,7 +61,8 @@ vec3 bandShift( vec3 p, vec4 b ) {
 }
 `
 
-function replaceOnce(src: string, anchor: string, by: string): string {
+/** `src` with its one `anchor` replaced by `by`; throws if the anchor is missing or repeated (three moved it). */
+export function replaceOnce(src: string, anchor: string, by: string): string {
   const at = src.indexOf(anchor)
   if (at < 0 || src.indexOf(anchor, at + anchor.length) >= 0) {
     throw new Error(`Band shader: LineMaterial's shader no longer has exactly one "${anchor}"; update bandLineMaterial.ts`)

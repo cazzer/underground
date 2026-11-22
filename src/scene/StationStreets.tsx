@@ -3,6 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, type Group } from 'three'
 import { interiorCovers, interiorStationIds } from '../data/interiorLoad'
 import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
+import type { StreetMask } from '../lib/basemap/streetMask'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
@@ -40,6 +41,8 @@ interface StationStreetsProps {
   labelBlockers: LabelBlockers
   /** For the station markers the labels keep clear of. */
   network: Network
+  /** Set while a layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
+  mask: StreetMask
 }
 
 /**
@@ -86,7 +89,7 @@ function streetMode(interior: InteriorModel | null): 'under' | 'over' | 'veiled'
  * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
  * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
  */
-function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network }: StreetLinesProps) {
+function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask }: StreetLinesProps) {
   const group = useRef<Group>(null)
   const shown = useRef(-1)
   const labelShown = useRef(0)
@@ -115,6 +118,15 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     return entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, at), ENTRANCE_SIZE_M, MARK_RGB)
   }, [layer, interior, interiorPending])
   const marks = useLineLayer(markBuffers, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
+  useLayoutEffect(() => {
+    mask.present = true
+    mask.x = layer.anchor.x
+    mask.z = layer.anchor.z
+    mask.radiusM = layer.file.radiusM
+    return () => {
+      mask.present = false
+    }
+  }, [layer, mask])
   // A rebuilt layer (the mode changes when the interior lands) starts at full opacity: catch it up.
   useLayoutEffect(() => {
     shown.current = -1

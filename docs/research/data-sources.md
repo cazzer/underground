@@ -352,6 +352,10 @@ laptop, `?debug`; decode times as the worker reports them):
   on the page with the same code); the Times Sq tiles 0.4 to 0.8 ms; the densest Midtown tile, 15/9650/12317 (45,518 B), 0.7 ms
   warm. Far under the 25 ms desktop target; a phone 4 to 6 times slower stays under 25 ms (not measured on a phone).
 
+**Drawing (ost.9.3).** `src/scene/Basemap.tsx` draws the decoded segments as six faint line layers; it adds no source and no
+credit: everything drawn is OSM-derived (the "© OpenStreetMap contributors" line already shown; the client loads z9 and finer,
+so the z0 to z5 Natural Earth water, public domain anyway, is never drawn); landcover stays dropped. `Attribution.tsx` is unchanged.
+
 ## 6. Static-hosting fit and pipeline
 
 **The MTA terms require a proxy; CORS doesn't.** The plan is a Cloudflare Worker at `/rt` that:

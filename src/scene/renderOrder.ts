@@ -8,6 +8,14 @@ export const RENDER_ORDER = {
   grid: -1,
   // The focused station's streets, at street level under the location disc and the route lines.
   streets: 0.35,
+  // The citywide basemap (Basemap.tsx), one layer per class: over the station streets, whose radius it masks its
+  // roads out of as they fade in, and under the location disc and the route lines. Roads over water and parks.
+  basemapPark: 0.36,
+  basemapWater: 0.37,
+  basemapPath: 0.38,
+  basemapMinor: 0.39,
+  basemapMajor: 0.4,
+  basemapHighway: 0.41,
   lines: 1,
   // From a station marker down to its sunken platform tracks, under the marker disc.
   stationTie: 1.5,
