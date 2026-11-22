@@ -70,3 +70,20 @@ export function searchEmptyText(typed: boolean, stationCount: number, v: Geocode
       return v.places.length === 0 ? 'No stations or places match.' : null
   }
 }
+
+/**
+ * The unavailable sentence is spoken once per dialog session: `none` until an error shows, `speaking` while that error
+ * is up, `spoken` after it clears (a later error is silent), and back to `none` when the dialog closes.
+ */
+export type ErrorSpoken = 'none' | 'speaking' | 'spoken'
+
+export function nextErrorSpoken(prev: ErrorSpoken, v: GeocodeView, open: boolean): ErrorSpoken {
+  if (!open) return 'none'
+  if (v.status === 'error') return prev === 'none' ? 'speaking' : prev
+  return prev === 'speaking' ? 'spoken' : prev
+}
+
+/** `geocodeAnnouncement`, but an error already spoken this session says nothing. */
+export function announcementFor(v: GeocodeView, errorSpoken: ErrorSpoken): string {
+  return v.status === 'error' && errorSpoken === 'spoken' ? '' : geocodeAnnouncement(v)
+}

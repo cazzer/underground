@@ -339,13 +339,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and `rememberAnswer`: a session memory cache of complete answers only, 50 entries), `data/geocodeFetch.ts` (`geocodeRequestUrl`,
   `parseGeocodeResponse` checking every row at the boundary, `fetchGeocode`: `cache: 'no-store'`, `credentials: 'omit'`, 8 s timeout,
   failures as `GeocodeAnswer` kinds, never an error's message), `lib/geocodeView.ts` (what shows and what the polite region says: one
-  sentence per settled query, "Still searching" only after 2 s; the Worker's `street` rows are dropped, 2q7.14 owns streets),
+  sentence per settled query, "Still searching" only after 2 s, the unavailable sentence once per dialog session (`nextErrorSpoken`); the Worker's `street` rows are dropped, 2q7.14 owns streets),
   `lib/searchItems.ts` (stations then places as one keyed list; the active option is tracked by key, so a late answer never moves it),
   `lib/placeLabel.ts` (`displayCase`: GeoSearch names are UPPERCASE, so an all-caps segment is re-cased; `placeText`, `distanceText`,
   `placePick`: the place's ground point and nearest station). `SearchResults.tsx` renders them: stations alone as the old flat
-  listbox, with places the APG grouped listbox (a "Stations" group, an "Addresses and places" group of `PlaceResult.tsx` options, each named
+  listbox, with places searched the APG grouped listbox from the first row (a "Stations" group, an "Addresses and places" group, present only with rows, of `PlaceResult.tsx` options, each named
   by one spoken sentence "120 Broadway, Manhattan, address"), the "Searching" and error notes (aria-hidden; the two status
-  regions speak them), and the credit for the sources of the rows shown. The dialog says "Addresses and places are looked up
+  regions speak them), and the credit for the sources of the rows shown ("Address and place data: " and the contract's `GEOCODE_ATTRIBUTION` strings). A 503 or 429 answer reads as unavailable and is never retried (the next keystroke's request is the only retry). The dialog says "Addresses and places are looked up
   through our server; your location is never sent." (the input's description). Picking a place in the HUD's search is a point
   flight, not a station pick (`flyToPoint(…, 'place')`, 250 m radius, which lands at the 1450 m floor, top-down; it neither expands
   a collapsed station panel nor bumps the collapse seq, and like any point flight it ends a train follow) and shows `PlaceStatus.tsx`
@@ -1201,8 +1201,9 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   answers are remembered in memory for the session (no storage, URL or history). The query is never in the page URL, history, storage
   or a console line (failures log a fixed kind and status). `focus` is the focused station, else the camera target, rounded to
   2 decimals, and is left out whenever it lies within 2 km (or twice the framing radius) of a shown location fix, or of the last
-  location flight's center until another flight replaces it (`lib/geocodeFocus.ts`; the fix is only read there, to exclude, and no
-  URL builder takes it). The dialog states this on screen.
+  location flight's center, or is the station nearest the fix (`lib/geocodeFocus.ts`; `lib/locateMemory.ts` remembers the flight's circle
+  and nearest station id in memory, through later flights and a cleared fix, until the camera target is farther from it than the guard,
+  when it is forgotten; the fix is only read there, to exclude, and no URL builder takes it). The dialog states this on screen.
 - **Walk shards are fetched only on a user action.** `data/walk/<id>.json` reveals its station id to the static host, so
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
   of a fix); no request carries the fix or the destination, and routing runs on the device.

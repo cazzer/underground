@@ -6,9 +6,11 @@ import { toGround, type Ground } from './projection'
 
 const SMALL_WORDS = new Set(['of', 'the', 'and', 'at', 'on', 'in', 'for', 'de', 'la'])
 /** Vowel-less abbreviations that are words, not initials: "ST" is "St", "JFK" stays "JFK". */
-const ABBREVIATIONS = new Set(['st', 'rd', 'dr', 'ln', 'ct', 'blvd', 'pkwy', 'hwy', 'expy', 'tpke', 'sq', 'plz', 'mt', 'ft'])
-/** Initials with a vowel in them. */
-const INITIALISMS = new Set(['nyu', 'mta', 'lirr', 'cuny', 'suny', 'usps', 'ymca', 'ywca', 'nypd', 'fdny', 'usa', 'ne', 'nw', 'se', 'sw'])
+const ABBREVIATIONS = new Set(['st', 'rd', 'dr', 'ln', 'ct', 'blvd', 'pkwy', 'hwy', 'expy', 'tpke', 'sq', 'plz', 'pl', 'ctr', 'hts', 'mt', 'ft', 'apt', 'bldg', 'pk', 'brg'])
+/** Initials a vowel rule can't tell from words. */
+const INITIALISMS = new Set(['nyc', 'ny', 'nj', 'lga', 'jfk', 'nyu', 'att', 'cuny', 'suny', 'mta', 'lirr', 'usps', 'ymca', 'ywca', 'nypd', 'fdny', 'usa', 'bam', 'moma', 'ne', 'nw', 'se', 'sw'])
+/** After an apostrophe these one-letter prefixes keep the next letter capital ("O'Neill", "D'Angelo"); others don't ("B'way"). */
+const NAME_PREFIXES = new Set(['o', 'd'])
 
 const HAS_LETTER = /\p{L}/u
 const LOWERCASE = /\p{Ll}/u
@@ -23,17 +25,17 @@ function caseWord(word: string): string {
   if (/^\d/.test(word)) return word.toLowerCase()
   // "O'NEILL" keeps its capital after a one-letter prefix; "BARCLAY'S" doesn't.
   const [head = '', ...rest] = word.split("'")
-  const tail = rest.map((piece) => (head.replace(/\P{L}/gu, '').length === 1 ? titleCase(piece) : piece.toLowerCase()))
   const letters = head.replace(/\P{L}/gu, '')
   const lower = letters.toLowerCase()
-  const keepsCaps = letters.length >= 2 && !/[aeiou]/.test(lower) && !ABBREVIATIONS.has(lower)
+  const tail = rest.map((piece) => (NAME_PREFIXES.has(lower) ? titleCase(piece) : piece.toLowerCase()))
+  const keepsCaps = letters.length >= 2 && !/[aeiouy]/.test(lower) && !ABBREVIATIONS.has(lower)
   const first = keepsCaps || INITIALISMS.has(lower) ? head.toUpperCase() : titleCase(head)
   return [first, ...tail].join("'")
 }
 
 /**
  * Upstream GeoSearch names are all capitals ("120 BROADWAY"). A segment with any lowercase letter is left alone;
- * an all-caps one is cased word by word: small words lowercase, vowel-less initials ("JFK", "PS") and ordinals' digits kept.
+ * an all-caps one is cased word by word: small words lowercase, initials ("JFK", "AT&T", "NYU") kept, street abbreviations ("PL", "CTR") title-cased.
  */
 export function displayCase(segment: string): string {
   if (!HAS_LETTER.test(segment) || LOWERCASE.test(segment)) return segment
@@ -41,7 +43,8 @@ export function displayCase(segment: string): string {
     .split(' ')
     .map((word, i) => {
       if (i > 0 && SMALL_WORDS.has(word.toLowerCase())) return word.toLowerCase()
-      return word.split('-').map(caseWord).join('-')
+      // A hyphen or slash joins separately cased parts: "WILKES-BARRE", "ATLANTIC YARDS/BARCLAY'S CENTER".
+      return word.split(/([-/])/).map((part) => (part === '-' || part === '/' ? part : caseWord(part))).join('')
     })
     .join(' ')
 }

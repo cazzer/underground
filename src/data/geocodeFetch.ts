@@ -62,9 +62,9 @@ export function parseGeocodeResponse(raw: unknown): GeocodeResponse {
   return { version: GEOCODE_SCHEMA_VERSION, results, attribution: attribution as GeocodeResponse['attribution'], incomplete: r.incomplete }
 }
 
-/** HTTP status to a failure: 503 is the Worker's `busy`; 400 and 403 are our request refused. */
+/** HTTP status to a failure: 503 is the Worker's `busy` and 429 its `rate-limited` (both read "not available right now", and nothing retries); 400 and 403 are our request refused. */
 function failureForStatus(status: number): Extract<GeocodeAnswer, { ok: false }> {
-  if (status === 503) return { ok: false, error: 'busy', status }
+  if (status === 503 || status === 429) return { ok: false, error: 'busy', status }
   if (status === 400 || status === 403) return { ok: false, error: 'rejected', status }
   return { ok: false, error: 'upstream', status }
 }

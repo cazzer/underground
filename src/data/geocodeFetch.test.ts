@@ -69,6 +69,7 @@ describe('fetchGeocode', () => {
 
   it.each([
     [503, 'busy'],
+    [429, 'busy'],
     [502, 'upstream'],
     [500, 'upstream'],
     [400, 'rejected'],

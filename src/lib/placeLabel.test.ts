@@ -18,6 +18,16 @@ describe('displayCase', () => {
     ['PS 321', 'PS 321'],
     ['WILKES-BARRE', 'Wilkes-Barre'],
     ['NYU LANGONE', 'NYU Langone'],
+    ["ATLANTIC YARDS/BARCLAY'S CENTER", "Atlantic Yards/Barclay's Center"],
+    ["ST MARK'S PL", "St Mark's Pl"],
+    ['ASTOR PL', 'Astor Pl'],
+    ['LYNCH ST', 'Lynch St'],
+    ['ROCKEFELLER CTR', 'Rockefeller Ctr'],
+    ['WASHINGTON HTS', 'Washington Hts'],
+    ['AT&T BUILDING', 'AT&T Building'],
+    ['LGA AIRPORT', 'LGA Airport'],
+    ['NYC HEALTH', 'NYC Health'],
+    ["B'WAY", "B'way"],
   ])('%s -> %s', (from, to) => expect(displayCase(from)).toBe(to))
 
   it('leaves a segment with any lowercase letter alone', () => {

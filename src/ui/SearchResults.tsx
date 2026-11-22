@@ -15,6 +15,8 @@ interface SearchResultsProps {
   optionId: (key: string) => string
   multiBorough: ReadonlySet<string>
   view: GeocodeView
+  /** Places are searched: the listbox keeps its grouped structure from the first row, so no station option remounts when places arrive. */
+  grouped: boolean
   emptyText: string | null
   keyboardInset: number
   onChoose: (item: SearchItem<Station>) => void
@@ -28,33 +30,42 @@ function sourcesOf(view: GeocodeView): readonly GeocodeSource[] {
   return view.status === 'ready' || view.status === 'pending' ? view.sources : []
 }
 
-/** Credit for the sources whose rows are listed; the words come from the Worker's contract, the OSM link is ours. */
+const OSM_NAME = 'OpenStreetMap contributors'
+
+/** The Photon credit as the Worker words it, with the OpenStreetMap name linked (plain text if the wording ever lacks it). */
+function PhotonCredit() {
+  const [before, after] = GEOCODE_ATTRIBUTION.photon.split(OSM_NAME)
+  if (before === undefined || after === undefined) return <>{GEOCODE_ATTRIBUTION.photon}</>
+  return (
+    <>
+      {before}
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className={LINK_CLASS}>
+        {OSM_NAME}
+        <span className="sr-only"> (opens in new tab)</span>
+      </a>
+      {after}
+    </>
+  )
+}
+
+/** Credit for the sources whose rows are listed, each in the Worker contract's words. */
 function SourceCredit({ sources }: { sources: readonly GeocodeSource[] }) {
   if (sources.length === 0) return null
   return (
     <p className="px-3 py-2 text-xs text-ink-dim">
-      {sources.includes('geosearch') && <>Addresses: {GEOCODE_ATTRIBUTION.geosearch}</>}
-      {sources.length === 2 && ' · '}
-      {sources.includes('photon') && (
-        <>
-          Places: ©{' '}
-          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className={LINK_CLASS}>
-            OpenStreetMap contributors
-            <span className="sr-only"> (opens in new tab)</span>
-          </a>
-          , via komoot Photon
-        </>
-      )}
+      Address and place data: {sources.includes('geosearch') && GEOCODE_ATTRIBUTION.geosearch}
+      {sources.length === 2 && '; '}
+      {sources.includes('photon') && <PhotonCredit />}
     </p>
   )
 }
 
 /**
- * The dialog's scroll area: the listbox (stations alone as one flat list, as before; with places, the stations and the
- * places as two groups of one listbox), the notes a status region already speaks, and the credit. Option ids come
+ * The dialog's scroll area: the listbox (stations alone as one flat list, as before; with places searched, always the
+ * grouped listbox, a "Stations" group and, once there are rows, an "Addresses and places" group), the notes a status region already speaks, and the credit. Option ids come
  * from `optionId` so the input's `aria-activedescendant` can name any of them.
  */
-export function SearchResults({ network, listId, items, current, optionId, multiBorough, view, emptyText, keyboardInset, onChoose, onActive }: SearchResultsProps) {
+export function SearchResults({ network, listId, items, current, optionId, multiBorough, view, grouped, emptyText, keyboardInset, onChoose, onActive }: SearchResultsProps) {
   const stationRows: ReactNode[] = []
   const placeRows: ReactNode[] = []
   items.forEach((item, i) => {
@@ -82,24 +93,26 @@ export function SearchResults({ network, listId, items, current, optionId, multi
   return (
     <div style={{ paddingBottom: keyboardInset }} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {items.length > 0 &&
-        (placeRows.length === 0 ? (
-          <ul id={listId} role="listbox" aria-label="Stations">
-            {stationRows}
-          </ul>
-        ) : (
+        (grouped ? (
           <div id={listId} role="listbox" aria-label="Stations, addresses and places">
             {stationRows.length > 0 && (
               <ul role="group" aria-label="Stations">
                 {stationRows}
               </ul>
             )}
-            <ul role="group" aria-labelledby={headingId}>
-              <li role="presentation" id={headingId} className="px-3 pt-3 pb-1 text-xs text-ink-dim uppercase">
-                Addresses and places
-              </li>
-              {placeRows}
-            </ul>
+            {placeRows.length > 0 && (
+              <ul role="group" aria-labelledby={headingId}>
+                <li role="presentation" id={headingId} className="px-3 pt-3 pb-1 text-xs text-ink-dim uppercase">
+                  Addresses and places
+                </li>
+                {placeRows}
+              </ul>
+            )}
           </div>
+        ) : (
+          <ul id={listId} role="listbox" aria-label="Stations">
+            {stationRows}
+          </ul>
         ))}
       {emptyText && (
         <p className="p-3 text-sm text-ink-dim" aria-hidden="true">

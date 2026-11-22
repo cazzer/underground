@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { dismissLocate, failLocating, failureFromCode, placeFix, startLocating, toFix, type LocateFailure, type LocateState } from '../lib/locate'
 import type { Network } from '../lib/network'
+import { rememberLocate } from '../lib/locateMemory'
 import type { Ground } from '../lib/projection'
 
 /**
@@ -72,7 +73,11 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
           return
         }
         settle(id, () => ({ status: 'located', placement }))
-        if (placement.kind !== 'outside') latest.current.flyToPoint(placement.viewCenter, placement.viewRadiusM, 'locate')
+        if (placement.kind !== 'outside') {
+          // The view now sits over the fix: the address search must keep its bias away from here (lib/geocodeFocus.ts).
+          rememberLocate({ center: placement.viewCenter, radiusM: placement.viewRadiusM, nearestId: placement.nearest.id })
+          latest.current.flyToPoint(placement.viewCenter, placement.viewRadiusM, 'locate')
+        }
       },
       (err) => {
         // Code and message only: never the position.

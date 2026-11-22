@@ -3,7 +3,8 @@ import { GEOCODE_URL } from '../data/realtime'
 import { useGeocode } from '../data/useGeocode'
 import { useFocus } from '../lib/focus'
 import { geocodeFocus } from '../lib/geocodeFocus'
-import { geocodeAnnouncement, searchEmptyText } from '../lib/geocodeView'
+import { locateMemoryFor } from '../lib/locateMemory'
+import { announcementFor, nextErrorSpoken, searchEmptyText, type ErrorSpoken } from '../lib/geocodeView'
 import { multiBoroughNames } from '../lib/labels'
 import type { MarkedPlacement } from '../lib/locate'
 import type { Network, Station } from '../lib/network'
@@ -72,19 +73,26 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const results = useMemo(() => searchStations(index, query), [index, query])
   // The bias is read when a request goes out, not per render.
-  const { focusedId, viewCenter, flyRequest } = useFocus()
-  const latest = useRef({ focusedId, flyRequest, fix })
+  const { focusedId, viewCenter } = useFocus()
+  const latest = useRef({ focusedId, fix })
   useEffect(() => {
-    latest.current = { focusedId, flyRequest, fix }
+    latest.current = { focusedId, fix }
   })
-  const focusFn = () =>
-    geocodeFocus({
+  const focusFn = () => {
+    const view = viewCenter()
+    return geocodeFocus({
       station: network.stationById.get(latest.current.focusedId ?? '')?.pos ?? null,
-      view: viewCenter(),
+      stationId: latest.current.focusedId,
+      view,
       fix: latest.current.fix,
-      lastFly: latest.current.flyRequest,
+      locate: locateMemoryFor(view),
     })
+  }
   const geo = useGeocode(placesOn ? GEOCODE_URL : null, query, open, focusFn)
+  // The unavailable sentence is spoken once per dialog session; the state follows the view during render.
+  const [errorSpoken, setErrorSpoken] = useState<ErrorSpoken>('none')
+  const nextSpoken = nextErrorSpoken(errorSpoken, geo, open)
+  if (nextSpoken !== errorSpoken) setErrorSpoken(nextSpoken)
   const items = useMemo(
     () => searchItems(results, geo.status === 'ready' || geo.status === 'pending' ? geo.places : []),
     [results, geo],
@@ -206,7 +214,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
           {statusText(typed, results.length)}
         </p>
         <p role="status" className="sr-only">
-          {geocodeAnnouncement(geo)}
+          {announcementFor(geo, nextSpoken)}
         </p>
         {!typed && (
           <p id={hintId} className="p-3 text-sm text-ink-dim">
@@ -221,6 +229,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, fix = null, on
           optionId={optionId}
           multiBorough={multiBorough}
           view={geo}
+          grouped={placesOn}
           emptyText={searchEmptyText(typed, results.length, geo)}
           keyboardInset={keyboardInset}
           onChoose={choose}

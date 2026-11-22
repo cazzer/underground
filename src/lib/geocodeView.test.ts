@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GeocodeResult } from '../data/realtime'
 import { INITIAL_GEOCODE, type GeocodeMachine } from './geocodeSearch'
-import { GEOCODE_ERROR_TEXT, geocodeAnnouncement, geocodeView, searchEmptyText } from './geocodeView'
+import { announcementFor, GEOCODE_ERROR_TEXT, geocodeAnnouncement, geocodeView, nextErrorSpoken, searchEmptyText } from './geocodeView'
 
 const row = (label: string, kind: GeocodeResult['kind'], source: GeocodeResult['source']): GeocodeResult => ({ label, kind, source, lat: 40.7, lon: -74 })
 const shown = (results: GeocodeResult[]) => ({ query: 'q', response: { version: 1 as const, results, attribution: {}, incomplete: false } })
@@ -68,5 +68,25 @@ describe('searchEmptyText', () => {
     expect(searchEmptyText(true, 0, { status: 'pending', tier: 0, places: [], sources: [] })).toBeNull()
     expect(searchEmptyText(true, 0, none)).toBe('No stations or places match.')
     expect(searchEmptyText(true, 0, { status: 'ready', places: [row('A', 'place', 'photon')], sources: ['photon'] })).toBeNull()
+  })
+})
+
+describe('the unavailable sentence is spoken once per dialog session', () => {
+  const error = { status: 'error', error: 'busy' } as const
+  const pending = { status: 'pending', tier: 0, places: [], sources: [] } as const
+
+  it('speaks the first error, then stays silent on repeats until the dialog closes', () => {
+    let state = nextErrorSpoken('none', error, true)
+    expect(state).toBe('speaking')
+    expect(announcementFor(error, state)).toBe("Address search isn't available right now")
+    state = nextErrorSpoken(state, error, true)
+    expect(state).toBe('speaking')
+    state = nextErrorSpoken(state, pending, true)
+    expect(state).toBe('spoken')
+    state = nextErrorSpoken(state, error, true)
+    expect(state).toBe('spoken')
+    expect(announcementFor(error, state)).toBe('')
+    expect(announcementFor({ status: 'ready', places: [], sources: [] }, state)).toBe('No addresses or places match')
+    expect(nextErrorSpoken(state, error, false)).toBe('none')
   })
 })
