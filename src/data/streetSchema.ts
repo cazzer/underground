@@ -15,8 +15,8 @@
  *    so what the file says and what the join saw are one thing.
  *  - Ways are sorted by id, entrances by x then z.
  *  - A complex's members all carry the complex's whole entrance set, each around its own anchor. `stopIds` are the
- *    catalog row's own stops, so an entrance's `stopIds` may not include this file's station. An entrance past `radiusM`
- *    has no street (`street` null, no label).
+ *    catalog row's own stops, so an entrance's `stopIds` may not include this file's station. An entrance shared from another
+ *    member is kept only within `radiusM` of the anchor; the member's own entrances always stay.
  *
  *  The client decoder (ost.4) owns turning the packed node table into meters.
  *

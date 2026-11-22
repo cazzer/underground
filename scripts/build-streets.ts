@@ -67,7 +67,7 @@ function main(): void {
   for (const l of log) console.log(`${l.kind === 'no-ways' ? '' : 'streets: '}${l.line}`)
   const gaps = byKind('near-miss').map((l) => l.gapM!)
   console.log('streets: log counts')
-  for (const kind of ['no-street', 'near-miss', 'bridge-tunnel', 'far-entrance', 'no-entrances', 'no-ways', 'whole-way', 'oneway'] as const) {
+  for (const kind of ['no-street', 'near-miss', 'bridge-tunnel', 'far-entrance', 'no-entrances', 'shared-dropped', 'no-ways', 'whole-way', 'oneway'] as const) {
     const extra = kind === 'near-miss' && gaps.length > 0 ? ` (median gap ${median(gaps).toFixed(1)} m)` : ''
     console.log(`  ${kind}: ${byKind(kind).length}${extra}`)
   }

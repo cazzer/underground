@@ -69,12 +69,6 @@
     {"id":1335878041,"highway":"footway","name":null,"oneway":0,"nodes":[79,80]}
   ],
   "entrances": [
-    {"x":-3909,"z":920,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 12th Street","wayId":646635889,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":-3517,"z":1142,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 12th Street","wayId":646635889,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":-3494,"z":226,"type":"Stair","entry":false,"exit":true,"stopIds":["132"],"street":"West 13th Street","wayId":5669806,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":-3200,"z":-359,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 14th Street","wayId":1080982438,"cross":"7th Avenue","crossWayId":196117091,"side":"SW","plaza":null},
-    {"x":-3122,"z":430,"type":"Stair","entry":false,"exit":true,"stopIds":["132"],"street":"West 13th Street","wayId":5669806,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":-2943,"z":-636,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":852992099,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-2926,"z":-95,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":196117091,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-2677,"z":-391,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 14th Street","wayId":1080982437,"cross":"7th Avenue","crossWayId":852992099,"side":"NE","plaza":null},
     {"x":-832,"z":901,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"south","plaza":null},

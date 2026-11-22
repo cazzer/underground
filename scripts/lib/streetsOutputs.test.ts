@@ -85,20 +85,19 @@ describe('committed street files', () => {
     }
   })
 
-  it("give every member of a complex the whole complex's entrances (Union Sq L03, R20 and 635 alike)", () => {
-    const catalog = (json(new URL('../../data/stations/catalog/stations.json', import.meta.url)) as { rows: { gtfsStopId: string; complexId: string }[] }).rows
-    const complexOf = new Map(catalog.map((r) => [r.gtfsStopId, r.complexId]))
-    const byComplex = new Map<string, string[]>()
-    for (const s of stations) byComplex.set(complexOf.get(s.id)!, [...(byComplex.get(complexOf.get(s.id)!) ?? []), s.id])
-    const sizes = new Map<string, number>()
-    for (const ids of byComplex.values()) {
-      if (ids.length < 2) continue
-      for (const id of ids) sizes.set(id, (json(new URL(`${id}.json`, OUT)) as StationStreets).entrances.length)
-      expect(new Set(ids.map((id) => sizes.get(id))).size, `complex of ${ids.join(', ')}`).toBe(1)
+  it("give every member of Union Sq (L03, R20 and 635) the complex's 12 entrances", () => {
+    const count = (id: string): number => (json(new URL(`${id}.json`, OUT)) as StationStreets).entrances.length
+    expect([count('L03'), count('R20'), count('635')]).toEqual([12, 12, 12])
+  })
+
+  it("hold no entrance shared from another member of the complex beyond the street radius", () => {
+    for (const name of names) {
+      const file = json(new URL(name, OUT)) as StationStreets
+      for (const e of file.entrances) {
+        if (e.stopIds.includes(file.stationId)) continue
+        expect(Math.hypot(e.x, e.z) / 10, `${name} ${e.type} at (${e.x}, ${e.z}) dm`).toBeLessThanOrEqual(file.radiusM)
+      }
     }
-    expect(sizes.get('L03')).toBeGreaterThan(0)
-    expect(sizes.get('L03')).toBe(sizes.get('635'))
-    expect(sizes.get('R20')).toBe(sizes.get('635'))
   })
 
   it('give Bedford Av (L08) its Bedford Av and North 7th Street corner', () => {

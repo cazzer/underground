@@ -102,6 +102,26 @@ describe('entrancesByStation over a complex', () => {
   })
 })
 
+describe('buildEntrances over a complex', () => {
+  const file = fileOf([horizontal(1, 'Main St', 0)])
+
+  it("drops a row shared from another member past the street radius, never one that lists the station", () => {
+    const own = row([20, 5])
+    const sharedNear = row([100, 5], { gtfsStopIds: ['T02'] })
+    const sharedFar = row([310, 5], { gtfsStopIds: ['T02'] })
+    const ownFar = row([320, 5], { gtfsStopIds: ['T01', 'T02'] })
+    const { entrances, log } = buildEntrances(STATION, [own, sharedNear, sharedFar, ownFar], file)
+    expect(entrances.map((e) => e.x)).toEqual([200, 1000, 3200])
+    const dropped = log.filter((l) => l.kind === 'shared-dropped')
+    expect(dropped).toHaveLength(1)
+    expect(dropped[0]!.line).toContain('dropped 1 shared')
+  })
+
+  it('logs nothing when no shared row is far', () => {
+    expect(buildEntrances(STATION, [row([20, 5]), row([30, 5], { gtfsStopIds: ['T02'] })], file).log.filter((l) => l.kind === 'shared-dropped')).toEqual([])
+  })
+})
+
 describe('buildEntrances', () => {
   it('sorts by x, then z, then type, and sorts the stop ids', () => {
     const file = fileOf([horizontal(1, 'Main St', 0)])

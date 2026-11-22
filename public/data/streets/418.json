@@ -244,7 +244,6 @@
     {"x":2460,"z":905,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"Fulton Street","wayId":1335306157,"cross":"William Street","crossWayId":526839040,"side":"SW","plaza":null},
     {"x":2473,"z":942,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"William Street","wayId":526839040,"cross":"Fulton Street","crossWayId":1335306157,"side":"SW","plaza":null},
     {"x":2654,"z":1030,"type":"Stair","entry":true,"exit":true,"stopIds":["229"],"street":"Fulton Street","wayId":1335306158,"cross":"William Street","crossWayId":526839040,"side":"SE","plaza":null},
-    {"x":2772,"z":761,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"William Street","wayId":1151033361,"cross":null,"crossWayId":null,"side":"east","plaza":null},
-    {"x":2911,"z":1012,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"Fulton Street","wayId":1335306158,"cross":null,"crossWayId":null,"side":"north","plaza":null}
+    {"x":2772,"z":761,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"William Street","wayId":1151033361,"cross":null,"crossWayId":null,"side":"east","plaza":null}
   ]
 }

@@ -17,7 +17,7 @@ export const NEAR_MISS_SLACK_M = JOIN_RADIUS_M - MEDIAN_MAX_M
 /** An entrance this close to the pin's radius edge may have streets cut off beyond it. */
 export const EDGE_MARGIN_M = 40
 
-export type LogKind = 'no-street' | 'near-miss' | 'bridge-tunnel' | 'far-entrance' | 'no-entrances' | 'no-ways' | 'whole-way' | 'oneway'
+export type LogKind = 'no-street' | 'near-miss' | 'bridge-tunnel' | 'far-entrance' | 'no-entrances' | 'shared-dropped' | 'no-ways' | 'whole-way' | 'oneway'
 
 export interface BuildLog {
   kind: LogKind
@@ -141,15 +141,26 @@ function nearMissGapM(p: [number, number], wayId: number, ways: readonly JoinWay
 }
 
 /** The station's entrances on the file's decimeter grid, joined to their streets, sorted by x, z, then type.
- *  `station` is its stations.json row; `rows` the catalog rows that list it (`entrancesByStation`). */
+ *  `station` is its stations.json row; `allRows` its catalog rows (`entrancesByStation`): those that list it, and the
+ *  complex's other rows, which are dropped past RADIUS_M (logged once per station). */
 export function buildEntrances(
   station: { id: StationId; name: string } & LatLon,
-  rows: readonly EntranceInput[],
+  allRows: readonly EntranceInput[],
   file: FileStreets,
 ): { entrances: StreetEntrance[]; log: BuildLog[] } {
   const ways = toJoinWays(file)
   const log: BuildLog[] = []
   const who = `${station.id} ${station.name}`
+  // A row shared from another member of the complex (it does not list this station) is dropped past the street
+  // radius: the streets there are clipped away, so it would be a streetless mark with no label.
+  const far = (row: EntranceInput): boolean => {
+    const g = toGround({ lat: row.lat, lon: row.lon }, station)
+    return Math.hypot(Math.round(g.x * 10), Math.round(g.z * 10)) / 10 > RADIUS_M
+  }
+  const rows = allRows.filter((row) => row.gtfsStopIds.includes(station.id) || !far(row))
+  if (rows.length < allRows.length) {
+    log.push({ kind: 'shared-dropped', line: `dropped ${allRows.length - rows.length} shared complex entrance(s) more than ${RADIUS_M} m away: ${who}` })
+  }
   if (rows.length === 0) log.push({ kind: 'no-entrances', line: `no entrances in the catalog: ${who}` })
   const entrances = rows.map((row): StreetEntrance => {
     const g = toGround({ lat: row.lat, lon: row.lon }, station)

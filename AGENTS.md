@@ -67,7 +67,8 @@ so dev and preview serve under that path.
   the street pin and the catalog entrances (clip to 300 m, simplify, project to decimeters, join each entrance to its street).
   Every member of a station complex gets the complex's whole entrance set (membership: `catalog/stations.json`
   `gtfsStopId` to `complexId`; a row's own `complexId` is not trusted), each at x/z around that member's own point;
-  an entrance past a member's 300 m clip has no street there (logged "no street", a mark but no label).
+  a shared entrance more than `radiusM` (300 m) from the member's own point is dropped (logged "dropped N shared"),
+  while the rows that list the member itself always stay.
   Rerun it after `data`, `data:streets:fetch`, `data:catalog:fetch` or a change to the `searchText.ts` synonyms (street join
   keys use them); `streetsOutputs.test.ts` fails while the files are stale. It builds and cap-checks every file before
   writing, prints the largest files, the totals and the join log (no street, near misses, bridge/tunnel ways, far entrances),
