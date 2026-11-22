@@ -17,7 +17,11 @@ interface StationSearchProps {
   network: Network
   onChoose: (stationId: string) => void
   /** The dialog closed (Esc, the Android back gesture, Cancel, or a choice); mirrors the native close event. */
-  onClose: () => void
+  onClose?: () => void
+  /** The dialog's name and the input's label; a second instance says what it picks. Default "Search stations". */
+  label?: string
+  /** The input's placeholder. Default "Station name". */
+  placeholder?: string
   ref: Ref<StationSearchHandle>
 }
 
@@ -32,9 +36,10 @@ function statusText(typed: boolean, count: number): string {
  * Full-screen station search in a native modal dialog: the page behind is inert, Esc closes it and focus
  * is trapped. Always mounted (closed, hence hidden) so `open()` can focus the input inside the tap. The input
  * is an ARIA combobox over a listbox; focus stays in the input and `aria-activedescendant` points at the
- * highlighted result. Closing hands focus back to whatever had it when the dialog opened.
+ * highlighted result. Closing hands focus back to whatever had it when the dialog opened. Esc closes it and goes no
+ * further: the dialog stops the keydown, so a window-level Esc handler (the HUD's panels) never also acts on it.
  */
-export function StationSearch({ network, onChoose, onClose, ref }: StationSearchProps) {
+export function StationSearch({ network, onChoose, onClose, label = 'Search stations', placeholder = 'Station name', ref }: StationSearchProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const list = useRef<HTMLUListElement>(null)
@@ -89,13 +94,16 @@ export function StationSearch({ network, onChoose, onClose, ref }: StationSearch
     <dialog
       ref={dialog}
       onClose={onClose}
-      aria-label="Search stations"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') e.stopPropagation()
+      }}
+      aria-label={label}
       className="pointer-events-auto m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-canvas p-0 text-ink backdrop:bg-canvas"
     >
       <div className="mx-auto flex h-full max-w-xl flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
         <div className="flex items-center gap-2 border-b border-edge p-3">
           <label htmlFor={`${id}-q`} className="sr-only">
-            Search stations
+            {label}
           </label>
           <div className="relative min-w-0 flex-1">
             <input
@@ -113,7 +121,7 @@ export function StationSearch({ network, onChoose, onClose, ref }: StationSearch
               autoCapitalize="none"
               spellCheck={false}
               enterKeyHint="go"
-              placeholder="Station name"
+              placeholder={placeholder}
               value={query}
               onChange={(e) => reset(e.target.value)}
               onKeyDown={onKeyDown}

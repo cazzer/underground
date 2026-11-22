@@ -17,6 +17,7 @@ import type { ScreenRect } from './lib/interiorCamera'
 import type { Network } from './lib/network'
 import type { BandedShapes } from './lib/networkBands'
 import { TrainSelectionProvider } from './lib/trainSelection'
+import { TripProvider } from './lib/trip'
 import { Scene } from './scene/Scene'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { Hud } from './ui/Hud'
@@ -108,7 +109,9 @@ export function App() {
       <main className="relative h-full w-full bg-canvas">
         {load.status === 'ready' ? (
           <TrainSelectionProvider layer={live.layer} network={load.network}>
-            <MapView network={load.network} bands={load.bands} live={live} />
+            <TripProvider stations={load.files.stations} arrivals={live.arrivals}>
+              <MapView network={load.network} bands={load.bands} live={live} />
+            </TripProvider>
           </TrainSelectionProvider>
         ) : (
           <LoadStatus load={load} onRetry={retry} />

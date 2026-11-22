@@ -200,8 +200,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   each pick (one row under the heading: "Following" with a Stop button while the camera follows the train, else a "Follow
   train" button; the same button node, so toggling keeps focus and the panel's size; its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useStopListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
-  notice, then the station, and closing either of the first two returns focus to the station heading or else
-  the location button); `LoadStatus.tsx` loading/error panel
+  notice, then the trip panel, then the station, and closing either of the first two returns focus to the trip heading, else the station heading, else
+  the Search button; `ArrivalsPanel.tsx` is the station panel (moved out of Hud.tsx, unchanged); `TripButton.tsx` the third header button (aria-expanded toggle) with
+  `useTripPanel.ts` (opens with `defaultEnds`, closes; × and Esc focus the station heading else the Trip button one frame later) and `TripPanel.tsx`, the trip
+  panel (see Navigation UI below), which sits behind a train or notice and in front of the station panel and shares its `panel` ref); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
   `FocusAnnouncer.tsx` a polite sr-only live region ("Showing <station>", name only) for any newly focused station (auto-focus, tap, link,
   "Go to"), 300 ms after it is entered and only if still focused, not covered by a train panel and not already holding focus (a
@@ -223,7 +225,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a combobox over a
   listbox of `SearchResult.tsx` rows (name and access icon, the borough on a dim line only for names whose stations span boroughs
   (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart); choosing a result
-  calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). `useKeyboardInset.ts`
+  calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). Optional `label`
+  (dialog name and input label, default "Search stations"), `placeholder` and `onClose` props let the trip panel mount two more
+  instances (From, To). The dialog's keydown stops Escape (the native cancel still closes it), so the HUD's window Esc
+  handler never also closes a panel; the HUD's `searchOpen` guard stays. `useKeyboardInset.ts`
   pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
   location message
   `OrbitHint.tsx` the header's muted turn hint under the status lines (right- or Shift-drag; two fingers on a
@@ -371,7 +376,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`consistSpanInto`, shared with picking), each on its chord between two track points (pitched on the profile), unfolding from the dot point (spacing and length by mix, section by the slot fade);
     `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within `carsReach` of the view center
     ((1 + 2 × tilt) camera distances plus 300 m, so 1 top-down and 3 at full tilt) are laid out; the rest are zeroed once
-- `src/lib/route/`: pure RAPTOR trip router (no fetch, React or three.js), not wired to the UI yet; tests colocated,
+- `src/lib/route/`: pure RAPTOR trip router (no fetch, React or three.js), used by the trip panel through `src/data/planTrip.ts`; tests colocated,
   `timetableFixture.ts` is the tests' mini timetable on `realtime/fixture.ts`'s stations
   - `types.ts` `Timetable` (immutable typed arrays), `Journey`/legs and the per-round `Labels`; `NO_TIME`
   - `stops.ts` `buildStopIndex` (child stops, stations, footpaths in CSR: a stop's own station at its change time,
@@ -391,7 +396,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     timetable files (`timetableCodec.ts`) into a `Timetable` (stop index = `stations.json`'s stops; pattern key
     `<label>/<file index>` so split lanes stay apart, trip id `<key>/<trip>`, label `<date>:<service>`; unknown
     stops and stations are skipped with one `console.warn`); `plan.ts` `planOn` runs `route` for epoch seconds and
-    returns `TripJourney`s (`departAt`/`arriveAt`/`startAt`/`endAt` in epoch seconds)
+    returns `TripJourney`s (`departAt`/`arriveAt`/`startAt`/`endAt` in epoch seconds; a ride leg's `terminalStop` is its
+    pattern's last stop, the headsign, looked up by pattern key in a per-timetable map, so `key#1` lanes resolve too)
   - `overlay.ts` `overlayRealtime(scheduled, { snapshot, nowS, day, lookup })`: for each healthy feed (not stale, no
     error; a snapshot over `SNAPSHOT_MAX_AGE_S` old overlays nothing) replaces the scheduled trips running or leaving in
     the next `REPLACEMENT_WINDOW_S` (30 min) with the feed's trips at predicted times, cancels the ones it lacks, and
@@ -402,7 +408,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     shifted times capped at now, after them its run times only when the feed's horizon cut the predictions off, else a
     short turn and a pattern of its own `rt:<stop ids>`), `overlayGroups.ts` regroups lanes (`key` minus `#j`) and
     rebuilds only the changed ones. Ids are `<feed>:<tripId>`, never a loader id. Feeds come from `ROUTE_FEED`
-    (`live/feedHealth.ts`). Not wired yet (2q7.9); `overlayFixture.ts` is the tests' scheduled evening and snapshots
+    (`live/feedHealth.ts`). Not wired to the trip panel yet (2q7.9 PR B); `overlayFixture.ts` is the tests' scheduled evening and snapshots
   - Times are integer seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days; may be negative or past 86400, |t| < 2^29); a loader shifts other
     service days itself and keeps their patterns separate
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
@@ -486,8 +492,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `interiorCache.ts`: `timetable/<service>.json`, `transfers.json`, and the calendar from `trip-index.json`) and
   `planTrip.ts` (`planTrip(stations, from, to, atS)`: reads the calendar, picks the window, fetches the files it
   needs, builds one `RouterTimetable` per window and `feedVersion`, kept as a single cache entry; `NoServiceError`
-  when the calendar has no service on that date). Nothing here loads at startup and nothing imports it yet: the
-  trip panel (2q7.9) is the first caller
+  when the calendar has no service on that date; User Timing measures `trip:fetch`, `trip:build` and `trip:route`).
+  Nothing here loads at startup; the trip panel opening is the first caller
+- Navigation UI (2q7.9, schedule only: live overlay is a follow-up): `src/lib/trip.tsx` `TripProvider` (wraps `MapView` in `App.tsx`)
+  and `useTrip` hold open, From and To in memory for the session (no URL, history or storage); `src/data/useTripPlan.ts` plans when
+  both ends are set and differ, leaving now (live clock once a snapshot has set it, else the device's), drops stale replies by request
+  id, replans every 30 s while open (silent), warms the timetable on open and shows "Finding trips…" only after 250 ms.
+  `src/lib/tripView.ts` (pure, tested): `defaultEnds` (a marked fix's nearest station is From, the focused station To; no fix: focused
+  is From), `tripMessage`, `orderJourneys`, `journeyView` (a journey departs with its first train), the spoken text, and the
+  announce rules (`shouldAnnounceTrip`: a settled plan once, not a refresh). `TripPanel.tsx` (`aside` "Trip"; heading takes focus on
+  mount) with `TripEnds.tsx` (From/To rows take focus, then open their own `StationSearch`), `TripJourneys.tsx` (disclosures, first
+  open; a station name calls `select`, the only camera move) and one always-mounted polite live region. Nothing typed or located is sent
 - `src/data/loadStationIndex.ts` fetches and validates `public/data/stations/index.json` (the ids that have an
   interior; generated by `data:stations`, so nothing is hand-kept; `scripts/lib/stationOutputs.test.ts` checks it
   against the files; authored and generated entries count alike); `loadStationInterior.ts` fetch and outer-shape check; `interiorCache.ts` one promise per id, failures
