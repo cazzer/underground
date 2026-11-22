@@ -4,6 +4,7 @@ import type { OutagePanelView } from '../lib/live/eneText'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { useStationStreets } from '../data/useStationStreets'
 import { listsStationFn } from '../lib/entranceList'
+import { accessLabel } from '../lib/labels'
 import type { Network } from '../lib/network'
 import { PartialAccessNote, StationName } from './AccessIcon'
 import { ArrivalsList } from './ArrivalsList'
@@ -35,16 +36,19 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
   const setHeading = useCallback((el: HTMLElement | null) => { headingRef.current = el }, [headingRef])
   const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
+  const access = accessLabel(station.access)
+  const barLabel = `Arrivals at ${station.name}${access === null ? '' : `, ${access}${outages.noStepFree ? '; no step-free access now' : ''}.`}`
   return (
     <aside
       ref={ref}
       aria-label={`Arrivals at ${station.name}`}
-      className={`pointer-events-auto max-h-full min-h-0 w-72 max-w-full overflow-auto border border-edge bg-panel text-ink backdrop-blur-sm sm:shrink-0 ${collapsed ? '' : 'p-4'}`}
+      className={`pointer-events-auto max-h-full min-h-0 ${collapsed ? 'w-full' : 'w-72'} max-w-full overflow-auto border border-edge bg-panel text-ink backdrop-blur-sm sm:w-72 sm:shrink-0 ${collapsed ? '' : 'p-4'}`}
     >
       {collapsed ? (
-        <ExpandBar ref={setHeading} controls={bodyId} onExpand={expand}>
-          <span className="sr-only">Arrivals at </span>
-          <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} />
+        <ExpandBar ref={setHeading} label={barLabel} controls={bodyId} onExpand={expand}>
+          <span aria-hidden="true">
+            <StationName name={station.name} access={station.access} context="card" />
+          </span>
         </ExpandBar>
       ) : (
         <div className="flex items-start justify-between gap-3">

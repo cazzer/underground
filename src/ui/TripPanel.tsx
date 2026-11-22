@@ -91,9 +91,11 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, exit
     <aside ref={setRef} onScroll={onScroll} aria-label="Trip" hidden={covered} inert={covered} className={`${PANEL} ${collapsed ? '' : 'p-4'}`}>
       <div ref={content}>
         {collapsed ? (
-          <ExpandBar ref={setHeading} controls={bodyId} onExpand={expand}>
-            <span aria-hidden="true">{bar.text}</span>
-            <span className="sr-only">{bar.spoken}</span>
+          <ExpandBar ref={setHeading} label={bar.spoken} controls={bodyId} onExpand={expand}>
+            <span aria-hidden="true" className="flex min-w-0">
+              <span className="min-w-0 truncate">{bar.head}</span>
+              <span className="min-w-0 shrink-[0.01] truncate whitespace-pre">{bar.tail}</span>
+            </span>
           </ExpandBar>
         ) : (
           <div className="flex items-start justify-between gap-3">

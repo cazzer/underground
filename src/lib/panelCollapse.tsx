@@ -29,10 +29,11 @@ const ControlsContext = createContext<PanelCollapseControls | null>(null)
 /**
  * Whether the station and trip panels are collapsed to a bar. The station flag lasts the session (browsing passes
  * through no-focus states, and a reset there would reopen the panel on every station); the trip flag resets when the
- * trip panel closes.
+ * trip panel closes. An explicit pick (a station flight request) expands a collapsed station panel without counting
+ * as a toggle: the pick's own flight frames it.
  */
 export function PanelCollapseProvider({ children }: { children: ReactNode }) {
-  const { focusedId } = useFocus()
+  const { focusedId, flyRequest } = useFocus()
   const { open } = useTrip()
   const { selectedSummary, notice } = useTrainSelection()
   const [state, dispatch] = useReducer(collapseReducer, INITIAL_COLLAPSE)
@@ -41,6 +42,11 @@ export function PanelCollapseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!open) dispatch({ type: 'tripClosed' })
   }, [open])
+
+  // Every explicit pick goes through `select`, which asks for a station flight; auto-focus never does.
+  useEffect(() => {
+    if (flyRequest?.kind === 'station') dispatch({ type: 'picked' })
+  }, [flyRequest])
 
   const collapsed = collapsedFront(state, front)
   const view = useMemo(() => ({ collapsed, seq: state.seq }), [collapsed, state.seq])

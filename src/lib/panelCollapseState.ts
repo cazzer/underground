@@ -15,6 +15,8 @@ export const INITIAL_COLLAPSE: CollapseState = { station: false, trip: false, se
 export type CollapseAction =
   | { type: 'set'; panel: CollapsiblePanel; collapsed: boolean; front: FrontPanel }
   | { type: 'tripClosed' }
+  /** An explicit station pick (search, tap, "Go to", a link): the station panel opens expanded. Not a toggle, so no `seq`. */
+  | { type: 'picked' }
 
 /**
  * Which panel is in front, in the order Hud.tsx renders them: a train panel, then a gone notice, then the trip panel
@@ -34,6 +36,7 @@ export function frontPanel(input: { trainShown: boolean; noticeShown: boolean; t
  */
 export function collapseReducer(state: CollapseState, action: CollapseAction): CollapseState {
   if (action.type === 'tripClosed') return state.trip ? { ...state, trip: false } : state
+  if (action.type === 'picked') return state.station ? { ...state, station: false } : state
   if (action.front !== action.panel || state[action.panel] === action.collapsed) return state
   return { ...state, [action.panel]: action.collapsed, seq: state.seq + 1 }
 }

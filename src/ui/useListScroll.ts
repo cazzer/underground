@@ -39,7 +39,8 @@ export function useListScroll<L extends HTMLElement = HTMLOListElement>(rowCount
 
   const measureCap = useCallback(() => {
     const ol = list.current
-    if (!ol) return
+    // Hidden (a collapsed panel's body): every rect is 0, so keep the last cap rather than measure a 0 one.
+    if (!ol || ol.getClientRects().length === 0) return
     const rows = [...ol.children]
     let cap: number | null = null
     if (isStackedPanel() && rows.length > MIN_ROWS) {

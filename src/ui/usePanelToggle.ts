@@ -1,4 +1,5 @@
 import { useCallback, type RefObject } from 'react'
+import { flushSync } from 'react-dom'
 import { usePanelCollapseControls } from '../lib/panelCollapse'
 import type { CollapsiblePanel } from '../lib/panelCollapseState'
 
@@ -9,15 +10,16 @@ export interface PanelToggle {
 }
 
 /**
- * One panel's collapse. After each toggle focus goes to `focusTarget` one frame later (the bar when collapsed, the
- * heading when expanded: the panel points the one ref at whichever is showing), since a tap doesn't focus a button on iOS.
+ * One panel's collapse. The toggle commits at once and focus goes to `focusTarget` in the same task (the bar when
+ * collapsed, the heading when expanded: the panel points the one ref at whichever is showing), so no frame has focus on
+ * the body; a tap doesn't focus a button on iOS, so it always moves.
  */
 export function usePanelToggle(panel: CollapsiblePanel, focusTarget: RefObject<HTMLElement | null>): PanelToggle {
   const { stationCollapsed, tripCollapsed, setCollapsed } = usePanelCollapseControls()
   const set = useCallback(
     (next: boolean) => {
-      setCollapsed(panel, next)
-      requestAnimationFrame(() => focusTarget.current?.focus({ preventScroll: true }))
+      flushSync(() => setCollapsed(panel, next))
+      focusTarget.current?.focus({ preventScroll: true })
     },
     [panel, setCollapsed, focusTarget],
   )
