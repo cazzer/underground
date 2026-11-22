@@ -16,60 +16,17 @@ import { trimEnvelopes } from './lib/catalogEnvelopes.ts'
 import { catalogBbox, trimOverpassCatalog } from './lib/catalogOsm.ts'
 import { OPEN_NY_TERMS } from './lib/catalogTypes.ts'
 import type { SodaHeader } from './lib/catalogTypes.ts'
+import { getJson } from './lib/fetchJson.ts'
 import { toStableJson } from './lib/stableJson.ts'
 
 const DIR = new URL('../data/stations/catalog/', import.meta.url)
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
 const SODA = 'https://data.ny.gov'
-const HEADERS = { 'User-Agent': 'underground-data-build/1.0', Accept: 'application/json' }
-const TIMEOUT_MS = 90_000
 const OVERPASS_TIMEOUT_MS = 240_000
 const ROW_LIMIT = 5000
-const RETRY_STATUSES = [429, 502, 503, 504]
-const RETRY_DELAYS_S = [30, 60, 120]
 const RADII = { platformRadiusM: 250, trackRadiusM: 300 }
 const MAX_FILE_BYTES = 2_000_000
 const MAX_TOTAL_BYTES = 5_000_000
-
-/** Seconds from a Retry-After header, as a number of seconds; an HTTP date or junk is ignored. */
-function retryAfterS(res: Response): number | undefined {
-  const n = Number(res.headers.get('Retry-After'))
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 300) : undefined
-}
-
-/** undici reports a dropped connection as TypeError "fetch failed" (cause: the socket error) and a cut
- *  body as TypeError "terminated"; a timeout is a TimeoutError, a stalled request an AbortError. Anything
- *  else (a bug, bad JSON) is not retried. */
-function isTransient(err: unknown): boolean {
-  if (err instanceof TypeError) return err.message === 'fetch failed' || err.message === 'terminated'
-  return err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')
-}
-
-const sleep = (s: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, s * 1000))
-
-/** GET or POST returning JSON. Retries 429/502/503/504 and thrown network errors (reset, timeout) after
- *  30, 60 and 120 s, or the Retry-After the server sent. */
-async function getJson(url: string, init: RequestInit = {}, timeoutMs = TIMEOUT_MS): Promise<unknown> {
-  const what = `${init.method ?? 'GET'} ${url}`
-  for (let attempt = 0; ; attempt++) {
-    const delay = RETRY_DELAYS_S[attempt]
-    let wait: number | undefined
-    let why: string
-    try {
-      const res = await fetch(url, { ...init, headers: { ...HEADERS, ...init.headers }, signal: AbortSignal.timeout(timeoutMs) })
-      if (res.ok) return await res.json()
-      await res.body?.cancel()
-      if (!RETRY_STATUSES.includes(res.status) || delay === undefined) throw new Error(`${what}: HTTP ${res.status} ${res.statusText}`)
-      why = `HTTP ${res.status}`
-      wait = retryAfterS(res)
-    } catch (err) {
-      if (delay === undefined || !isTransient(err)) throw err
-      why = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-    }
-    console.log(`${what}: ${why}; retry ${attempt + 1} of ${RETRY_DELAYS_S.length} in ${wait ?? delay} s`)
-    await sleep(wait ?? delay!)
-  }
-}
 
 /** Header plus the exact rows: count(*) first, then everything in one page; the counts must agree. */
 async function fetchDataset(dataset: string, ext: 'json' | 'geojson'): Promise<{ header: SodaHeader; rows: unknown }> {
