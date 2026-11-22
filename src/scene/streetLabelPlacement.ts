@@ -67,6 +67,20 @@ function frame(p: LabelPlacement, anchor: Ground, view: PlacementView, a: Vector
 }
 
 /**
+ * The trip exit's label (`view.priorityEntrance`) may cover other entrances' marks: among a crowded corner's marks it
+ * would otherwise find no box, and naming the way out matters more than keeping a neighbour's mark clear.
+ */
+function exemptExitFromMarks(p: LabelPlacement, view: PlacementView): void {
+  if (view.priorityEntrance < 0) return
+  for (let i = 0; i < p.entrances.length && i < 32; i++) {
+    if (p.entrances[i]!.index !== view.priorityEntrance) continue
+    const exempt = p.bounds.exempt!
+    for (let k = FIXED_RECTS; k < FIXED_RECTS + p.marks.length; k++) exempt[k] = exempt[k]! | (1 << i)
+    return
+  }
+}
+
+/**
  * Builds every candidate for this view and declutters in two passes, recording the picks for next time.
  * Allocation-free. All labels keep clear of the header, footer, panel, every entrance mark, nearby station markers
  * (and the focus ring) and the level labels in `levels`. Entrances go first, ranked by `rankEntrances`; then streets,
@@ -96,6 +110,7 @@ export function placeLabels(p: LabelPlacement, anchor: Ground, view: PlacementVi
   const e = p.entrances.length
   let box = 0
   for (let i = 0; i < e; i++) box = entranceBoxes(p, i, anchor, view, a, b, box, markerRect, markerCount)
+  exemptExitFromMarks(p, view)
   rankEntrances(p, view)
   declutter(p.cand, p.bounds, p.prefer, p.out, 0, e)
   markNamedStreets(p)
