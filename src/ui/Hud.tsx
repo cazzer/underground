@@ -31,6 +31,7 @@ import { TripAnnouncer } from './TripAnnouncer'
 import { TripPanel } from './TripPanel'
 import { usePlaceLine } from './usePlaceLine'
 import { useHudInsets } from './useHudInsets'
+import { useLineFilter } from './useLineFilter'
 import { useTripPanel } from './useTripPanel'
 
 interface HudProps {
@@ -63,6 +64,7 @@ interface HudProps {
 
 export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
+  const lineFilter = useLineFilter(focusedId)
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
   const trainOpen = selectedSummary !== null
@@ -259,6 +261,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             arrivals={arrivals}
             interior={interior}
             outages={outages}
+            lineFilter={lineFilter}
             onDirections={(end) => openTrip(end, { stationId: focusedId, place: null })}
             ref={panel}
             headingRef={stationHeading}

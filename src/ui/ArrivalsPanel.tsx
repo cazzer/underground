@@ -13,6 +13,7 @@ import { EntranceList } from './EntranceList'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
 import { OutageStatus } from './OutageStatus'
 import { CollapseButton, ExpandBar } from './PanelBar'
+import type { LineFilterControl } from './useLineFilter'
 import { usePanelToggle } from './usePanelToggle'
 
 interface ArrivalsPanelProps {
@@ -23,6 +24,8 @@ interface ArrivalsPanelProps {
   interior: InteriorStatusInfo
   /** Elevators and escalators out of service at the focused station. */
   outages: OutagePanelView
+  /** The arrivals' line filter, held by the HUD so a train panel covering this one doesn't reset it. */
+  lineFilter: LineFilterControl
   /** "Directions from here" and "Directions to here": open the trip panel with this station as that end. */
   onDirections: (end: TripEnd) => void
   ref: Ref<HTMLElement>
@@ -33,7 +36,7 @@ interface ArrivalsPanelProps {
 const LINK =
   'flex min-h-11 cursor-pointer items-center px-2 text-ink-dim underline hover:text-ink focus-visible:outline-2 focus-visible:outline-focus'
 
-export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, onDirections, ref, headingRef }: ArrivalsPanelProps) {
+export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, lineFilter, onDirections, ref, headingRef }: ArrivalsPanelProps) {
   // The street file loads on focus only (the scene's streets share it through the cache); nothing shows until it is in.
   const streets = useStationStreets(stationId)
   // The merged station's members all count as "listing" the station, so another member's elevators rank like the lead's own.
@@ -79,7 +82,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
         </p>
         <InteriorStatus info={interior} />
         <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
-        <ArrivalsList key={`arrivals-${stationId}`} network={network} station={station} source={arrivals} status={live} onFocusLost={() => headingRef.current?.focus()} />
+        <ArrivalsList key={`arrivals-${stationId}`} network={network} station={station} source={arrivals} status={live} lineFilter={lineFilter} onFocusLost={() => headingRef.current?.focus()} />
         <EntranceList entrances={streets?.entrances ?? null} listsStation={listsStation} />
       </div>
     </aside>
