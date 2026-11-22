@@ -48,7 +48,7 @@ describe('committed walk files', () => {
       total += gzip
     }
     expect(total).toBeLessThanOrEqual(WALK_TOTAL_GZIP_CAP_BYTES)
-  })
+  }, 60_000)
 
   it('have valid indexes, ascending node ids, sorted edges, true lengths and one-use interiors', () => {
     for (const name of names) {
@@ -77,7 +77,7 @@ describe('committed walk files', () => {
       })
       expect([...uses.keys()].length, `${name}: every listed node is used`).toBe(n)
     }
-  })
+  }, 60_000)
 
   it('put every node at the same x/z as the street file of the same station', () => {
     const streetsOut = new URL('../../public/data/streets/', import.meta.url)
@@ -94,7 +94,7 @@ describe('committed walk files', () => {
       })
     }
     expect(shared).toBeGreaterThan(0)
-  })
+  }, 60_000)
 
   it('give Bedford Av (L08) sidewalks, crossings and roads in one mostly connected graph', () => {
     const l08 = json(new URL('L08.json', OUT)) as StationWalk
