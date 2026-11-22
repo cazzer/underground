@@ -41,7 +41,7 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   }, [arrivals])
   // A train panel or the gone notice in front of the trip panel: it stops refreshing until they go.
   const { selectedSummary, notice } = useTrainSelection()
-  const { plan, showLoading, retry } = useTripPlan(stations, ends, open, selectedSummary !== null || notice !== null, sourceRef)
+  const { plan, showLoading, retry } = useTripPlan(stations, ends, open, selectedSummary !== null || notice !== null, sourceRef, arrivals?.snapshot ?? null)
 
   const setOpen = useCallback((next: boolean, defaults?: TripEnds) => {
     setOpenState(next)

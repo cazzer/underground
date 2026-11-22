@@ -8,12 +8,20 @@ interface TripJourneysProps {
   views: readonly JourneyView[]
   /** A station name was pressed: the one place the trip panel moves the camera. */
   onStation: (stationId: string) => void
+  /** The trips the map draws as trains (keyed as a live ride leg's `tripId`); only those can be shown. */
+  drawnKeys: ReadonlySet<string> | null
+  /** "Show train" was pressed on a live ride leg: selects that train (its panel then covers the trip). */
+  onShowTrain: (tripId: string) => void
 }
 
 interface LegProps {
   network: Network
   leg: LegView
+  /** The journey mixes live and scheduled trains, so a scheduled one says so. */
+  mixed: boolean
+  drawnKeys: ReadonlySet<string> | null
   onStation: (stationId: string) => void
+  onShowTrain: (tripId: string) => void
 }
 
 interface StationLinkProps {
@@ -35,7 +43,7 @@ function StationLink({ stationId, name, onStation }: StationLinkProps) {
   )
 }
 
-function Leg({ network, leg, onStation }: LegProps) {
+function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain }: LegProps) {
   if (leg.kind === 'change') {
     return (
       <li className="text-ink-dim">
@@ -58,6 +66,7 @@ function Leg({ network, leg, onStation }: LegProps) {
         {route ? <RouteChip route={route} as="span" className="min-w-9 shrink-0 text-center" /> : <span>{leg.routeId}</span>}
         <span className="min-w-0">
           <span className="text-ink-dim">to</span> {leg.headsign}
+          {mixed && !leg.live && <span className="text-ink-dim"> · scheduled</span>}
         </span>
       </p>
       <p className="text-sm">
@@ -66,6 +75,16 @@ function Leg({ network, leg, onStation }: LegProps) {
       <p className="text-sm">
         {leg.stopsText}, off {leg.alight.clock} at <StationLink stationId={leg.alight.stationId} name={leg.alight.name} onStation={onStation} />
       </p>
+      {leg.live && drawnKeys?.has(leg.tripId) && (
+        <button
+          type="button"
+          onClick={() => onShowTrain(leg.tripId)}
+          aria-label={`Show train, ${route?.shortName ?? leg.routeId} to ${leg.headsign}`}
+          className="-ml-2 flex min-h-11 cursor-pointer items-center px-2 text-sm underline hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          Show train
+        </button>
+      )}
     </li>
   )
 }
@@ -76,9 +95,11 @@ interface JourneyProps {
   open: boolean
   onToggle: () => void
   onStation: (stationId: string) => void
+  drawnKeys: ReadonlySet<string> | null
+  onShowTrain: (tripId: string) => void
 }
 
-function Journey({ network, view, open, onToggle, onStation }: JourneyProps) {
+function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTrain }: JourneyProps) {
   const legsId = useId()
   return (
     <li className="border-t border-edge first:border-t-0">
@@ -109,7 +130,7 @@ function Journey({ network, view, open, onToggle, onStation }: JourneyProps) {
       </button>
       <ol id={legsId} hidden={!open} className="flex flex-col gap-2 pb-3 pl-1 text-sm">
         {view.legs.map((leg, i) => (
-          <Leg key={i} network={network} leg={leg} onStation={onStation} />
+          <Leg key={i} network={network} leg={leg} mixed={view.source === 'mixed'} drawnKeys={drawnKeys} onStation={onStation} onShowTrain={onShowTrain} />
         ))}
       </ol>
     </li>
@@ -117,7 +138,7 @@ function Journey({ network, view, open, onToggle, onStation }: JourneyProps) {
 }
 
 /** The journeys as disclosures, soonest arrival first; the first starts open, the rest collapsed. */
-export function TripJourneys({ network, views, onStation }: TripJourneysProps) {
+export function TripJourneys({ network, views, onStation, drawnKeys, onShowTrain }: TripJourneysProps) {
   // Only the ones the visitor toggled are kept; the rest follow the default (the first is open).
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(new Map())
   if (views.length === 0) return null
@@ -131,6 +152,8 @@ export function TripJourneys({ network, views, onStation }: TripJourneysProps) {
           open={toggled.get(view.key) ?? i === 0}
           onToggle={() => setToggled((m) => new Map(m).set(view.key, !(m.get(view.key) ?? i === 0)))}
           onStation={onStation}
+          drawnKeys={drawnKeys}
+          onShowTrain={onShowTrain}
         />
       ))}
     </ol>

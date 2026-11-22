@@ -1,7 +1,8 @@
 import type { StationId, StationsFile } from './schema'
 import { serviceCalendar, timetableFile, transfersFile } from './loadTimetable'
 import { complexMembers } from '../lib/route/ends'
-import { planOn, type RouterTimetable, type TripJourney } from '../lib/route/plan'
+import type { RouterTimetable, TripJourney } from '../lib/route/plan'
+import { planOnLive, type LiveInput, type LivePlan } from '../lib/route/planLive'
 import { serviceWindow, windowKey } from '../lib/route/serviceDay'
 import { buildRouterTimetable, sourcesFor } from '../lib/route/timetable'
 import type { RouteOptions } from '../lib/route/types'
@@ -53,7 +54,22 @@ export function loadRouterTimetable(stations: StationsFile, atS: number): Promis
   return build(stations, atS)
 }
 
-/** Journeys from any of `from` to any of `to` leaving no earlier than `atS` (epoch seconds). Fetches lazily. */
+/**
+ * Journeys from any of `from` to any of `to` leaving no earlier than `atS` (epoch seconds). Fetches lazily. With
+ * `live` the next 30 minutes come from realtime (`planOnLive`); `atS` should then be the live clock.
+ */
+export async function planTripLive(
+  stations: StationsFile,
+  from: readonly StationId[],
+  to: readonly StationId[],
+  atS: number,
+  live: LiveInput | null,
+  opts?: RouteOptions,
+): Promise<LivePlan> {
+  return planOnLive(await loadRouterTimetable(stations, atS), from, to, atS, live, opts)
+}
+
+/** Scheduled journeys only; see `planTripLive`. */
 export async function planTrip(
   stations: StationsFile,
   from: readonly StationId[],
@@ -61,11 +77,7 @@ export async function planTrip(
   atS: number,
   opts?: RouteOptions,
 ): Promise<TripJourney[]> {
-  const rt = await loadRouterTimetable(stations, atS)
-  const start = performance.now()
-  const journeys = planOn(rt, from, to, atS, opts)
-  measureSince('trip:route', start)
-  return journeys
+  return (await planTripLive(stations, from, to, atS, null, opts)).journeys
 }
 
 /**
@@ -78,11 +90,12 @@ export async function planTripBetween(
   from: StationId,
   to: StationId,
   atS: number,
+  live: LiveInput | null = null,
   opts?: RouteOptions,
-): Promise<{ journeys: TripJourney[]; sameStation: boolean }> {
+): Promise<LivePlan & { sameStation: boolean }> {
   const { transfers } = await transfersFile()
   const fromSet = complexMembers(stations.stations, from, transfers)
   const toSet = complexMembers(stations.stations, to, transfers)
-  if (fromSet.some((id) => toSet.includes(id))) return { journeys: [], sameStation: true }
-  return { journeys: await planTrip(stations, fromSet, toSet, atS, opts), sameStation: false }
+  if (fromSet.some((id) => toSet.includes(id))) return { journeys: [], overlay: null, sameStation: true }
+  return { ...(await planTripLive(stations, fromSet, toSet, atS, live, opts)), sameStation: false }
 }

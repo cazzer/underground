@@ -408,7 +408,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     shifted times capped at now, after them its run times only when the feed's horizon cut the predictions off, else a
     short turn and a pattern of its own `rt:<stop ids>`), `overlayGroups.ts` regroups lanes (`key` minus `#j`) and
     rebuilds only the changed ones. Ids are `<feed>:<tripId>`, never a loader id. Feeds come from `ROUTE_FEED`
-    (`live/feedHealth.ts`). Not wired to the trip panel yet (2q7.9 PR B); `overlayFixture.ts` is the tests' scheduled evening and snapshots
+    (`live/feedHealth.ts`). `planLive.ts` runs it for the trip panel; `overlayFixture.ts` is the tests' scheduled evening and snapshots
   - Times are integer seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days; may be negative or past 86400, |t| < 2^29); a loader shifts other
     service days itself and keeps their patterns separate
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
@@ -490,18 +490,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
 - `src/data/loadTimetable.ts` (`expectTimetable`, `expectServiceCalendar`; one lazy cached promise per file via
   `interiorCache.ts`: `timetable/<service>.json`, `transfers.json`, and the calendar from `trip-index.json`) and
-  `planTrip.ts` (`planTrip(stations, from, to, atS)`: reads the calendar, picks the window, fetches the files it
-  needs, builds one `RouterTimetable` per window and `feedVersion`, kept as a single cache entry; `NoServiceError`
-  when the calendar has no service on that date; User Timing measures `trip:fetch`, `trip:build` and `trip:route`).
+  `planTrip.ts` (`planTripLive(stations, from, to, atS, live)`: reads the calendar, picks the window, fetches the files it
+  needs, builds one `RouterTimetable` per window and `feedVersion`, kept as a single cache entry, then `planOnLive`
+  (`lib/route/planLive.ts`, pure: `overlayRealtime` over it with the snapshot, memoised on the timetable and snapshot
+  identity, a snapshot over `SNAPSHOT_MAX_AGE_S` old never cached; a throwing overlay is one `console.error` per snapshot and the
+  schedule answers, `overlay` null; `planTrip` is the scheduled-only form); `NoServiceError`
+  when the calendar has no service on that date; User Timing measures `trip:fetch`, `trip:build`, `trip:overlay` and `trip:route`).
   Nothing here loads at startup; the trip panel opening is the first caller
-- Navigation UI (2q7.9, schedule only: live overlay is a follow-up): `src/lib/trip.tsx` `TripProvider` (wraps `MapView` in `App.tsx`)
+- Navigation UI (2q7.9): `src/lib/trip.tsx` `TripProvider` (wraps `MapView` in `App.tsx`)
   and `useTrip` hold open, From and To in memory for the session (no URL, history or storage). `src/data/useTripPlan.ts` plans when
   both ends are set and differ, leaving now (live clock once a snapshot has set it, else the device's), drops stale replies by request
-  id, replans every 30 s while open and not covered by a train panel or notice (silent; once more when the cover goes), warms the
+  id, replans every 30 s, and on each snapshot newer than the one planned on (trigger `poll`, never announced), while open and not covered by a train panel or notice (silent; once more when the cover goes), on the schedule with the next 30 minutes from the latest snapshot (`overlay` counts ride the ready plan; `?debug` prints them), warms the
   timetable on open and shows "Finding trips…" only after 250 ms. It loads `planTrip.ts` by dynamic `import()`, so the router and its
   loaders are their own chunk, not the startup bundle. `planTripBetween` expands each end to its complex (`lib/route/ends.ts`
   `complexMembers`: same-named stations linked in transfers.json) so a trip never starts or ends with a walk to a same-named station;
-  `journeyView` still words a mid-trip walk between same-named stations as a change.
+  `journeySource` tags a journey Live (every ride leg live), Live and scheduled (a dim "scheduled" on the others) or Scheduled, in the summary ("Leaves in 4 min · Live") and as the spoken sentence's last words; a live ride leg the map draws (`ArrivalsSource.drawnKeys`) has a "Show train" button calling `selectTrain`, so the train panel covers the trip and its × returns focus to the trip heading. `journeyView` still words a mid-trip walk between same-named stations as a change.
   `src/lib/tripView.ts` (pure, tested): `defaultEnds` (a marked fix's nearest station is From, the focused station To; no fix: focused
   is From), `tripMessage`, `orderJourneys`, `journeyView` (a journey departs with its first train), the spoken text, and the
   announce rules (`shouldAnnounceTrip`: a settled plan once, not a refresh). `TripAnnouncer.tsx` is the one polite live region for it,

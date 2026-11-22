@@ -3,6 +3,7 @@ import type { Placement } from './locate'
 import type { TripJourney, TripLeg } from './route/plan'
 import {
   defaultEnds,
+  journeySource,
   journeyView,
   ON_MAP_QUIET_MS,
   orderJourneys,
@@ -70,6 +71,7 @@ describe('journeyView', () => {
         kind: 'ride',
         routeId: 'L',
         tripId: `L-${T}`,
+        live: false,
         headsign: 'End',
         board: { stationId: 'L08', name: 'Bedford Av', clock: '8:12' },
         alight: { stationId: 'L03', name: 'Union Sq', clock: '8:20' },
@@ -198,9 +200,35 @@ describe('tripMessage', () => {
   })
 })
 
+describe('journeySource', () => {
+  const live = (routeId: string, board: string, alight: string, a: number, b: number) => ride(routeId, board, alight, a, b, { live: true })
+  const sched = (routeId: string, board: string, alight: string, a: number, b: number) => ride(routeId, board, alight, a, b, { live: false })
+  it('is Live when every ride leg is live, walks aside', () => {
+    const two = journey([live('L', 'L08', 'L03', T, T + 300), walk('L03N', '635N', T + 300, 120, false), live('4', '635', '630', T + 600, T + 900)], 1)
+    expect(journeySource(two)).toBe('live')
+    expect(journeySource(journey([live('L', 'L08', 'L03', T, T + 300)], 0))).toBe('live')
+  })
+  it('is Live and scheduled when some ride legs are', () => {
+    expect(journeySource(journey([live('L', 'L08', 'L03', T, T + 300), sched('4', 'L03', '630', T + 600, T + 900)], 1))).toBe('mixed')
+  })
+  it('is Scheduled when none are, and for a walk-only journey', () => {
+    expect(journeySource(journey([sched('L', 'L08', 'L03', T, T + 300)], 0))).toBe('scheduled')
+    expect(journeySource(journey([walk('L08N', 'L03N', T, 300, false)], 0))).toBe('scheduled')
+  })
+  it('ends the spoken sentence with the same words and marks each leg', () => {
+    const v = journeyView(journey([live('L', 'L08', 'L03', T, T + 300), sched('4', 'L03', '630', T + 600, T + 900)], 1), NOW, names)
+    expect(v).toMatchObject({ source: 'mixed', sourceText: 'Live and scheduled' })
+    expect(v.spoken.endsWith(' Live and scheduled.')).toBe(true)
+    expect(v.legs.flatMap((l) => (l.kind === 'ride' ? [l.live] : []))).toEqual([true, false])
+    const all = journeyView(journey([live('L', 'L08', 'L03', T, T + 300)], 0), NOW, names)
+    expect(all).toMatchObject({ source: 'live', sourceText: 'Live' })
+    expect(all.spoken.endsWith(' Live.')).toBe(true)
+  })
+})
+
 describe('tripAnnouncement and shouldAnnounceTrip', () => {
   const one = journeyView(journey([ride('L', 'L08', 'L03', T, T + 2100)], 1), NOW, names)
-  const ready = (trigger: 'ends' | 'tick' | 'retry', attempt = 1, key = 'A>B'): TripPlanState => ({
+  const ready = (trigger: 'ends' | 'tick' | 'poll' | 'retry', attempt = 1, key = 'A>B'): TripPlanState => ({
     status: 'ready',
     key,
     attempt,
@@ -221,6 +249,8 @@ describe('tripAnnouncement and shouldAnnounceTrip', () => {
     expect(shouldAnnounceTrip(ready('ends'), null)).toBe(true)
     expect(shouldAnnounceTrip(ready('ends'), 'A>B#1')).toBe(false)
     expect(shouldAnnounceTrip(ready('tick'), null)).toBe(false)
+    expect(shouldAnnounceTrip(ready('poll'), null)).toBe(false)
+    expect(shouldAnnounceTrip(ready('poll', 2, 'A>C'), 'A>B#1')).toBe(false)
   })
   it('announces new ends and a retry of the same ends', () => {
     expect(shouldAnnounceTrip(ready('ends', 2, 'A>C'), 'A>B#1')).toBe(true)
