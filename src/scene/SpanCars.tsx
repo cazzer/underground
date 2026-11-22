@@ -9,7 +9,8 @@ interface SpanCarsProps {
 
 /**
  * The cars of trains on a revealed station's platforms, redrawn above the interior veil and the strokes of their
- * platform level and below (the levels above draw over them, StationInterior's `over` layers), in the same three
+ * platform level and below, and the feet of the stairs from it up to their roof (the rest and the levels above draw
+ * over them, StationInterior's `over` layers), in the same three
  * passes as TrainCars (selected rim, background footprints, bodies). The bodies test depth against the street cars
  * (they share matrices with their originals, so they pass where those drew), which keeps a nearer street car in
  * front. LiveTrains writes them per frame.
