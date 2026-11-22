@@ -1,0 +1,53 @@
+{
+  "stationId": "401",
+  "anchor": {
+    "lat": 40.88604,
+    "lon": -73.87875
+  },
+  "format": 1,
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "osmTimestamp": "2026-11-22T04:33:58Z",
+  "nodeId": [42723680,12394,4,4,25249,11683,7,7172,1953,5,734389400,3,215,4,33052,641,10,25,4,9,6,4,7,7,6,16,11,4,7,86269,100,11,9,10,719,3,2,58487,3,6,7,5,4,5,910145,1,4,9,98843,21,3,2,1,2,13,1274258195,2155149678,2,1,1,1,1,1280192405,1353702909,1,1,1,1,1,4,1,1,1,3465985133,1223795579,121698352,14,4,1,97946,1,18,2,1,9,1,33,1,1,1340635468,2,1,150982,13,1,1,69051716,1,1,58],
+  "x": [-378,650,-525,-1041,149,235,961,-285,858,774,470,543,1840,2372,1612,1416,1480,1671,1701,1434,1315,1264,1262,1299,1371,1596,1588,1606,1552,2467,2508,2557,2630,2904,2314,1935,1733,1609,1884,2208,2497,2709,2822,2876,2915,2740,2536,2266,1560,2630,2739,2788,2811,2802,1760,-1728,525,561,687,657,479,554,-3,966,912,705,470,556,558,735,698,450,792,-55,-1372,1009,881,672,852,882,-368,-377,541,612,-604,-566,-551,-389,-484,-251,219,330,387,361,361,347,899,949,926,1366],
+  "z": [-4721,-1184,907,1826,2493,1313,1687,2249,2876,-796,-2254,-1748,-2178,-2547,-2090,2665,2440,1450,1321,609,268,-137,-368,-618,-915,-1466,-1916,-2422,-2646,-1536,-1335,-1182,-1132,-1083,2012,1519,1230,228,125,-29,-236,-453,-696,-908,1020,1195,1443,1948,2068,1139,610,308,47,-305,2058,3047,-1209,-1585,-1603,-1771,-2102,-2123,-69,1242,471,-915,-953,-912,-1434,-1301,-1438,-793,-943,3287,4140,575,983,-850,-878,1569,905,930,-736,-817,847,775,786,890,830,213,-586,-852,-979,-960,-911,-913,2575,1984,2279,435],
+  "ways": [
+    {"id":5698221,"highway":"residential","name":"Rochambeau Avenue","oneway":0,"nodes":[73,4]},
+    {"id":5698934,"highway":"residential","name":"East 213th Street","oneway":0,"nodes":[2,5,6]},
+    {"id":5699410,"highway":"residential","name":"DeKalb Avenue","oneway":0,"nodes":[74,7,5]},
+    {"id":5699780,"highway":"residential","name":"East 212th Street","oneway":0,"nodes":[3,7,4,8]},
+    {"id":62235488,"highway":"service","name":"Central Avenue","oneway":0,"nodes":[11,59,14,12,13]},
+    {"id":62238242,"highway":"service","name":"Whitewood Avenue","oneway":0,"nodes":[29,30,31,32,33]},
+    {"id":62240003,"highway":"service","name":"Linden Avenue","oneway":0,"nodes":[20,37,38,39,40,41,42,43]},
+    {"id":62270903,"highway":"service","name":"West Border Avenue","oneway":0,"nodes":[15,16,48,17,18,36,19,99,20,21,22,23,24,25,26,14,27,28]},
+    {"id":62292689,"highway":"service","name":"Myosotis Avenue","oneway":0,"nodes":[44,45,46,47]},
+    {"id":62302712,"highway":"service","name":"Wintergreen Avenue","oneway":0,"nodes":[46,49,50,51,52,53,42]},
+    {"id":62302715,"highway":"service","name":"Spiraea Avenue","oneway":0,"nodes":[48,54,47]},
+    {"id":62307102,"highway":"service","name":"Laurel Avenue","oneway":0,"nodes":[34,47,35,36]},
+    {"id":223870996,"highway":"secondary","name":"Bainbridge Avenue","oneway":0,"nodes":[9,64,63,6,97,98,96,8]},
+    {"id":223891349,"highway":"secondary","name":"Jerome Avenue","oneway":0,"nodes":[71,62,88,2,3,55]},
+    {"id":420883758,"highway":"secondary","name":"Jerome Avenue","oneway":1,"nodes":[57,68,56]},
+    {"id":420883761,"highway":"secondary","name":"Jerome Avenue","oneway":1,"nodes":[10,60,11,57]},
+    {"id":420883762,"highway":"secondary","name":"Jerome Avenue","oneway":1,"nodes":[70,58,59,61,10]},
+    {"id":730295055,"highway":"secondary","name":"Bainbridge Avenue","oneway":1,"nodes":[1,65,9]},
+    {"id":730295056,"highway":"secondary","name":"Jerome Avenue","oneway":1,"nodes":[71,67,1]},
+    {"id":730295058,"highway":"secondary","name":"Jerome Avenue","oneway":1,"nodes":[56,66,71]},
+    {"id":730295060,"highway":"secondary","name":"Bainbridge Avenue","oneway":1,"nodes":[9,72,69,70]},
+    {"id":904471093,"highway":"secondary","name":"Jerome Avenue","oneway":1,"nodes":[1,70]},
+    {"id":1106225374,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[84,85]},
+    {"id":1253646260,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[75,78]},
+    {"id":1253646264,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[76,77]},
+    {"id":1253658068,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[79,80,87]},
+    {"id":1253658080,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[81,80,82,83]},
+    {"id":1253658084,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[85,86]},
+    {"id":1253658085,"highway":"footway","footway":"crossing","name":null,"oneway":0,"nodes":[86,88,87]},
+    {"id":1414034714,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[85,89,90,91,95,93]},
+    {"id":1414049749,"highway":"steps","name":null,"oneway":0,"nodes":[94,92]},
+    {"id":1414049751,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[94,95]},
+    {"id":1416722194,"highway":"secondary","name":"Jerome Avenue","oneway":0,"nodes":[0,10]}
+  ],
+  "entrances": [
+    {"x":314,"z":-866,"type":"Stair","entry":true,"exit":true,"stopIds":["401"],"street":"Jerome Avenue","wayId":730295058,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":530,"z":-775,"type":"Stair","entry":true,"exit":true,"stopIds":["401"],"street":"Jerome Avenue","wayId":730295056,"cross":null,"crossWayId":null,"side":"east","plaza":null}
+  ]
+}

@@ -106,6 +106,13 @@ Review the diff, then commit; `scripts/lib/streetsData.test.ts` checks the files
 `UNCOVERED_STATIONS` in `scripts/lib/streetsOsm.ts` with a reason). The source choice is in
 `../docs/research/data-sources.md` §5.2.
 
+`npm run data:streets` (offline) turns the pin and `stations/catalog/entrances.json` into `public/data/streets/<id>.json`, one
+per station. Rerun it after `data`, `data:streets:fetch` or `data:catalog:fetch`; `streetsOutputs.test.ts` fails while the files
+are stale. Each file clips the pinned ways to 300 m (footways, steps and paths to `WALK_RADIUS_M`, 100 m: 200 m left two
+dense downtown stations over the 16 KB cap, 150 m one), simplifies to 0.5 m, rounds to decimeters around the station point, and
+joins every entrance row that lists the station to the street it opens onto. The build prints where the join is doubtful
+(no street within 40 m, near misses for a median, bridge and tunnel ways, entrances near the 300 m edge); read it after a refresh.
+
 ## Access exceptions
 
 `stations/access-exceptions.json` is hand-written and empty today:
@@ -132,6 +139,8 @@ the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `n
 - `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors,
   available under the ODbL 1.0.
 - `streets/` is © OpenStreetMap contributors, available under the ODbL 1.0 (see `../public/data/LICENSE-ODbL.md`).
+  The street files built from it (`public/data/streets/`) are ODbL derivatives; their entrance points are MTA data (i9wp-a4ja)
+  under the OPEN-NY Terms of Use, which each file's `attribution` says.
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.

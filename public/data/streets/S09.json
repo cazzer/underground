@@ -1,0 +1,51 @@
+{
+  "stationId": "S09",
+  "anchor": {
+    "lat": 40.51276,
+    "lon": -74.25196
+  },
+  "format": 1,
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "osmTimestamp": "2026-11-22T04:33:58Z",
+  "nodeId": [42950794,20453,5033,3,286,2,3,3,6,7,2,3354,3,663,4,1557,2,14,12744,2808,4,3,5455,1,312,4,49,2003,320,13190,367679720,157,543493,220,280,267012637,883879195,5,2778964018,1,1986840631,627349096,1,1,632220926,9,1,184319476,1,1,4494302,583437275,2244838314,646615854,1,5,3,4,447777374,2,74730529,780716826,89,12,3],
+  "x": [2520,712,507,1074,2362,2317,2166,2103,1900,1580,913,676,1656,467,1381,353,11,-193,2872,-845,-614,-100,1107,1579,1619,2572,1530,-593,2515,3228,818,923,846,735,431,2201,-447,696,853,839,-823,1555,1426,1491,-746,637,686,889,1363,2410,3464,3267,1985,-403,-370,-57,1441,1446,-85,-73,2145,76,1386,2228,2590],
+  "z": [-1580,-981,2341,1947,-1128,-1129,-1040,-1023,-997,-956,-526,967,2303,1124,2352,2135,2531,3149,-370,705,906,1548,-256,-605,450,1755,328,2314,-137,845,-745,-598,-528,-671,-399,-1927,383,-722,-494,-520,665,2368,2380,2385,607,-775,-715,-1114,-1433,-2029,-756,189,-1806,1791,1754,1464,316,336,1459,1468,2956,2431,3470,-538,-1685],
+  "ways": [
+    {"id":5711238,"highway":"residential","name":"Girard Street","oneway":0,"nodes":[64,0]},
+    {"id":5713039,"highway":"residential","name":"Earley Place","oneway":1,"nodes":[3,2]},
+    {"id":5713059,"highway":"residential","name":"Utah Street","oneway":0,"nodes":[4,5,6,7,8]},
+    {"id":5713060,"highway":"residential","name":"Utah Street","oneway":0,"nodes":[9,10]},
+    {"id":5713272,"highway":"residential","name":"Butler Avenue","oneway":1,"nodes":[60,12,11]},
+    {"id":5713313,"highway":"residential","name":"Lafayette Street","oneway":1,"nodes":[12,41,43,42,14,3,13]},
+    {"id":5713458,"highway":"residential","name":"Hopping Avenue","oneway":0,"nodes":[15,61,16,17]},
+    {"id":5714270,"highway":"residential","name":"Johnson Avenue","oneway":0,"nodes":[4,18]},
+    {"id":5714905,"highway":"residential","name":"Conference Court","oneway":0,"nodes":[22,23]},
+    {"id":5714934,"highway":"residential","name":"Main Street","oneway":0,"nodes":[10,22,26,24]},
+    {"id":5715115,"highway":"residential","name":"Arthur Kill Road","oneway":1,"nodes":[21,13,11,26]},
+    {"id":5716624,"highway":"residential","name":"Tyrrell Street","oneway":0,"nodes":[63,28,29]},
+    {"id":35013707,"highway":"residential","name":"Ellis Street","oneway":0,"nodes":[49,35,52,48,47,1]},
+    {"id":35013880,"highway":"footway","name":null,"oneway":0,"nodes":[40,44,36]},
+    {"id":35062988,"highway":"steps","name":null,"oneway":0,"nodes":[32,31]},
+    {"id":35063007,"highway":"steps","name":null,"oneway":0,"nodes":[33,30]},
+    {"id":68665091,"highway":"tertiary","name":"Main Street","oneway":1,"nodes":[24,25]},
+    {"id":142744314,"highway":"footway","name":null,"oneway":0,"nodes":[45,46,37]},
+    {"id":217842579,"highway":"residential","name":"Bentley Street","oneway":0,"nodes":[21,15,2,62]},
+    {"id":222788018,"highway":"tertiary","name":"Arthur Kill Road","oneway":0,"nodes":[18,28,24]},
+    {"id":222788109,"highway":"residential","name":"Johnson Avenue","oneway":1,"nodes":[51,18]},
+    {"id":436236596,"highway":"footway","name":null,"oneway":0,"nodes":[10,38,39,32]},
+    {"id":436270514,"highway":"footway","name":null,"oneway":0,"nodes":[34,33]},
+    {"id":569025792,"highway":"residential","name":"Arthur Kill Road","oneway":0,"nodes":[21,54,53,27]},
+    {"id":812372977,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[44,58,59,55,57,56,38]},
+    {"id":1247347043,"highway":"tertiary","name":"Arthur Kill Road","oneway":0,"nodes":[50,18]},
+    {"id":1356470906,"highway":"residential","name":"Bentley Street","oneway":0,"nodes":[19,20,21]},
+    {"id":1356470913,"highway":"residential","name":"Utah Street","oneway":0,"nodes":[8,9]},
+    {"id":1356470914,"highway":"residential","name":"Tyrrell Street","oneway":0,"nodes":[8,63]}
+  ],
+  "entrances": [
+    {"x":-825,"z":667,"type":"Ramp","entry":true,"exit":true,"stopIds":["S09"],"street":"Bentley Street","wayId":1356470906,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-737,"z":616,"type":"Stair","entry":true,"exit":true,"stopIds":["S09"],"street":"Bentley Street","wayId":1356470906,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":677,"z":-711,"type":"Stair","entry":true,"exit":true,"stopIds":["S09"],"street":"Ellis Street","wayId":35013707,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":836,"z":-528,"type":"Stair","entry":true,"exit":true,"stopIds":["S09"],"street":"Utah Street","wayId":5713060,"cross":null,"crossWayId":null,"side":"north","plaza":null}
+  ]
+}

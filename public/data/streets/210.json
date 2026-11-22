@@ -1,0 +1,48 @@
+{
+  "stationId": "210",
+  "anchor": {
+    "lat": 40.86546,
+    "lon": -73.86735
+  },
+  "format": 1,
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "osmTimestamp": "2026-11-22T04:33:58Z",
+  "nodeId": [42725071,1851,7660,4,4,4,4,9902,13,5,5,3,3,282,1883,5,9475,3,7,5271,4,3,3,7,2714704440,99296290,145812,515710926,1,832540054,1,1220346478,15084120,47144349,643413568,885067738,1,900194195,2022056309,6,2599619750,1,2,26,1,4,26,45,1,1,6,1,6,7580699,2,34,1,4],
+  "x": [-2567,-2771,-1703,-914,-62,790,1534,-1507,-857,-5,847,1638,2428,-2593,2387,2493,-1519,-823,28,-1608,-790,64,912,1704,-2932,774,-2771,2032,2094,2005,2721,-2602,-1569,-92,-2926,114,-119,-938,-3050,-3032,-2603,-1788,-1705,-1681,-1673,-2545,3142,1378,1733,1721,1548,1578,2381,-1493,-1487,72,56,955],
+  "z": [106,64,2461,2481,2499,2519,2542,77,59,36,12,-9,-31,-1299,1691,-2644,-1272,-1254,-1232,-2743,-2723,-2703,-2682,-2663,123,3149,139,-20,-2654,2064,1364,-1676,-2258,3745,42,32,39,3484,91,12,2343,2459,2545,1354,1233,1218,-51,2710,2328,2544,2586,2336,1878,-9,-160,-3040,-2338,-4340],
+  "ways": [
+    {"id":5696037,"highway":"primary","name":"Southern Boulevard","oneway":1,"nodes":[1,34,39]},
+    {"id":5696588,"highway":"residential","name":"Mace Avenue","oneway":0,"nodes":[41,2,3,4,5,6,49]},
+    {"id":5697376,"highway":"residential","name":"Wallace Avenue","oneway":0,"nodes":[52,14,12,15]},
+    {"id":5697919,"highway":"residential","name":"Britton Street","oneway":0,"nodes":[13,16,17,18]},
+    {"id":5698233,"highway":"residential","name":"Arnow Avenue","oneway":0,"nodes":[21,22,23]},
+    {"id":5698453,"highway":"residential","name":"Barker Avenue","oneway":1,"nodes":[19,32,16,54,53,7,44,43,2,42]},
+    {"id":46594516,"highway":"secondary","name":"Allerton Avenue","oneway":0,"nodes":[0,7,8,36]},
+    {"id":132500832,"highway":"residential","name":"Bronx Park East","oneway":0,"nodes":[40,45,0,13,31]},
+    {"id":224058075,"highway":"primary","name":"Boston Road","oneway":0,"nodes":[29,48,6]},
+    {"id":224082355,"highway":"secondary","name":"White Plains Road","oneway":0,"nodes":[33,4,9,18,56]},
+    {"id":270745636,"highway":"primary","name":"Southern Boulevard","oneway":1,"nodes":[38,24,26]},
+    {"id":275375847,"highway":"residential","name":"Holland Avenue","oneway":1,"nodes":[6,51,11]},
+    {"id":275375848,"highway":"residential","name":"Holland Avenue","oneway":0,"nodes":[11,23]},
+    {"id":281696353,"highway":"residential","name":"Cruger Avenue","oneway":1,"nodes":[5,25]},
+    {"id":330300609,"highway":"service","name":"Wallace's Alley Way","oneway":1,"nodes":[27,28]},
+    {"id":420565568,"highway":"primary","name":"Boston Road","oneway":0,"nodes":[14,29]},
+    {"id":420565574,"highway":"primary","name":"Boston Road","oneway":0,"nodes":[30,14]},
+    {"id":420571083,"highway":"primary","name":"Boston Road","oneway":0,"nodes":[6,47]},
+    {"id":533922044,"highway":"secondary","name":"Allerton Avenue","oneway":0,"nodes":[35,10,11,27,12,46]},
+    {"id":734879632,"highway":"residential","name":"Cruger Avenue","oneway":0,"nodes":[5,10,22,57]},
+    {"id":750361388,"highway":"secondary","name":"Allerton Avenue","oneway":0,"nodes":[36,9,35]},
+    {"id":763598769,"highway":"residential","name":"Holland Avenue","oneway":1,"nodes":[6,50]},
+    {"id":954881975,"highway":"residential","name":"Olinville Avenue","oneway":1,"nodes":[37,3,8,17,20]},
+    {"id":1084548300,"highway":"primary","name":"Southern Boulevard","oneway":1,"nodes":[0,1]},
+    {"id":1084548301,"highway":"primary","name":"Southern Boulevard","oneway":1,"nodes":[26,0]},
+    {"id":1355589220,"highway":"secondary","name":"White Plains Road","oneway":0,"nodes":[56,21]},
+    {"id":1355589221,"highway":"residential","name":"Arnow Avenue","oneway":0,"nodes":[19,20,21]},
+    {"id":1355589222,"highway":"secondary","name":"White Plains Road","oneway":0,"nodes":[21,55]}
+  ],
+  "entrances": [
+    {"x":-106,"z":-161,"type":"Stair","entry":true,"exit":true,"stopIds":["210"],"street":"White Plains Road","wayId":224082355,"cross":"Allerton Avenue","crossWayId":750361388,"side":"NW","plaza":null},
+    {"x":87,"z":226,"type":"Stair","entry":true,"exit":true,"stopIds":["210"],"street":"White Plains Road","wayId":224082355,"cross":"Allerton Avenue","crossWayId":750361388,"side":"SE","plaza":null}
+  ]
+}

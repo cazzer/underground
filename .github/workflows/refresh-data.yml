@@ -73,6 +73,10 @@ jobs:
       - name: Regenerate station interiors
         run: npm run data:stations 2>&1 | tee -a "$RUNNER_TEMP/data.log"
 
+      # The street files follow the stations and the entrance catalog; also writes only under public/data/.
+      - name: Regenerate street files
+        run: npm run data:streets 2>&1 | tee -a "$RUNNER_TEMP/data.log"
+
       - name: Check for changes
         id: diff
         run: |

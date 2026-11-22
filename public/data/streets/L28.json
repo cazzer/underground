@@ -1,0 +1,51 @@
+{
+  "stationId": "L28",
+  "anchor": {
+    "lat": 40.65057,
+    "lon": -73.89948
+  },
+  "format": 1,
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "osmTimestamp": "2026-11-22T04:33:58Z",
+  "nodeId": [42460410,19775,1886,5,10618,5,785,7,2,15030,13367,260836761,1,710361344,8,1560180686,1,1,2624739428,284085916,2091553414,1,1,1,1,1,1,1,1,1,1996619606,5496305,1,1,81863116,1,2,10,5,1,2173077443,2,1,2256325,38375,68155554,35396,41587116,101645783,1,1,1,1,1,1],
+  "x": [967,-1191,-330,1232,9,1384,-1837,-560,634,2009,-2745,508,283,256,496,-558,-541,-508,2570,-3218,514,244,531,505,540,506,490,232,245,519,732,699,742,655,765,2004,1238,350,1887,638,1222,622,402,2970,913,-1775,-4216,-251,404,385,52,63,110,523,-172],
+  "z": [-2801,2145,-1737,97,1143,2774,2700,1735,606,2244,362,-764,-1059,-967,-858,1688,1628,1573,1630,767,-854,-975,-783,-877,-863,-837,-845,-948,-942,-866,3276,684,647,723,628,2109,218,975,2215,736,-57,721,647,-1387,-2910,-3470,-1381,-1640,679,662,948,965,1057,702,1142],
+  "ways": [
+    {"id":5673709,"highway":"residential","name":"Bank Street","oneway":0,"nodes":[44,0]},
+    {"id":5677996,"highway":"residential","name":"East 103rd Street","oneway":0,"nodes":[4,5]},
+    {"id":5679284,"highway":"residential","name":"East 104th Street","oneway":0,"nodes":[8,31,9]},
+    {"id":5680426,"highway":"residential","name":"East 101st Street","oneway":0,"nodes":[46,10]},
+    {"id":27624173,"highway":"unclassified","name":"East 105th Street","oneway":0,"nodes":[45,2]},
+    {"id":46865760,"highway":"residential","name":"Foster Avenue","oneway":0,"nodes":[19,10,2]},
+    {"id":87178453,"highway":"footway","name":null,"oneway":0,"nodes":[24,22,11]},
+    {"id":87178454,"highway":"footway","name":null,"oneway":0,"nodes":[29,20]},
+    {"id":87178457,"highway":"residential","name":"Farragut Road","oneway":1,"nodes":[7,15,16,17,4]},
+    {"id":87178460,"highway":"residential","name":"East 105th Street","oneway":0,"nodes":[11,3,18]},
+    {"id":276043648,"highway":"residential","name":"East 102nd Street","oneway":1,"nodes":[30,7]},
+    {"id":276043652,"highway":"residential","name":"Farragut Road","oneway":0,"nodes":[4,52,53,8,3,43]},
+    {"id":346962027,"highway":"residential","name":"Foster Avenue","oneway":0,"nodes":[2,0]},
+    {"id":346962029,"highway":"pedestrian","name":"East 105th Street","oneway":0,"nodes":[47,12]},
+    {"id":735258598,"highway":"residential","name":"Farragut Road","oneway":0,"nodes":[6,1]},
+    {"id":810135166,"highway":"steps","name":null,"oneway":0,"nodes":[20,25,26,14]},
+    {"id":810135167,"highway":"steps","name":null,"oneway":0,"nodes":[13,28,27,21]},
+    {"id":810135168,"highway":"steps","name":null,"oneway":0,"nodes":[14,23]},
+    {"id":1040045310,"highway":"footway","footway":"crossing","name":null,"oneway":0,"nodes":[32,31,33]},
+    {"id":1051003067,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[35,34]},
+    {"id":1051003068,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[32,34,36]},
+    {"id":1051003074,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[37,39,33]},
+    {"id":1051003076,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[38,39]},
+    {"id":1274224349,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[40,24]},
+    {"id":1274224350,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[39,41]},
+    {"id":1274224351,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[42,49,50,54]},
+    {"id":1300412547,"highway":"footway","footway":"crossing","name":null,"oneway":0,"nodes":[41,53,48]},
+    {"id":1300412548,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[49,48]},
+    {"id":1300412549,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[50,51]},
+    {"id":1300412550,"highway":"footway","footway":"crossing","name":null,"oneway":0,"nodes":[51,52]},
+    {"id":1344666734,"highway":"service","name":"East 105th Street","oneway":0,"nodes":[2,47]}
+  ],
+  "entrances": [
+    {"x":244,"z":-992,"type":"Stair","entry":true,"exit":true,"stopIds":["L28"],"street":"East 105th Street","wayId":346962029,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":523,"z":-865,"type":"Stair","entry":true,"exit":true,"stopIds":["L28"],"street":"East 105th Street","wayId":87178460,"cross":null,"crossWayId":null,"side":"east","plaza":null}
+  ]
+}

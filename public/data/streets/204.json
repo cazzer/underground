@@ -1,0 +1,45 @@
+{
+  "stationId": "204",
+  "anchor": {
+    "lat": 40.89838,
+    "lon": -73.85438
+  },
+  "format": 1,
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "osmTimestamp": "2026-11-22T04:33:58Z",
+  "nodeId": [42730675,3,6,5,2,3,6,4,4694,4,5,2,3,7,9,6902,12,9472,11,5652,6,5233,3,3,194,4,6,4,1306086350,306,37752,17,703731107,1950088408,1487878644,733494114,10786,1,702509063,1252992743,20,12,43,215746093,1257476473,1184939034,1733620105,23,3,9,6,3,2,15,4,469337999,4,208624373,98250851,1,1,1,80279519],
+  "x": [-2879,-2200,-1525,-851,60,794,1495,2653,-2919,-2242,-1563,-725,24,731,1677,-3217,-419,-2511,-46,353,2453,1519,2030,2543,-1066,230,1160,1805,3028,2587,2928,3086,-472,-3221,-1403,2569,1584,1415,706,3049,1475,-693,2215,1184,2240,175,-973,-40,-612,1373,1435,1620,857,1475,1644,1651,1737,-3200,780,803,899,893,3187],
+  "z": [-1593,-1250,-898,-554,-80,297,624,295,140,488,838,1258,1576,1873,2275,2397,-2748,2690,3677,2718,-1006,2681,1429,450,-3133,-2344,-1790,-1401,2103,580,-1838,-447,748,724,2877,3279,454,769,-3129,-649,2195,3258,1002,3068,-2133,-3723,1143,1694,1005,595,619,597,193,-2278,-2561,-1299,-1165,-1,149,162,217,215,139],
+  "ways": [
+    {"id":5696639,"highway":"residential","name":"East 237th Street","oneway":0,"nodes":[57,8,9,10,46,11,12,13,40]},
+    {"id":5697096,"highway":"residential","name":"Matilda Avenue","oneway":1,"nodes":[15,9,2,16,45]},
+    {"id":5697983,"highway":"residential","name":"Byron Avenue","oneway":0,"nodes":[18,19,13,37,6,36,20,30]},
+    {"id":5698275,"highway":"residential","name":"Whitehall Place","oneway":0,"nodes":[19,43]},
+    {"id":5698321,"highway":"residential","name":"East 239th Street","oneway":0,"nodes":[24,16,25,26]},
+    {"id":5698932,"highway":"residential","name":"Furman Avenue","oneway":0,"nodes":[41,47,12,5,52,27]},
+    {"id":5699038,"highway":"residential","name":"Boyd Avenue","oneway":0,"nodes":[35,22]},
+    {"id":5699801,"highway":"residential","name":"Richardson Avenue","oneway":1,"nodes":[25,3,10,17]},
+    {"id":46594840,"highway":"tertiary","name":"Nereid Avenue","oneway":0,"nodes":[6,51,7,62]},
+    {"id":49590156,"highway":"secondary","name":"Nereid Avenue","oneway":0,"nodes":[0,1,2,3,4]},
+    {"id":120256664,"highway":"residential","name":"Gunther Avenue","oneway":1,"nodes":[23,29,28]},
+    {"id":461067733,"highway":"residential","name":"Carpenter Avenue","oneway":1,"nodes":[24,1,8,33]},
+    {"id":586133498,"highway":"secondary","name":"White Plains Road","oneway":0,"nodes":[54,53,26]},
+    {"id":667481206,"highway":"secondary","name":"White Plains Road","oneway":0,"nodes":[4,32,48,11,34]},
+    {"id":813527491,"highway":"tertiary","name":"Barnes Avenue","oneway":0,"nodes":[21,14,22,42,23,7]},
+    {"id":879261208,"highway":"residential","name":"East 237th Street","oneway":0,"nodes":[40,14]},
+    {"id":1202880800,"highway":"residential","name":"East 239th Street","oneway":0,"nodes":[26,27,20,39]},
+    {"id":1202880801,"highway":"secondary","name":"White Plains Road","oneway":0,"nodes":[26,4]},
+    {"id":1358373408,"highway":"tertiary","name":"Nereid Avenue","oneway":0,"nodes":[4,5,49,50,6]},
+    {"id":1390219294,"highway":"residential","name":"Barnes Avenue","oneway":0,"nodes":[7,31]},
+    {"id":1419087955,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[55,58,59]},
+    {"id":1419087962,"highway":"residential","name":"Furman Avenue","oneway":0,"nodes":[27,44]},
+    {"id":1419102259,"highway":"residential","name":"Richardson Avenue","oneway":1,"nodes":[38,25]},
+    {"id":1455419581,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[61,60,56]},
+    {"id":1455419582,"highway":"footway","footway":"crossing","name":null,"oneway":0,"nodes":[59,52,61]}
+  ],
+  "entrances": [
+    {"x":28,"z":134,"type":"Stair","entry":true,"exit":true,"stopIds":["204"],"street":"White Plains Road","wayId":667481206,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":107,"z":-351,"type":"Stair","entry":true,"exit":true,"stopIds":["204"],"street":"White Plains Road","wayId":1202880801,"cross":null,"crossWayId":null,"side":"west","plaza":null}
+  ]
+}

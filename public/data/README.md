@@ -31,6 +31,7 @@ Route colors come from `routes.txt`. MTA's IP status for those colors is UNVERIF
 
 - `stations/L08.json` and the generated `stations/<id>.json`
 - `station-depths.json`
+- `streets/<id>.json`
 
 Per-station interior files (`stations/<id>.json`) merge hand-authored interiors with OSM
 platform polygons. The whole file is marked as a derivative database under the ODbL; each
@@ -40,6 +41,12 @@ MTA data under the OPEN-NY Terms of Use (the file's `attribution` says so, see b
 platform track runs and rail height, so the map's tracks can descend to the platform), and carries
 the same license and the OSM and MTA credits; it adds an OPEN-NY line only when a rail height
 comes from an E&E rise.
+
+`streets/<id>.json` (one per station) is the OSM streets and walking ways within 300 m of the station point, clipped,
+simplified and packed (`npm run data:streets`), plus the station's entrances joined to the street they open onto. The
+whole file is a derivative database under the ODbL; the entrance points are MTA data (NY Open Data i9wp-a4ja) under the
+OPEN-NY Terms of Use, not ODbL, and each file's `attribution` says so. The files load on focus and sit outside the
+startup budget.
 
 ## NY Open Data / MTA Elevator and Escalator feeds
 

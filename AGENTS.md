@@ -46,7 +46,14 @@ so dev and preview serve under that path.
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
 - `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
   within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
-  `streetsData.test.ts` checks it. Nothing reads it yet (ost.3 builds the per-station street files from it).
+  `streetsData.test.ts` checks it. Rerun `data:streets` after it.
+- `npm run data:streets`: offline; builds `public/data/streets/<stationId>.json` for every `stations.json` station from
+  the street pin and the catalog entrances (clip to 300 m, simplify, project to decimeters, join each entrance to its street).
+  Rerun it after `data`, `data:streets:fetch`, `data:catalog:fetch` or a change to the `searchText.ts` synonyms (street join
+  keys use them); `streetsOutputs.test.ts` fails while the files are stale. It builds and cap-checks every file before
+  writing, prints the largest files, the totals and the join log (no street, near misses, bridge/tunnel ways, far entrances),
+  and checks the startup budget total did not move. If a file passes its cap, lower the one global `WALK_RADIUS_M` in
+  `scripts/lib/streetsBuild.ts` (footways only), never per file.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).
@@ -347,6 +354,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   station), written only by `scripts/fetch-streets.ts`; `manifest.json` (license, query, shard list) and `cell-<lat>_<lon>.json`
   shards, each with its own node table (ways index OSM node ids; coordinates 1e-6 deg). Pure trim and shard layout in
   `scripts/lib/streetsOsm.ts` and `streetsShard.ts`; `fetchJson.ts` is the retrying fetch both pin scripts share
+- `public/data/streets/<stationId>.json`: one file per station (`StationStreets`, `src/data/streetSchema.ts`), built by
+  `scripts/build-streets.ts` (IO only) from the pin and `catalog/entrances.json`. Pure: `scripts/lib/streetsPin.ts`
+  (`loadPin`, `waysNear`), `streetsBuild.ts` (`buildStationStreets`: `clipSpan`, `simplifySpans`, `onewayOf`, packing),
+  `streetsEntrances.ts` (the station's entrances, `joinEntrance` from `entranceStreet.ts` and the join log), with
+  `streetsFixture.ts` the tests' mini pin. Outside the startup budget; own caps in `scripts/lib/budget.ts`
   - `data/stations/layout-oracle.json` (tuning, 62 layouts and 13 to decline) and `layout-holdout.json` (30, never tune
     on it): platform type, platforms, tracks, mezzanine per station, agent-checked against English Wikipedia
     (CC BY-SA 4.0, facts only, revision ids); scoring only, not shipped
@@ -658,7 +670,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
-  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors don't count.
+  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors and street files don't count (street files have their own caps: 16 KB gzipped each, and a total, in `budget.ts`).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), change `public/data`. The workflow runs typecheck, tests, and build before pushing, but the
