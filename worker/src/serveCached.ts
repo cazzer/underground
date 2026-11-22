@@ -1,5 +1,8 @@
 import { FAILURE_BACKOFF_MS, cacheDecision, type CacheDecision, type Memo } from './cache'
 import { corsHeaders } from './cors'
+import { readEdge, writeEdge, type EdgeCache } from './edgeCache'
+
+export type { EdgeCache }
 
 type CacheState = Exclude<CacheDecision, 'busy' | 'refresh'> | 'edge' | 'miss'
 
@@ -16,12 +19,6 @@ export interface CachedRoute {
   state: { memo: Memo | null; refreshingSince: number | null; failedUntil: number | null }
 }
 
-/** The part of the Cache API used here (`caches.default` fits). */
-export interface EdgeCache {
-  match(request: Request): Promise<Response | undefined>
-  put(request: Request, response: Response): Promise<void>
-}
-
 function respond(body: string, state: CacheState, origin: string | null): Response {
   return new Response(body, {
     headers: {
@@ -31,14 +28,6 @@ function respond(body: string, state: CacheState, origin: string | null): Respon
       ...corsHeaders(origin),
     },
   })
-}
-
-async function readEdge(edge: EdgeCache, cacheKey: Request, now: number): Promise<Memo | null> {
-  const cached = await edge.match(cacheKey)
-  if (!cached) return null
-  // Expiry comes from our own header, not Age.
-  const expiresAt = Number(cached.headers.get('x-rt-expires'))
-  return expiresAt > now ? { body: await cached.text(), expiresAt } : null
 }
 
 async function refresh(
@@ -54,20 +43,7 @@ async function refresh(
   const body = await route.build(request)
   // Taken after the fetches: Workers' clock only advances on I/O.
   const fresh: Memo = { body, expiresAt: Date.now() + route.ttlMs }
-  ctx.waitUntil(
-    edge
-      .put(
-        cacheKey,
-        new Response(fresh.body, {
-          headers: {
-            'content-type': 'application/json; charset=utf-8',
-            'cache-control': `public, max-age=${route.ttlMs / 1000}`,
-            'x-rt-expires': String(fresh.expiresAt),
-          },
-        }),
-      )
-      .catch(console.error),
-  )
+  writeEdge(edge, ctx, cacheKey, fresh, route.ttlMs)
   return { memo: fresh, state: 'miss' }
 }
 

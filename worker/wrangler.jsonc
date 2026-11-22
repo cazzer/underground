@@ -6,5 +6,8 @@
   // on a custom domain/route (tracked in 8x4.5). Until then the per-isolate memo and the
   // upstream cf.cacheTtl are what limit upstream fetches.
   "workers_dev": true,
-  "observability": { "enabled": true }
+  // Invocation logs record "Fetch GET <url>", and /geocode's URL carries the user's query, so they
+  // are off for the whole Worker. Our own console logs (rt-miss, ene-miss, geocode-miss: counts and
+  // fixed codes, never a query) stay on. Never enable observability.traces: they record subrequest URLs.
+  "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": false } }
 }

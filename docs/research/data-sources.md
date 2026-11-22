@@ -382,6 +382,26 @@ laptop, `?debug`; decode times as the worker reports them):
 credit: everything drawn is OSM-derived (the "© OpenStreetMap contributors" line already shown; the client loads z9 and finer,
 so the z0 to z5 Natural Earth water, public domain anyway, is never drawn); landcover stays dropped. `Attribution.tsx` is unchanged.
 
+### 5.4 Address and place search (GeoSearch, Photon; 2q7.33)
+
+Both are called only by the Worker's `GET /geocode` (never by the client), with a descriptive User-Agent, a 3 s timeout, a
+256 KB body cap and the NYC bbox `[-74.2591, 40.4774, -73.7004, 40.9176]`. Checked 2026-11-22.
+
+- **NYC GeoSearch** (`https://geosearch.planninglabs.nyc/v2/autocomplete`, Pelias on the Department of City Planning's PAD): free,
+  no key, `access-control-allow-origin: *`. It publishes no terms, no rate limit and no attribution rule (the
+  `geocoding.attribution` link, `/attribution`, was a 404): **UNVERIFIED**. The data is NYC Open Data. We credit "NYC GeoSearch, NYC
+  Department of City Planning" anyway and cap our own calls (20 burst, 2 a second per isolate). Every hit comes back as `layer: venue`,
+  `source: nycpad`; a `housenumber` is what marks an address. It returns PAD aliases at one point (Barclays Center: 10 rows).
+- **Photon** (`https://photon.komoot.io/api`): free, best-effort, no guarantee. Its README allows use "as long as the number of
+  requests stay in a reasonable limit"; extensive use "will be throttled or completely banned". We cap it at 5 burst, 0.5 a second per
+  isolate, behind the shared bucket. The data is OpenStreetMap (ODbL), the software Apache 2.0: results go out with "© OpenStreetMap
+  contributors, via komoot Photon", and the 1 h cache matches Photon's own `max-age=3600`. Photon's transit rows (`railway`,
+  `public_transport`) and rows outside New York state are dropped.
+- **What leaves the device:** the typed text and a map-centre focus rounded to 2 decimals, to our Worker, which sends them on from its
+  own address (the upstreams never see the client's IP or headers). The Worker never logs the text or the focus; Workers Logs
+  invocation logs, which record the request URL, are off (`worker/wrangler.jsonc`); never enable traces.
+- A GeoSearch or Photon outage shows as `incomplete` answers (not cached) or a 502, and station and street search never wait on it.
+
 ## 6. Static-hosting fit and pipeline
 
 **The MTA terms require a proxy; CORS doesn't.** The plan is a Cloudflare Worker at `/rt` that:

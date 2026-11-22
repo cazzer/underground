@@ -59,3 +59,32 @@ export interface EneSnapshot {
   dropped: number         // malformed rows skipped
   outages: EneOutage[]    // in effect at generatedAt, one per code, sorted by code
 }
+
+/** Bump on incompatible shape changes to the /geocode body; also part of its cache keys. */
+export const GEOCODE_SCHEMA_VERSION = 1
+export const GEOCODE_MAX_RESULTS = 8
+export type GeocodeKind = 'address' | 'place' | 'street' | 'area'
+export type GeocodeSource = 'geosearch' | 'photon'
+
+export interface GeocodeResult {
+  label: string          // "120 BROADWAY, Manhattan"; upstream casing, cleaned, at most 120 code points
+  kind: GeocodeKind
+  lat: number            // 5 decimals, inside the NYC bbox
+  lon: number
+  source: GeocodeSource
+}
+
+export interface GeocodeResponse {
+  version: typeof GEOCODE_SCHEMA_VERSION
+  results: GeocodeResult[]                              // at most GEOCODE_MAX_RESULTS, best first; [] is a valid answer
+  attribution: Partial<Record<GeocodeSource, string>>   // one entry per source that has a result
+  incomplete: boolean                                   // a source this answer wanted failed or was skipped; never cached
+}
+
+export type GeocodeErrorCode = 'bad-query' | 'bad-focus' | 'forbidden' | 'busy' | 'upstream' | 'internal'
+
+/** Shown by the client beside any result of that source (2q7.16). */
+export const GEOCODE_ATTRIBUTION: Record<GeocodeSource, string> = {
+  geosearch: 'NYC GeoSearch, NYC Department of City Planning',
+  photon: '© OpenStreetMap contributors, via komoot Photon',
+}

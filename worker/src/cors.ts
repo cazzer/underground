@@ -1,7 +1,7 @@
 const PAGES_ORIGIN = 'https://cazzer.github.io'
 const LOCAL_DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/
 
-function isAllowedOrigin(origin: string | null): origin is string {
+export function isAllowedOrigin(origin: string | null): origin is string {
   return origin !== null && (origin === PAGES_ORIGIN || LOCAL_DEV_ORIGIN.test(origin))
 }
 
