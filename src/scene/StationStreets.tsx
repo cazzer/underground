@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, type Group } from 'three'
+import { interiorCovers, interiorStationIds } from '../data/interiorLoad'
 import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
@@ -49,7 +50,8 @@ export function StationStreets({ interior, ...rest }: StationStreetsProps) {
   const { focusedId } = useFocus()
   const layer = useStationStreets(focusedId)
   if (!layer) return null
-  const own = interior?.stationId === layer.stationId ? interior : null
+  // A complex's interior covers every member: focused on any of them, it is this station's.
+  const own = interiorCovers(interior, layer.stationId) ? interior : null
   return <StreetLines key={layer.stationId} layer={layer} interior={own} {...rest} />
 }
 
@@ -60,9 +62,13 @@ interface StreetLinesProps extends StationStreetsProps {
 /** Stations this far beyond the street label radius still block (their marker reaches in), meters. */
 const STATION_REACH_M = DESKTOP_LABEL_RADIUS_M + 50
 
-function nearbyStations(network: Network, layer: StreetLayer): Ground[] {
+/** The stations near the layer whose markers are drawn: not the focused one, nor the members its interior covers
+ *  (their markers are hidden with it). */
+function nearbyStations(network: Network, layer: StreetLayer, interior: InteriorModel | null): Ground[] {
+  const hidden = new Set(interior ? interiorStationIds(interior) : [])
   return network.stations
-    .filter((s) => s.id !== layer.stationId && Math.hypot(s.pos.x - layer.anchor.x, s.pos.z - layer.anchor.z) <= STATION_REACH_M)
+    .filter((s) => s.id !== layer.stationId && !hidden.has(s.id))
+    .filter((s) => Math.hypot(s.pos.x - layer.anchor.x, s.pos.z - layer.anchor.z) <= STATION_REACH_M)
     .map((s) => s.pos)
 }
 
@@ -86,7 +92,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
   const labelShown = useRef(0)
   const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1, markerRadiusM: 0, ringRadiusM: 0 })
   // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring.
-  const stations = useMemo(() => nearbyStations(network, layer), [network, layer])
+  const stations = useMemo(() => nearbyStations(network, layer, interior), [network, layer, interior])
   // Which street candidates a subway line runs along, so their labels step clear of its bundle.
   const bundles = useMemo(() => routeBundles(layer.streets, layer.anchor, network.shapes, STATION_REACH_M), [network, layer])
   const focused = network.stationById.get(layer.stationId)?.pos ?? null
