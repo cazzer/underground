@@ -8,8 +8,11 @@
   "pin": {
     "build": "20261121",
     "basemapVersion": "4.15.2",
-    "release": "basemap-20261121-ed912214",
-    "sha256": "ed912214705ab93014bab5a5670aef4824d9a4a3498a79aae58ca47faf02ea7b",
-    "bytes": 32962122
+    "release": "basemap-20261121-ddcef445",
+    "asset": "nyc-tiles.tar.gz",
+    "sha256": "ddcef445d5796ec084353d92a442c6be995236c50d661fed038dc0f8e7805082",
+    "bytes": 31347718,
+    "files": 3820,
+    "tileBytes": 44878229
   }
 }
