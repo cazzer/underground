@@ -150,6 +150,15 @@ describe('clampAzimuth', () => {
     expect(clampAzimuth(2 * Math.PI + 0.2, 0.1, -Math.PI, Math.PI)).toBeCloseTo(0.2, 12)
   })
 
+  it('keeps turning when the view trails the goal by more than π (anchored on the last goal)', () => {
+    // A fast slide from -2.5: the damped view is still near -2.2 while the goal passes +1.0.
+    let goal = -2.5
+    for (let i = 0; i < 12; i++) goal = clampAzimuth(goal + 0.3, wrapAngle(goal), -CAP, CAP)
+    expect(goal).toBeCloseTo(1.1, 12)
+    goal = clampAzimuth(goal + 0.3, wrapAngle(goal), -CAP, CAP)
+    expect(goal).toBeCloseTo(1.4, 12)
+  })
+
   it('leaves an open window unwrapped', () => {
     expect(clampAzimuth(7, 0.7, -Infinity, Infinity)).toBe(7)
     expect(clampAzimuth(7, 0.7, -Infinity, 1)).toBe(7)

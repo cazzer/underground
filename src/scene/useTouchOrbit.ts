@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import { Vector3 } from 'three'
 import type { OrbitProbe } from '../lib/focus'
-import { clampAzimuth, createTouchOrbit, takeTurn, touchDown, touchMove, touchReset, touchUp, type TouchOrbit } from '../lib/touchOrbit'
+import { clampAzimuth, createTouchOrbit, takeTurn, touchDown, touchMove, touchReset, touchUp, wrapAngle, type TouchOrbit } from '../lib/touchOrbit'
 import type { MapControlsImpl } from './cameraFlight'
 import { twistLook } from './twistLook'
 
@@ -64,7 +64,12 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
     }
     const onDown = (e: PointerEvent) => {
       touch.current = e.pointerType === 'touch'
-      if (!touch.current) return
+      if (!touch.current) {
+        // A mouse or pen after a lost touch lift: forget the fingers and give the wheel its zoom back.
+        touchReset(t)
+        release()
+        return
+      }
       if (e.isPrimary) touchReset(t)
       touchDown(t, e.pointerId, e.clientX, e.clientY)
       if (t.lock !== 'rotate') release()
@@ -76,9 +81,8 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
       const was = t.lock
       touchMove(t, e.pointerId, e.clientX, e.clientY, canTurnRef.current())
       if (t.lock !== 'rotate') return
-      const theta = c.getAzimuthalAngle()
       if (was !== 'rotate') {
-        r.goal = theta
+        r.goal = c.getAzimuthalAngle()
         if (holdZoom) {
           r.held = c
           r.heldZoom = c.zoomSpeed
@@ -87,7 +91,8 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
       }
       const turn = takeTurn(t, el.clientHeight)
       if (turn === 0) return
-      r.goal = clampAzimuth(r.goal + turn, theta, c.minAzimuthAngle, c.maxAzimuthAngle)
+      // Unwrapped around the last goal, not the view: the view trails the goal (damping) and may be over π behind.
+      r.goal = clampAzimuth(r.goal + turn, wrapAngle(r.goal), c.minAzimuthAngle, c.maxAzimuthAngle)
       r.due = true
     }
     const onUp = (e: PointerEvent) => {
@@ -133,7 +138,8 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
     }
   }, [gl, get, connected, controls])
 
-  // Before drei's update() (-1). Only on a frame where a move changed the goal: the moves since the last frame
+  // At -2, before drei's update() (-1). setAzimuthalAngle runs a controls update() itself, so a frame with a move
+  // updates the controls twice (as the controls' own touch rotate did per move). Only on a frame where a move changed the goal: the moves since the last frame
   // collapse into one apply (setAzimuthalAngle replaces the pending damped turn with the rest of the way to the
   // goal), and the lift's last goal still applies once. Fingers held still apply nothing, so they never pull the
   // view back against a fly-to. No allocation.
