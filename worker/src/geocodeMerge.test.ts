@@ -8,8 +8,15 @@ import type { GeocodeKind, GeocodeSource } from './schema'
 const labels = (c: Candidate[][], q: string, limit?: number) =>
   mergeCandidates(c, queryTokens(q), limit).map((r) => r.label)
 
-function cand(name: string, lat: number, lon: number, source: GeocodeSource = 'photon', kind: GeocodeKind = 'place'): Candidate {
-  return { name, key: nameKey(name), result: { label: name, kind, lat, lon, source } }
+function cand(
+  name: string,
+  lat: number,
+  lon: number,
+  source: GeocodeSource = 'photon',
+  kind: GeocodeKind = 'place',
+  address: string | null = null,
+): Candidate {
+  return { name, key: nameKey(name), address: address && nameKey(address), result: { label: name, kind, lat, lon, source } }
 }
 
 describe('nameKey', () => {
@@ -63,6 +70,18 @@ describe('mergeCandidates on synthetic rows', () => {
     const b = cand('Joe Pizza', 40.7027, -74)
     expect(distanceM(a.result, b.result)).toBeGreaterThan(250)
     expect(mergeCandidates([[a, b]], ['joe', 'pizza'])).toHaveLength(2)
+  })
+
+  it('keeps two branches of a chain 100 m apart when each has its own address, folds one with the same', () => {
+    const a = cand('Starbucks', 40.7, -74, 'photon', 'place', '10 Main Street')
+    const b = cand('Starbucks', 40.7009, -74, 'photon', 'place', '40 Main Street')
+    const twin = cand('Starbucks', 40.70005, -74, 'photon', 'place', '10 Main St')
+    const bare = cand('Starbucks', 40.7003, -74, 'geosearch')
+    expect(distanceM(a.result, b.result)).toBeLessThan(150)
+    expect(mergeCandidates([[a, b]], ['starbucks'])).toHaveLength(2)
+    expect(mergeCandidates([[a, twin]], ['starbucks'])).toHaveLength(1)
+    // A row with no address of its own cannot tell the branches apart: it folds.
+    expect(mergeCandidates([[a, bare]], ['starbucks'])).toHaveLength(1)
   })
 
   it('prefers the candidate that has the query words (the last may be half typed), then the shorter name', () => {

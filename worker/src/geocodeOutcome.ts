@@ -12,6 +12,17 @@ import {
 /** The whole vocabulary of upstream failures. Never a message: a fetch error's text can hold the URL, and so the query. */
 export type GeocodeFetchError = 'timeout' | 'fetch-failed' | 'too-large' | 'parse-failed' | 'bad-shape' | `http-${number}`
 
+/**
+ * Whether a failure says the source is struggling (back it off) rather than that this query upset it
+ * (a 4xx other than 429, a body that would not parse or fit: another query may be fine).
+ */
+export function shouldBackOff(error: GeocodeFetchError): boolean {
+  if (error === 'timeout' || error === 'fetch-failed') return true
+  if (!error.startsWith('http-')) return false
+  const status = Number(error.slice(5))
+  return status === 429 || status >= 500
+}
+
 export type SourceOutcome =
   | { status: 'ok'; results: SourceResults; cacheStatus: string | null }
   | { status: 'failed'; error: GeocodeFetchError }

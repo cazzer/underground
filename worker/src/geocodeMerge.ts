@@ -17,6 +17,8 @@ export function distanceM(a: GeocodeResult, b: GeocodeResult): number {
 function areDuplicates(a: Candidate, b: Candidate): boolean {
   const d = distanceM(a.result, b.result)
   if (a.result.source === 'geosearch' && b.result.source === 'geosearch' && d <= SAME_POINT_M) return true
+  // Two branches of a chain share a name and sit close, but each has its own address.
+  if (a.address !== null && b.address !== null && a.address !== b.address) return false
   return a.key === b.key && d <= TWIN_M
 }
 

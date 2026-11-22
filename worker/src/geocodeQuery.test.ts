@@ -22,7 +22,11 @@ describe('normalizeQuery', () => {
     expect(normalizeQuery('  120   BROADWAY ')).toBe('120 broadway')
     expect(normalizeQuery('１２０ Ｂｒｏａｄｗａｙ')).toBe('120 broadway')
     expect(normalizeQuery('Katz’s ‘Deli')).toBe("katz's 'deli")
-    expect(normalizeQuery('a‮bc​d')).toBe('abcd')
+    expect(normalizeQuery('a\u202Ebc\u200Bd')).toBe('abcd')
+    // A tab or newline is a word break, not nothing.
+    expect(normalizeQuery('120\tBroadway')).toBe('120 broadway')
+    expect(normalizeQuery('120\r\nBroadway\u200B ')).toBe('120 broadway')
+    expect(normalizeQuery('a \u200B b')).toBe('a b')
   })
 })
 

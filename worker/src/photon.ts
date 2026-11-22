@@ -4,6 +4,8 @@ import type { GeocodeKind } from './schema'
 
 /** Stops, stations and entrances: the station search covers them, and they flood "Barclays Center". */
 const TRANSIT_KEYS = new Set(['railway', 'public_transport'])
+/** Bus stops are tagged highway=bus_stop; other highway rows (streets, paths) are wanted. */
+const isBusStop = (p: Record<string, unknown>): boolean => p.osm_key === 'highway' && p.osm_value === 'bus_stop'
 const AREA_TYPES = new Set(['locality', 'district', 'city', 'county'])
 /** The NYC bbox also covers Jersey City, Hoboken and Newark. */
 const STATE = 'New York'
@@ -21,6 +23,7 @@ const readRow: RowReader = (p) => {
   if (p.state !== undefined && p.state !== STATE) return null
   if (p.countrycode !== undefined && p.countrycode !== COUNTRY) return null
   if (typeof p.osm_key === 'string' && TRANSIT_KEYS.has(p.osm_key)) return null
+  if (isBusStop(p)) return null
   if (p.type === 'country' || p.type === 'state') return null
 
   const housenumber = str(p.housenumber)
@@ -36,7 +39,7 @@ const readRow: RowReader = (p) => {
   if (area !== null) parts.push(area)
   const label = cleanLabel(parts.join(', '))
   if (label === null) return null
-  return { name: cleanLabel(name) ?? name, label, kind: kindOf(p, given !== null) }
+  return { name: cleanLabel(name) ?? name, label, kind: kindOf(p, given !== null), address: given !== null ? address : null }
 }
 
 /** Photon answer to candidates; throws a fixed-message TypeError on a bad shape. */

@@ -399,7 +399,8 @@ Both are called only by the Worker's `GET /geocode` (never by the client), with 
   `public_transport`) and rows outside New York state are dropped.
 - **What leaves the device:** the typed text and a map-centre focus rounded to 2 decimals, to our Worker, which sends them on from its
   own address (the upstreams never see the client's IP or headers). The Worker never logs the text or the focus; Workers Logs
-  invocation logs, which record the request URL, are off (`worker/wrangler.jsonc`); never enable traces.
+  invocation logs, which record the request URL, are off, query strings are redacted and traces are off (`worker/wrangler.jsonc`;
+  `wrangler tail` may still show full URLs to whoever tails production). Responses are `Cache-Control: no-store`.
 - A GeoSearch or Photon outage shows as `incomplete` answers (not cached) or a 502, and station and street search never wait on it.
 
 ## 6. Static-hosting fit and pipeline

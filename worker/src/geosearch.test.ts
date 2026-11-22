@@ -39,7 +39,7 @@ describe('trimGeoSearch on synthetic rows', () => {
         feature(NaN, 40.7, { name: 'B' }),
         feature(Infinity, 40.7, { name: 'B2' }),
         row({ borough: 'Queens' }),
-        row({ name: '‮​  ' }),
+        row({ name: '\u202E\u200B  ' }),
         { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0]] }, properties: { name: 'C' } },
         row({ name: 'OK', borough: 'Queens' }),
       ),
@@ -67,8 +67,10 @@ describe('trimGeoSearch on synthetic rows', () => {
   })
 
   it('cleans control and bidi characters and caps a label at 120 code points', () => {
-    const got = trimGeoSearch(collection(row({ name: 'A‮B\u0007  C', borough: 'Bronx' }), row({ name: 'x'.repeat(200) })))
+    const got = trimGeoSearch(collection(row({ name: 'A\u202EB\u0007  C', borough: 'Bronx' }), row({ name: 'x'.repeat(200) })))
     expect(got.candidates[0]?.result.label).toBe('AB C, Bronx')
+    const broken = trimGeoSearch(collection(row({ name: 'Foo\nBar\tBaz', borough: 'Bronx' })))
+    expect(broken.candidates[0]?.result.label).toBe('Foo Bar Baz, Bronx')
     expect(Array.from(got.candidates[1]?.result.label ?? '')).toHaveLength(120)
   })
 })

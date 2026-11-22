@@ -42,5 +42,8 @@ describe('token buckets', () => {
     tryTake([b], 1000)
     tryTake([b], 1000)
     expect(tryTake([b], 0)).toBe(false)
+    // The step back must not rewind the refill clock, or time already counted would refill twice.
+    expect(tryTake([b], 1000)).toBe(false)
+    expect(tryTake([b], 2000)).toBe(true)
   })
 })

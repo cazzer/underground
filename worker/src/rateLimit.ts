@@ -14,7 +14,7 @@ function refill(bucket: TokenBucket, now: number): void {
   // A clock that stepped back adds nothing.
   const elapsedS = Math.max(0, now - bucket.updatedAt) / 1000
   bucket.tokens = Math.min(bucket.capacity, bucket.tokens + elapsedS * bucket.refillPerS)
-  bucket.updatedAt = now
+  bucket.updatedAt = Math.max(bucket.updatedAt, now)
 }
 
 /** Takes one token from every bucket, or from none when any is empty. */

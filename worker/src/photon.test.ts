@@ -41,12 +41,16 @@ describe('trimPhoton on synthetic rows', () => {
         at({ name: 'Elsewhere', countrycode: 'CA' }),
         at({ name: 'Metro', osm_key: 'public_transport', osm_value: 'platform' }),
         at({ name: 'Stop', osm_key: 'railway' }),
+        at({ name: 'Bus Stop', osm_key: 'highway', osm_value: 'bus_stop' }),
         at({ name: 'Open Cafe', osm_key: 'amenity', district: 'Queens' }),
         feature(-74, 40.7, { name: 'No State Cafe', city: 'New York' }),
       ),
     )
-    expect(got.dropped).toBe(4)
+    expect(got.dropped).toBe(5)
     expect(got.candidates.map((c) => c.result.label)).toEqual(['Open Cafe, Queens', 'No State Cafe, New York'])
+    // Other highway rows are wanted.
+    const street = at({ name: 'Main St', type: 'street', osm_key: 'highway', osm_value: 'residential' })
+    expect(trimPhoton(collection(street)).candidates).toHaveLength(1)
   })
 
   it('reads streets and areas, and needs both parts of an unnamed address', () => {

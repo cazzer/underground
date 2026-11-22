@@ -20,6 +20,7 @@ export function normalizeQuery(raw: string): string {
     .replace(/[’‘]/g, "'")
     .replace(INVISIBLE, '')
     .replace(/\s+/g, ' ')
+    // Invisible characters are removed before the collapse, so "a \u200B b" collapses to "a b".
     .trim()
     .toLowerCase()
 }

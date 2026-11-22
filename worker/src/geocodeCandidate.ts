@@ -9,6 +9,8 @@ export interface Candidate {
   name: string
   /** `nameKey(name)`. */
   key: string
+  /** `nameKey` of a street address the row carries beside its name (Photon), else null. Two branches of a chain differ by it. */
+  address: string | null
 }
 
 export interface SourceResults {
@@ -24,6 +26,7 @@ export interface Row {
   name: string
   label: string
   kind: GeocodeKind
+  address?: string | null
 }
 
 export type RowReader = (properties: Record<string, unknown>) => Row | null
@@ -61,7 +64,12 @@ export function trimFeatures(json: unknown, source: GeocodeSource, read: RowRead
       continue
     }
     const result: GeocodeResult = { label: row.label, kind: row.kind, lat: round5(lat), lon: round5(lon), source }
-    out.candidates.push({ result, name: row.name, key: nameKey(row.name) })
+    out.candidates.push({
+      result,
+      name: row.name,
+      key: nameKey(row.name),
+      address: row.address ? nameKey(row.address) : null,
+    })
   }
   return out
 }

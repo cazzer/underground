@@ -1,7 +1,10 @@
 const LABEL_MAX_CODE_POINTS = 120
 
-/** Control and format characters (bidi overrides, zero-width marks) never reach a label. */
-export const INVISIBLE = /[\p{Cc}\p{Cf}]/gu
+/**
+ * Control and format characters (bidi overrides, zero-width marks) never reach a label. Whitespace is left
+ * for the collapse (a tab or newline is a word break, not nothing), so it is excluded here.
+ */
+export const INVISIBLE = /(?!\s)[\p{Cc}\p{Cf}]/gu
 
 /** A label text from upstream: invisible characters removed, whitespace collapsed, capped; null when nothing is left. */
 export function cleanLabel(text: string): string | null {

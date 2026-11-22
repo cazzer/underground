@@ -112,9 +112,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - The Worker's Cache API layer is a no-op on workers.dev; edge caching needs a custom
   domain (tracked in 8x4.5). The per-isolate memo and upstream `cf.cacheTtl` still apply; `/geocode` likewise keeps a
   per-isolate 1 h LRU (500 entries) and upstream `cf` caching.
-- `worker/wrangler.jsonc` sets `observability.logs.invocation_logs` to false: Workers Logs invocation logs record the full
-  request URL, and `/geocode`'s carries the user's query. Our own `console.log` lines stay on (so the `*-miss` lines still
-  show). Never enable `observability.traces` (they record subrequest URLs).
+- `worker/wrangler.jsonc` sets `observability.logs.invocation_logs` to false, `observability.redact_query_string` to true and
+  `observability.traces.enabled` to false (`src/wrangler.test.ts` pins all three): Workers Logs invocation logs record the full
+  request URL, and `/geocode`'s carries the user's query; traces record subrequest URLs. Our own `console.log` lines stay on
+  (so the `*-miss` lines still show). `wrangler tail` and the dashboard's live logs may still show full URLs to whoever tails
+  production. Never enable traces.
 - The client finds the Worker through `VITE_RT_URL` (copy `.env.example` to `.env.local`).
 
 ## Directory map
@@ -790,8 +792,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     takes its cap); `edgeCache.ts` the Cache API read and write both routes share (`EdgeCache`, `readEdge`, `writeEdge`)
   - `/geocode`: `serveGeocode.ts` (IO orchestration, never throws: 403 unless an allowed Origin, 400, the per-isolate LRU, the
     edge cache, then the sources: GeoSearch first and Photon only when it had no place-like hit (an address hit satisfies a
-    house-number query), or both at once for a query that looks like a business; only complete answers are cached, a failed
-    source is skipped for 30 s, 503 `busy` when nothing may be called; one `geocode-miss` log line, counts and fixed codes
+    house-number query), or both at once for a query that looks like a business; only complete answers are cached, a source
+    that timed out, failed to connect or answered 429 or 5xx is skipped for 30 s, 503 `busy` (with `retry-after`, exposed to CORS)
+    when nothing may be called; one `geocode-miss` log line, counts and fixed codes
     only, never `q`, the focus or a label); `geocodeQuery.ts` / `geocodeText.ts` (parse, normalize, key, heuristics);
     `geosearch.ts` / `photon.ts` (the pure trims; Photon rows for transit, another state or country dropped) over
     `geocodeCandidate.ts`; `geocodeMerge.ts` (dedupe: PAD aliases, cross-source twins; rank); `geocodeOutcome.ts` (status,
@@ -1111,7 +1114,9 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   through a non-MTA host, even though the feeds send ACAO `*`. Realtime goes through
   the `worker/` proxy, which returns decoded JSON with a 15 s edge cache (outages at `/ene`: 120 s).
 - **The client never fetches GeoSearch or Photon directly; addresses and places go through the Worker's `/geocode`.**
-  `q` is never logged (custom logs carry counts only, invocation logs are off, never enable traces). `focus` is the map
+  `q` is never logged (custom logs carry counts only, invocation logs are off, query strings are redacted, never enable
+  traces). Its responses are `Cache-Control: no-store` (the 1 h cache is server-side only, so no typed query reaches a
+  device's disk cache) and carry no `x-rt-cache` header (it would be a cross-user oracle for recent searches). `focus` is the map
   centre or a chosen station, never the location fix; the Worker rounds it to 2 decimals and drops it outside the NYC bbox.
   Answers carry `attribution`, which the UI must show beside the results (2q7.16). Upstreams see the Worker, never the
   client's IP or headers. `/geocode` refuses a request with no allowed Origin (403).
