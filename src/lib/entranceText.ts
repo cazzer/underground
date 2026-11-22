@@ -1,5 +1,6 @@
-/** One station's entrance labels, worded together: one order per street pair, a nearby street for an entrance with
- *  no cross street, and a compass side of it when two labels would still read the same. Pure; reads the street file
+/** One station's entrance labels, worded together: one order per street pair, a nearby street (or two, around a
+ *  median entrance) for an entrance with no cross street, a compass side of it when two labels would still read the
+ *  same, and one label for a head house's same-corner stairs. Pure; reads the street file
  *  as it is (the join and the files are left alone). */
 import type { StationStreets } from '../data/streetSchema'
 import { isClosedRing, isStreet, streetKey } from './streetClass'
@@ -26,6 +27,8 @@ export interface EntranceText {
   unique: boolean
   /** The `streetKey`s of the streets the label names. */
   keys: string[]
+  /** Its head house: entrances chained within HEAD_HOUSE_M share one index. */
+  headHouse: number
 }
 
 interface NamedLine {
@@ -68,7 +71,44 @@ function compass(dx: number, dz: number): 'N' | 'S' | 'E' | 'W' {
   return dz > 0 ? 'S' : 'N'
 }
 
-/** Every entrance of `file` that has a label (a street or a plaza), worded for the station as a whole. */
+/** The nearest point of each other street (by key, nearest first) within NEAR_STREET_M of p. */
+function nearStreets(lines: readonly NamedLine[], p: readonly [number, number], own: string) {
+  const byKey = new Map<string, NonNullable<ReturnType<typeof nearest>>>()
+  for (const line of lines) {
+    if (line.key === own) continue
+    const hit = nearest([line], p, () => true)
+    const was = byKey.get(line.key)
+    if (hit && hit.d <= NEAR_STREET_M && (!was || hit.d < was.d)) byKey.set(line.key, hit)
+  }
+  return [...byKey.values()].sort((a, b) => a.d - b.d)
+}
+
+/** Groups points (meters) chained within `m` of each other; returns a group index per point. */
+export function clusters(points: readonly (readonly [number, number])[], m: number): number[] {
+  const parent = points.map((_, i) => i)
+  const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i]!)))
+  for (let i = 0; i < points.length; i++) {
+    for (let j = 0; j < i; j++) {
+      if (Math.hypot(points[i]![0] - points[j]![0], points[i]![1] - points[j]![1]) <= m) parent[root(i)] = root(j)
+    }
+  }
+  const ids = new Map<number, number>()
+  return points.map((_, i) => {
+    const r = root(i)
+    if (!ids.has(r)) ids.set(r, ids.size)
+    return ids.get(r)!
+  })
+}
+
+/** Entrances whose labels read the same within this far of each other share one label (one head house's stairs). */
+export const MERGE_M = 15
+/** Entrances within this far of each other chain into one head house. */
+export const HEAD_HOUSE_M = 25
+
+/**
+ * Every entrance of `file` that has a label (a street or a plaza), worded for the station as a whole. Same-text
+ * entrances within MERGE_M share one label (the first's mark carries it); each label has its head house's index.
+ */
 export function entranceTexts(file: StationStreets): EntranceText[] {
   const at = (n: number): [number, number] => [file.x[n]! / DM_PER_M, file.z[n]! / DM_PER_M]
   const lines: NamedLine[] = file.ways
@@ -91,11 +131,19 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
         if (!pairFirst.has(pair)) pairFirst.set(pair, ra !== rb ? (ra < rb ? own : other) : own)
         w.swap = pairFirst.get(pair) !== own
       } else {
-        const hit = nearest(lines, p, (l) => l.key !== own)
-        if (hit && hit.d <= NEAR_STREET_M) {
-          near = hit.line
-          w.near = hit.line.name
-          keys.push(hit.line.key)
+        const hits = nearStreets(lines, p, own)
+        const first = hits[0]
+        if (first) {
+          near = first.line
+          w.near = first.line.name
+          keys.push(first.line.key)
+          // A median entrance between two cross streets names both.
+          const other = hits.find((h) => (h.qx - p[0]) * (first.qx - p[0]) + (h.qz - p[1]) * (first.qz - p[1]) < 0)
+          if (e.side === 'median' && other) {
+            const names = [first.line.name, other.line.name].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+            w.between = [names[0]!, names[1]!]
+            keys.push(other.line.key)
+          }
         }
       }
     }
@@ -114,18 +162,27 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
   for (const d of drafts) {
     const parts = entranceParts(d.e, d.w)
     if (!parts) continue
+    const text = joinParts(parts)
+    const twin = out.find((u) => u.text === text && Math.hypot(u.x - d.p[0], u.z - d.p[1]) <= MERGE_M)
+    if (twin) continue
     out.push({
       index: d.index,
       x: d.p[0],
       z: d.p[1],
       head: parts.head,
       tail: parts.tail,
-      text: joinParts(parts),
+      text,
       elevator: d.e.type === 'Elevator',
       unique: true,
       keys: d.keys,
+      headHouse: 0,
     })
   }
   for (const t of out) t.unique = out.filter((u) => u.text === t.text).length === 1
+  const houses = clusters(
+    out.map((t) => [t.x, t.z] as const),
+    HEAD_HOUSE_M,
+  )
+  out.forEach((t, i) => (t.headHouse = houses[i]!))
   return out
 }

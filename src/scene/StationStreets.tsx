@@ -11,10 +11,11 @@ import type { LabelBlockers } from '../lib/labelBlockers'
 import type { Rgb } from '../lib/lineBuffers'
 import { DESKTOP_LABEL_RADIUS_M, streetLabelOpacity } from '../lib/streetLabelReveal'
 import type { Network } from '../lib/network'
+import { routeBundles } from '../lib/routeBundles'
 import type { Ground } from '../lib/projection'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
-import { cameraDistance } from './cameraDistance'
+import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
 import { interiorLook } from './interiorLook'
 import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
 import { RENDER_ORDER } from './renderOrder'
@@ -56,9 +57,6 @@ interface StreetLinesProps extends StationStreetsProps {
   layer: StreetLayer
 }
 
-/** A station marker's half size the labels keep clear of, meters: its smallest world radius (MARKER_MIN_METERS)
- *  grown as a focused marker grows. */
-const STATION_HALF_M = MARKER_MIN_METERS * 1.4
 /** Stations this far beyond the street label radius still block (their marker reaches in), meters. */
 const STATION_REACH_M = DESKTOP_LABEL_RADIUS_M + 50
 
@@ -86,9 +84,11 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
   const group = useRef<Group>(null)
   const shown = useRef(-1)
   const labelShown = useRef(0)
-  const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1 })
+  const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1, markerRadiusM: 0, ringRadiusM: 0 })
   // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring.
   const stations = useMemo(() => nearbyStations(network, layer), [network, layer])
+  // Which street candidates a subway line runs along, so their labels step clear of its bundle.
+  const bundles = useMemo(() => routeBundles(layer.streets, layer.anchor, network.shapes, STATION_REACH_M), [network, layer])
   const focused = network.stationById.get(layer.stationId)?.pos ?? null
   const insetsRef = useRef(insets)
   const panelRef = useRef(panel)
@@ -125,6 +125,9 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     ctx.interior = interior
     ctx.focusRing = interior || interiorPending ? null : focused
     ctx.depthScale = depthScaleY(depth)
+    // As Stations.tsx and FocusRing.tsx size them at this distance.
+    ctx.markerRadiusM = screenScale(distance, markerRadiusPx(distance), MARKER_MIN_METERS)
+    ctx.ringRadiusM = ctx.markerRadiusM * focusScaleFactor(distance, ctx.markerRadiusM)
     if (marks && marks.material.opacity !== o) marks.material.opacity = o
     if (o === shown.current) return
     shown.current = o
@@ -132,7 +135,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     g.visible = o > 0
   })
 
-  useStreetLabels(layer, stations, labelShown, labelContext, insetsRef, panelRef, labelBlockers, ENTRANCE_SIZE_M / 2, STATION_HALF_M)
+  useStreetLabels(layer, stations, bundles, labelShown, labelContext, insetsRef, panelRef, labelBlockers, ENTRANCE_SIZE_M / 2)
 
   return (
     <group ref={group} position={[layer.anchor.x, 0, layer.anchor.z]} visible={false}>

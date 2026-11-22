@@ -6,7 +6,7 @@ import { RECT, writeRect } from '../lib/labelGeometry'
 import type { Ground } from '../lib/projection'
 import { entranceBoxes, rankEntrances } from './entranceLabelBoxes'
 import { FIXED_RECTS, groundHalfPx, toScreen, type LabelPlacement, type PlacementView } from './labelPlacementState'
-import { rankStreets, streetBoxes } from './streetLabelBoxes'
+import { markNamedStreets, rankStreets, streetBoxes } from './streetLabelBoxes'
 
 /** Gap the camera framing keeps between the free area and the panel (interiorFreeRect), px. */
 const FREE_GAP_PX = 16
@@ -24,15 +24,18 @@ function markRect(rects: Float32Array, r: number, x: number, z: number, halfM: n
 }
 
 /** Writes a padded rect at each of the interior's outline points on screen from rect `r` on (a zero rect for one
- *  behind the camera); returns the next free rect. */
-function interiorRects(rects: Float32Array, r: number, view: PlacementView, a: Vector3): number {
+ *  behind the camera); returns the next free rect. The pad is at least half the points' spacing on screen, so the
+ *  rects join up along each outline. */
+function interiorRects(rects: Float32Array, r: number, view: PlacementView, a: Vector3, b: Vector3): number {
   const m = view.interior
   if (!m) return r
-  const o = m.outline
+  const o = m.outline.points
   const n = Math.min(o.length / 3, MAX_OUTLINE_SAMPLES)
+  let pad = INTERIOR_PAD_PX
+  if (toScreen(a, m.origin.x, 0, m.origin.z, view)) pad = Math.max(pad, groundHalfPx(a, b, m.origin.x, m.origin.z, m.outline.stepM / 2, view) + 2)
   for (let k = 0; k < n; k++) {
     if (toScreen(a, m.origin.x + o[3 * k]!, o[3 * k + 1]! * view.depthScale, m.origin.z + o[3 * k + 2]!, view)) {
-      writeRect(rects, r++, a.x - INTERIOR_PAD_PX, a.y - INTERIOR_PAD_PX, a.x + INTERIOR_PAD_PX, a.y + INTERIOR_PAD_PX)
+      writeRect(rects, r++, a.x - pad, a.y - pad, a.x + pad, a.y + pad)
     } else writeRect(rects, r++, 0, 0, 0, 0)
   }
   return r
@@ -74,11 +77,15 @@ export function placeLabels(p: LabelPlacement, anchor: Ground, view: PlacementVi
   const rects = p.bounds.rects
   let r = FIXED_RECTS
   for (let k = 0; k < p.marks.length; k++) markRect(rects, r++, anchor.x + p.marks[k]!.x, anchor.z + p.marks[k]!.z, view.markHalfM, view, a, b)
-  for (let k = 0; k < p.stations.length; k++) markRect(rects, r++, p.stations[k]!.x, p.stations[k]!.z, view.stationHalfM, view, a, b)
+  // Station markers and the focus ring, sized as drawn now; an entrance whose own mark sits in one ignores it.
+  const markerRect = r
+  for (let k = 0; k < p.stations.length; k++) markRect(rects, r++, p.stations[k]!.x, p.stations[k]!.z, view.markerRadiusM, view, a, b)
   const ring = view.focusRing
-  if (ring) markRect(rects, r, ring.x, ring.z, view.stationHalfM, view, a, b)
+  if (ring) markRect(rects, r, ring.x, ring.z, view.ringRadiusM, view, a, b)
   else writeRect(rects, r, 0, 0, 0, 0)
   r++
+  const markerCount = r - markerRect
+  p.bounds.exempt!.fill(0)
   const shown = Math.min(levels.count, MAX_LEVEL_BLOCKERS)
   const lr = levels.rects
   for (let k = 0; k < shown; k++) {
@@ -88,12 +95,13 @@ export function placeLabels(p: LabelPlacement, anchor: Ground, view: PlacementVi
   p.bounds.count = r
   const e = p.entrances.length
   let box = 0
-  for (let i = 0; i < e; i++) box = entranceBoxes(p, i, anchor, view, a, b, box)
+  for (let i = 0; i < e; i++) box = entranceBoxes(p, i, anchor, view, a, b, box, markerRect, markerCount)
   rankEntrances(p, view)
   declutter(p.cand, p.bounds, p.prefer, p.out, 0, e)
+  markNamedStreets(p)
   for (let i = e; i < p.cand.count; i++) box = streetBoxes(p, i, anchor, view, a, b, box)
   rankStreets(p)
-  p.bounds.count = interiorRects(rects, r, view, a)
+  p.bounds.count = interiorRects(rects, r, view, a, b)
   declutter(p.cand, p.bounds, p.prefer, p.out, e, p.cand.count)
   for (let i = 0; i < p.cand.count; i++) {
     const k = p.out[i]!
@@ -103,5 +111,6 @@ export function placeLabels(p: LabelPlacement, anchor: Ground, view: PlacementVi
     p.lastSrc[i] = k < 0 ? -1 : street ? p.src[chosen]! : k
     p.lastSide[i] = street ? p.srcSide[chosen]! : 0
     p.lastAngle[i] = k < 0 ? NaN : p.angle[chosen]!
+    p.lastFirst[i] = k === 0 ? 1 : 0
   }
 }

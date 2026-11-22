@@ -49,7 +49,7 @@ describe('entranceTexts', () => {
     const texts = entranceTexts(
       file([entrance(-10, -40, { street: 'Broadway', side: 'west' }), entrance(-10, -20, { street: 'Broadway', side: 'west' })]),
     )
-    expect(texts.map((t) => t.text)).toEqual(['Broadway · west side N of W 94 St', 'Broadway · west side S of W 94 St'])
+    expect(texts.map((t) => t.text)).toEqual(['Broadway · west side · north of W 94 St', 'Broadway · west side · south of W 94 St'])
     expect(texts.every((t) => t.unique)).toBe(true)
   })
 
@@ -63,20 +63,29 @@ describe('entranceTexts', () => {
     expect(texts.map((t) => t.head)).toEqual(['Broadway & W 94 St', 'Broadway & W 94 St'])
   })
 
-  it('flags duplicates, ranks elevators and skips unlabelled entrances', () => {
+  it('merges one head house’s same-text stairs, flags far duplicates, keeps elevators apart, skips unlabelled', () => {
+    const corner = { street: 'Broadway', cross: 'West 94th Street', side: 'SE' } as const
     const texts = entranceTexts(
       file([
-        entrance(5, -35, { street: 'Broadway', cross: 'West 94th Street', side: 'SE' }),
-        entrance(6, -36, { street: 'Broadway', cross: 'West 94th Street', side: 'SE', type: 'Elevator' }),
-        entrance(7, -37, { street: 'Broadway', cross: 'West 94th Street', side: 'SE' }),
+        entrance(5, -35, corner),
+        entrance(6, -36, { ...corner, type: 'Elevator' }),
+        entrance(7, -37, corner),
+        entrance(5, 40, corner),
         entrance(0, 0, {}),
       ]),
     )
     expect(texts.map((t) => [t.index, t.unique, t.elevator])).toEqual([
       [0, false, false],
       [1, true, true],
-      [2, false, false],
+      [3, false, false],
     ])
+    expect(texts.map((t) => t.headHouse)).toEqual([0, 0, 1])
+  })
+
+  it('names both cross streets around a median entrance', () => {
+    const [t] = entranceTexts(file([entrance(0, 10, { street: 'Broadway', side: 'median' })]))
+    expect(t!.text).toBe('Broadway median between W 93 & W 94 St')
+    expect(t!.keys).toEqual(['broadway', 'w 94 st', 'w 93 st'])
   })
 })
 

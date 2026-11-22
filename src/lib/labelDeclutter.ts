@@ -17,11 +17,13 @@ export interface LabelCandidates {
 }
 
 /** What a label must keep clear of: the first `count` packed rects of `rects` (labelGeometry's RECT floats each), and
- *  anything outside `viewport`. */
+ *  anything outside `viewport`. Bit i of `exempt[k]` lets item i (i < 32) ignore rect k (a marker its own mark sits
+ *  in). */
 export interface LabelBounds {
   viewport: ScreenRect
   rects: Float32Array
   count: number
+  exempt?: Uint32Array
 }
 
 /** Box `box` (of the item at order position `r`) lies in the viewport, off every blocked rect, and clear of every
@@ -29,7 +31,12 @@ export interface LabelBounds {
 function fits(c: LabelCandidates, bounds: LabelBounds, out: Int16Array, r: number, box: number): boolean {
   const v = bounds.viewport
   if (!boxInRect(c.boxes, box, v.left, v.top, v.right, v.bottom)) return false
-  for (let k = 0; k < bounds.count; k++) if (boxHitsRect(c.boxes, box, bounds.rects, k)) return false
+  const item = c.order[r]!
+  const exempt = bounds.exempt
+  for (let k = 0; k < bounds.count; k++) {
+    if (exempt && item < 32 && (exempt[k]! >>> item) & 1) continue
+    if (boxHitsRect(c.boxes, box, bounds.rects, k)) return false
+  }
   for (let q = 0; q < r; q++) {
     const j = c.order[q]!
     const pick = out[j]!

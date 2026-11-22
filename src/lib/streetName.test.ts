@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abbreviateStreet, entranceLabel, entranceParts, type LabelledEntrance } from './streetName'
+import { abbreviateStreet, entranceLabel, entranceParts, streetPair, type LabelledEntrance } from './streetName'
 
 describe('abbreviateStreet', () => {
   it('shortens a closing type word', () => {
@@ -112,10 +112,26 @@ describe('entranceParts', () => {
       'Broadway · west side at W 94 St',
     )
     expect(entranceLabel({ ...base, street: 'Broadway', side: 'median' }, { near: 'West 96th Street', of: 'S' })).toBe(
-      'Broadway median S of W 96 St',
+      'Broadway median south of W 96 St',
     )
+    expect(entranceLabel({ ...base, street: 'Broadway', side: 'median' }, { near: 'West 95th Street', between: ['West 95th Street', 'West 96th Street'] })).toBe(
+      'Broadway median between W 95 & W 96 St',
+    )
+    expect(entranceLabel({ ...base, street: 'Broadway', side: 'median' }, { near: 'West 95th Street' })).toBe('Broadway median near W 95 St')
+    expect(entranceParts({ ...base, side: 'east' }, { near: 'North 7th Street', of: 'N' })).toEqual({
+      head: 'Bedford Av',
+      tail: 'east side · north of N 7 St',
+    })
     expect(entranceParts({ ...base, street: 'Broadway' }, { near: 'West 94th Street' })).toEqual({ head: 'Broadway', tail: 'at W 94 St' })
     // A corner keeps its own cross street.
     expect(entranceLabel({ ...base, cross: 'North 7th Street', side: 'NE' }, { near: 'Driggs Avenue' })).toBe('Bedford Av & N 7 St · NE corner')
+  })
+})
+
+describe('streetPair', () => {
+  it('shares a closing type word, MTA style', () => {
+    expect(streetPair('West 95th Street', 'West 96th Street')).toBe('W 95 & W 96 St')
+    expect(streetPair('Broadway', 'West 96th Street')).toBe('Broadway & W 96 St')
+    expect(streetPair('5th Avenue', 'West 42nd Street')).toBe('5 Av & W 42 St')
   })
 })

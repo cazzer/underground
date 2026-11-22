@@ -6,7 +6,7 @@ const triples = (a: Float32Array) => Array.from({ length: a.length / 3 }, (_, i)
 
 describe('outlineSamples', () => {
   it('walks each closed outline every 4 m at its level, × yScale, and each slab’s at the street', () => {
-    const pts = triples(outlineSamples(fixture(), 2))
+    const pts = triples(outlineSamples(fixture(), 2).points)
     // The platform's 92 m ring gives 23 points at y = -8 × 2, the slab's 40 m ring 10 at -4 × 2.
     expect(pts.filter((p) => p[1] === -16)).toHaveLength(23)
     expect(pts.filter((p) => p[1] === -8)).toHaveLength(10)
@@ -19,8 +19,9 @@ describe('outlineSamples', () => {
   })
 
   it('stretches its spacing to stay within the cap', () => {
-    const pts = outlineSamples(fixture(), 1, 12)
-    expect(pts.length / 3).toBeLessThanOrEqual(12)
-    expect(pts.length / 3).toBeGreaterThanOrEqual(10)
+    const { points, stepM } = outlineSamples(fixture(), 1, 12)
+    expect(points.length / 3).toBeLessThanOrEqual(12)
+    expect(points.length / 3).toBeGreaterThanOrEqual(10)
+    expect(stepM).toBeCloseTo(172 / 12)
   })
 })

@@ -59,6 +59,16 @@ describe('declutter', () => {
     expect(place(c, {}, [7])).toEqual([0])
   })
 
+  it('lets an item ignore the rects it is exempt from', () => {
+    const c = candidates([[[100, 100]], [[300, 100]]])
+    const rects = new Float32Array(2 * RECT)
+    writeRect(rects, 0, 80, 90, 120, 110)
+    writeRect(rects, 1, 280, 90, 320, 110)
+    const out = new Int16Array(2)
+    declutter(c, { viewport, rects, count: 2, exempt: new Uint32Array([0b01, 0]) }, new Int16Array([-1, -1]), out)
+    expect([...out]).toEqual([0, -1])
+  })
+
   it('places nothing for an item with no candidates', () => {
     expect(place(candidates([[], [[100, 100]]]))).toEqual([-1, 0])
   })

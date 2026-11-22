@@ -24,9 +24,12 @@ export interface LabelPlacement {
    *  blocked for all labels. */
   marks: readonly Ground[]
   stations: readonly Ground[]
-  /** Measured label sizes, px, per item. */
+  /** Per street and run: each candidate's subway bundle along the street (routeBundles.ts, BUNDLE_STRIDE floats). */
+  bundles: readonly (readonly Float32Array[])[]
+  /** Measured label sizes, px, and line count, per item. */
   w: Float32Array
   h: Float32Array
+  lines: Uint8Array
   cand: LabelCandidates
   bounds: LabelBounds
   /** Per box: its screen center and angle (radians); for a street its run, candidate index in that run and side. */
@@ -36,18 +39,21 @@ export interface LabelPlacement {
   srcRun: Int16Array
   src: Int16Array
   srcSide: Int8Array
-  /** Per item: last placement's run, candidate (-1 for none), side and angle (NaN), the preference, the result. */
+  /** Per item: last placement's run, candidate (-1 for none), side, angle (NaN) and whether it was its first
+   *  candidate; the preference, the result. */
+  lastFirst: Uint8Array
   lastRun: Int16Array
   lastSrc: Int16Array
   lastSide: Int8Array
   lastAngle: Float32Array
   prefer: Int16Array
   out: Int16Array
-  /** Scratch: each entrance mark's screen point and rank score; per run its on-screen count and whether it was
-   *  emitted; per street whether a placed entrance label names it. */
+  /** Scratch: each entrance mark's screen point and rank score, each head house's best score; per run its on-screen
+   *  count and whether it was emitted; per street whether a placed entrance label names it. */
   markX: Float32Array
   markY: Float32Array
   score: Float64Array
+  houseBest: Float64Array
   runCount: Int16Array
   runDone: Uint8Array
   named: Uint8Array
@@ -58,6 +64,7 @@ export function createLabelPlacement(
   streets: readonly StreetLabelSource[],
   marks: readonly Ground[],
   stations: readonly Ground[],
+  bundles: readonly (readonly Float32Array[])[],
 ): LabelPlacement {
   const n = entrances.length + streets.length
   let boxes = entrances.length * ENTRANCE_SLOTS
@@ -76,8 +83,10 @@ export function createLabelPlacement(
     streets,
     marks,
     stations,
+    bundles,
     w: new Float32Array(n),
     h: new Float32Array(n),
+    lines: new Uint8Array(n).fill(1),
     cand: {
       boxes: new Float32Array(boxes * BOX),
       start: new Int32Array(n),
@@ -85,13 +94,19 @@ export function createLabelPlacement(
       order: new Int16Array(n).map((_, i) => i),
       count: n,
     },
-    bounds: { viewport: { left: 0, top: 0, right: 0, bottom: 0 }, rects: new Float32Array(rects * RECT), count: 0 },
+    bounds: {
+      viewport: { left: 0, top: 0, right: 0, bottom: 0 },
+      rects: new Float32Array(rects * RECT),
+      count: 0,
+      exempt: new Uint32Array(rects),
+    },
     cx: new Float32Array(boxes),
     cy: new Float32Array(boxes),
     angle: new Float32Array(boxes),
     srcRun: new Int16Array(boxes),
     src: new Int16Array(boxes),
     srcSide: new Int8Array(boxes),
+    lastFirst: new Uint8Array(n),
     lastRun: minus(n),
     lastSrc: minus(n),
     lastSide: new Int8Array(n),
@@ -101,6 +116,7 @@ export function createLabelPlacement(
     markX: new Float32Array(entrances.length),
     markY: new Float32Array(entrances.length),
     score: new Float64Array(entrances.length),
+    houseBest: new Float64Array(entrances.length),
     runCount: new Int16Array(runs),
     runDone: new Uint8Array(runs),
     named: new Uint8Array(streets.length),
@@ -124,9 +140,10 @@ export interface PlacementView {
   panelPad: number
   /** How far from the anchor a street label may sit, meters. */
   radiusM: number
-  /** An entrance mark's and a station marker's half side, meters. */
+  /** An entrance mark's half side, and a station marker's and the focus ring's radius as drawn now, meters. */
   markHalfM: number
-  stationHalfM: number
+  markerRadiusM: number
+  ringRadiusM: number
   /** The focused station's point while it draws a focus ring (no interior), else null. */
   focusRing: Ground | null
   /** The loaded interior, whose outlines the street names keep clear of, and its group's y scale. */
@@ -139,6 +156,36 @@ export interface PlacementView {
   focusY: number
   stationX: number
   stationY: number
+}
+
+/** Labels keep this far clear of the station panel, px. */
+const PANEL_PAD_PX = 8
+
+/** A blank view; useStreetLabels writes it field by field before each placement. */
+export function newView(camera: PlacementView['camera'], markHalfM: number): PlacementView {
+  return {
+    camera,
+    width: 0,
+    height: 0,
+    left: 0,
+    top: 0,
+    insetTop: 0,
+    insetBottom: 0,
+    panel: null,
+    panelPad: PANEL_PAD_PX,
+    radiusM: 0,
+    markHalfM,
+    markerRadiusM: 0,
+    ringRadiusM: 0,
+    focusRing: null,
+    interior: null,
+    depthScale: 1,
+    fresh: false,
+    focusX: 0,
+    focusY: 0,
+    stationX: 0,
+    stationY: 0,
+  }
 }
 
 /** Projects world (x, y, z) into canvas px in `v`; false when behind the camera or past its far plane. */

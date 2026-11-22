@@ -107,8 +107,12 @@ export type LabelledEntrance = Pick<StreetEntrance, 'street' | 'cross' | 'side' 
  *  street the nearest other street (`near`, verbatim) and, when two labels would still match, which side of it. */
 export interface EntranceWording {
   swap?: boolean
+  /** The nearest other street (verbatim) of an entrance with no cross street. */
   near?: string
+  /** Which side of `near` the entrance is on, said when two labels would otherwise match. */
   of?: 'N' | 'S' | 'E' | 'W'
+  /** A median entrance between two streets (verbatim, in reading order). */
+  between?: readonly [string, string]
 }
 
 /** A label in two parts, for two lines on a phone: the street part, then the rest ('' when there is none). */
@@ -117,11 +121,25 @@ export interface EntranceParts {
   tail: string
 }
 
+const COMPASS_WORDS = { N: 'north', S: 'south', E: 'east', W: 'west' } as const
+
+/** Two streets as one phrase, sharing a closing type word: "W 95 & W 96 St", else "Broadway & W 96 St". */
+export function streetPair(a: string, b: string): string {
+  const x = abbreviateStreet(a).split(' ')
+  const y = abbreviateStreet(b).split(' ')
+  const last = x.at(-1)!
+  if (x.length > 1 && y.length > 1 && last === y.at(-1) && Object.values(TYPE_WORDS).includes(last)) {
+    return `${x.slice(0, -1).join(' ')} & ${y.join(' ')}`
+  }
+  return `${x.join(' ')} & ${y.join(' ')}`
+}
+
 /**
  * The text beside an entrance mark, street first: "Bedford Av & N 7 St" / "NE corner", "Broadway median" / "at W 95
- * St", "Broadway" / "west side at W 94 St", the street (and cross street) alone when no side is known, or the
- * plaza's name when no street is in range. "elevator" for an elevator entrance, "exit only" when it can't be
- * entered, "entry only" when it can't be left by. Null when the entrance has neither a street nor a plaza.
+ * St" (or "between W 95 & W 96 St", "near W 95 St"), "Broadway" / "west side at W 94 St" (or "east side · north of
+ * N 7 St" when two would match), the street (and cross street) alone when no side is known, or the plaza's name when
+ * no street is in range. "elevator" for an elevator entrance, "exit only" when it can't be entered, "entry only"
+ * when it can't be left by. Null when the entrance has neither a street nor a plaza.
  */
 export function entranceParts(e: LabelledEntrance, w: EntranceWording = {}): EntranceParts | null {
   let head: string
@@ -133,18 +151,22 @@ export function entranceParts(e: LabelledEntrance, w: EntranceWording = {}): Ent
     const street = abbreviateStreet(e.street)
     const cross = e.cross === null ? null : abbreviateStreet(e.cross)
     const near = w.near === undefined ? null : abbreviateStreet(w.near)
-    const relation = near === null ? null : w.of ? `${w.of} of ${near}` : `at ${near}`
+    const of = near !== null && w.of ? `${COMPASS_WORDS[w.of]} of ${near}` : null
     if (e.side === 'median') {
       head = `${street} median`
       if (cross) tail.push(`at ${cross}`)
-      else if (relation) tail.push(relation)
+      else if (of) tail.push(of)
+      else if (w.between) tail.push(`between ${streetPair(...w.between)}`)
+      else if (near) tail.push(`near ${near}`)
     } else if (cross) {
       head = w.swap ? `${cross} & ${street}` : `${street} & ${cross}`
       if (e.side !== null) tail.push(SIDE_WORDS[e.side])
     } else {
       head = street
-      const words = [e.side === null ? null : SIDE_WORDS[e.side], relation].filter((t) => t !== null)
-      if (words.length > 0) tail.push(words.join(' '))
+      const side = e.side === null ? null : SIDE_WORDS[e.side]
+      if (of) tail.push(...(side ? [side, of] : [of]))
+      else if (near) tail.push(side ? `${side} at ${near}` : `at ${near}`)
+      else if (side) tail.push(side)
     }
   }
   if (e.type === 'Elevator') tail.push('elevator')
@@ -153,7 +175,7 @@ export function entranceParts(e: LabelledEntrance, w: EntranceWording = {}): Ent
   return { head, tail: tail.join(' · ') }
 }
 
-const RELATION = /^(at|[NSEW] of) /
+const RELATION = /^(at|near|between|(north|south|east|west) of) /
 
 /** The parts on one line: "Broadway median at W 95 St", "Bedford Av & N 7 St · NE corner · elevator". */
 export function joinParts(p: EntranceParts): string {
