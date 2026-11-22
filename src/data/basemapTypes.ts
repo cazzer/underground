@@ -32,8 +32,10 @@ export interface BasemapStats {
   cachedTiles: number
   cachedBytes: number
   decodeMs: { count: number; mean: number; max: number }
-  /** The z/x/y of every tile asked for, in order (dev only: `__underground.basemap()`). */
+  /** The z/x/y of the last 200 tiles asked for, in order (for `__underground.basemap()`). */
   log: string[]
+  /** performance.now() of the first tile asked for, or null. */
+  firstRequestMs: number | null
 }
 
 export interface BasemapTiles {

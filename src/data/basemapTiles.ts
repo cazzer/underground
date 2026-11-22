@@ -59,6 +59,7 @@ export function createBasemapTiles(config: BasemapConfig, { createWorker = realW
   const counts = { requested: 0, loaded: 0, missing: 0, notMvt: 0, errors: 0, cancelled: 0, stale: 0 }
   const decode = { count: 0, total: 0, max: 0 }
   const requestLog: string[] = []
+  let firstRequestMs: number | null = null
   const logged = new Set<string>()
   const rays = { p: new Float64Array(3), dirs: new Float64Array(12), distance: 0 }
   const footprint = new Float64Array(8)
@@ -100,6 +101,7 @@ export function createBasemapTiles(config: BasemapConfig, { createWorker = realW
       inflight.set(t.key, ++seq)
       counts.requested++
       requestLog.push(place(t.key))
+      firstRequestMs ??= clock
       if (requestLog.length > LOG_MAX) requestLog.shift()
       post({ type: 'load', key: t.key, seq, url: tileUrl(config, t.z, t.x, t.y), z: t.z, x: t.x, y: t.y })
     }
@@ -259,6 +261,7 @@ export function createBasemapTiles(config: BasemapConfig, { createWorker = realW
       cachedBytes: lru.bytes,
       decodeMs: { count: decode.count, mean: decode.count > 0 ? decode.total / decode.count : 0, max: decode.max },
       log: [...requestLog],
+      firstRequestMs,
     }),
     dispose: stop,
   }

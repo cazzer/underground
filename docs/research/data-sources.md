@@ -311,10 +311,10 @@ table to its job summary and fails above 200 MB.
 3,820 files (1 each at z0 to z8, 2, 6, 16, 56, 195, 728 and 2,808 at z9 to z15), 44,878,229 bytes unpacked (z15 19.9 MB, z14 12.7 MB,
 z13 5.9 MB), larger than the 33 MB `.pmtiles` because that stores each tile gzipped and these are plain. The tarball is
 31,372,949 bytes (`gzip -9n`). Unpacking takes about 0.6 s with `scripts/basemap-tiles.ts unpack` (2.4 s for the deploy's whole
-`ensureTiles`, which also hashes and scans). UNVERIFIED until the first tile-pinned deploy (the `verify-basemap` summary records
-it; section 6's TODO): that Pages serves `.mvt` as `application/octet-stream`, that it gzips each tile for a client that offers
-gzip (it did gzip the `.pmtiles`, which was `application/octet-stream`), and so that a tile costs about what its entry in the
-`.pmtiles` did on the wire. The Pages artifact limit is
+`ensureTiles`, which also hashes and scans). Measured on the first tile-pinned deploy (basemap-20261121-ddcef445, section 6):
+Pages serves `.mvt` as `application/vnd.mapbox-vector-tile` and does not compress it, so a tile costs its raw size on the wire,
+more than its gzipped entry in the `.pmtiles` did (shipping gzipped tiles is a follow-up; the client already inflates them). The
+Pages artifact limit is
 1 GB (the deploy fails above 900 MB and prints the artifact's size and file count); the tiles add 45 MB to it. The artifact is
 uploaded as a single tar, so the 3,820 files should not slow `upload-pages-artifact` (the job summary times it).
 
@@ -326,20 +326,31 @@ table unless run with `-pg`, which the workflow does.
 **Client (ost.9.2).** `src/data/basemapTiles.ts` asks for `basemap/tiles/{z}/{x}/{y}.mvt?v=<release>` (same origin; the
 release tag busts caches) for the tiles the camera's ground footprint touches, inside the spec bbox and never above its
 maxzoom, z 9 at the coarsest, at most 24 at once (the zoom steps down past that), at most 6 in flight, nearest the view
-center first; a tile no longer wanted is aborted. Nothing is asked for before the first map frame and an idle callback. The
-basemap worker (`basemapWorker.ts`) fetches and decodes (`@mapbox/vector-tile` 3.0.0, `pbf` 5.2.0, worker chunk only); no
-tile is decoded on the main thread, and without a worker the basemap is off (logged). Empty-tile policy: a 404 is "not
-served" and a 200 that is not raw MVT (an HTML fallback, or gzip, which is rejected rather than inflated) "not MVT"; both
-draw nothing, are never asked for again in the session, and log one line each per session (the 404 at info level, with
-z/x/y only). Network failures and other statuses retry after 15 s. Privacy: tiles follow the camera, never the GPS fix,
-and after a location fly-to no new tile is requested until the user's own gesture or a station flight.
+center first; a tile no longer wanted is aborted, and a reply to an aborted or repeated load is dropped by its sequence
+number. It picks again on a 10% pan, a 15% zoom, a 10° turn, a resize, or once the footprint leaves the last chosen one plus
+its margin, after 150 ms still (every 500 ms while moving). Nothing is asked for before the first map frame and an idle
+callback. The basemap worker (`basemapWorker.ts`) fetches, inflates a gzip body (`DecompressionStream`; raw MVT passes
+through) and decodes (`@mapbox/vector-tile` 3.0.0, `pbf` 5.2.0, worker chunk only); no tile is decoded on the main thread, and
+without a worker the basemap is off (logged). Empty-tile policy: a 404 is "not served" and a 200 that is not MVT once inflated
+(an HTML page, a corrupt tile) "not MVT"; both draw nothing, are never asked for again in the session, and log one line each per
+session (the 404 at info level, with z/x/y only). Network failures and other statuses retry after 15 s.
 
-Measured (dev tile directory from the 20261121 pin via `tile-join -e <dir> -pC`, Chrome on an Apple-silicon laptop, decode
-in the page with the same code, median of 10): the densest z15 tile, 15/9647/12320 (City Hall, 86,949 B raw, 3,300
-segments), 1.1 ms (1.6 ms cold in the worker); the densest Midtown one, 15/9650/12317 (45,518 B), 0.7 ms; a z10 overview
-tile (215 KB raw, 16,519 segments) 3.8 ms. Far under the 25 ms desktop target; a phone at 4 to 6 times slower stays under
-25 ms. The city view at load wants the six z10 tiles (about 930 KB raw, 675 KB gzipped as stored), a station view at 400 m
-two to four z15 tiles.
+Privacy: tiles follow the camera, never the GPS fix. A location fly-to frames the fix, so street-level tiles for that view
+would tell GitHub where the user is: from such a flight on, tiles load no finer than z12 (about 7 km a tile at NYC's latitude,
+borough scale) until the user moves the view themselves (a drag past the 6 px mouse / 10 px touch click slop, any wheel step,
+a second finger) or picks a station (tap, panel, search result). A tap that doesn't move, or the controls' `start` alone,
+keeps the cap. On the lift the tiles are picked again for the view as it is then (`lib/basemap/locationCap.ts`, fed by
+`src/scene/useBasemapTiles.ts`; tested with the store and a fake worker in `basemapTiles.test.ts`).
+
+Measured (the pinned release basemap-20261121-ddcef445 via `npm run basemap:fetch`, Vite dev, Chrome on an Apple-silicon
+laptop, `?debug`; decode times as the worker reports them):
+- First paint 328 ms; first tile request 664 ms, after the first map frame and the idle callback. The city view at load wants
+  the six z10 tiles (about 930 KB raw), decoded in 2.2 to 5.6 ms each (16,519 segments in the largest, 215 KB).
+- A station flight to Brooklyn Bridge-City Hall asks for 24 z15 tiles mid-flight, settling on 4 at 400 m tilted; then Times
+  Sq asks for 5 more and wants 3. Every request was a tile of the view or its margin.
+- The densest z15 tile, 15/9647/12320 (City Hall, 86,949 B, 3,300 segments), 1.5 ms in the worker (1.1 ms warm, median of 10
+  on the page with the same code); the Times Sq tiles 0.4 to 0.8 ms; the densest Midtown tile, 15/9650/12317 (45,518 B), 0.7 ms
+  warm. Far under the 25 ms desktop target; a phone 4 to 6 times slower stays under 25 ms (not measured on a phone).
 
 ## 6. Static-hosting fit and pipeline
 
@@ -394,11 +405,13 @@ browser decodes transparently. There is no Range dependency anywhere now (`scrip
 
 - Cache: `cache-control: max-age=600` (an `etag` changes with each deploy), so a tile can be stale for up to 10 minutes after a
   deploy; the CDN varies on `Accept-Encoding`.
-- UNVERIFIED for tiles until the first tile-pinned deploy: the `.mvt` content-type, whether Pages compresses `.mvt` files, and the
-  wire size of a tile (only the `.pmtiles` was measured, above).
-- Each deploy's `verify-basemap` job records the tiles' headers (content-type, content-encoding, cache-control, etag) in its summary:
-  TODO fill in from the first deploy with a tile pin. It also asks for a tile the pack lacks (z15, x 0, y 0), recorded not judged:
-  Pages should answer `404`, which the client must treat as an empty tile.
+- Tiles, measured on the first tile-pinned deploy (basemap-20261121-ddcef445, 3,820 tiles): `200`,
+  `content-type: application/vnd.mapbox-vector-tile`, no `content-encoding` with or without gzip offered (Pages does not
+  compress this type), `cache-control: max-age=600`. So a tile's wire size is its raw size. A tile the pack lacks (z15, x 0,
+  y 0) answers `404` with `text/html`, which the client treats as an empty tile. Each deploy's `verify-basemap` job records
+  these headers in its summary.
+- That deploy's artifact: 69.75 MB in 5,149 files; `upload-pages-artifact` took 4 s; the basemap download 0.9 s and the unpack
+  1.1 s.
 - Vite dev (sirv) serves `public/basemap/tiles/...` uncompressed with an empty content type, and a small dev-only middleware in
   `vite.config.ts` answers 404 for a tile not in the tree (without it the SPA fallback returned `index.html` with status 200); `vite preview` compresses only text and
   JSON. Neither is Pages.
