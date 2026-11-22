@@ -6,8 +6,11 @@ import type { Viewport } from '../lib/framing'
 import { freeCenterShift, type ScreenRect, type ScreenShift } from '../lib/interiorCamera'
 import {
   azimuthBounds,
+  complexPanRadius,
   focusPoint,
+  nearestPoint,
   panClampArmed,
+  PAN_RADIUS_BARE,
   panRadius,
   pivotShift,
   rotateArmed,
@@ -38,6 +41,8 @@ interface StationOrbitOptions {
   camera: PerspectiveCamera
   /** The focused station's ground position, or null when nothing is focused. */
   focusPos: Ground | null
+  /** Every member's point of the focused station's complex, `focusPos` first; just `focusPos` for a lone station. */
+  members: readonly Ground[]
   /** The focused station's interior once loaded (null otherwise). */
   interior: InteriorModel | null
   viewport: Viewport
@@ -61,11 +66,13 @@ export interface StationOrbitGestures {
 
 /**
  * What the view orbits and pans around. The pan clamp holds the free area's middle within `radius` of
- * `center`. An interior pivots on that middle too (where its fly-to puts it); a bare station pivots on its
- * own point, wherever it sits on screen.
+ * `center`, or for a bare complex of its nearest member. An interior pivots on that middle too (where its fly-to
+ * puts it); a bare station pivots on its own point (a complex on its nearest member), wherever it sits on screen.
  */
 interface OrbitFocus {
   center: Ground
+  /** The clamp's centers: [center], or a bare complex's members. */
+  members: readonly Ground[]
   radius: number
   /** Interior depth term at ISO_POLAR and full depth (FocusAnchor.towardCamera); 0 for a bare station. */
   towardCamera: number
@@ -83,6 +90,7 @@ export function useStationOrbit({
   controls,
   camera,
   focusPos,
+  members,
   interior,
   viewport,
   free,
@@ -132,10 +140,10 @@ export function useStationOrbit({
 
   const focus = useMemo<OrbitFocus | null>(() => {
     if (!focusPos) return null
-    if (!interior) return { center: focusPos, radius: panRadius(null), towardCamera: 0, bare: true }
+    if (!interior) return { center: focusPos, members, radius: complexPanRadius(members), towardCamera: 0, bare: true }
     const a = interior.focusAnchor
-    return { center: a.center, radius: panRadius(a.reach), towardCamera: a.towardCamera, bare: false }
-  }, [focusPos, interior])
+    return { center: a.center, members: [a.center], radius: panRadius(a.reach), towardCamera: a.towardCamera, bare: false }
+  }, [focusPos, members, interior])
 
   // Before drei's controls.update() (priority -1), beside the polar lock in CameraRig.
   useFrame((_, delta) => {
@@ -198,13 +206,15 @@ export function useStationOrbit({
     const landed = wasFlying.current
     wasFlying.current = isFlying
     if (!isFlying && !landed && theta !== theta0) {
-      // A bare station pivots on its own point while it is within its pan radius of the free area's middle;
-      // farther off (a held flight, a station focused at the edge) on that middle, so a turn can't swing the view away.
+      // A bare station pivots on its own point (a complex on its member nearest the free area's middle) while that is
+      // within PAN_RADIUS_BARE of the middle; farther off (a held flight, a station focused at the edge) on that middle,
+      // so a turn can't swing the view away.
       let ps = s
       if (f.bare) {
         const mid = focusPoint(c.target, s.right, s.toward, theta0, point.current)
-        if (Math.hypot(mid.x - f.center.x, mid.z - f.center.z) <= f.radius) {
-          screenOffsetTo(c.target, f.center, theta0, pivot.current)
+        const at = nearestPoint(mid, f.members)
+        if (Math.hypot(mid.x - at.x, mid.z - at.z) <= PAN_RADIUS_BARE) {
+          screenOffsetTo(c.target, at, theta0, pivot.current)
           ps = pivot.current
         }
       }
@@ -218,12 +228,14 @@ export function useStationOrbit({
       camera.position.z += m.z
     }
     const p = focusPoint(c.target, s.right, s.toward, theta, point.current)
-    const inside = Math.hypot(p.x - f.center.x, p.z - f.center.z) <= f.radius
+    // A bare complex's clamp is the union of its members' discs: the free area's middle is held to the nearest one.
+    const hub = nearestPoint(p, f.members)
+    const inside = Math.hypot(p.x - hub.x, p.z - hub.z) <= f.radius
     armed.current = panClampArmed(armed.current, armedFor.current === f.center, isBusy, tiltT(distance), inside)
     armedFor.current = f.center
     if (!armed.current) return
     const out = clamped.current
-    if (!softClampToRadius(p, f.center, f.radius, delta, out)) return
+    if (!softClampToRadius(p, hub, f.radius, delta, out)) return
     c.target.x += out.x - p.x
     c.target.z += out.z - p.z
     camera.position.x += out.x - p.x

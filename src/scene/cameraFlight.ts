@@ -5,7 +5,7 @@ import { Vector3, type PerspectiveCamera } from 'three'
 import type { IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
 import { priorityLanding, type PriorityFrame } from '../lib/pathFrame'
-import { bareStationFrame } from '../lib/freeFrame'
+import { bareStationFrame, type FramePoint } from '../lib/freeFrame'
 import { flightDuration } from '../lib/flight'
 import type { FlyRequest } from '../lib/focus'
 import { EXIT_DISTANCE } from '../lib/focusMachine'
@@ -125,9 +125,9 @@ export function interiorFlight(
 }
 
 /**
- * Fly-to for a station with no interior: its point and as many of its entrance marks `points` as fit in the free area
- * (above a stacked panel), from the landing distance out as far as they need, the target near the station
- * (bareStationFrame in freeFrame.ts).
+ * Fly-to for a station with no interior: its point, its complex's other members' points and as many of its entrance
+ * marks `points` as fit in the free area (above a stacked panel), from the landing distance out as far as they need,
+ * the target near the station or a member (bareStationFrame in freeFrame.ts).
  */
 export function stationFlight(
   network: Network,
@@ -142,8 +142,23 @@ export function stationFlight(
   const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Station flight to unknown station "${stationId}"`)
   const free = interiorFreeRect(viewport, insets, panel)
-  const { distance, target } = bareStationFrame({ station: station.pos, points, azimuth, viewport, free, fovDeg })
+  const members = complexMemberPoints(network, stationId)
+  const { distance, target } = bareStationFrame({ station: station.pos, points, members, azimuth, viewport, free, fovDeg })
   return { stationId, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false, freeBottom: free.bottom }
+}
+
+/** The points of the other members of `stationId`'s complex (network.groupById), in member order; none for a lone station. */
+export function complexMemberPoints(network: Network, stationId: string): Ground[] {
+  const ids = network.groupById.get(stationId)?.memberIds ?? []
+  return ids.flatMap((id) => (id === stationId ? [] : [network.stationById.get(id)!.pos]))
+}
+
+/** A bare station's frame points by priority tier, as its landing wants them: its point, its complex's other members, its marks. */
+export function bareStationTiers(network: Network, stationId: string, marks: readonly Ground[]): FramePoint[][] {
+  const level = (p: Ground): FramePoint => ({ x: p.x, y: 0, z: p.z })
+  const station = network.stationById.get(stationId)
+  if (!station) throw new Error(`Station frame for unknown station "${stationId}"`)
+  return [[level(station.pos)], complexMemberPoints(network, stationId).map(level), marks.map(level)]
 }
 
 /**

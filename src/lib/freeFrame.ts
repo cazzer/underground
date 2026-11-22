@@ -4,8 +4,8 @@
  * the target panned off the centred one only as far as needed. Each point's height is drawn at the depth factor of the
  * distance tried (as the interior's group scales it). The target stays within TARGET_RADIUS_M of one of the anchors
  * (the stations the frame is for: a short drag can't move focus past ENTER_RADIUS 140) and within `centerRadius` of the
- * centred target. A bare station (bareStationFrame) frames its point and its entrance marks; an interior with a trip's
- * way out frames that path (pathFrame.ts).
+ * centred target. A bare station (bareStationFrame) frames its point, its complex's members and its entrance marks;
+ * an interior with a trip's way out frames that path (pathFrame.ts).
  */
 import { clipToHalfPlane, nearestInPolygon, polygonHalfPlanes, square, type HalfPlane } from './convexRegion'
 import { createFollowView, followTargetInto, writeFollowView, type FollowView } from './follow'
@@ -255,6 +255,8 @@ export interface BareStationFrameInput {
   station: Ground
   /** The station's entrance marks on the ground (scene meters). */
   points: readonly Ground[]
+  /** The other members of the station's complex (their points; network.groupById), none for a lone station. */
+  members?: readonly Ground[]
   azimuth: number
   viewport: Viewport
   free: ScreenRect
@@ -266,19 +268,17 @@ export type BareStationFrame = Pick<FreeFrame, 'distance' | 'target'>
 const level = (p: Ground): FramePoint => ({ x: p.x, y: 0, z: p.z })
 
 function bareInput(i: BareStationFrameInput, wanted: readonly FramePoint[]): FreeFrameInput {
-  const station = level(i.station)
+  const { station, members = [], azimuth, viewport, free, fovDeg } = i
   return {
-    required: [station],
+    required: [level(station)],
     wanted,
-    center: station,
-    anchors: [i.station],
-    // So the orbit pivots on the station; on the phone panels measured for ost.11 this never cost an entrance.
-    centerRadius: PAN_RADIUS_BARE,
+    center: level(station),
+    // A complex may land near any member: its focused distance is the nearest member's (focusMachine.ts).
+    anchors: [station, ...members],
+    // So the orbit pivots on the station (or a member); on the phone panels measured for ost.11 this never cost an entrance.
+    centerRadius: PAN_RADIUS_BARE + Math.max(0, ...members.map((m) => gap(m, station))),
     fallbackRadius: STATION_ONLY_RADIUS_M,
-    azimuth: i.azimuth,
-    viewport: i.viewport,
-    free: i.free,
-    fovDeg: i.fovDeg,
+    azimuth, viewport, free, fovDeg,
   }
 }
 
@@ -289,12 +289,12 @@ export function bareTargetAt(input: BareStationFrameInput, points: readonly Grou
 }
 
 /**
- * Distance and ground target for landing on a bare station: freeFrame with the station required and its entrances
- * wanted nearest first. When not even the station alone fits within PAN_RADIUS_BARE (a tall panel over a phone), the
- * station alone is framed within STATION_ONLY_RADIUS_M; failing that, the centred target is pulled within that radius,
- * the station possibly outside the free area.
+ * A bare station's landing: freeFrame with the station required, then its complex's other members, then its entrances
+ * wanted, each nearest the station first, the target within PAN_RADIUS_BARE of the station or a member. When not even the
+ * station fits (a tall phone panel), it is framed alone within STATION_ONLY_RADIUS_M, else the centred target is pulled in.
  */
 export function bareStationFrame(input: BareStationFrameInput): FreeFrame {
-  const sorted = [...input.points].sort((a, b) => gap(a, input.station) - gap(b, input.station))
-  return freeFrame(bareInput(input, sorted.map(level)))
+  const near = (a: Ground, b: Ground) => gap(a, input.station) - gap(b, input.station)
+  const wanted = [...[...(input.members ?? [])].sort(near), ...[...input.points].sort(near)]
+  return freeFrame(bareInput(input, wanted.map(level)))
 }
