@@ -1,11 +1,12 @@
 /**
  * One MVT tile to line segments per class, in absolute scene meters at street level: (x, 0, z) pairs, six floats
  * a segment. Lines and polygon outlines are clipped to the tile square; a polygon edge the tiler cut along the
- * tile edge is dropped. Runs in the basemap worker.
+ * tile edge is dropped, and so is a ring too small for the tile's zoom (areaFilter.ts). Runs in the basemap worker.
  */
 import { VectorTile } from '@mapbox/vector-tile'
 import { PbfReader } from 'pbf'
 import { groundX, groundZ } from '../projection'
+import { AREA_STEPS, keepRing, ringArea } from './areaFilter'
 import { clipSegment, onTileEdge } from './clip'
 import { classOf, type BasemapClass, type GeomType } from './featureClass'
 import { tileXToLon, tileYToLat } from './tileMath'
@@ -18,6 +19,24 @@ export type ClassBuffers = Partial<Record<BasemapClass, Float32Array>>
  */
 export function isMvtBytes(bytes: Uint8Array): boolean {
   return bytes.length === 0 || bytes[0] === 0x1a
+}
+
+/** From this zoom in every ring is drawn, whatever its size. */
+const FILTER_BELOW_Z = Math.max(...AREA_STEPS.map((s) => s.fromZ))
+
+/** Whether a polygon ring (tile-local points) is drawn at tile zoom `z` (areaFilter.ts): its area in scene meters. */
+function keepRingOf(
+  line: readonly { x: number; y: number }[],
+  extent: number,
+  z: number,
+  sx: (u: number) => number,
+  sz: (v: number) => number,
+): boolean {
+  if (z >= FILTER_BELOW_Z) return true
+  if (line.some((p) => p.x <= 0 || p.y <= 0 || p.x >= extent || p.y >= extent)) return true
+  const xz: number[] = []
+  for (const p of line) xz.push(sx(p.x), sz(p.y))
+  return keepRing(ringArea(xz), z, false)
 }
 
 export function decodeTile(bytes: Uint8Array, z: number, x: number, y: number, layers: readonly string[]): ClassBuffers {
@@ -38,6 +57,7 @@ export function decodeTile(bytes: Uint8Array, z: number, x: number, y: number, l
       const out = (acc[cls] ??= [])
       const ring = f.type === 3
       for (const line of f.loadGeometry()) {
+        if (ring && !keepRingOf(line, extent, z, sx, sz)) continue
         for (let j = 1; j < line.length; j++) {
           const a = line[j - 1]!
           const b = line[j]!

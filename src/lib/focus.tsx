@@ -55,6 +55,8 @@ export interface UndergroundDevHooks {
   trainAt?: (key: string) => { x: number; y: number; rear: { x: number; y: number } | null; front: { x: number; y: number } | null } | null
   /** The basemap tile store's counters (useBasemapTiles). */
   basemap?: () => BasemapStats
+  /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */
+  basemapSegments?: () => { distance: number; classes: Record<string, { used: number; capacity: number; visible: boolean }> }
 }
 
 declare global {

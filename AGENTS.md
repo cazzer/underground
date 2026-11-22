@@ -14,6 +14,7 @@ pure realtime library. The station panel shows real arrivals. Bedford Av (L08) h
 about 250 more stations have generated ones (labelled "Estimated layout"), shown to everyone since 9wc.5.
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
+A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -116,6 +117,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (1.9:1, `veiledStreetHex` in `src/lib/streetVeil.ts`), while the focused station's interior is loaded under look A.
   TEMPORARY: `?streets=under|over` forces one order until the ost.7 card is decided; the removal list is in
   `src/scene/streetsLook.ts`
+  `basemap` holds one `{ stroke, width }` per basemap class (highway, major, minor, path, water, park), faint by color;
+  `src/themeBasemap.test.ts` holds its contrasts (roads under `streetStroke` and every line, highway over major
+  (≥ 1.95:1) over minor (≤ 1.5:1) over path (≥ 1.3:1), highway apart from major by tone too, water and park 1.5 to 2.5:1; every class
+  1 px, so width marks only the subway) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
+  TEMPORARY: `?basemap=off` draws no basemap and loads no tiles until ost.9.3's look is signed off; the removal list is
+  in `src/scene/basemapLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -194,6 +201,28 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     at priority 0 each frame; read a frame late); street names also keep clear of the interior's outlines
     (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing). Sized after mount,
     after `document.fonts.ready` and when a resize flips phone and desktop sizes; opacity `streetLabelOpacity` (the level labels' depth gate)
+    While mounted it writes Scene's `StreetMask` (anchor and file radius), which the basemap's roads give way to
+  - `Basemap.tsx` the citywide basemap: `useBasemapTiles` plus six class layers (`basemapLayer.ts`: one LineSegments2
+    over a pooled buffer per class, tiles in `lib/basemap/tilePool.ts` order so a new tile set rewrites and uploads
+    only from the first moved tile; it grows on demand and shrinks after `SHRINK_AFTER_S` (2 s) under a quarter full,
+    never below 1024 segments; DynamicDrawUsage, frustumCulled off, hidden at strength 0 or with no segments). Each
+    class fades by mixing its stroke toward the background with camera distance (`lib/basemap/classFade.ts`: water to
+    0.6 by 20 km, parks and highways down to half by 60 km, major roads out by 25 km, minor by 8 km, paths by 2400 m);
+    never by opacity. `CLASS_FADE`'s distances are named constants of their own, the one exception to taking camera
+    distances only from the tilt and reveal helpers (paths reuse `DEFAULT_TILT.farDistance` and `DOTS_FROM_M`). Every
+    class draws with `basemapLineMaterial.ts` (LineMaterial with three factors on its fragment alpha, a fragment at 0
+    discarded; anchors throw, naming the file, if three moves them; not in `BAND_UNIFORMS`), all twins of
+    `lib/basemap/edgeFade.ts` or `streetMask.ts`: the network fade (`NETWORK_GLSL` / `networkAlpha`: 1 within 5 km of
+    the stations' convex hull, `lib/basemap/networkHull.ts`, one half-plane per hull edge (at most 32; the vertex loop and uniform array
+    are sized by the `NET_EDGES` define), then smoothstep
+    to 0 over 7 km more; the network's bounding box would sit outside the bbox once padded), the bbox edge (`EDGE_GLSL` /
+    `edgeAlpha`: 0 at the spec bbox, in over `edgeFadeFor(distance)`, 4% of the camera distance held to 100 m..3 km and
+    written per frame, so a station near the edge keeps its streets close in), and for roads the street mask
+    (`MASK_GLSL` / `maskAlpha`): inside the focused station's street radius they fade out as its streets fade in, the
+    exact complement of that layer's 70 m edge fade, at the station layer's `interiorOpacity`. Scene wraps it in an
+    `ErrorBoundary` with a null fallback: a crash there logs once and draws no basemap. Dev only:
+    `__underground.basemapSegments()` (camera distance, per-class used/capacity/visible) and a `basemap:apply`
+    performance measure per tile-set change
 - `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
@@ -467,15 +496,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   release as version; null for a legacy or absent pin; under `vite serve`, `VITE_BASEMAP_DEV=1` in `.env.local` loads
   the local `public/basemap/tiles` with version "dev") and `tileUrl` (`basemap/tiles/{z}/{x}/{y}.mvt?v=<release>`).
   `src/scene/useBasemapTiles.ts` runs it (starts after the first frame and an idle callback; feeds the location cap,
-  see Data); `BasemapProbe.tsx` mounts it only under `?debug` in dev until ost.9.3 draws, with
-  `__underground.basemap()` for its counters, decode times and the request log
+  see Data), mounted by `src/scene/Basemap.tsx`, with `__underground.basemap()` for its counters, decode times and the
+  request log
 - `src/lib/basemap/`: pure basemap helpers, tests colocated: `tileMath.ts` (Web Mercator tiles, numeric `tileKey`,
   `zoomFor` with 512 px tiles clamped to [`MIN_Z` 9, maxzoom]), `footprint.ts` (`groundFootprint` from the frustum's
   corner rays, misses stopped at 4 camera distances; `selectTiles`, a 0.1 × distance margin, at most 24, stepping the
   zoom down; `footprintInside`), `reselect.ts`, `tileCover.ts` (`drawnTiles`: ready, else previous children that
   cover it, else nearest ready ancestor, else partial previous children), `tileLru.ts`, `locationCap.ts` (the
   location zoom cap's state machine), `clip.ts` (Liang–Barsky; a ring's cut along a tile edge dropped), `featureClass.ts`
-  (`classOf`: highway, major, minor, path, water, park; tunnels, rail, ferry, earth and points dropped),
+  (`classOf`: highway, major, minor, path, water, park; tunnels, sidewalks and crossings (a path's `kind_detail`), rail,
+  ferry, earth and points dropped), `areaFilter.ts` (`keepRing`: park and water rings under 1 ha only in z14+ tiles,
+  about 7 km in; under 5 ha only in z13+, about 14 km in; a ring reaching the tile edge always stays),
   `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip),
   `mvtFixture.ts` (tests' MVT writer). `projection.ts` exports `groundX`/`groundZ` for per-vertex use
 - `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,
@@ -723,7 +754,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, focused station's streets 0.35 (7.5 above the veil
-  while the interior is loaded under look A; TEMPORARY `?streets=` forces either), lines 1, station tie 1.5, line focus 2,
+  while the interior is loaded under look A; TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
+  0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,

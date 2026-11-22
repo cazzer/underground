@@ -4,6 +4,7 @@ import { BASEMAP } from '../data/basemapConfig'
 import { hiddenSiblingIds, interiorStationIds, type IndexLoad } from '../data/interiorLoad'
 import type { LiveLayer } from '../data/useLive'
 import { createBandView } from '../lib/bandOffset'
+import { createStreetMask } from '../lib/basemap/streetMask'
 import type { Insets } from '../lib/framing'
 import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
@@ -15,7 +16,8 @@ import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
-import { BasemapProbe } from './BasemapProbe'
+import { Basemap } from './Basemap'
+import { basemapLook } from './basemapLook'
 import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
@@ -28,8 +30,8 @@ import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
 import { YouAreHere } from './YouAreHere'
 
-/** Until the basemap draws (ost.9.3), its tiles load only under `?debug` in dev, to check the tile source. */
-const basemapProbe = import.meta.env.DEV && new URLSearchParams(window.location.search).has('debug') ? BASEMAP : null
+/** TEMPORARY `?basemap=off` (basemapLook.ts) draws no basemap and loads no tiles. */
+const basemapConfig = basemapLook === 'off' ? null : BASEMAP
 
 interface SceneProps {
   network: Network
@@ -62,6 +64,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const bandView = useMemo(createBandView, [])
   /** Written by LiveTrains at -3, read by CameraRig: the selected train the camera follows. */
   const anchor = useMemo(createFollowAnchor, [])
+  /** Written by StationStreets, read by Basemap: the basemap's roads give way to the focused station's streets. */
+  const streetMask = useMemo(createStreetMask, [])
   /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
   const interiorSpans = useMemo(
     () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),
@@ -100,10 +104,16 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         panel={panel}
         labelBlockers={labelBlockers}
         network={network}
+        mask={streetMask}
       />
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} labelBlockers={labelBlockers} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
-      {basemapProbe && <BasemapProbe config={basemapProbe} />}
+      {basemapConfig && (
+        // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
+        <ErrorBoundary fallback={null}>
+          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} />
+        </ErrorBoundary>
+      )}
     </Canvas>
   )
 }

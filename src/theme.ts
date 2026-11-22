@@ -1,3 +1,4 @@
+import type { BasemapClass } from './lib/basemap/featureClass'
 import type { RouteLineMix } from './lib/routeColor'
 
 /** Every color, line width, and font token lives here. Never hardcode these elsewhere. */
@@ -88,6 +89,16 @@ export interface Theme {
   streetStroke: string
   /** Street line width in CSS px. */
   streetWidth: number
+  /**
+   * The citywide basemap (Basemap.tsx), one stroke and width (CSS px) per class, under
+   * every route line. All 1 px (a wider stroke marks only the subway). Roads are blue-grays fainter than `streetStroke`
+   * and every drawn route color, in steps: highway (bluer, about 2.5:1) over major (about 2:1) over minor (about
+   * 1.45:1) over path (at least 1.3:1); highway also differs from major by tone. Water a teal and parks a green, each
+   * 1.5:1 to 2.5:1. All
+   * stay 60 in sRGB from the route colors, the rim and `here`, and 0.05 in OKLab from the grid and from each other
+   * across water, park and roads (themeBasemap.test.ts). Drawn opaque; a class fades by mixing toward the background.
+   */
+  basemap: Readonly<Record<BasemapClass, { stroke: string; width: number }>>
 }
 
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
@@ -141,6 +152,14 @@ export const THEMES = {
     interiorApproxGap: 0.75,
     streetStroke: '#646468',
     streetWidth: 1,
+    basemap: {
+      highway: { stroke: '#525f78', width: 1 },
+      major: { stroke: '#495163', width: 1 },
+      minor: { stroke: '#353d4f', width: 1 },
+      path: { stroke: '#2f3748', width: 1 },
+      water: { stroke: '#16606e', width: 1 },
+      park: { stroke: '#385446', width: 1 },
+    },
   },
 } as const satisfies Record<string, Theme>
 
