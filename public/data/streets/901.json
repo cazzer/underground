@@ -152,9 +152,6 @@
     {"x":1673,"z":1256,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["631"],"street":"East 42nd Street","wayId":1364312922,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":1717,"z":715,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["631"],"street":"Park Avenue","wayId":1037772011,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":1787,"z":1225,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["631"],"street":"East 42nd Street","wayId":1364312922,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":1937,"z":802,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["631"],"street":"Park Avenue","wayId":1037772011,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":2228,"z":1650,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["631"],"street":"East 42nd Street","wayId":1272613980,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":2559,"z":744,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["631"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null},
-    {"x":2669,"z":1184,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["631"],"street":"East 42nd Street","wayId":1272613980,"cross":null,"crossWayId":null,"side":"north","plaza":null}
+    {"x":1937,"z":802,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["631"],"street":"Park Avenue","wayId":1037772011,"cross":null,"crossWayId":null,"side":"south","plaza":null}
   ]
 }

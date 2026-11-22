@@ -166,8 +166,6 @@
     {"id":1554794896,"highway":"footway","name":null,"oneway":0,"nodes":[273,264]}
   ],
   "entrances": [
-    {"x":-2483,"z":-1185,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"East 42nd Street","wayId":438384692,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":-2291,"z":-1443,"type":"Stair","entry":true,"exit":true,"stopIds":["901"],"street":"East 42nd Street","wayId":438384692,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-1554,"z":-1072,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"East 42nd Street","wayId":5672991,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-1271,"z":-534,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"East 42nd Street","wayId":5672991,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-1154,"z":-1537,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"East 43rd Street","wayId":1106482769,"cross":null,"crossWayId":null,"side":"south","plaza":null},

@@ -75,6 +75,8 @@ function Toggle({ expanded, controls, onToggle, onFocusLost, className, children
 interface EntranceListProps {
   /** The focused station's labelled entrances (the street file's), null until they load or when it has none. */
   entrances: readonly EntranceText[] | null
+  /** Whether a label's entrance lists the focused station; rows that do come first (a complex shares its entrances). */
+  listsStation?: (text: EntranceText) => boolean
   /** Takes focus when the button that has it goes away (a resize across the stacked-panel breakpoint, another station). */
   onFocusLost: () => void
 }
@@ -86,12 +88,12 @@ interface EntranceListProps {
  * region, and nothing while the street file loads or when the station has no labelled entrance. Key it by station
  * so a new station starts collapsed.
  */
-export function EntranceList({ entrances, onFocusLost }: EntranceListProps) {
+export function EntranceList({ entrances, listsStation, onFocusLost }: EntranceListProps) {
   const stacked = useStackedPanel()
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
   const headingId = useId()
-  const all = useMemo(() => (entrances ? entranceRows(entrances) : []), [entrances])
+  const all = useMemo(() => (entrances ? entranceRows(entrances, listsStation) : []), [entrances, listsStation])
   const rows = expanded ? all : stacked ? [] : all.slice(0, COLLAPSED_ROWS)
   const { scroller, list, capPx, overflows, atEnd, onScroll } = useListScroll<HTMLUListElement>(rows.length)
   if (all.length === 0) return null

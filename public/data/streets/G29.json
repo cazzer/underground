@@ -123,7 +123,6 @@
     {"x":-20,"z":-1090,"type":"Stair","entry":true,"exit":true,"stopIds":["G29"],"street":"Union Avenue","wayId":1109542392,"cross":"Keap Street","crossWayId":448657729,"side":"SE","plaza":null},
     {"x":124,"z":-1538,"type":"Stair","entry":true,"exit":true,"stopIds":["G29"],"street":"Metropolitan Avenue","wayId":1205112614,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":318,"z":1106,"type":"Stair","entry":true,"exit":true,"stopIds":["G29"],"street":"Powers Street","wayId":685311603,"cross":"Union Avenue","crossWayId":46359897,"side":"NE","plaza":null},
-    {"x":1654,"z":-1624,"type":"Elevator","entry":true,"exit":true,"stopIds":["L10"],"street":"Lorimer Street","wayId":1034698262,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":1654,"z":-1310,"type":"Stair","entry":true,"exit":true,"stopIds":["L10"],"street":"Lorimer Street","wayId":1205112615,"cross":"Metropolitan Avenue","crossWayId":1205112614,"side":"SW","plaza":null},
     {"x":1776,"z":-1579,"type":"Stair","entry":true,"exit":true,"stopIds":["L10"],"street":"Lorimer Street","wayId":1034698262,"cross":"Metropolitan Avenue","crossWayId":198924599,"side":"NE","plaza":null},
     {"x":1819,"z":-1243,"type":"Stair","entry":true,"exit":true,"stopIds":["L10"],"street":"Lorimer Street","wayId":1205112615,"cross":null,"crossWayId":null,"side":"east","plaza":null}

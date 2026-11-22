@@ -124,7 +124,6 @@
   ],
   "entrances": [
     {"x":-212,"z":40,"type":"Stair","entry":true,"exit":true,"stopIds":["L01"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":-121,"z":-185,"type":"Elevator","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-82,"z":-205,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":169,"z":250,"type":"Stair","entry":true,"exit":true,"stopIds":["L01"],"street":"West 14th Street","wayId":1080982439,"cross":"8th Avenue","crossWayId":465098295,"side":"SE","plaza":null},
     {"x":301,"z":6,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":1080982439,"cross":"8th Avenue","crossWayId":194923811,"side":"NE","plaza":null},

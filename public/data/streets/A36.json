@@ -172,13 +172,10 @@
     {"id":1549124950,"highway":"residential","name":"Warren Street","oneway":1,"nodes":[249,88]}
   ],
   "entrances": [
-    {"x":-1629,"z":2381,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["E01"],"street":"Church Street","wayId":1227588718,"cross":"Vesey Street","crossWayId":44225576,"side":"SW","plaza":null},
     {"x":-1492,"z":2042,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Vesey Street","wayId":44225576,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":-1328,"z":2542,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Church Street","wayId":5672377,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-1122,"z":1608,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Church Street","wayId":1227588718,"cross":"Barclay Street","crossWayId":222299238,"side":"SW","plaza":null},
     {"x":-821,"z":890,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Park Place","wayId":1334995999,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-613,"z":760,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Church Street","wayId":587038051,"cross":"Park Place","crossWayId":1334995999,"side":"NW","plaza":null},
-    {"x":-451,"z":1127,"type":"Elevator","entry":true,"exit":true,"stopIds":["E01"],"street":"Park Place","wayId":1330602154,"cross":"Church Street","crossWayId":1149017059,"side":"SE","plaza":null},
     {"x":-410,"z":417,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Church Street","wayId":1149017114,"cross":"Murray Street","crossWayId":222299272,"side":"SW","plaza":null},
     {"x":-378,"z":1169,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Park Place","wayId":1330602154,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-366,"z":832,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Church Street","wayId":1149017144,"cross":"Park Place","crossWayId":1330602154,"side":"NE","plaza":null},

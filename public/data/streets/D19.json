@@ -69,8 +69,6 @@
     {"id":1335878041,"highway":"footway","name":null,"oneway":0,"nodes":[79,80]}
   ],
   "entrances": [
-    {"x":-2926,"z":-95,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":196117091,"cross":null,"crossWayId":null,"side":"east","plaza":null},
-    {"x":-2677,"z":-391,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 14th Street","wayId":1080982437,"cross":"7th Avenue","crossWayId":852992099,"side":"NE","plaza":null},
     {"x":-832,"z":901,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-743,"z":741,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-721,"z":962,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":"6th Avenue","crossWayId":496979224,"side":"SW","plaza":null},

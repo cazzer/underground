@@ -66,6 +66,7 @@ describe('entrancesByStation over a complex', () => {
     expect(complexOf.get('B2')).toBe('7')
     expect(complexOf.get('C3')).toBe('8')
     expect(() => parseComplexOf({ rows: [{ gtfsStopId: 'A1' }] })).toThrow(/rows\[0\]\.complexId/)
+    expect(() => parseComplexOf({ rows: [{ gtfsStopId: 'A1', complexId: '7' }, { gtfsStopId: 'A1', complexId: '8' }] })).toThrow(/rows\[1\]\.gtfsStopId: "A1" is listed twice/)
   })
 
   it("gives every member of a complex the complex's rows, each once, and a member with none of its own too", () => {
@@ -105,16 +106,27 @@ describe('entrancesByStation over a complex', () => {
 describe('buildEntrances over a complex', () => {
   const file = fileOf([horizontal(1, 'Main St', 0)])
 
-  it("drops a row shared from another member past the street radius, never one that lists the station", () => {
+  it('drops a row shared from another member beyond 260 m, never one that lists the station', () => {
     const own = row([20, 5])
     const sharedNear = row([100, 5], { gtfsStopIds: ['T02'] })
+    const sharedEdge = row([270, 5], { gtfsStopIds: ['T02'] })
     const sharedFar = row([310, 5], { gtfsStopIds: ['T02'] })
     const ownFar = row([320, 5], { gtfsStopIds: ['T01', 'T02'] })
-    const { entrances, log } = buildEntrances(STATION, [own, sharedNear, sharedFar, ownFar], file)
+    const { entrances, log } = buildEntrances(STATION, [own, sharedNear, sharedEdge, sharedFar, ownFar], file)
     expect(entrances.map((e) => e.x)).toEqual([200, 1000, 3200])
     const dropped = log.filter((l) => l.kind === 'shared-dropped')
     expect(dropped).toHaveLength(1)
-    expect(dropped[0]!.line).toContain('dropped 1 shared')
+    expect(dropped[0]!.line).toContain('dropped 2 shared complex entrance(s) (0 elevator(s), 2 beyond 260 m)')
+  })
+
+  it('drops every shared elevator, near or far, and keeps one that lists the station', () => {
+    const ownLift = row([60, 5], { type: 'Elevator' })
+    const sharedLift = row([50, 5], { type: 'Elevator', gtfsStopIds: ['T02'] })
+    const sharedFarLift = row([400, 5], { type: 'Elevator', gtfsStopIds: ['T02'] })
+    const sharedStair = row([70, 5], { gtfsStopIds: ['T02'] })
+    const { entrances, log } = buildEntrances(STATION, [ownLift, sharedLift, sharedFarLift, sharedStair], file)
+    expect(entrances.map((e) => [e.x, e.type])).toEqual([[600, 'Elevator'], [700, 'Stair']])
+    expect(log.find((l) => l.kind === 'shared-dropped')!.line).toContain('dropped 2 shared complex entrance(s) (2 elevator(s), 0 beyond 260 m)')
   })
 
   it('logs nothing when no shared row is far', () => {

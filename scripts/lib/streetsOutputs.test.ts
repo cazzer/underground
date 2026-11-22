@@ -13,7 +13,7 @@ import { isClosedRing } from '../../src/lib/streetClass.ts'
 import { STREETS_FILE_GZIP_CAP_BYTES, STREETS_TOTAL_GZIP_CAP_BYTES } from './budget.ts'
 import { toStableJson } from './stableJson.ts'
 import { buildAllStreets, WALK_RADIUS_M } from './streetsBuild.ts'
-import { entrancesByStation, parseComplexOf, parseEntranceRows } from './streetsEntrances.ts'
+import { EDGE_MARGIN_M, entrancesByStation, parseComplexOf, parseEntranceRows } from './streetsEntrances.ts'
 import { loadPin } from './streetsPin.ts'
 import type { StreetShard, StreetsManifest } from './streetsShard.ts'
 
@@ -90,12 +90,13 @@ describe('committed street files', () => {
     expect([count('L03'), count('R20'), count('635')]).toEqual([12, 12, 12])
   })
 
-  it("hold no entrance shared from another member of the complex beyond the street radius", () => {
+  it('hold no entrance shared from another member of the complex that is an elevator or beyond 260 m', () => {
     for (const name of names) {
       const file = json(new URL(name, OUT)) as StationStreets
       for (const e of file.entrances) {
         if (e.stopIds.includes(file.stationId)) continue
-        expect(Math.hypot(e.x, e.z) / 10, `${name} ${e.type} at (${e.x}, ${e.z}) dm`).toBeLessThanOrEqual(file.radiusM)
+        expect(e.type, `${name} shared entrance at (${e.x}, ${e.z}) dm`).not.toBe('Elevator')
+        expect(Math.hypot(e.x, e.z) / 10, `${name} ${e.type} at (${e.x}, ${e.z}) dm`).toBeLessThanOrEqual(file.radiusM - EDGE_MARGIN_M)
       }
     }
   })

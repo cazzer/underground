@@ -150,9 +150,10 @@ are stale. Each file clips the pinned ways to 300 m (footways, steps and paths t
 dense downtown stations over the 16 KB cap, 150 m one), simplifies to 0.5 m, rounds to decimeters around the station point, and
 joins every entrance row that lists the station, or any station of its complex (`gtfsStopId` to `complexId` in
 `catalog/stations.json`; the rows' own `complexId` is wrong for a few stops, so it isn't used), to the street it opens onto. Union Sq's L03, R20 and 635
-files carry the same 12 entrances, each placed around that file's own station point. A shared entrance more than 300 m from
-a member's own point (Times Sq, Chambers St and Grand Central members span 400 m and more) is dropped, with one "dropped N shared"
-log line per station: its streets are clipped away, so it would be a mark with no label. A row that lists the member itself always stays. The pin's manifest lists the `stationIds` it was fetched for: a station added to `stations.json` since gets a file from whatever
+files carry the same 12 entrances, each placed around that file's own station point. A shared entrance (one that doesn't list the member) is dropped when it is an
+elevator (it doesn't serve the member's trains, and would rank first in the list) or more than 260 m from the member's own point (Times Sq,
+Chambers St and Grand Central members span 400 m and more; its streets are cut off or gone, so it would be a mark with no label), with one
+"dropped N shared" log line per station. A row that lists the member itself always stays. The pin's manifest lists the `stationIds` it was fetched for: a station added to `stations.json` since gets a file from whatever
 pinned ways lie near it and a `WARNING:` line from the build (not a failure) until `data:streets:fetch` is rerun. The build prints where the join is doubtful
 (no street within 40 m, near misses for a median, bridge and tunnel ways, entrances near the 300 m edge); read it after a refresh.
 

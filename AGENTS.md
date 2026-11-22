@@ -65,10 +65,11 @@ so dev and preview serve under that path.
   `streetsData.test.ts` checks it. Rerun `data:streets`, `data:walk` and `data:search:streets` after it.
 - `npm run data:streets`: offline; builds `public/data/streets/<stationId>.json` for every `stations.json` station from
   the street pin and the catalog entrances (clip to 300 m, simplify, project to decimeters, join each entrance to its street).
-  Every member of a station complex gets the complex's whole entrance set (membership: `catalog/stations.json`
+  Every member of a station complex gets the complex's entrance set (membership: `catalog/stations.json`
   `gtfsStopId` to `complexId`; a row's own `complexId` is not trusted), each at x/z around that member's own point;
-  a shared entrance more than `radiusM` (300 m) from the member's own point is dropped (logged "dropped N shared"),
-  while the rows that list the member itself always stay.
+  a shared entrance (one that doesn't list the member) is dropped when it is an elevator, since it doesn't serve the
+  member's trains, or lies more than 260 m (`radiusM` minus the 40 m edge margin) from the member's point, with one
+  "dropped N shared" log line per station; the rows that list the member itself always stay.
   Rerun it after `data`, `data:streets:fetch`, `data:catalog:fetch` or a change to the `searchText.ts` synonyms (street join
   keys use them); `streetsOutputs.test.ts` fails while the files are stale. It builds and cap-checks every file before
   writing, prints the largest files, the totals and the join log (no street, near misses, bridge/tunnel ways, far entrances),

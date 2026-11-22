@@ -88,9 +88,6 @@
     {"id":1538467118,"highway":"residential","name":"East 56th Street","oneway":1,"nodes":[11,12]}
   ],
   "entrances": [
-    {"x":-2688,"z":400,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":1388287829,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":-2627,"z":255,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":1388287829,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":-2599,"z":449,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":1388287829,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-2438,"z":270,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"Lexington Avenue","wayId":458180193,"cross":"East 51st Street","crossWayId":1388287829,"side":"NW","plaza":null},
     {"x":-2334,"z":603,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":658583340,"cross":"Lexington Avenue","crossWayId":458180193,"side":"SE","plaza":null},
     {"x":-2260,"z":457,"type":"Stair","entry":true,"exit":true,"stopIds":["630"],"street":"East 51st Street","wayId":658583340,"cross":"Lexington Avenue","crossWayId":458180193,"side":"NE","plaza":null},

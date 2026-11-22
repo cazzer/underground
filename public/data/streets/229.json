@@ -197,11 +197,7 @@
     {"id":1416936035,"highway":"secondary","name":"Park Row","oneway":1,"nodes":[10,73]}
   ],
   "entrances": [
-    {"x":-2884,"z":-310,"type":"Stair","entry":true,"exit":true,"stopIds":["418"],"street":"Broadway","wayId":1158491838,"cross":"Maiden Lane","crossWayId":46154327,"side":"SE","plaza":null},
-    {"x":-2627,"z":-1074,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["418"],"street":"Broadway","wayId":837943499,"cross":"Dey Street","crossWayId":5673211,"side":"SW","plaza":null},
-    {"x":-2369,"z":-1710,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":835694480,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-2279,"z":-1156,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"Broadway","wayId":835694479,"cross":null,"crossWayId":null,"side":"east","plaza":null},
-    {"x":-2209,"z":-1793,"type":"Stair","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":835694480,"cross":"Broadway","crossWayId":222299275,"side":"NW","plaza":null},
     {"x":-2202,"z":-828,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"John Street","wayId":5670877,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-2072,"z":-1478,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":1334200288,"cross":"Broadway","crossWayId":835694479,"side":"SE","plaza":null},
     {"x":-2006,"z":-1473,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":1334200288,"cross":null,"crossWayId":null,"side":"south","plaza":null},

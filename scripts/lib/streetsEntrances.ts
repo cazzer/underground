@@ -16,6 +16,9 @@ import { RADIUS_M } from './streetsOsm.ts'
 export const NEAR_MISS_SLACK_M = JOIN_RADIUS_M - MEDIAN_MAX_M
 /** An entrance this close to the pin's radius edge may have streets cut off beyond it. */
 export const EDGE_MARGIN_M = 40
+/** A shared complex entrance farther than this from the member's point is dropped (the far-entrance log's threshold). */
+export const SHARED_MAX_M = RADIUS_M - EDGE_MARGIN_M
+const ELEVATOR = 'Elevator'
 
 export type LogKind = 'no-street' | 'near-miss' | 'bridge-tunnel' | 'far-entrance' | 'no-entrances' | 'shared-dropped' | 'no-ways' | 'whole-way' | 'oneway'
 
@@ -66,11 +69,15 @@ export function parseEntranceRows(json: unknown): EntranceInput[] {
  *  catalog's own membership; stations.json carries none). */
 export function parseComplexOf(json: unknown): Map<StationId, string> {
   const rows = list(record(json, 'catalog/stations.json').rows, 'catalog/stations.json.rows')
-  return new Map(rows.map((raw, i): [StationId, string] => {
+  const out = new Map<StationId, string>()
+  rows.forEach((raw, i) => {
     const at = `catalog/stations.json.rows[${i}]`
     const row = record(raw, at)
-    return [text(row.gtfsStopId, `${at}.gtfsStopId`), text(row.complexId, `${at}.complexId`)]
-  }))
+    const id = text(row.gtfsStopId, `${at}.gtfsStopId`)
+    if (out.has(id)) throw new Error(`${at}.gtfsStopId: "${id}" is listed twice`)
+    out.set(id, text(row.complexId, `${at}.complexId`))
+  })
+  return out
 }
 
 /** Rows grouped by every station id they list, so a two-stop row reaches both stations. With `complexOf`, every
@@ -142,7 +149,7 @@ function nearMissGapM(p: [number, number], wayId: number, ways: readonly JoinWay
 
 /** The station's entrances on the file's decimeter grid, joined to their streets, sorted by x, z, then type.
  *  `station` is its stations.json row; `allRows` its catalog rows (`entrancesByStation`): those that list it, and the
- *  complex's other rows, which are dropped past RADIUS_M (logged once per station). */
+ *  complex's other rows, of which elevators and those past SHARED_MAX_M are dropped (logged once per station). */
 export function buildEntrances(
   station: { id: StationId; name: string } & LatLon,
   allRows: readonly EntranceInput[],
@@ -151,15 +158,23 @@ export function buildEntrances(
   const ways = toJoinWays(file)
   const log: BuildLog[] = []
   const who = `${station.id} ${station.name}`
-  // A row shared from another member of the complex (it does not list this station) is dropped past the street
-  // radius: the streets there are clipped away, so it would be a streetless mark with no label.
+  // A row shared from another member of the complex (it does not list this station) is dropped when it is an elevator
+  // (one that does not list a member does not serve its trains, and an elevator ranks first on the map and in the list)
+  // or when it lies near or past the street radius: the streets there are cut off or gone, so it would be a mark
+  // without a label. The rows that list the station always stay.
   const far = (row: EntranceInput): boolean => {
     const g = toGround({ lat: row.lat, lon: row.lon }, station)
-    return Math.hypot(Math.round(g.x * 10), Math.round(g.z * 10)) / 10 > RADIUS_M
+    return Math.hypot(Math.round(g.x * 10), Math.round(g.z * 10)) / 10 > SHARED_MAX_M
   }
-  const rows = allRows.filter((row) => row.gtfsStopIds.includes(station.id) || !far(row))
+  const shared = (row: EntranceInput): boolean => !row.gtfsStopIds.includes(station.id)
+  const elevators = allRows.filter((row) => shared(row) && row.type === ELEVATOR).length
+  const rows = allRows.filter((row) => !shared(row) || (row.type !== ELEVATOR && !far(row)))
   if (rows.length < allRows.length) {
-    log.push({ kind: 'shared-dropped', line: `dropped ${allRows.length - rows.length} shared complex entrance(s) more than ${RADIUS_M} m away: ${who}` })
+    const beyond = allRows.length - rows.length - elevators
+    log.push({
+      kind: 'shared-dropped',
+      line: `dropped ${allRows.length - rows.length} shared complex entrance(s) (${elevators} elevator(s), ${beyond} beyond ${SHARED_MAX_M} m): ${who}`,
+    })
   }
   if (rows.length === 0) log.push({ kind: 'no-entrances', line: `no entrances in the catalog: ${who}` })
   const entrances = rows.map((row): StreetEntrance => {

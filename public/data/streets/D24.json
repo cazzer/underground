@@ -174,7 +174,6 @@
   ],
   "entrances": [
     {"x":-1677,"z":617,"type":"Stair","entry":true,"exit":true,"stopIds":["R31"],"street":"Pacific Street","wayId":145079213,"cross":"4th Avenue","crossWayId":420883002,"side":"NW","plaza":null},
-    {"x":-1347,"z":728,"type":"Elevator","entry":true,"exit":true,"stopIds":["R31"],"street":"Pacific Street","wayId":5682175,"cross":"4th Avenue","crossWayId":420883003,"side":"NE","plaza":null},
     {"x":-1283,"z":592,"type":"Stair","entry":true,"exit":true,"stopIds":["R31"],"street":"4th Avenue","wayId":420883003,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-708,"z":-358,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["235"],"street":"Flatbush Avenue","wayId":1121724623,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-539,"z":-650,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["235"],"street":"Hanson Place","wayId":1164493976,"cross":null,"crossWayId":null,"side":"south","plaza":null},

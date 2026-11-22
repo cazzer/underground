@@ -102,9 +102,6 @@
     {"x":418,"z":-1081,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":852992099,"cross":"West 14th Street","crossWayId":1080982438,"side":"NW","plaza":null},
     {"x":436,"z":-540,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"7th Avenue","wayId":196117091,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":685,"z":-836,"type":"Stair","entry":true,"exit":true,"stopIds":["132"],"street":"West 14th Street","wayId":1080982437,"cross":"7th Avenue","crossWayId":852992099,"side":"NE","plaza":null},
-    {"x":2530,"z":456,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":2619,"z":296,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":2641,"z":518,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":"6th Avenue","crossWayId":496979224,"side":"SW","plaza":null},
-    {"x":2728,"z":351,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":"6th Avenue","crossWayId":496978510,"side":"NW","plaza":null}
+    {"x":2530,"z":456,"type":"Stair","entry":true,"exit":true,"stopIds":["D19"],"street":"West 14th Street","wayId":1080982436,"cross":null,"crossWayId":null,"side":"south","plaza":null}
   ]
 }

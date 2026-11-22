@@ -163,9 +163,7 @@
     {"id":1554794897,"highway":"footway","name":null,"oneway":0,"nodes":[221,223,224]}
   ],
   "entrances": [
-    {"x":-2236,"z":-1462,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"East 42nd Street","wayId":5672991,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-1953,"z":-923,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"East 42nd Street","wayId":5672991,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":-1837,"z":-1926,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"East 43rd Street","wayId":1106482769,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-1806,"z":-809,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"East 42nd Street","wayId":5672991,"cross":"Park Avenue","crossWayId":44165027,"side":"SW","plaza":null},
     {"x":-1708,"z":-1788,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["901"],"street":"Vanderbilt Avenue","wayId":5671160,"cross":"East 43rd Street","crossWayId":1106482769,"side":"SW","plaza":null},
     {"x":-1632,"z":-1205,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["901"],"street":"Park Avenue","wayId":359180982,"cross":null,"crossWayId":null,"side":"north","plaza":null},

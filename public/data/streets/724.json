@@ -122,12 +122,9 @@
     {"id":1577112226,"highway":"footway","name":null,"oneway":0,"nodes":[546,548,547]}
   ],
   "entrances": [
-    {"x":-2723,"z":118,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["D16"],"street":"West 40th Street","wayId":542258061,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-2430,"z":472,"type":"Stair","entry":true,"exit":true,"stopIds":["D16"],"street":"West 40th Street","wayId":226041022,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-2337,"z":350,"type":"Stair","entry":true,"exit":true,"stopIds":["D16"],"street":"West 40th Street","wayId":226041022,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":-2298,"z":-1243,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["D16"],"street":"West 42nd Street","wayId":167922072,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-1878,"z":-1369,"type":"Stair","entry":true,"exit":true,"stopIds":["D16"],"street":"6th Avenue","wayId":127693103,"cross":"West 42nd Street","crossWayId":167922072,"side":"NW","plaza":null},
-    {"x":-1815,"z":-1471,"type":"Elevator","entry":true,"exit":true,"stopIds":["D16"],"street":"6th Avenue","wayId":127693103,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-1763,"z":-1570,"type":"Stair","entry":true,"exit":true,"stopIds":["D16"],"street":"6th Avenue","wayId":127693103,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-1615,"z":-863,"type":"Stair","entry":true,"exit":true,"stopIds":["D16"],"street":"West 42nd Street","wayId":1320232776,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-1539,"z":-1337,"type":"Stair","entry":true,"exit":true,"stopIds":["D16"],"street":"6th Avenue","wayId":127693103,"cross":null,"crossWayId":null,"side":"east","plaza":null},

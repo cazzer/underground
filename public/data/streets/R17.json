@@ -171,7 +171,6 @@
     {"x":-466,"z":1132,"type":"Stair","entry":true,"exit":true,"stopIds":["R17"],"street":"6th Avenue","wayId":460606347,"cross":"West 32nd Street","crossWayId":460606348,"side":"NE","plaza":null},
     {"x":-297,"z":1234,"type":"Stair","entry":true,"exit":true,"stopIds":["R17"],"street":"West 32nd Street","wayId":1071919873,"cross":"Broadway","crossWayId":35027226,"side":"NW","plaza":null},
     {"x":-209,"z":-298,"type":"Stair","entry":true,"exit":true,"stopIds":["D17"],"street":"West 34th Street","wayId":384649121,"cross":null,"crossWayId":null,"side":"south","plaza":null},
-    {"x":-180,"z":-61,"type":"Elevator","entry":true,"exit":true,"stopIds":["D17"],"street":"6th Avenue","wayId":439933932,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-170,"z":-584,"type":"Stair","entry":true,"exit":true,"stopIds":["D17"],"street":"West 34th Street","wayId":384649121,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-131,"z":-1468,"type":"Stair","entry":true,"exit":true,"stopIds":["D17"],"street":"West 35th Street","wayId":1051750426,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-79,"z":-1257,"type":"Stair","entry":true,"exit":true,"stopIds":["D17"],"street":"West 35th Street","wayId":1051750426,"cross":null,"crossWayId":null,"side":"south","plaza":null},
