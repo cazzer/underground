@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { StationIndex, StationInterior } from '../../src/data/stationSchema.ts'
 import { buildInteriorBuffers, RAIL_DROP_M } from '../../src/lib/interiorGeometry.ts'
+import { MTA_CREDIT, OPEN_NY_NOTE } from './stationMerge.ts'
 import { toStableJson } from './stableJson.ts'
 import { buildStationIndex, INDEX_FILE, NOT_INTERIOR_FILES } from './stationIndex.ts'
 
@@ -52,6 +53,11 @@ describe('station index', () => {
 })
 
 describe('station interior files', () => {
+  it('every file with an ee-rise level height carries the MTA credit and OPEN_NY_NOTE', () => {
+    const withRise = ids.filter((id) => read(id).levels.some((l) => l.depthSource === 'ee-rise'))
+    expect(withRise.length).toBeGreaterThan(0)
+    for (const id of withRise) expect(read(id).attribution, id).toEqual(expect.arrayContaining([MTA_CREDIT, OPEN_NY_NOTE]))
+  })
   it.each(ids)('%s builds non-empty interior buffers', (id) => {
     const { strong, fine } = buildInteriorBuffers(read(id), OPTIONS)
     expect(strong.positions.length).toBeGreaterThan(0)

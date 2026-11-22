@@ -3,6 +3,7 @@
 import type { InteriorSource, Level, StationInterior } from '../../src/data/stationSchema.ts'
 import { INTERIOR_MIN_CONFIDENCE } from './archetype.ts'
 import type { GeneratedMeta } from './stationInputs.ts'
+import { withEeRiseCredit } from './stationMerge.ts'
 
 function generatedSources(sources: readonly InteriorSource[]): InteriorSource[] {
   return [...new Set(sources.map((s): InteriorSource => (s === 'authored' ? 'generated' : s)))].sort()
@@ -35,14 +36,15 @@ export function markGenerated(interior: StationInterior, meta: GeneratedMeta): S
     throw new Error(`${id}: confidence ${confidence} is below the interior bar ${INTERIOR_MIN_CONFIDENCE}`)
   }
   const mark = <T extends { sources: InteriorSource[] }>(e: T): T => ({ ...e, sources: generatedSources(e.sources) })
+  const levels = withDepthSources(interior, meta.levelDepths)
   return {
     stationId: interior.stationId,
     name: interior.name,
     anchor: { ...interior.anchor },
     license: interior.license,
-    attribution: [...interior.attribution],
+    attribution: withEeRiseCredit(interior.attribution, levels),
     generated: { archetype: meta.archetype, confidence },
-    levels: withDepthSources(interior, meta.levelDepths),
+    levels,
     platforms: interior.platforms.map(mark),
     slabs: interior.slabs.map(mark),
     connectors: interior.connectors.map(mark),

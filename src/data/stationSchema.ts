@@ -40,7 +40,7 @@ export interface StationInterior {
   name: string
   /** Local origin. Render in a group at toGround(anchor); children use local x/z as-is. */
   anchor: LatLon
-  /** The whole file is a derivative database of OpenStreetMap. OSM-derived parts are ODbL 1.0; `nyopendata` elements are MTA data under the OPEN-NY Terms of Use (see attribution). */
+  /** The whole file is a derivative database of OpenStreetMap. OSM-derived parts are ODbL 1.0; `nyopendata` elements and `ee-rise` level heights are MTA data under the OPEN-NY Terms of Use (see attribution). */
   license: 'ODbL-1.0'
   /** Credits required by the sources present, fixed order (OSM first). */
   attribution: string[]

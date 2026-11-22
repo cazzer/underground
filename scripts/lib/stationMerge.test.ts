@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { toStableJson } from './stableJson.ts'
 import { elevatedFixture, fixture, ll } from './stationFixture.ts'
 import { ELEVATOR_WIDTH_M, ESCALATOR_WIDTH_M } from './stationEquipment.ts'
-import { buildStationInterior, checkEntranceLinks, OPEN_NY_NOTE } from './stationMerge.ts'
+import { buildStationInterior, checkEntranceLinks, MTA_CREDIT, OPEN_NY_NOTE, withEeRiseCredit } from './stationMerge.ts'
 
 const build = (mutate: (f: ReturnType<typeof fixture>) => void = () => {}) => {
   const f = fixture()
@@ -227,6 +227,12 @@ describe('output', () => {
     const out = build()
     expect(out.license).toBe('ODbL-1.0')
     expect(out.attribution).toEqual(['© OpenStreetMap contributors', 'Metropolitan Transportation Authority, data.ny.gov', OPEN_NY_NOTE])
+  })
+  it('adds the MTA credit and OPEN-NY note once, in order, for an ee-rise level with no nyopendata credit', () => {
+    const osm = '© OpenStreetMap contributors'
+    expect(withEeRiseCredit([osm], [{ depthSource: 'ee-rise' }])).toEqual([osm, MTA_CREDIT, OPEN_NY_NOTE])
+    expect(withEeRiseCredit([osm, MTA_CREDIT, OPEN_NY_NOTE], [{ depthSource: 'ee-rise' }])).toEqual([osm, MTA_CREDIT, OPEN_NY_NOTE])
+    expect(withEeRiseCredit([osm], [{ depthSource: 'osm-level' }, {}])).toEqual([osm])
   })
   it('keeps every number to 2 decimals or fewer', () => {
     const nums: number[] = []

@@ -25,6 +25,14 @@ const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
 export const OPEN_NY_NOTE =
   'Elements whose sources include nyopendata, and level heights whose depthSource is ee-rise, contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
 
+/** A file with an `ee-rise` level height carries the MTA credit and OPEN_NY_NOTE even with no nyopendata element, in the credits' fixed order (card 2q7.29.1). */
+export function withEeRiseCredit(attribution: readonly string[], levels: readonly Pick<Level, 'depthSource'>[]): string[] {
+  if (!levels.some((l) => l.depthSource === 'ee-rise')) return [...attribution]
+  const order = [ATTRIBUTION.osm, MTA_CREDIT, OPEN_NY_NOTE]
+  const out = new Set([...attribution, MTA_CREDIT, OPEN_NY_NOTE])
+  return [...out].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99))
+}
+
 /** The street files' counterpart of OPEN_NY_NOTE: their entrance points are MTA data, the rest of the file is OSM. */
 export const ENTRANCES_OPEN_NY_NOTE = 'Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
 
@@ -197,10 +205,13 @@ export function buildStationInterior(authored: AuthoredStation, sources: Station
     ...(authored.approximate === undefined ? {} : { approximate: onlyTrue(authored.approximate, 'approximate') }),
     anchor: { lat: authored.frame.anchor.lat, lon: authored.frame.anchor.lon },
     license: 'ODbL-1.0',
-    attribution: [
-      ...(['osm', 'nyopendata'] as const).filter((s) => used.has(s)).map((s) => ATTRIBUTION[s]),
-      ...(used.has('nyopendata') ? [OPEN_NY_NOTE] : []),
-    ],
+    attribution: withEeRiseCredit(
+      [
+        ...(['osm', 'nyopendata'] as const).filter((s) => used.has(s)).map((s) => ATTRIBUTION[s]),
+        ...(used.has('nyopendata') ? [OPEN_NY_NOTE] : []),
+      ],
+      levels,
+    ),
     levels,
     platforms: platforms.sort(byId),
     slabs: slabs.sort(byId),
