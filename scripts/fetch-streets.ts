@@ -49,7 +49,9 @@ function readStations(): { feedVersion: string; stations: StreetStation[] } {
 }
 
 /** Overpass answers HTTP 200 with a `remark` (and partial elements) when a query hits its time or memory limit. */
-class RemarkError extends Error {}
+class RemarkError extends Error {
+  override name = 'RemarkError'
+}
 
 async function post(url: string, query: string, retries?: number): Promise<unknown> {
   const body = new URLSearchParams({ data: query })
@@ -84,6 +86,7 @@ async function fetchStreets(url: string, stations: readonly StreetStation[], wal
   } catch (err) {
     if (!(err instanceof RemarkError) && !isRetryable(err)) throw err
     console.log(`the single request failed (${err instanceof Error ? err.message : String(err)}); falling back to ${FALLBACK_BATCHES} batches`)
+    await sleep(BATCH_PAUSE_S)
     return fetchBatches(url, stations, walk, FALLBACK_BATCHES)
   }
 }
@@ -138,7 +141,7 @@ async function main(): Promise<void> {
 
   mkdirSync(DIR, { recursive: true })
   const names = new Set(files.map((f) => f.name))
-  // Everything new is written and renamed first; only then is anything old deleted, so an interrupted run leaves a whole pin.
+  // Everything new is written and renamed first; only then is anything old deleted, so an interrupt never leaves a pin with files missing (the data test rejects a half-renamed one).
   const stale = readdirSync(DIR).filter((f) => (/^cell-.*\.json$/.test(f) && !names.has(f)) || (f.endsWith('.tmp') && !names.has(f.slice(0, -4))))
   for (const { name, text: body } of files) writeFileSync(new URL(`${name}.tmp`, DIR), body)
   for (const { name } of files) renameSync(new URL(`${name}.tmp`, DIR), new URL(name, DIR))

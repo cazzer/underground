@@ -67,7 +67,7 @@ describe('the street pin shards', () => {
         for (const k of Object.keys(w.tags)) if (!STREET_TAGS.includes(k)) bad.push(`${at}: tag ${k}`)
         const highway = w.tags.highway
         if (highway === undefined || !allowed.has(highway)) bad.push(`${at}: highway=${String(highway)}`)
-        else if (w.tags.name === undefined && !WALK_CLASSES.includes(highway)) bad.push(`${at}: unnamed highway=${highway}`)
+        else if (w.tags.name === undefined && !(manifest.walk && WALK_CLASSES.includes(highway))) bad.push(`${at}: unnamed highway=${highway}`)
       }
     }
     expect(bad).toEqual([])
