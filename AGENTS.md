@@ -873,8 +873,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   armed only, to rotate on a 12° twist or a midpoint slide of 40 px plus the spread's change. Under the rotate lock the view
   turns by the twist (a clockwise twist turns the content clockwise) plus the slide as before (-2π · dx / height), the whole
   turn since the gesture started. Moves only move an unwrapped goal, clamped to the azimuth window on the turn nearest the
-  view; a -2 frame applies it once per frame through `setAzimuthalAngle` (so the controls' damped lag and glide stay, at
-  the same pace at any touch event rate). `zoomSpeed` is 0 until the lock ends (not under `?twist=both`), so a mouse
+  view; a -2 frame applies it through `setAzimuthalAngle` only on a frame where a move changed it, once however many moves
+  came in (so the controls' damped lag and glide stay, and fingers held still never pull the view back against a fly-to). `zoomSpeed` is 0 until the lock ends (not under `?twist=both`), so a mouse
   wheel on a touchscreen laptop doesn't zoom either until the lift. A third finger, any lift or a cancel ends it, a new
   first touch forgets every finger (a lost pointerup can't count a stale one), and only a later touch making exactly two
   fingers down starts the next. A pinch with modest drift turns nothing.

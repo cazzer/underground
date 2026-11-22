@@ -37,8 +37,8 @@ const holdZoom = twistLook === 'lock'
  * (useStationOrbit holds their rotateSpeed at 0 for touch); this follows the two live touches on the element the
  * controls listen on and, once a gesture locks to rotate, holds the controls' zoom (zoomSpeed 0, restored when the
  * lock ends; a wheel then doesn't zoom either) and steers the azimuth. Moves only move the goal; a frame at -2,
- * before drei's update(), applies it once through setAzimuthalAngle, whose damping keeps the controls' lag and glide
- * at the same pace whatever the touch event rate. No props or on* handlers of the controls change (underground-by0).
+ * before drei's update(), applies it through setAzimuthalAngle, once per frame however many moves came in, whose
+ * damping keeps the controls' lag and glide. No props or on* handlers of the controls change (underground-by0).
  * Its pointerdown listens in the capture phase, before the controls' own, so onGestureStart knows the pointer type;
  * its pointermove is on the element, before the controls' document listener, so a lock lands before that move's dolly.
  */
@@ -133,13 +133,14 @@ export function useTouchOrbit({ controls, canTurn }: TouchOrbitOptions): TouchOr
     }
   }, [gl, get, connected, controls])
 
-  // Before drei's update() (-1). While the lock holds it re-applies the goal every frame (setAzimuthalAngle
-  // replaces the pending damped turn with the rest of the way to it, so this paces the turn per frame), and once
-  // more for a goal a last move left before the lift. No allocation.
+  // Before drei's update() (-1). Only on a frame where a move changed the goal: the moves since the last frame
+  // collapse into one apply (setAzimuthalAngle replaces the pending damped turn with the rest of the way to the
+  // goal), and the lift's last goal still applies once. Fingers held still apply nothing, so they never pull the
+  // view back against a fly-to. No allocation.
   useFrame(() => {
     const r = run.current
     const c = controls.current
-    if (!c || (r.t.lock !== 'rotate' && !r.due)) return
+    if (!c || !r.due) return
     r.due = false
     c.setAzimuthalAngle(r.goal)
   }, -2)
