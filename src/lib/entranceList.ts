@@ -87,13 +87,16 @@ export function entranceRows(texts: readonly EntranceText[], listsStation?: (tex
     }))
 }
 
-/** Whether a label's entrance lists `stationId`: one of the file entrances it stands for (`members`) has the station
- *  among its `stopIds` (the catalog row's own stops; a complex's other members' rows list other stops). */
+/** Whether a label's entrance lists `stationIds` (one id, or every member of the focused merged station: any counts):
+ *  one of the file entrances it stands for (`members`) has one of them among its `stopIds` (the catalog row's own
+ *  stops; a complex's other members' rows list other stops). For a merged station pass all its members, so another
+ *  member's elevators are not sorted behind the lead's own rows. */
 export function listsStationFn(
   fileEntrances: readonly { stopIds: readonly string[] }[],
-  stationId: string,
+  stationIds: string | readonly string[],
 ): (text: EntranceText) => boolean {
-  return (t) => t.members.some((i) => fileEntrances[i]?.stopIds.includes(stationId) ?? false)
+  const ids = typeof stationIds === 'string' ? [stationIds] : stationIds
+  return (t) => t.members.some((i) => fileEntrances[i]?.stopIds.some((s) => ids.includes(s)) ?? false)
 }
 
 /** How many entrances the rows stand for. */

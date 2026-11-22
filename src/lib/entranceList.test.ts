@@ -115,4 +115,10 @@ describe('rows of a complex member', () => {
     expect(listsStationFn(file, 'A1')(input[3]!)).toBe(false)
     expect(listsStationFn(file, 'B2')(input[3]!)).toBe(true)
   })
+
+  it("for a merged station, any member counts, so another member's elevator stays first", () => {
+    const rows = entranceRows(input, listsStationFn(file, ['A1', 'B2']))
+    expect(rows.map((r) => r.key)).toEqual(['1', '3', '0', '2'])
+    expect(listsStationFn(file, ['A1', 'C3'])(input[1]!)).toBe(false)
+  })
 })

@@ -11,6 +11,7 @@ import type { StationsFile } from '../../src/data/schema.ts'
 import type { StationStreets } from '../../src/data/streetSchema.ts'
 import { isClosedRing } from '../../src/lib/streetClass.ts'
 import { STREETS_FILE_GZIP_CAP_BYTES, STREETS_TOTAL_GZIP_CAP_BYTES } from './budget.ts'
+import { complexLeadIds } from './stationComplexes.ts'
 import { toStableJson } from './stableJson.ts'
 import { buildAllStreets, WALK_RADIUS_M } from './streetsBuild.ts'
 import { EDGE_MARGIN_M, entrancesByStation, parseComplexOf, parseEntranceRows } from './streetsEntrances.ts'
@@ -23,7 +24,7 @@ const json = (url: URL): unknown => JSON.parse(readFileSync(url, 'utf8'))
 
 const stationsFile = json(new URL('../../public/data/stations.json', import.meta.url)) as StationsFile
 const stations = stationsFile.stations
-const leads = new Set((stationsFile.complexes ?? []).map((group) => group[0]!))
+const leads = complexLeadIds(stationsFile.complexes, stations)
 const manifest = json(new URL('manifest.json', PIN)) as StreetsManifest
 const pin = loadPin(manifest, new Map(manifest.shards.map((s) => [s.file, json(new URL(s.file, PIN)) as StreetShard])))
 const entranceRows = entrancesByStation(

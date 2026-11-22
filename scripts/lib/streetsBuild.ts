@@ -91,7 +91,7 @@ export interface StationStreetsResult {
 
 /** The street file of `station` from the pin and the catalog entrances that list it. Every way the pin has near it
  *  is a candidate, but only the part within the radius is kept. */
-export function buildStationStreets(station: Station, pin: Pin, rows: readonly EntranceInput[], lead = false): StationStreetsResult {
+export function buildStationStreets(station: Station, pin: Pin, rows: readonly EntranceInput[], { lead = false }: { lead?: boolean } = {}): StationStreetsResult {
   const who = `${station.id} ${station.name}`
   const log: BuildLog[] = []
   const dm = new Map<number, Pt>()
@@ -142,7 +142,7 @@ export function buildStationStreets(station: Station, pin: Pin, rows: readonly E
   const tags = new Map(kept.map((k) => [k.way.id, k.way.tags]))
   if (ways.length === 0) log.push({ kind: 'no-ways', line: `WARNING: no pinned ways within ${RADIUS_M} m, wrote an empty street file: ${who}` })
 
-  const joined = buildEntrances(station, rows, { ways, x, z, tags }, lead)
+  const joined = buildEntrances(station, rows, { ways, x, z, tags }, { lead })
   const file: StationStreets = {
     stationId: station.id,
     anchor: { lat: station.lat, lon: station.lon },
@@ -168,5 +168,5 @@ export function buildAllStreets(
   rowsOf: ReadonlyMap<StationId, readonly EntranceInput[]>,
   leads: ReadonlySet<StationId> = new Set(),
 ): StationStreetsResult[] {
-  return stations.map((s) => buildStationStreets(s, pin, rowsOf.get(s.id) ?? [], leads.has(s.id)))
+  return stations.map((s) => buildStationStreets(s, pin, rowsOf.get(s.id) ?? [], { lead: leads.has(s.id) }))
 }

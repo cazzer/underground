@@ -134,7 +134,7 @@ describe('buildEntrances over a complex', () => {
     const sharedLift = row([50, 5], { type: 'Elevator', gtfsStopIds: ['T02'] })
     const sharedFarLift = row([400, 5], { type: 'Elevator', gtfsStopIds: ['T02'] })
     const sharedStair = row([70, 5], { gtfsStopIds: ['T02'] })
-    const { entrances, log } = buildEntrances(STATION, [ownLift, sharedLift, sharedFarLift, sharedStair], file, true)
+    const { entrances, log } = buildEntrances(STATION, [ownLift, sharedLift, sharedFarLift, sharedStair], file, { lead: true })
     expect(entrances.map((e) => [e.x, e.type, e.stopIds])).toEqual([[500, 'Elevator', ['T02']], [600, 'Elevator', ['T01']], [700, 'Stair', ['T02']]])
     expect(log.find((l) => l.kind === 'shared-dropped')!.line).toContain('dropped 1 shared complex entrance(s) (0 elevator(s), 1 beyond 260 m)')
   })

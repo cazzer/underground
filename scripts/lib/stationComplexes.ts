@@ -1,6 +1,7 @@
 /** Station complexes for stations.json: the catalog's complex_id (MTA 39hk-dx4f) is the source of truth. Pure; `.ts`
  *  imports because a test and the build scripts share it. */
 import type { StationId } from '../../src/data/schema.ts'
+import { stationLeads } from '../../src/lib/stationLeads.ts'
 
 /** Members within this many metres of the same distance from the centroid tie for lead (then routes, then id). */
 export const LEAD_TIE_M = 1
@@ -96,4 +97,14 @@ export function checkComplexLeads(
       }
     }
   }
+}
+
+/** The lead id of every complex in stations.json, validated as the client does (`stationLeads`: known ids, 2+ members,
+ *  no id twice). A lead's street file stands for its whole complex (2q7.43). */
+export function complexLeadIds(
+  complexes: readonly (readonly StationId[])[] | undefined,
+  stations: readonly { id: StationId }[],
+): ReadonlySet<StationId> {
+  const leads = stationLeads(complexes ?? [], new Set(stations.map((s) => s.id)))
+  return new Set([...leads.values()])
 }

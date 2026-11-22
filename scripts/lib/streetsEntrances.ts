@@ -156,7 +156,7 @@ export function buildEntrances(
   station: { id: StationId; name: string } & LatLon,
   allRows: readonly EntranceInput[],
   file: FileStreets,
-  lead = false,
+  { lead = false }: { lead?: boolean } = {},
 ): { entrances: StreetEntrance[]; log: BuildLog[] } {
   const ways = toJoinWays(file)
   const log: BuildLog[] = []
