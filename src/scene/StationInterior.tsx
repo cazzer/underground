@@ -101,7 +101,7 @@ export function StationInterior({ model, network }: StationInteriorProps) {
             style={{ opacity: 0, visibility: 'hidden' }}
             // pointer-events-none on the div itself: drei's pointerEvents prop only applies in
             // transform mode, and label events would bubble into r3f with the wrong offsets.
-            className="pointer-events-none -translate-x-1/2 bg-canvas/80 px-1 font-mono text-[10px] whitespace-nowrap text-ink-dim uppercase tracking-widest"
+            className="pointer-events-none -translate-x-1/2 [text-shadow:0_0_2px_var(--ug-bg),0_0_2px_var(--ug-bg),0_0_5px_var(--ug-bg)] font-mono text-[10px] whitespace-nowrap text-ink-dim uppercase tracking-widest"
           >
             {label.text}
           </div>
