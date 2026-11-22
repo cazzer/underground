@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import type { StationInterior } from '../data/stationSchema'
 import { quickestExit } from './exitChoice'
 import { chooseTransfer } from './interiorTransfer'
-import { stationPathFrameOf, pathLanding, type PathFrame } from './pathFrame'
+import { priorityFrameOf, priorityLanding, priorityTurn, type PriorityFrame } from './pathFrame'
 import { framedCount, FRAME_MAX_DISTANCE, FRAME_PAD_PX, TARGET_RADIUS_M, type FreeFrame } from './freeFrame'
 import type { Viewport } from './framing'
 import { stationAxis } from './interiorAxis'
@@ -37,14 +37,14 @@ const PHONES: [string, Viewport, ScreenRect][] = [
 ]
 
 /** The quickest way out from `stopId`, or with `toStop` the change of trains to it. */
-function pathAt(id: string, stopId: string, toStop?: string): { frame: PathFrame; interior: StationInterior; plain: (view: View) => Landing } {
+function pathAt(id: string, stopId: string, toStop?: string): { frame: PriorityFrame; interior: StationInterior; plain: (view: View) => Landing } {
   const interior = JSON.parse(readFileSync(`public/data/stations/${id}.json`, 'utf8')) as StationInterior
   const origin = toGround(interior.anchor)
   const model = { stationId: interior.stationId, interior, origin, yScale: Y, focusAnchor: interiorFocusAnchor(origin, interior, Y, Math.tan(ISO_POLAR)) }
   const choice = toStop ? chooseTransfer({ interior, fromStop: stopId, toStop }) : quickestExit({ interior, stopId })
   if (choice.kind === 'none') throw new Error(`${stopId}: no path`)
   const anchors = (interior.memberStationIds ?? [interior.stationId]).map((m) => pos.get(m)!)
-  const frame = stationPathFrameOf(model, choice, anchors, { stepRise: STEP_RISE_M, railDrop: RAIL_DROP_M, boardHalfM: BOARD_HALF_M })
+  const frame = priorityFrameOf(model, choice, [], anchors, { stepRise: STEP_RISE_M, railDrop: RAIL_DROP_M, boardHalfM: BOARD_HALF_M })
   if (!frame) throw new Error(`${stopId}: no frame`)
   return { frame, interior, plain: (view) => frameInterior({ ...model.focusAnchor, ...view }) }
 }
@@ -85,7 +85,7 @@ describe('the way out above a phone trip panel', () => {
         const { frame, interior, plain } = pathAt(id, stopId, toStop)
         const view = { azimuth: landingAzimuth(stationAxis(interior), 0, free), viewport, free, fovDeg: FOV }
         const usual = plain(view)
-        const f = pathLanding(frame, view, usual)
+        const f = priorityLanding(frame, view, usual)
         // The Broadway platforms' way out: the usual landing clips its top, so the path frame is what lands.
         if (id === '635' && !toStop) expect(f).not.toBe(usual)
         expect(f.distance).toBeGreaterThanOrEqual(LANDING_DISTANCE)
@@ -115,8 +115,28 @@ describe('the way out above a phone trip panel', () => {
         const { frame, interior, plain } = pathAt('635', stopId, toStop)
         const view = { azimuth: landingAzimuth(stationAxis(interior), 0, free), viewport, free, fovDeg: FOV }
         const usual = plain(view)
-        expect(pathLanding(frame, view, usual)).toBe(usual)
+        expect(priorityLanding(frame, view, usual)).toBe(usual)
         expect(framedCount(view, usual, frame.wanted.slice(0, frame.pathCount))).toBeLessThan(frame.pathCount)
+      })
+
+      // TEMPORARY ?landturn=half (landingLook.ts): half a turn more puts the path on the far side, where it all fits.
+      it(`with ?landturn=half lands with the whole path from ${stopId}${toStop ? ` to ${toStop}` : ''} at Union Sq on ${name}, turned half way round`, () => {
+        const { frame, interior, plain } = pathAt('635', stopId, toStop)
+        const view = { azimuth: landingAzimuth(stationAxis(interior), 0, free), viewport, free, fovDeg: FOV }
+        const path = frame.wanted.slice(0, frame.pathCount)
+        const { azimuth, landing } = priorityTurn(frame, view, plain)
+        expect(Math.abs(Math.abs(azimuth - view.azimuth) - Math.PI)).toBeLessThan(1e-9)
+        const turnedPlain = plain({ ...view, azimuth })
+        if (landing.distance !== turnedPlain.distance || landing.target.x !== turnedPlain.target.x || landing.target.z !== turnedPlain.target.z) {
+          expect(Math.min(...frame.anchors.map((a) => gap(a, landing.target)))).toBeLessThanOrEqual(TARGET_RADIUS_M + 1e-6)
+        }
+        for (const p of path) {
+          const s = project(p, landing, azimuth, viewport)
+          expect(s.x).toBeGreaterThanOrEqual(free.left + PAD)
+          expect(s.x).toBeLessThanOrEqual(free.right - PAD)
+          expect(s.y).toBeGreaterThanOrEqual(free.top + PAD)
+          expect(s.y).toBeLessThanOrEqual(free.bottom - PAD)
+        }
       })
     }
   }

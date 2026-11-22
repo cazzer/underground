@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { IndexLoad } from '../data/interiorLoad'
 import {
   classifyAwaiting,
-  pathReadyFor,
+  frameReadyFor,
   interiorReadyFor,
   nextAwaiting,
   reframeAction,
@@ -135,34 +135,35 @@ describe('a bare station found out after the flight set off', () => {
   })
 })
 
-describe('awaiting the way out with the trip panel open', () => {
+describe('awaiting the priority frame with the trip panel open', () => {
   const union = { stationId: '635', memberStationIds: ['635', 'L03', 'R20'] }
-  const exit = { stationId: 'L03', kind: 'path' as const, reduced: false }
+  const frame = { stationId: 'L03', kind: 'frame' as const, reduced: false }
 
   it('follows an interior that is framed while the trip panel is open, and nothing else', () => {
-    expect(nextAwaiting(awaiting, true)).toEqual({ ...awaiting, kind: 'path' })
-    expect(nextAwaiting(exit, true)).toBe(exit)
+    expect(nextAwaiting(awaiting, true)).toEqual({ ...awaiting, kind: 'frame' })
+    expect(nextAwaiting(frame, true)).toBe(frame)
+    // Trip panel closed: the landing is final, so a later outage poll or panel resize never moves the camera.
     expect(nextAwaiting(awaiting, false)).toBeNull()
-    expect(nextAwaiting(exit, false)).toBeNull()
+    expect(nextAwaiting(frame, false)).toBeNull()
     expect(nextAwaiting({ stationId: 'L08', kind: 'streets', reduced: false }, true)).toBeNull()
     expect(nextAwaiting(null, true)).toBeNull()
   })
 
-  it("is ready once the exit frame is the loaded interior's and the interior covers the awaited member", () => {
-    expect(pathReadyFor(exit, { interiorId: '635' }, union)).toBe(true)
-    expect(pathReadyFor(exit, null, union)).toBe(false)
-    expect(pathReadyFor(exit, { interiorId: 'L08' }, union)).toBe(false)
-    expect(pathReadyFor(exit, { interiorId: '635' }, null)).toBe(false)
-    expect(pathReadyFor({ ...exit, stationId: 'L08' }, { interiorId: '635' }, union)).toBe(false)
-    expect(pathReadyFor({ ...exit, kind: 'interior' }, { interiorId: '635' }, union)).toBe(false)
+  it("is ready once the frame is the loaded interior's and the interior covers the awaited member", () => {
+    expect(frameReadyFor(frame, { interiorId: '635' }, union)).toBe(true)
+    expect(frameReadyFor(frame, null, union)).toBe(false)
+    expect(frameReadyFor(frame, { interiorId: 'L08' }, union)).toBe(false)
+    expect(frameReadyFor(frame, { interiorId: '635' }, null)).toBe(false)
+    expect(frameReadyFor({ ...frame, stationId: 'L08' }, { interiorId: '635' }, union)).toBe(false)
+    expect(frameReadyFor({ ...frame, kind: 'interior' }, { interiorId: '635' }, union)).toBe(false)
   })
 
-  it('drops on a focus change, a follow or the panel closing (missing), and waits for the way out', () => {
+  it('drops on a focus change, a follow or the trip panel closing (missing), and waits while there is no frame', () => {
     const ready = { ...landed, focusedId: 'L03' }
-    expect(reframeAction(exit, ready)).toBe('reframe')
-    expect(reframeAction(exit, { ...ready, ready: false })).toBe('wait')
-    expect(reframeAction(exit, { ...ready, focusedId: '635' })).toBe('drop')
-    expect(reframeAction(exit, { ...ready, following: true })).toBe('drop')
-    expect(reframeAction(exit, { ...ready, missing: true })).toBe('drop')
+    expect(reframeAction(frame, ready)).toBe('reframe')
+    expect(reframeAction(frame, { ...ready, ready: false })).toBe('wait')
+    expect(reframeAction(frame, { ...ready, focusedId: '635' })).toBe('drop')
+    expect(reframeAction(frame, { ...ready, following: true })).toBe('drop')
+    expect(reframeAction(frame, { ...ready, missing: true })).toBe('drop')
   })
 })

@@ -137,6 +137,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1 px, so width marks only the subway) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
   TEMPORARY: `?basemap=off` draws no basemap and loads no tiles until ost.9.3's look is signed off; the removal list is
   in `src/scene/basemapLook.ts`
+  TEMPORARY: `?landturn=half` lets a landing on an interior with a priority frame (trip path, machines out of service) turn half
+  way round when the far side shows more of it (`priorityTurn` in `lib/pathFrame.ts`; south up at Pelham Pkwy on a phone) until the
+  2q7.25 landing-turn card is decided (default off: the usual landing turn); the removal list is in `src/scene/landingLook.ts`
   Exit tokens `exitPath` (pink, 3:1, held apart from the interior, focus, location and route colors, also under simulated
   red-green color blindness; theme.test.ts), `exitPathWidth` (3 px), `exitPathDash` / `exitPathGap` (world m) draw the trip's
   way out. TEMPORARY: `?exitPath=a|b` (centerline only, or restroked connectors and entrance too; default b) and
@@ -147,15 +150,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `interiorFlight` takes the focused station id, which for a complex member is not the file's `stationId`, so the focus hold follows the member; `follows` marks a flight to the selected
-    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; with the trip panel open `interiorFlight` frames the trip's path there, `pathLanding`), `newFlight`, `flushMotion` and the landing turn;
+    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; `interiorFlight` frames the interior's priority frame when there is one, `priorityLanding`, and under TEMPORARY `?landturn=half` may land half a turn round, `priorityTurn`), `newFlight`, `flushMotion` and the landing turn;
     `useStationFlights.ts` the fly-request effect and the mid-flight retarget (interior, bare streets, the trip's path frame, panel size);
     `useEntranceProbe.ts` dev-only `__underground.entrancesAt()` (entrance marks and station in viewport px, free rect);
-    `usePathProbe.ts` dev-only `__underground.stationPathAt()` (the framed trip path's marker ends and centerline in viewport px, free rect);
+    `usePathProbe.ts` dev-only `__underground.stationPathAt()` (the priority frame's path marker ends and centerline, and its out-of-service machines' ends, in viewport px, free rect);
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);
     `useInteriorReframe.ts` frames an interior that loaded too late for its station flight (after LATE_TURN_PROGRESS
     or after landing): once landed, a 0.6-1 s eased flight onto it with the landing turn decided then (reduced motion
     snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `ready` is `interiorReadyFor`, `interiorCovers(interior, awaited station)`, so a complex's other member reframes too, or for a bare station awaiting its streets (`kind: 'streets'`) `streetsReadyFor`: the same reframe onto its entrances, no turn; with the trip panel open a framed interior goes on
-    awaiting the trip's path there (`kind: 'path'`, `nextAwaiting`, `pathReadyFor`): its arrival or a panel move reframes onto it, no turn, until a gesture, a focus change, a follow or the panel closing; a reframe with nothing to move is skipped);
+    awaiting its priority frame (`kind: 'frame'`, `nextAwaiting`, `frameReadyFor`; the trip's path, then the machines out of service): its arrival, a change to it or a panel move reframes onto it, no turn, until a gesture, a focus change, a follow or the panel closing; with the trip panel closed the landing (which frames the machines out, as known by then, the late-interior reframe included) is final, so a later /ene poll, an outage list expanded or the trip panel opened never moves the camera (on a phone the expanded list leaves about 32 px above the panel, too little to frame anyway); a reframe with nothing to move is skipped);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
@@ -608,7 +611,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   by the /rt live clock, else the device clock, is unknown, never "in service" (`useEne` republishes 20 s after it would go stale);
   `closedForRouting(join)` is the step-free routing's input: `chooseExit({ closed })`, or null when status is unknown (callers must
   then say step-free status is unknown; checked on L08 in `exitOutage.test.ts`; no UI routes with it yet), `eneText.ts` (panel text, New York return times). `App` passes `outages.outIds` to `Scene` > `StationInterior`, which
-  rebuilds its four line layers only when that set changes (`interiorLayers`; `InteriorModel` itself never changes).
+  rebuilds its four line layers only when that set changes (`interiorLayers`; `InteriorModel` itself never changes). `outIds` is a new
+  array every render, so Scene keys on its joined ids for `outageFramePoints` (`lib/outageFrame.ts`: each machine's two drawn ends,
+  `planEnds` over `connectorContext`, so a zero-run escalator's 30 degree run and its bank spread are where they draw), the camera's
+  priority frame (`lib/pathFrame.ts`), so a poll with the same machines out leaves a flight's destination alone.
   The panel alone also names machines only the equipment index lists (every station, interior or not): `useEquipmentIndex.ts` fetches
   `stations/equipment.json` (`loadEquipmentIndex.ts`, contract `equipmentSchema.ts`) on the first focus, only while `/ene` is configured
   (`loading` from the first render that wants it, a failure retried on the next focus change), and `eneIndexJoin.ts` (`joinPanelOutages`,
@@ -959,12 +965,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   last 10 m; `platformMask.ts`), so only the interior's track shows there. Mezzanine guides and a
   street-level copy of each mezzanine outline give a street reference. A click centers the interior
   beside the station panel at the tilt's near distance, in full 3D (on a phone turned so the platforms run nearly
-  up the screen); with the trip panel open, a station flight to an interior the trip draws a path at (its way out,
-  or a change of trains; `pathFrame.ts` `stationPathFrameOf`: marker ends at rail height, the centerline, the outline per level, an
-  exit's walk) lands as usual when that already shows the whole path, else on `freeFrame`'s frame of it (400 to 600 m, the
-  target within 100 m of a member) when that shows more (`pathLanding`). Above a phone's trip panel the target sits 130 m or
-  more toward the camera from what the free area shows, so at Union Sq the Lexington and Canarsie paths can't be framed within
-  100 m and land as usual (`pathFrame.data.test.ts`); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior). Both
+  up the screen); a station flight to an interior with a priority frame (`pathFrame.ts` `priorityFrameOf`: with the trip
+  panel open the trip's path there, its way out or a change of trains, then the machines out of service, `outageFrame.ts`; wanted in that
+  order: path marker ends at rail height, the centerline, the machines' ends, the outline per level, an
+  exit's walk) lands as usual when that already shows the whole path and every machine, else on `freeFrame`'s frame of it (400 to 600 m, the
+  target within 100 m of a member) when that shows more of the path, or as much of it and more machines (`priorityLanding`); under the
+  TEMPORARY `?landturn=half` (`landingLook.ts`), deciding its landing turn it also tries half a turn round and takes that when it shows
+  more by the same rule (`priorityTurn`). Above a phone's panel the target sits 130 m or
+  more toward the camera from what the free area shows, so at Union Sq the Lexington and Canarsie paths, and the station-house
+  machines at Pelham Pkwy (211), can't be framed within 100 m looking north and land as usual, part of them under the panel
+  (with `?landturn=half` they land half a turn round, where the far side fits; `pathFrame.data.test.ts`, `outageFrame.data.test.ts`; a phone panel with the outage list expanded leaves too little free area
+  for any frame); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior). Both
   retarget mid-flight when the interior, a bare station's streets (or the index, for a deep link) or the panel's final size arrives. An interior arriving after 90% of the
   flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,
   unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,

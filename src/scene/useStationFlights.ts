@@ -7,7 +7,7 @@ import type { FocusHold } from '../lib/focusHold'
 import { flightProgress } from '../lib/flight'
 import type { Insets, Viewport } from '../lib/framing'
 import { LATE_TURN_PROGRESS, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
-import type { PathFrame } from '../lib/pathFrame'
+import type { PriorityFrame } from '../lib/pathFrame'
 import { classifyAwaiting, nextAwaiting, stationIsBare, streetsReadyFor, type AwaitingInterior } from '../lib/interiorReframe'
 import type { Network } from '../lib/network'
 import { prefersReducedMotion } from '../lib/reducedMotion'
@@ -22,6 +22,7 @@ import {
   type MapControlsImpl,
 } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
+import { landingLook } from './landingLook'
 import type { ReframeLayout } from './useInteriorReframe'
 
 /** What a fly request frames with, read when it fires (CameraRig's `latest`). */
@@ -46,8 +47,8 @@ interface StationFlightsOptions {
   streets: StreetLayer | null | undefined
   /** The station index: a flight that set off before it loaded learns from it that its station is bare. */
   index: IndexLoad
-  /** The trip's way out at the loaded interior (trip panel open): an interior flight frames it once it arrives. */
-  path: PathFrame | null
+  /** The loaded interior's priority frame (the trip's path, the machines out of service): an interior flight frames it once it arrives. */
+  frame: PriorityFrame | null
 }
 
 /**
@@ -70,7 +71,7 @@ export function useStationFlights({
   insets,
   streets,
   index,
-  path,
+  frame,
 }: StationFlightsOptions): void {
   // Layout effect, not a passive one: a frame between the select and a passive effect would see
   // the new focus with no flight and drop it again (the camera is still far out).
@@ -99,17 +100,17 @@ export function useStationFlights({
     // A bare station (the index lists no interior) awaits only its streets: nothing once they are cached, or once
     // its load found no file (null).
     const points = bareStationPoints(station.id, l.streets, l.index)
-    // With the trip panel open, a framed interior goes on awaiting the trip's way out there (useInteriorReframe).
-    if (known) awaiting.current = l.tripOpen ? { stationId: station.id, kind: 'path', reduced } : null
+    // With the trip panel open, a framed interior goes on awaiting its priority frame (useInteriorReframe).
+    if (known) awaiting.current = l.tripOpen ? { stationId: station.id, kind: 'frame', reduced } : null
     else if (!stationIsBare(station.id, l.index)) awaiting.current = { stationId: station.id, kind: 'interior', reduced }
     else awaiting.current = l.streets === undefined ? { stationId: station.id, kind: 'streets', reduced } : null
     const dest = known
-      ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced, l.path)
+      ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced, l.frame, landingLook === 'half')
       : stationFlight(network, station.id, points, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
     flight.current = newFlight(dest, c, camera, reduced, known !== null || reduced)
   }, [flyRequest, network, camera, controls, flight, hold, awaiting, layout])
 
-  // The interior (first visit), a bare station's streets or the index, the trip's way out, or the panel's measurement
+  // The interior (first visit), a bare station's streets or the index, the priority frame, or the panel's measurement
   // (it grows as arrivals fill in) can land mid-flight: retarget that flight's destination. It rebases on the camera's current
   // pose and keeps the timing, so the camera doesn't jump. An interior or streets that arrive late in the flight, or
   // after it, are framed after landing (useInteriorReframe). Focus reached by zooming has no flight.
@@ -137,7 +138,7 @@ export function useStationFlights({
       // Later: too late to fold in without a lurch; the flight lands as it is and the reframe takes over.
       if (turn === 'later') return
       // Keep: frame for the azimuth already chosen (the landing turn, or the current one when there is none).
-      dest = interiorFlight(f.stationId, interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide', path)
+      dest = interiorFlight(f.stationId, interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide', frame, landingLook === 'half')
       if (turn === 'keep') dest.azimuth = f.azimuth
       f.turnDecided = true
       awaiting.current = nextAwaiting(awaiting.current, layout.current.tripOpen)
@@ -149,5 +150,5 @@ export function useStationFlights({
     f.target = dest.target
     f.distance = dest.distance
     f.azimuth = dest.azimuth
-  }, [interior, panel, size, insets, streets, index, path, camera, network, controls, flight, awaiting, layout])
+  }, [interior, panel, size, insets, streets, index, frame, camera, network, controls, flight, awaiting, layout])
 }

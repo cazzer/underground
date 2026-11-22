@@ -62,6 +62,8 @@ export interface StationPathProbe {
   distance: number
   /** The board ends and the centerline, as drawn at the current depth factor. */
   path: { x: number; y: number }[]
+  /** The out-of-service machines' ends, the same way. */
+  outages: { x: number; y: number }[]
   free: { left: number; top: number; right: number; bottom: number }
 }
 
@@ -69,7 +71,7 @@ export interface StationPathProbe {
 export interface UndergroundDevHooks {
   /** The focused station's street layer probe (useEntranceProbe), while it has a streets file. */
   entrancesAt?: () => EntranceProbe
-  /** The trip's way out the camera frames (usePathProbe): its path points in viewport px, while the trip panel frames one. */
+  /** The priority frame the camera frames (usePathProbe): its path and machine points in viewport px, while there is one. */
   stationPathAt?: () => StationPathProbe
   select?: (stationId: string) => void
   selectTrain?: (key: string) => void
