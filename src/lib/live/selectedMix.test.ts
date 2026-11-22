@@ -67,6 +67,25 @@ describe('selectedMix', () => {
     expect(selectedMixActive(s)).toBe(false)
   })
 
+  it('keeps folding a deselected train back when another is selected mid-fold', () => {
+    const s = createSelectedMix()
+    selectSlot(s, 2, true)
+    stepFor(s, SELECT_EASE_S)
+    selectSlot(s, -1, true)
+    stepFor(s, SELECT_EASE_S / 4)
+    const folding = slotMix(s, 2, 0)
+    expect(folding).toBeGreaterThan(0.5)
+    selectSlot(s, 7, false)
+    expect(slotMix(s, 2, 0)).toBeCloseTo(folding, 6)
+    stepFor(s, SELECT_EASE_S / 4)
+    expect(slotMix(s, 2, 0)).toBeLessThan(folding)
+    expect(slotMix(s, 2, 0)).toBeGreaterThan(0)
+    expect(slotMix(s, 7, 0)).toBeGreaterThan(0)
+    stepFor(s, SELECT_EASE_S)
+    expect(slotMix(s, 2, 0)).toBe(0)
+    expect(slotMix(s, 7, 0)).toBe(1)
+  })
+
   it('drops the old slot at once when it now holds another trip', () => {
     const s = createSelectedMix()
     selectSlot(s, 2, true)

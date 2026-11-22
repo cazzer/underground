@@ -65,6 +65,8 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   const spanCars = useSpanCars(cars)
   const spans = (interiorStationId !== null && network.platformSpans.get(interiorStationId)) || null
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
+  const selection = useSelectedSlot(table, cars)
+  const sm = selection.mix
   /** Each slot's dot color (shared Color objects), so the selected dot can take it without allocating. */
   const slotColors = useMemo(() => new Array<Color | null>(TRAIN_CAPACITY).fill(null), [])
   const point = useMemo(createTrackPoint, [])
@@ -140,11 +142,9 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     for (const i of needsColor) colorSlot(d, i)
     if (needsColor.length > 0) d.instanceColor!.needsUpdate = true
     if (overflow > 0) console.warn(`Live trains: ${overflow} trips over the ${TRAIN_CAPACITY}-slot capacity are not drawn`)
-  }, [trips, offsetS, table, colorSlot, view])
-
-  // After the reconcile above, so a slot reused by another trip since the last poll loses the highlight.
-  const selection = useSelectedSlot(table, trips, cars)
-  const sm = selection.mix
+    // A slot reused by another trip since the last poll loses the highlight.
+    selection.sync()
+  }, [trips, offsetS, table, colorSlot, view, selection])
 
   useLayoutEffect(() => {
     const mixOf = (slot: number, base: number) => slotMix(sm, slot, base)
@@ -224,7 +224,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
       sd.scale.setScalar(Math.max(dotScale, 1e-6))
     }
     d.count = h.count = mix >= 1 ? 0 : table.high
-    cars.commit(table.high, carsOn)
+    cars.commit(table.high, carsOn, mix < 1)
     const reveal = interiorOpacity(camera)
     spanCars.write(table, spans, reveal, veilWeight(reveal, view.depth), mix, localS, sel, slotColors, cars.consistOf)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.

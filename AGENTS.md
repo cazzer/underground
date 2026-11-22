@@ -414,7 +414,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
-  car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
+  car halo 5.5, trains 6, the selected train's car rim 6.03 and gap 6.06 (only while the other trains are still dots, carMix
+  below 1: the rim mesh switches from 5.25 and a copy of its footprints draws over the dots; otherwise 5.25 and 5.5),
+  selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom) draws no marker and no

@@ -33,6 +33,15 @@ export function TrainCars({ layer }: TrainCarsProps) {
       >
         <meshBasicMaterial color={theme.background} transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
+      {/* The selected train's gap over the other trains' dots; useTrainCars.commit sets its count and the rim's order. */}
+      <instancedMesh
+        ref={layer.gaps}
+        args={[layer.geometry.halo, undefined, MAX_CARS]}
+        frustumCulled={false}
+        renderOrder={RENDER_ORDER.selectedCarGap}
+      >
+        <meshBasicMaterial color={theme.background} transparent depthTest={false} depthWrite={false} />
+      </instancedMesh>
       <instancedMesh
         ref={layer.bodies}
         args={[layer.geometry.body, undefined, CAR_CAPACITY]}
