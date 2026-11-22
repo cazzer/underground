@@ -112,7 +112,10 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
   // A chosen line with nothing due keeps the collapsed height, so a poll doesn't shrink the panel.
   const collapsed = stacked && !expanded && (view.kind === 'rows' || (view.kind === 'empty' && chosen !== null))
   const sections = collapsed ? soonestSections(all, COLLAPSED_ARRIVALS, focused) : all
-  const showToggle = stacked && (expanded || total > COLLAPSED_ARRIVALS)
+  const showToggle = stacked && total > 0 && (expanded || total > COLLAPSED_ARRIVALS)
+  const emptyText = view.kind !== 'empty' ? null : chosenChip ? `No upcoming ${spokenName(chosenChip)} trains` : 'No upcoming trains'
+  // Collapsed, the message sits in the sizer's cell, so a line flipping between rows and none keeps the height.
+  const emptyInCell = collapsed && emptyText !== null
   const { scroller, list, capPx, overflows, atEnd, onScroll } = useListScroll<HTMLDivElement>(arrivalGroupCount(sections), 'li[data-group]')
   const onBlur = (e: FocusEvent<HTMLDivElement>) => {
     if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) setFocused(null)
@@ -136,9 +139,7 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
           </p>
         ))}
       </div>
-      {view.kind === 'empty' && (
-        <p className="mt-1 text-sm">{chosenChip ? `No upcoming ${spokenName(chosenChip)} trains` : 'No upcoming trains'}</p>
-      )}
+      {emptyText !== null && !emptyInCell && <p className="mt-1 text-sm">{emptyText}</p>}
       <div className="relative">
         {/* Capped at whole rows while the stacked panel is expanded (useListScroll); a focusable region only while it
             scrolls. The negative margin and padding give the rows' hover fill and focus ring room inside the clip. */}
@@ -160,6 +161,7 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
               onFocus={(e) => setFocused(focusedGroup(e.target))}
               onBlur={onBlur}
             >
+              {emptyInCell && <p className="mt-1 text-sm">{emptyText}</p>}
               {sections.map((groupsOfDirection, i) => (
                 <ul key={groupsOfDirection[0]!.direction} className={sectionClass(i)}>
                   {groupsOfDirection.map((g) => (
