@@ -36,6 +36,18 @@ export function groupName(members: readonly { name: string }[]): { name: string;
   return { name, otherNames: [...counts.keys()].filter((n) => n !== name) }
 }
 
+/** Route order, then id for routes the order doesn't know (never NaN: Infinity - Infinity). */
+function byRouteOrder(routeOrder: ReadonlyMap<RouteId, number>): (a: RouteId, b: RouteId) => number {
+  return (a, b) => {
+    const oa = routeOrder.get(a)
+    const ob = routeOrder.get(b)
+    if (oa !== undefined && ob !== undefined) return oa - ob || (a < b ? -1 : a > b ? 1 : 0)
+    if (oa !== undefined) return -1
+    if (ob !== undefined) return 1
+    return a < b ? -1 : a > b ? 1 : 0
+  }
+}
+
 /** Route names for a note: short names in order, once each, an express variant ("6X") dropped when its base ("6") is listed. */
 function noteRoutes(routeIds: readonly RouteId[], routeName: (id: RouteId) => string): string {
   const names = [...new Set(routeIds.map(routeName))]
@@ -49,20 +61,23 @@ function noteRoutes(routeIds: readonly RouteId[], routeName: (id: RouteId) => st
 /**
  * The access of a complex: all full is full, all none is none, else partial. The note lists the fully accessible
  * members' routes, then each partly accessible member's routes and its own note, "; "-separated; with no partly
- * accessible member " only" ends it ("L, N, Q, R, W only").
+ * accessible member " only" ends it ("L, N, Q, R, W only"). Routes are in `routeOrder`.
  */
 export function groupAccess(
   members: readonly Pick<Station, 'routeIds' | 'access'>[],
   routeName: (id: RouteId) => string,
+  routeOrder: ReadonlyMap<RouteId, number> = new Map(),
 ): StationAccessInfo {
+  const inOrder = byRouteOrder(routeOrder)
   if (members.every((m) => m.access.status === 'full')) return { status: 'full' }
   if (members.every((m) => m.access.status === 'none')) return { status: 'none' }
   const full = members.filter((m) => m.access.status === 'full')
   const partial = members.filter((m) => m.access.status === 'partial')
   const parts: string[] = []
-  if (full.length > 0) parts.push(noteRoutes(full.flatMap((m) => m.routeIds), routeName))
+  if (full.length > 0) parts.push(noteRoutes([...new Set(full.flatMap((m) => m.routeIds))].sort(inOrder), routeName))
   for (const m of partial) {
-    parts.push(m.access.note ? `${noteRoutes(m.routeIds, routeName)} ${m.access.note}` : noteRoutes(m.routeIds, routeName))
+    const routes = noteRoutes([...m.routeIds].sort(inOrder), routeName)
+    parts.push(m.access.note ? `${routes} ${m.access.note}` : routes)
   }
   const note = parts.join('; ')
   return { status: 'partial', note: partial.length === 0 ? `${note} only` : note }
@@ -98,15 +113,13 @@ export function buildStationGroups(
         return m
       })
       const { name, otherNames } = groupName(members)
-      const routeIds = [...new Set(members.flatMap((m) => m.routeIds))].sort(
-        (a, b) => (routeOrder.get(a) ?? Infinity) - (routeOrder.get(b) ?? Infinity),
-      )
+      const routeIds = [...new Set(members.flatMap((m) => m.routeIds))].sort(byRouteOrder(routeOrder))
       group = {
         ...s,
         name,
         routeIds,
         stops: [...new Set(members.flatMap((m) => m.stops))].sort(),
-        access: groupAccess(members, routeName),
+        access: groupAccess(members, routeName, routeOrder),
         memberIds: ids,
         otherNames,
       }

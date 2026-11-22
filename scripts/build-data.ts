@@ -106,9 +106,10 @@ async function buildRegular(zip: Uint8Array) {
   const { segments, skipped: skippedSegments } = buildSegments(feed.stopTimes)
   const { file: tripIndex, skippedNoShape } = buildTripIndex(feed)
   const catalogStations = readCatalogStations()
-  const access = addAccess(buildStations(feed), catalogStations, readAccessExceptions())
+  const exceptions = readAccessExceptions()
+  const access = addAccess(buildStations(feed), catalogStations, exceptions)
   for (const warning of access.warnings) console.warn(`WARNING: ${warning}`)
-  const complexes = buildComplexes(access.stations, catalogStations)
+  const complexes = buildComplexes(access.stations, catalogStations, exceptions.orphans)
   for (const warning of complexes.warnings) console.warn(`WARNING: ${warning}`)
   const timetables = buildTimetables(feed)
   const outputs: [string, unknown, number][] = [

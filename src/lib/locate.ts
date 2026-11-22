@@ -106,7 +106,8 @@ export function toFix(lat: number, lon: number, accuracyM: number): Fix | null {
 
 /**
  * Closest station to `ground` by straight-line distance; null for an empty network. A complex is one station, so the
- * nearest member is lifted to its group's id, name and point; `distanceM` stays the distance to the member itself.
+ * nearest member is lifted to its group's id, name and point (the lead's), while `distanceM` stays the distance to the
+ * member itself, so a near-or-far decision and a framing radius read the member the fix is actually beside.
  */
 export function nearestStation(
   ground: Ground,

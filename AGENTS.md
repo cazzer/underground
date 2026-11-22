@@ -8,7 +8,7 @@ a station continuously tilts the camera from top-down to isometric; later that v
 shows the station's levels, stairways, and upcoming arrivals.
 
 Status: the real static network (every route shape and station from `public/data/`) renders, a station complex (the catalog's
-complex_id: Times Sq with 42 St-Port Authority, Union Sq, Atlantic Av) is one station (one search row, marker, focus and panel), and
+complex_id: Times Sq with 42 St-Port Authority, Union Sq, Atlantic Av) is one station (one search row, focus and panel; every member keeps its own marker on its line, and a tap on any selects the complex), and
 trains are live: the client polls the deployed realtime Worker (`worker/`) and draws dots from the
 pure realtime library. The station panel shows real arrivals. Bedford Av (L08) has a hand-authored interior, the 14 St-Union Sq complex
 (`data/stations/635.authored.json`, members 635, L03, R20) an authored approximate one from OSM stairs and elevators, and
@@ -378,7 +378,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `stationGroups.ts` a complex as one station (`StationGroup`: the lead's id, point, borough and leadId; the most common member name,
     `otherNames` the rest; routes and stops the union; `groupAccess`: all full is full, else a partly accessible note naming the fully
     accessible routes and each partial member's own; `stationLeads` validates stations.json `complexes`); `Network.stationGroups`
-    (one per station as the UI shows it, the drawn markers), `Network.groupById` (every member id to its group) and `Station.leadId`. Over it: `stationSearch.ts` matches a group's `otherNames` too (`ALIAS_PENALTY` 0.5 below its own name) and
+    (one per station as the UI shows it: search rows, focus; the markers are `Network.stations`, one per member), `Network.groupById` (every member id to its group) and `Station.leadId`. Over it: `stationSearch.ts` matches a group's `otherNames` too (`ALIAS_PENALTY` 0.5 below its own name) and
     `SearchResult` shows a dim "with …" line; `locate.ts` `nearestStation` / `placeFix` and `placeLabel.ts` `placePick` lift the nearest member
     to its group (id, name, point; the distance stays the member's); `arrivalsAt` takes a group's `stops` and `memberIds` (a trip once at its
     soonest member, one ending at any member skipped, north first then soonest); the panel, announcers and trip bar name the group;
@@ -1050,9 +1050,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   vertices that keep the drawn chords within 0.5 m of the ease (`rampSampling.ts`, densest where it curves most;
   flat runs add none), and the platform fade one per ramp end; trains take y on the drawn chord between those vertices
   (`trackPointInto`), so they sit exactly on their line. Top-down everything is flat.
-- Station markers are instanced: matrices are rewritten only when the scale or focus changes. They are one per station group (a
-  complex's lead, `Network.stationGroups`): the other members draw no marker or tie and aren't pick targets, but auto-focus enters
-  from any member (`nextFocus` maps the nearest member to its lead and measures the exit from the nearest member).
+- Station markers are instanced: matrices are rewritten only when the scale or focus changes. A complex keeps one marker and tie per
+  member, each on its own line; a tap on any selects the complex (`select` focuses its lead), and auto-focus enters from any member
+  (`nextFocus` maps the nearest member to its lead and measures the exit from the nearest member). With the complex's interior
+  loaded every member's marker and tie hide (`hiddenSiblings`); a bare focused complex keeps them all, the lead with the focus ring.
 - Picking is screen space, on click only: `ScenePicker` listens on the canvas (never stopping or
   preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),
   projects stations (22 px) and live trains (16 px, dot or car line, read from the slot table) to pixels,

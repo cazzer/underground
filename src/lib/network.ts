@@ -91,7 +91,7 @@ export interface Network {
   /** Sorted by id. */
   stations: readonly Station[]
   stationById: ReadonlyMap<StationId, Station>
-  /** One per station as the UI shows it, a complex once (its lead's place); sorted by id; the drawn markers. */
+  /** One per station as the UI shows it, a complex once (its lead's place); sorted by id; search rows and focus (the markers are `stations`, one per member). */
   stationGroups: readonly StationGroup[]
   /** Every station id, a complex member too, to its group. */
   groupById: ReadonlyMap<StationId, StationGroup>

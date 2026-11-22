@@ -17,11 +17,11 @@ delta-encoded.
 
 Route colors come from `routes.txt`. MTA's IP status for those colors is UNVERIFIED.
 
-- `stations.json` (also see the NY Open Data section: its `borough`, `ada` and `adaPartial` fields)
+- `stations.json` (also see the NY Open Data section: its `borough`, `ada`, `adaPartial` and `complexes` fields)
 - `routes.json`
 - `shapes.json`
 - `segments.json`
-- `transfers.json`
+- `route/transfers.json` (the trip router's station links; loaded when the trip panel plans, outside the startup budget)
 - `trip-index.json`
 - `timetable/<serviceId>.json` (derived: each service's exact scheduled arrival and departure times, not
   medians, regrouped by stop pattern in 30 s units: a lossless re-encoding of `stop_times.txt` minus trip ids,
@@ -80,7 +80,8 @@ These datasets carry no license field, so the OPEN-NY Terms of Use (2013-03-08) 
 (see `docs/research/data-sources.md` §5.1).
 
 - MTA Subway Stations (dataset 39hk-dx4f, pinned in `data/stations/catalog/stations.json`) gives
-  `borough`, `ada` and `adaPartial` in `stations.json`. MTA data under the OPEN-NY Terms of Use
+  `borough`, `ada` and `adaPartial` in `stations.json`, and, from its `complex_id`, `complexes` (the station complexes of 2+
+  stations, lead first). MTA data under the OPEN-NY Terms of Use
   (2013-03-08), attributed to the Metropolitan Transportation Authority.
 - Subway entrances and exits (dataset i9wp-a4ja) and the elevator and escalator asset inventory
   (94fv-bak7) feed entrance and elevator positions in `stations/*.json`. These elements have

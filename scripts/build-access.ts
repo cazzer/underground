@@ -17,9 +17,10 @@ function main(): void {
   const file = JSON.parse(readFileSync(new URL(STATIONS, DATA_DIR), 'utf8')) as StationsFile
   const bare = file.stations.map(({ borough: _b, ada: _a, adaPartial: _p, ...rest }) => rest)
   const catalog = readCatalogStations()
-  const access = addAccess(bare, catalog, readAccessExceptions())
+  const exceptions = readAccessExceptions()
+  const access = addAccess(bare, catalog, exceptions)
   if (access.warnings.length > 0) throw new Error(`Stale access exceptions (nothing written):\n  ${access.warnings.join('\n  ')}`)
-  const complexes = buildComplexes(access.stations, catalog)
+  const complexes = buildComplexes(access.stations, catalog, exceptions.orphans)
   if (complexes.warnings.length > 0) throw new Error(`Catalog complexes disagree with stations.json (nothing written):\n  ${complexes.warnings.join('\n  ')}`)
   const rebuilt = renderedFile(STATIONS, toStableJson({ ...file, stations: access.stations, complexes: complexes.complexes }, 2))
 

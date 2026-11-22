@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { StationsFile } from '../../src/data/schema.ts'
-import { readCatalogStations } from './accessInputs.ts'
+import { readAccessExceptions, readCatalogStations } from './accessInputs.ts'
 import { buildComplexes, checkComplexLeads, type ComplexStation } from './stationComplexes.ts'
 
 const st = (id: string, lat: number, lon: number, routes: string[] = ['A']): ComplexStation => ({ id, lat, lon, routes })
@@ -37,6 +37,14 @@ describe('buildComplexes', () => {
     expect(warnings).toEqual(['catalog complex x: member GONE is not in stations.json'])
   })
 
+  it('skips silently a missing member that access-exceptions documents as an orphan', () => {
+    const rows = [row('A', 'x'), row('B', 'x'), row('GONE', 'x')]
+    const stations = [st('A', 40.7, -74), st('B', 40.7, -74.001)]
+    expect(buildComplexes(stations, rows, { GONE: 'out of system' })).toEqual({ complexes: [['A', 'B']], warnings: [] })
+    expect(buildComplexes(stations, rows, new Set(['GONE'])).warnings).toEqual([])
+    expect(buildComplexes(stations, rows).warnings).toHaveLength(1)
+  })
+
   it('throws on a GTFS id in two complexes', () => {
     const stations = [st('A', 40.7, -74), st('B', 40.7, -74.001)]
     expect(() => buildComplexes(stations, [row('A', 'x'), row('B', 'x'), row('A', 'y')])).toThrow(/A is in two complexes/)
@@ -56,7 +64,7 @@ describe('checkComplexLeads', () => {
 describe('committed stations.json', () => {
   it('has the complexes the pinned catalog gives (rerun npm run data:access when stale)', () => {
     const file = JSON.parse(readFileSync(new URL('../../public/data/stations.json', import.meta.url), 'utf8')) as StationsFile
-    const built = buildComplexes(file.stations, readCatalogStations())
+    const built = buildComplexes(file.stations, readCatalogStations(), readAccessExceptions().orphans)
     expect(built.warnings).toEqual([])
     expect(file.complexes).toEqual(built.complexes)
   })

@@ -118,8 +118,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       <color attach="background" args={[theme.background]} />
       <SubwayLines network={network} paths={banded?.shapes ?? network.shapes} interiorSpans={interiorSpans} view={bandView} />
       <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
-      <Stations stations={network.stationGroups} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
-      <ScenePicker stations={network.stationGroups} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
+      <Stations stations={network.stations} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
+      <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
           <LiveTrains {...live} network={network} trainPick={trainPick} deckSpans={spansByDeck} view={bandView} anchor={anchor} />

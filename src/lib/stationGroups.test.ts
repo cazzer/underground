@@ -62,6 +62,14 @@ describe('groupAccess', () => {
     ]
     expect(groupAccess(members, routeName)).toEqual({ status: 'partial', note: '7, G; E, FX Manhattan-bound only' })
   })
+  it('lists routes in route order, whatever the member order, unknown routes last by id', () => {
+    const members = [
+      { routeIds: ['Q', 'N'], access: full },
+      { routeIds: ['L', 'ZZ', 'YY'], access: full },
+      { routeIds: ['6'], access: none },
+    ]
+    expect(groupAccess(members, routeName, order).note).toBe('L, N, Q, YY, ZZ only')
+  })
   it('drops an express variant whose base is listed, and keeps one alone', () => {
     expect(groupAccess([{ routeIds: ['6', '6X'], access: full }, { routeIds: ['A'], access: none }], routeName).note).toBe('6 only')
     expect(groupAccess([{ routeIds: ['6X'], access: full }, { routeIds: ['A'], access: none }], routeName).note).toBe('6X only')
@@ -89,8 +97,12 @@ describe('buildStationGroups', () => {
     expect(groups[0]!.stops).toEqual(['127N', '127S', '725N', '725S', 'A27N', 'A27S'])
   })
   it('merges access', () => {
-    expect(groups[0]!.access).toEqual({ status: 'partial', note: '1, 2, E, A only' })
+    expect(groups[0]!.access).toEqual({ status: 'partial', note: '1, 2, A, E only' })
     expect(groups[1]!.access).toEqual({ status: 'none' })
+  })
+  it('sorts routes with none in the order by id instead of NaN', () => {
+    const odd = buildStationGroups([station('X1', 'X', ['B', 'L']), station('X2', 'X', ['C', 'A'])], [['X1', 'X2']], new Map(), routeName)
+    expect(odd.groups[0]!.routeIds).toEqual(['A', 'B', 'C', 'L'])
   })
   it('maps every station id, a member too, to its group', () => {
     expect([...groupById.keys()].sort()).toEqual(['127', '725', 'A27', 'B01'])

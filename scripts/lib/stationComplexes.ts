@@ -20,11 +20,18 @@ const M_PER_DEG = 111_320
 
 /** The catalog's complexes with 2+ stations.json members: lead first (nearest the members' centroid, distances within
  *  LEAD_TIE_M tie, then more routes, then lower id), the rest by id; sorted by lead. A member stations.json lacks is
- *  dropped with a warning (a group left with one member is no complex). Throws on a GTFS id in two complexes. */
+ *  dropped with a warning (a group left with one member is no complex), unless `orphans` (access-exceptions.json's
+ *  catalog rows with no GTFS station) documents it: then it is skipped silently. Throws on a GTFS id in two complexes.
+ *
+ *  A two-member complex has two members equally far from its centroid, so its lead is decided by route count, then id
+ *  (168 St: A09 with A and C beats 112 with the 1). That can flip when a feed change adds or drops a route at either
+ *  member; the lead is the id the UI, `#station=` and trip ends use, and the build rewrites it every run. */
 export function buildComplexes(
   stations: readonly ComplexStation[],
   rows: readonly { gtfsStopId: string; complexId: string }[],
+  orphans: ReadonlySet<string> | Readonly<Record<string, unknown>> = {},
 ): ComplexBuild {
+  const isOrphan = (id: string): boolean => (orphans instanceof Set ? orphans.has(id) : id in orphans)
   const byId = new Map(stations.map((s) => [s.id, s]))
   const warnings: string[] = []
   const claimed = new Map<string, string>()
@@ -37,6 +44,7 @@ export function buildComplexes(
     claimed.set(row.gtfsStopId, row.complexId)
     const station = byId.get(row.gtfsStopId)
     if (!station) {
+      if (isOrphan(row.gtfsStopId)) continue
       warnings.push(`catalog complex ${row.complexId}: member ${row.gtfsStopId} is not in stations.json`)
       continue
     }
