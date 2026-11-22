@@ -61,9 +61,18 @@ describe('choosePick', () => {
   })
 
   it('lets a train in reach win at the station that is already open', () => {
-    expect(choosePick({ index: 1, distancePx: 2 }, { index: 7, distancePx: 3 }, 1)).toEqual({ kind: 'train', index: 7 })
-    expect(choosePick({ index: 1, distancePx: 2 }, { index: 7, distancePx: 3 }, 0)).toEqual({ kind: 'station', index: 1 })
-    expect(choosePick({ index: 1, distancePx: 2 }, null, 1)).toEqual({ kind: 'station', index: 1 })
+    expect(choosePick({ index: 1, distancePx: 2 }, { index: 7, distancePx: 3 }, new Set([1]))).toEqual({ kind: 'train', index: 7 })
+    expect(choosePick({ index: 1, distancePx: 2 }, { index: 7, distancePx: 3 }, new Set([0]))).toEqual({ kind: 'station', index: 1 })
+    expect(choosePick({ index: 1, distancePx: 2 }, null, new Set([1]))).toEqual({ kind: 'station', index: 1 })
+  })
+
+  it('treats every hidden member of the open complex like the open station', () => {
+    const open = new Set([1, 6])
+    expect(choosePick({ index: 6, distancePx: 2 }, { index: 7, distancePx: 3 }, open)).toEqual({ kind: 'train', index: 7 })
+    // A station that is not a member still wins its near-ties.
+    expect(choosePick({ index: 5, distancePx: 2 }, { index: 7, distancePx: 3 }, open)).toEqual({ kind: 'station', index: 5 })
+    // A direct tap on a hidden member with no train in reach is a normal station pick.
+    expect(choosePick({ index: 6, distancePx: 2 }, null, open)).toEqual({ kind: 'station', index: 6 })
   })
 
   it('takes whichever exists, or nothing', () => {
@@ -81,11 +90,13 @@ describe('trainHitPx', () => {
   })
 
   it('gives a touch the bigger train target at the open station, whose marker is hidden', () => {
-    expect(trainHitPx(true, { index: 4, distancePx: 3 }, 4)).toBe(TRAIN_TOUCH_HIT_PX)
-    expect(trainHitPx(true, { index: 4, distancePx: 3 }, 2)).toBe(TRAIN_HIT_PX)
-    expect(trainHitPx(false, { index: 4, distancePx: 3 }, 4)).toBe(TRAIN_HIT_PX)
+    expect(trainHitPx(true, { index: 4, distancePx: 3 }, new Set([4]))).toBe(TRAIN_TOUCH_HIT_PX)
+    expect(trainHitPx(true, { index: 4, distancePx: 3 }, new Set([2]))).toBe(TRAIN_HIT_PX)
+    expect(trainHitPx(false, { index: 4, distancePx: 3 }, new Set([4]))).toBe(TRAIN_HIT_PX)
+    // The same for a hidden sibling of the open station's complex.
+    expect(trainHitPx(true, { index: 8, distancePx: 3 }, new Set([4, 8]))).toBe(TRAIN_TOUCH_HIT_PX)
     // A train within the touch target beside the hidden open station wins; with none, the station is picked.
-    expect(choosePick({ index: 4, distancePx: 2 }, { index: 9, distancePx: TRAIN_TOUCH_HIT_PX - 1 }, 4)).toEqual({ kind: 'train', index: 9 })
-    expect(choosePick({ index: 4, distancePx: 2 }, null, 4)).toEqual({ kind: 'station', index: 4 })
+    expect(choosePick({ index: 4, distancePx: 2 }, { index: 9, distancePx: TRAIN_TOUCH_HIT_PX - 1 }, new Set([4]))).toEqual({ kind: 'train', index: 9 })
+    expect(choosePick({ index: 4, distancePx: 2 }, null, new Set([4]))).toEqual({ kind: 'station', index: 4 })
   })
 })

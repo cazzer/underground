@@ -53,6 +53,8 @@ function MapView({ network, bands, live }: MapViewProps) {
             panel={panel}
             interior={model}
             focusedMarker={interior.streetMarker}
+            siblings={interior.siblings}
+            index={interior.index}
             here={here}
           />
         )}

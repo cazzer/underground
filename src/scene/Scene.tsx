@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
+import { hiddenSiblingIds, interiorStationIds, type IndexLoad } from '../data/interiorLoad'
 import type { LiveLayer } from '../data/useLive'
 import { createBandView } from '../lib/bandOffset'
 import type { Insets } from '../lib/framing'
@@ -7,6 +8,7 @@ import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
+import { memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
@@ -36,19 +38,29 @@ interface SceneProps {
   interior: InteriorModel | null
   /** The focused station draws its own street marker and tie: it has no interior, or its load failed. */
   focusedMarker: boolean
+  /** The focused station's complex siblings from the index (empty for a lone station); hidden once the interior that covers them is loaded. */
+  siblings: readonly string[]
+  /** The station index, from which the camera finds the focused and the closed station's complex. */
+  index: IndexLoad
   /** The station panel's screen rect; interior fly-tos frame beside it. */
   panel: ScreenRect | null
   /** The user's location, once found inside the covered area; null draws no marker. */
   here: { ground: Ground; accuracyM: number } | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, focusedMarker, panel, here }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, focusedMarker, siblings, index, panel, here }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
   /** Written by LiveTrains at -3, read by CameraRig: the selected train the camera follows. */
   const anchor = useMemo(createFollowAnchor, [])
-  const interiorStationId = interior?.stationId ?? null
+  /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
+  const interiorSpans = useMemo(
+    () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),
+    [interior, network],
+  )
+  // The index says who shares the file; the model says who it draws. Their markers and ties go with the focused one's.
+  const hiddenSiblings = useMemo(() => hiddenSiblingIds(siblings, interior), [siblings, interior])
   return (
     <Canvas
       // No tone mapping, so every theme token renders as the exact color it names.
@@ -61,19 +73,19 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, fo
     >
       <color attach="background" args={[theme.background]} />
       <MapGrid />
-      <SubwayLines network={network} paths={banded?.shapes ?? network.shapes} interiorStationId={interiorStationId} view={bandView} />
-      <StationTies network={network} focusedMarker={focusedMarker} />
-      <Stations stations={network.stations} focusedMarker={focusedMarker} />
-      <ScenePicker stations={network.stations} trainPick={trainPick} />
+      <SubwayLines network={network} paths={banded?.shapes ?? network.shapes} interiorSpans={interiorSpans} view={bandView} />
+      <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
+      <Stations stations={network.stations} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
+      <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
-          <LiveTrains {...live} network={network} trainPick={trainPick} interiorStationId={interiorStationId} view={bandView} anchor={anchor} />
+          <LiveTrains {...live} network={network} trainPick={trainPick} interiorSpans={interiorSpans} view={bandView} anchor={anchor} />
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
       <StationStreets />
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} />}
-      <CameraRig network={network} insets={insets} panel={panel} interior={interior} anchor={anchor} />
+      <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
     </Canvas>
   )
 }

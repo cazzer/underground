@@ -1,3 +1,4 @@
+import { interiorCovers } from '../data/interiorLoad'
 /**
  * The "landed, awaiting interior" rule: a station flight that set off before its interior was known, and couldn't
  * frame it in flight (it arrived after LATE_TURN_PROGRESS, or after landing), reframes onto it once it is known and
@@ -11,14 +12,22 @@ export interface AwaitingInterior {
   reduced: boolean
 }
 
+/** Whether the loaded interior (or none) covers the awaited station, a complex member included: `ReframeInput.interiorReady`. */
+export function interiorReadyFor(
+  awaiting: AwaitingInterior | null,
+  interior: { stationId: string; memberStationIds?: readonly string[] } | null,
+): boolean {
+  return awaiting !== null && interiorCovers(interior, awaiting.stationId)
+}
+
 export interface ReframeInput {
   /** A flight is under way: its own retarget frames an interior that arrives in time, and its landing asks again. */
   flying: boolean
   /** The camera follows a train. */
   following: boolean
   focusedId: string | null
-  /** The station whose interior is loaded, or null. */
-  interiorId: string | null
+  /** The loaded interior covers the awaited station (it is its own, or the station is a member of its complex). */
+  interiorReady: boolean
 }
 
 /**
@@ -30,7 +39,7 @@ export type ReframeAction = 'none' | 'wait' | 'drop' | 'reframe' | 'snap'
 export function reframeAction(awaiting: AwaitingInterior | null, s: ReframeInput): ReframeAction {
   if (!awaiting) return 'none'
   if (s.following || s.focusedId !== awaiting.stationId) return 'drop'
-  if (s.flying || s.interiorId !== awaiting.stationId) return 'wait'
+  if (s.flying || !s.interiorReady) return 'wait'
   return awaiting.reduced ? 'snap' : 'reframe'
 }
 

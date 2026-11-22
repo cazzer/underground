@@ -1,7 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { CircleGeometry, Color, DynamicDrawUsage, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial } from 'three'
-import type { StationId } from '../data/schema'
 import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix, carsReach } from '../lib/live/consist'
@@ -16,6 +15,7 @@ import { trainRouteId } from '../lib/live/trainRoute'
 import { interiorOpacity, veilWeight } from '../lib/interiorReveal'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
+import type { StationSpans } from '../lib/platformSpan'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { routeLineColor } from '../lib/routeColor'
 import { tiltT } from '../lib/tilt'
@@ -43,8 +43,8 @@ interface LiveTrainsProps extends LiveLayer {
   network: Network
   /** Filled while mounted, so a click can be tested against the trains as drawn. */
   trainPick: RefObject<TrainPickSource | null>
-  /** The station whose interior is loaded (null for none): its platform trains draw above the veil as it reveals. */
-  interiorStationId: StationId | null
+  /** The loaded interior's platform spans, every member of a complex unioned (null for none): trains on them draw above the veil as it reveals. */
+  interiorSpans: StationSpans | null
   /** This frame's band view, written by SubwayLines before this frame runs: dots, cars and picks sit on the drawn bands. */
   view: BandView
   /** Filled at priority -3 with the selected train's drawn point, for the camera follow. */
@@ -57,7 +57,7 @@ interface LiveTrainsProps extends LiveLayer {
  * poll's hop plan at the live clock and writes matrices without allocating. Zoomed in, each dot
  * unfolds into its train's cars (carMix): the dot shrinks by 1 - mix as the train lengthens by mix.
  */
-export function LiveTrains({ trips, offsetS, patterns, network, trainPick, interiorStationId, view, anchor }: LiveTrainsProps) {
+export function LiveTrains({ trips, offsetS, patterns, network, trainPick, interiorSpans, view, anchor }: LiveTrainsProps) {
   const dots = useRef<InstancedMesh>(null)
   const halo = useRef<InstancedMesh>(null)
   // The selected train's dot is drawn on its own, above every other dot: rim, background gap, then the dot.
@@ -67,7 +67,6 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   const selectedDot = useRef<Mesh<CircleGeometry, MeshBasicMaterial>>(null)
   const cars = useTrainCars()
   const spanCars = useSpanCars(cars)
-  const spans = (interiorStationId !== null && network.platformSpans.get(interiorStationId)) || null
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
   const selection = useSelectedSlot(table, cars)
   const sm = selection.mix
@@ -230,7 +229,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn, mix < 1)
     const reveal = interiorOpacity(camera)
-    spanCars.write(table, spans, reveal, veilWeight(reveal, view.depth), mix, localS, sel, slotColors, cars.consistOf)
+    spanCars.write(table, interiorSpans, reveal, veilWeight(reveal, view.depth), mix, localS, sel, slotColors, cars.consistOf)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
     range.count = table.high * 16
     d.instanceMatrix.updateRanges.push(range)

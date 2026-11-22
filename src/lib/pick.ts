@@ -65,21 +65,25 @@ export function nearestStation(
   return best
 }
 
+/** No station is open or hidden. */
+export const NO_STATIONS: ReadonlySet<number> = new Set()
+
 /**
- * The train target for a pick: a touch with no station in reach gets the bigger one. The open station
- * (`focusedIndex`) draws no marker, so it doesn't count: a tap on a train at its platform gets the bigger one too.
+ * The train target for a pick: a touch with no station in reach gets the bigger one. The open station and the other
+ * members of its complex (`open`: their indices) draw no marker, so they don't count: a tap on a train at their
+ * platforms gets the bigger one too.
  */
-export function trainHitPx(touch: boolean, station: PickHit | null, focusedIndex = -1): number {
-  return touch && (station === null || station.index === focusedIndex) ? TRAIN_TOUCH_HIT_PX : TRAIN_HIT_PX
+export function trainHitPx(touch: boolean, station: PickHit | null, open: ReadonlySet<number> = NO_STATIONS): number {
+  return touch && (station === null || open.has(station.index)) ? TRAIN_TOUCH_HIT_PX : TRAIN_HIT_PX
 }
 
 /**
  * Station or train: the station wins ties and near-ties, so station picks keep working where trains run
- * through. When the station is the one already open (`focusedIndex`), any train in reach wins instead: the
- * station's panel is up, so a second click there means the train waiting at it.
+ * through. When the station is the one already open, or another member of the open complex (`open`: their
+ * indices), any train in reach wins instead: the panel is up, so a second click there means the train waiting at it.
  */
-export function choosePick(station: PickHit | null, train: PickHit | null, focusedIndex = -1): ScenePick | null {
-  if (train && (!station || station.index === focusedIndex || train.distancePx <= station.distancePx - STATION_PRIORITY_PX)) {
+export function choosePick(station: PickHit | null, train: PickHit | null, open: ReadonlySet<number> = NO_STATIONS): ScenePick | null {
+  if (train && (!station || open.has(station.index) || train.distancePx <= station.distancePx - STATION_PRIORITY_PX)) {
     return { kind: 'train', index: train.index }
   }
   return station ? { kind: 'station', index: station.index } : null

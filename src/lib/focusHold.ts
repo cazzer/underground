@@ -18,6 +18,19 @@ export interface FocusHold {
   distance: number
   /** View center when the flight was cancelled. */
   target: Ground
+  /** The positions of every station of the held one's complex (itself included), when it is one: the interior flight aims at their hull. */
+  members?: readonly Ground[]
+}
+
+/** The ground positions of the stations in `group` (a complex's members); undefined for none. Allocates: call it once per hold. */
+export function groupPositions(group: ReadonlySet<string>, stationById: ReadonlyMap<string, { pos: Ground }>): Ground[] | undefined {
+  if (group.size === 0) return undefined
+  const out: Ground[] = []
+  for (const id of group) {
+    const s = stationById.get(id)
+    if (s) out.push(s.pos)
+  }
+  return out
 }
 
 /**
@@ -26,7 +39,9 @@ export interface FocusHold {
  * farther than EXIT_RADIUS from it), or after a deliberate zoom out or pan.
  */
 export function shouldReleaseHold(hold: FocusHold, distance: number, target: Ground): boolean {
-  const off = Math.hypot(target.x - hold.station.x, target.z - hold.station.z)
+  // From the nearest member of a complex: its interior flight lands on the hull centre, between them.
+  let off = Math.hypot(target.x - hold.station.x, target.z - hold.station.z)
+  for (const m of hold.members ?? []) off = Math.min(off, Math.hypot(target.x - m.x, target.z - m.z))
   if (distance <= EXIT_DISTANCE && off <= EXIT_RADIUS) return true
   if (distance > hold.distance * HOLD_ZOOM_OUT) return true
   // Measured against the closer of the two distances: after zooming in, a smaller pan is deliberate.

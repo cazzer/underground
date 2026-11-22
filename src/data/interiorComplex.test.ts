@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { InteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
 import {
-  deriveInteriorLoad, interiorCovers, interiorIdOf, interiorStationIds, NO_SIBLINGS, siblingIdsOf, type IndexLoad,
+  deriveInteriorLoad, hiddenSiblingIds, interiorCovers, interiorIdOf, interiorStationIds, NO_SIBLINGS, siblingIdsOf, type IndexLoad,
 } from './interiorLoad'
 
 const complex = { stationId: 'T01', memberStationIds: ['T01', 'U01', 'V01'] } as unknown as InteriorModel
@@ -54,6 +54,20 @@ describe('siblingIdsOf', () => {
     expect(siblingIdsOf('X99', index)).toBe(NO_SIBLINGS)
     expect(siblingIdsOf(null, index)).toBe(NO_SIBLINGS)
     expect(siblingIdsOf('T01', { status: 'loading' })).toBe(NO_SIBLINGS)
+  })
+})
+
+describe('hiddenSiblingIds', () => {
+  it('hides the siblings the loaded interior covers', () => {
+    expect(hiddenSiblingIds(['U01', 'V01'], complex)).toEqual(['U01', 'V01'])
+  })
+  it('drops a sibling the index lists but the model does not cover (stale deploy)', () => {
+    expect(hiddenSiblingIds(['U01', 'Z99'], complex)).toEqual(['U01'])
+    expect(hiddenSiblingIds(['U01'], alone)).toBe(NO_SIBLINGS)
+  })
+  it('hides nothing before the model loads or without siblings', () => {
+    expect(hiddenSiblingIds(['U01'], null)).toBe(NO_SIBLINGS)
+    expect(hiddenSiblingIds(NO_SIBLINGS, complex)).toBe(NO_SIBLINGS)
   })
 })
 

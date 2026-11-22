@@ -251,3 +251,49 @@ describe('stationAxis', () => {
     expect(stationAxis({ ...fixture(), platforms: [] })).toEqual([1, 0])
   })
 })
+
+describe('walkways', () => {
+  const WALKWAY: Connector = {
+    id: 'WK1',
+    kind: 'walkway',
+    lower: { x: -3, z: 8, level: 'mezz' },
+    upper: { x: 3, z: 8, level: 'mezz' },
+    width: 2,
+    sources: ['authored'],
+  }
+  /** Indexes of the strong segments that run x -3 to 3 at drawn height `y`: only a walkway's sides here. */
+  const sidesAt = (b: Buffers, y: number) =>
+    Array.from({ length: count(b) }, (_, k) => k).filter((k) => {
+      const s = seg(b, k)
+      return s[0] === -3 && s[3] === 3 && s[1] === y && s[4] === y
+    })
+
+  it('draws two strong side edges in the outline color at the level, half the width either side, and no end caps', () => {
+    const { strong, fine } = machines([WALKWAY])
+    expect(count(strong) - BASE_STRONG).toBe(2)
+    expect(count(fine)).toBe(0)
+    const sides = sidesAt(strong, -8)
+    expect(sides).toHaveLength(2)
+    expect(sides.map((k) => seg(strong, k)[2]).sort()).toEqual([7, 9])
+    for (const k of sides) expect(strong.colors[k * 6]).toBe(ROLES.indexOf('outline'))
+  })
+
+  it('is flat on its level whichever level that is', () => {
+    const { strong } = machines([
+      { ...WALKWAY, lower: { ...WALKWAY.lower, level: 'plat' }, upper: { ...WALKWAY.upper, level: 'plat' } },
+    ])
+    expect(sidesAt(strong, -16)).toHaveLength(2)
+  })
+
+  it('throws for a walkway with no plan run', () => {
+    expect(() => machines([{ ...WALKWAY, upper: { ...WALKWAY.lower } }])).toThrow(/no horizontal run/)
+  })
+
+  it('dashes its sides on an estimated layout, and only then', () => {
+    const solid = buildInteriorBuffers(fixture([WALKWAY]), opts({ guides: false })).strong
+    const dashed = buildInteriorBuffers(fixture([WALKWAY]), opts({ guides: false, dashStructure: true })).strong
+    const distances = (b: Buffers) => sidesAt(b, -8).map((k) => Array.from(b.distances.subarray(k * 2, k * 2 + 2)))
+    expect(distances(solid)).toEqual([[0, 0], [0, 0]])
+    expect(distances(dashed)).toEqual([[0, 6], [0, 6]])
+  })
+})

@@ -2,10 +2,11 @@ import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
+import { interiorCovers, type IndexLoad } from '../data/interiorLoad'
 import { useFocus } from '../lib/focus'
 import { newDwell, settled } from '../lib/focusDwell'
-import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
-import { nextFocus, type FocusInput } from '../lib/focusMachine'
+import { groupPositions, shouldReleaseHold, type FocusHold } from '../lib/focusHold'
+import { NO_FOCUS_GROUP, nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
@@ -26,6 +27,7 @@ import {
   type MapControlsImpl,
 } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
+import { useFocusGroups } from './useFocusGroups'
 import { useInteriorReframe } from './useInteriorReframe'
 import { useStationOrbit } from './useStationOrbit'
 import { useTrainFollow } from './useTrainFollow'
@@ -40,13 +42,15 @@ interface CameraRigProps {
   insets: Insets
   /** The focused station's interior once loaded; a click on that station frames it instead. */
   interior: InteriorModel | null
+  /** The station index: the focused and the closed station's complexes come from it. */
+  index: IndexLoad
   /** The station panel's screen rect, kept clear when framing an interior. */
   panel: ScreenRect | null
   /** The selected train's drawn point (LiveTrains writes it at -3): the camera follows it. */
   anchor: FollowAnchor
 }
 
-export function CameraRig({ network, insets, interior, panel, anchor }: CameraRigProps) {
+export function CameraRig({ network, insets, interior, index, panel, anchor }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -64,7 +68,10 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     target: { x: 0, z: 0 },
     stations: network.stations,
     settled: false,
+    focusGroup: NO_FOCUS_GROUP,
+    dismissedGroup: NO_FOCUS_GROUP,
   })
+  const focusGroup = useFocusGroups(input, index, interior, focusedId, dismissedId)
   // Auto-focus enters only once the view has held still (focusDwell.ts); a gesture in progress never has.
   const dwell = useRef(newDwell())
   const gesture = useRef(false)
@@ -117,10 +124,10 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     if (!c) throw new Error('Fly request before the map controls mounted')
     flushMotion(c, camera)
     const reduced = prefersReducedMotion()
-    const known = l.interior?.stationId === station.id ? l.interior : null
+    const known = interiorCovers(l.interior, station.id) ? l.interior : null
     awaiting.current = known ? null : { stationId: station.id, reduced }
     const dest = known
-      ? interiorFlight(known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
+      ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
       : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
     flight.current = newFlight(dest, c, camera, reduced, known !== null || reduced)
   }, [flyRequest, network, camera])
@@ -138,14 +145,14 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     const az = c.getAzimuthalAngle()
     const e0 = flightProgress(f.elapsed, f.duration)
     let dest
-    if (interior?.stationId !== f.stationId) {
+    if (!interior || !interiorCovers(interior, f.stationId)) {
       dest = stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
     } else {
       const turn = retargetTurn(f.turnDecided, e0)
       // Later: too late to fold in without a lurch; the flight lands as it is and the reframe takes over.
       if (turn === 'later') return
       // Keep: frame for the azimuth already chosen (the landing turn, or the current one when there is none).
-      dest = interiorFlight(interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide')
+      dest = interiorFlight(f.stationId, interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide')
       if (turn === 'keep') dest.azimuth = f.azimuth
       f.turnDecided = true
       awaiting.current = null
@@ -180,7 +187,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     controls,
     camera,
     focusPos,
-    interior: interior?.stationId === focusedId ? interior : null,
+    interior: interiorCovers(interior, focusedId) ? interior : null,
     viewport: size,
     free,
     flying,
@@ -234,7 +241,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       // Cheap pre-check on the reused input; only a real change pays for a copied target and
       // a functional update, which re-runs the rules against the latest state.
       if (nextFocus(cur) !== cur) {
-        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, cur.settled)
+        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, cur.settled, cur.focusGroup, cur.dismissedGroup)
       }
     }
 
@@ -257,6 +264,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
         station: station.pos,
         distance: camera.position.distanceTo(c.target),
         target: { x: c.target.x, z: c.target.z },
+        members: groupPositions(focusGroup.current, latest.current.network.stationById),
       }
     }
     flight.current = null

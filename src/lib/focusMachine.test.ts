@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_DISTANCE, EXIT_RADIUS, nextFocus, type FocusState } from './focusMachine'
+import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_DISTANCE, EXIT_RADIUS, focusGroupOf, NO_FOCUS_GROUP, nextFocus, type FocusState } from './focusMachine'
+import type { IndexLoad } from '../data/interiorLoad'
 import type { Station } from './network'
 
 const station = (id: string, x: number, z: number): Station => ({ id, name: id, pos: { x, z }, routeIds: [], stops: [], access: { status: 'none' } })
@@ -19,8 +20,10 @@ function run(
   z: number,
   stations: readonly Station[] = [A],
   settled = true,
+  focusGroup: ReadonlySet<string> = NO_FOCUS_GROUP,
+  dismissedGroup: ReadonlySet<string> = NO_FOCUS_GROUP,
 ) {
-  const input = { ...state, distance, target: { x, z }, stations, settled }
+  const input = { ...state, distance, target: { x, z }, stations, settled, focusGroup, dismissedGroup }
   return { input, next: nextFocus(input) }
 }
 
@@ -125,5 +128,117 @@ describe('nextFocus', () => {
   it('does nothing without stations', () => {
     const { input, next } = run(NONE, 100, 0, 0, [])
     expect(next).toBe(input)
+  })
+})
+
+describe('nextFocus in a station complex', () => {
+  // Fulton-like: two members 300 m apart; the interior flight lands on the hull centre between them.
+  const M1 = station('M1', 0, 0)
+  const M2 = station('M2', 300, 0)
+  const X = station('X', 0, 600)
+  const group = new Set(['M1', 'M2'])
+  const all = [M1, M2, X]
+
+  it('keeps the focused member when the view sits on the hull centre or over a sibling', () => {
+    const centre = run(focused('M1'), 400, 150, 0, all, true, group)
+    expect(centre.next).toBe(centre.input)
+    // 40 m from M2, 260 m from M1: without the group the nearer station takes the focus.
+    const over = run(focused('M1'), 400, 260, 0, all, true, group)
+    expect(over.next).toBe(over.input)
+    expect(run(focused('M1'), 400, 260, 0, all).next).toEqual(focused('M2'))
+  })
+
+  it('does not drop a member when the view is past EXIT_RADIUS from it but near a sibling', () => {
+    const far = 300 + ENTER_RADIUS - 40
+    const { input, next } = run(focused('M1'), 400, far, 0, all, true, group)
+    expect(next).toBe(input)
+    expect(run(focused('M1'), 400, far, 0, [M1, M2]).next).toEqual(focused('M2'))
+  })
+
+  it('drops focus once the view is past EXIT_RADIUS from every member, or zoomed out', () => {
+    expect(run(focused('M1'), 400, 150, 800, [M1, M2], true, group).next).toEqual(NONE)
+    expect(run(focused('M1'), EXIT_DISTANCE + 10, 150, 0, all, true, group).next).toEqual(NONE)
+  })
+
+  it('still lets a station outside the group take the focus', () => {
+    expect(run(focused('M1'), 400, 0, 600, all, true, group).next).toEqual(focused('X'))
+    expect(run(focused('M1'), 400, 0, 600 - ENTER_RADIUS - 10, all, true, group).next).toEqual(NONE)
+  })
+
+  it('ignores a group that does not hold the focused station, and an empty group is the old rule', () => {
+    expect(run(focused('X'), 400, 260, 0, all, true, group).next).toEqual(focused('M2'))
+    expect(run(NONE, 200, 50, 0, [M1, M2], true, group).next).toEqual(focused('M1'))
+  })
+})
+
+describe('nextFocus after closing a complex member', () => {
+  // Three members, the way Union Sq has them: the closed R20 and its siblings 635 and L03 around the hull centre.
+  const R20 = station('R20', 0, 0)
+  const S635 = station('635', 130, 0)
+  const L03 = station('L03', 300, 0)
+  const X = station('X', 0, 900)
+  const members = [R20, S635, L03, X]
+  const group = new Set(['R20', '635', 'L03'])
+  const closed = dismissed('R20')
+  const hull = 130
+
+  it('does not reopen the panel as a sibling when the view is centered on the hull', () => {
+    const { input, next } = run(closed, 400, hull, 0, members, true, NO_FOCUS_GROUP, group)
+    expect(next).toBe(input)
+    // Without the group, the sibling the view sits on takes the focus.
+    expect(run(closed, 400, hull, 0, members).next).toEqual({ focusedId: '635', dismissedId: 'R20' })
+  })
+
+  it('keeps the dismissal while the view is within the exit radius of any member, however far from the closed one', () => {
+    // 400 m from R20 (past EXIT_RADIUS), 100 m from L03.
+    const { input, next } = run(closed, 400, 400, 0, members, true, NO_FOCUS_GROUP, group)
+    expect(next).toBe(input)
+    expect(run(closed, 400, 400, 0, members).next).toEqual(focused('L03'))
+  })
+
+  it('clears the dismissal once the view leaves every member, then focuses again on return', () => {
+    const away = run(closed, 400, 0, EXIT_RADIUS + 100, members, true, NO_FOCUS_GROUP, group)
+    expect(away.next).toEqual(NONE)
+    expect(run(NONE, 400, hull, 0, members, true).next).toEqual(focused('635'))
+  })
+
+  it('still focuses a station outside the closed complex', () => {
+    expect(run(closed, 400, 0, 900, members, true, NO_FOCUS_GROUP, group).next).toEqual(focused('X'))
+  })
+
+  it('ignores a group that does not hold the dismissed station', () => {
+    expect(run(dismissed('X'), 400, hull, 0, members, true, NO_FOCUS_GROUP, group).next).toEqual(focused('635'))
+  })
+})
+
+describe('focusGroupOf', () => {
+  const index: IndexLoad = {
+    status: 'ready',
+    index: {
+      stations: {
+        L08: { provenance: 'authored' },
+        T01: { provenance: 'authored' },
+        U01: { provenance: 'authored', file: 'T01' },
+        V01: { provenance: 'authored', file: 'T01' },
+      },
+    },
+  }
+
+  it('is the complex from the index, from any member, with no interior loaded (as after the panel closes)', () => {
+    expect(focusGroupOf('U01', index, null)).toEqual(new Set(['T01', 'U01', 'V01']))
+    expect(focusGroupOf('T01', index, null)).toEqual(new Set(['T01', 'U01', 'V01']))
+  })
+
+  it('is cut to the members the loaded interior covers', () => {
+    expect(focusGroupOf('T01', index, { stationId: 'T01', memberStationIds: ['T01', 'U01'] })).toEqual(new Set(['T01', 'U01']))
+    // An interior that covers only the station itself leaves no complex.
+    expect(focusGroupOf('T01', index, { stationId: 'T01', memberStationIds: ['T01'] })).toBe(NO_FOCUS_GROUP)
+  })
+
+  it('is the shared empty group for a lone or unlisted station, no station, or an index that is not ready', () => {
+    expect(focusGroupOf('L08', index, null)).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupOf('X99', index, null)).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupOf(null, index, null)).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupOf('T01', { status: 'loading' }, null)).toBe(NO_FOCUS_GROUP)
   })
 })

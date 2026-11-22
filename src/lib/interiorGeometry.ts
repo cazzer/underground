@@ -12,6 +12,7 @@ import {
   drawElevatorStop,
   drawEscalator,
   drawRamp,
+  drawWalkway,
   type ConnectorContext,
 } from './interiorConnectors.ts'
 import { SegmentWriter, SplitAtY, type Buffers, type InteriorRole, type Rgb } from './interiorSegments.ts'
@@ -36,8 +37,8 @@ export interface InteriorBufferOptions {
    */
   guides: boolean
   /**
-   * Generated interiors: mark platform and slab outlines, the slab guides and their street-level copy
-   * as dashed in `distances` (tracks stay solid). Positions and colors are the same either way.
+   * Generated interiors: mark platform and slab outlines, the slab guides and their street-level copy, and a
+   * walkway's sides, as dashed in `distances` (tracks stay solid). Positions and colors are the same either way.
    */
   dashStructure?: boolean
   /**
@@ -129,6 +130,7 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
     yScale,
     stepRise: opts.stepRise,
     colorOf,
+    dash,
     axis: stationAxis(interior),
     center: [(bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2],
     anchorOf: (id) => anchors.get(id),
@@ -175,6 +177,7 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
       } else if (lower === li) {
         const ctx = connectorCtx(lower, upper)
         if (c.kind === 'escalator') drawEscalator(ctx, c, lower, upper)
+        else if (c.kind === 'walkway') drawWalkway(ctx, c, lower)
         else drawRamp(ctx, c, lower, upper)
       }
     }

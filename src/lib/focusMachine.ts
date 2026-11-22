@@ -1,3 +1,4 @@
+import { interiorCovers, siblingIdsOf, type IndexLoad } from '../data/interiorLoad'
 import type { Station } from './network'
 import type { Ground } from './projection'
 
@@ -29,6 +30,41 @@ export interface FocusInput extends FocusState {
   stations: readonly Station[]
   /** The view has held still long enough to enter a station (focusDwell's `settled`). Exits never wait. */
   settled: boolean
+  /**
+   * The stations that share the focused station's interior (a complex's members, the focused one included), or
+   * NO_FOCUS_GROUP. An interior flight lands on the complex's hull centre, which can be farther than ENTER_RADIUS or
+   * EXIT_RADIUS from the focused member's own point, so the focused distance is the nearest member's and focus never
+   * switches to another member. Ignored unless it holds `focusedId`.
+   */
+  focusGroup: ReadonlySet<string>
+  /**
+   * The same for `dismissedId`: the closed station's complex. Its panel stays closed for the whole complex (a view
+   * centered on a sibling doesn't reopen it as that sibling), and the dismissal clears only once the view has left
+   * every member by EXIT_RADIUS. Ignored unless it holds `dismissedId`.
+   */
+  dismissedGroup: ReadonlySet<string>
+}
+
+/** No complex: the focused station stands alone (the rules measure from its own point). */
+export const NO_FOCUS_GROUP: ReadonlySet<string> = new Set()
+
+/**
+ * The complex `id` belongs to, from the station index (which still lists it once the interior has unloaded, as when
+ * the panel closes): `id` and its siblings, or NO_FOCUS_GROUP for a lone station or an index that isn't ready. When
+ * the loaded `interior` covers `id`, the group is cut to the members it really draws (a stale index can't widen
+ * it). Allocates, so call it when the index or the id changes, never per frame.
+ */
+export function focusGroupOf(
+  id: string | null,
+  index: IndexLoad,
+  interior: { stationId: string; memberStationIds?: readonly string[] } | null,
+): ReadonlySet<string> {
+  if (id === null) return NO_FOCUS_GROUP
+  const siblings = siblingIdsOf(id, index)
+  if (siblings.length === 0) return NO_FOCUS_GROUP
+  const members = [id, ...siblings]
+  const drawn = interiorCovers(interior, id) ? members.filter((m) => interiorCovers(interior, m)) : members
+  return drawn.length > 1 ? new Set(drawn) : NO_FOCUS_GROUP
 }
 
 /**
@@ -37,7 +73,9 @@ export interface FocusInput extends FocusState {
  * it does not allocate unless the state changes.
  */
 export function nextFocus(input: FocusInput): FocusState {
-  const { focusedId, dismissedId, distance, target, stations, settled } = input
+  const { focusedId, dismissedId, distance, target, stations, settled, focusGroup, dismissedGroup } = input
+  const grouped = focusedId !== null && focusGroup.has(focusedId)
+  const dismissedGrouped = dismissedId !== null && dismissedGroup.has(dismissedId)
   let nearest: string | null = null
   let nd = Infinity
   let fd = Infinity
@@ -49,18 +87,20 @@ export function nextFocus(input: FocusInput): FocusState {
       nd = d
       nearest = s.id
     }
-    if (s.id === focusedId) fd = d
-    if (s.id === dismissedId) dd = d
+    // Focused distance: from the focused station, or from the nearest member of its complex.
+    if (s.id === focusedId || (grouped && focusGroup.has(s.id))) fd = Math.min(fd, d)
+    if (s.id === dismissedId || (dismissedGrouped && dismissedGroup.has(s.id))) dd = Math.min(dd, d)
   }
 
   const dismissed = dismissedId && (distance > EXIT_DISTANCE || dd > EXIT_RADIUS) ? null : dismissedId
   let focused = focusedId && (distance > EXIT_DISTANCE || fd > EXIT_RADIUS) ? null : focusedId
   if (distance < ENTER_DISTANCE && nd < ENTER_RADIUS) {
-    if (nearest === dismissed) {
-      // Centered on a station the user closed: don't leave a neighbour's panel up either.
+    if (nearest === dismissed || (dismissed !== null && dismissedGrouped && nearest !== null && dismissedGroup.has(nearest))) {
+      // Centered on a station the user closed (or one of its complex): don't leave a neighbour's panel up either.
       focused = null
-    } else if (settled && (focused === null || fd > ENTER_RADIUS)) {
-      // Switch only once the current station is clearly behind, so neighbours don't flip-flop.
+    } else if (settled && (focused === null || fd > ENTER_RADIUS) && !(grouped && nearest !== null && focusGroup.has(nearest))) {
+      // Switch only once the current station is clearly behind, so neighbours don't flip-flop, and never to
+      // another member of the focused complex: they share its interior.
       focused = nearest
     }
   }

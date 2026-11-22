@@ -114,24 +114,24 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
-    `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `follows` marks a flight to the selected
+    `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `interiorFlight` takes the focused station id, which for a complex member is not the file's `stationId`, so the focus hold follows the member; `follows` marks a flight to the selected
     train), `newFlight`, `flushMotion` and the landing turn;
     `useStationOrbit.ts` the focused-station orbit (azimuth bounds per frame, pivot, pan-radius clamp, first-turn signal);
     `useInteriorReframe.ts` frames an interior that loaded too late for its station flight (after LATE_TURN_PROGRESS
     or after landing): once landed, a 0.6-1 s eased flight onto it with the landing turn decided then (reduced motion
-    snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure);
+    snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `interiorReady` is `interiorCovers(interior, awaited station)`, so a complex's other member reframes too);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
     shapes arrive, then eases them in over 300 ms (`BandView.ease`: offset and split blend linearly from unbanded, so no fold); writes the shared `BandView` (Scene owns it; LiveTrains reads
-    it) and the band uniforms per frame at priority -0.25); `usePlatformFade.ts` writes the loaded interior's
+    it) and the band uniforms per frame at priority -0.25); `usePlatformFade.ts` (given `interiorSpans`, `memberSpans` of the loaded interior: a complex's members unioned) writes the loaded interior's
     per-segment platform fade for every band layer (the `?lines=` overlays too); `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
     if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
-    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
+    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, and so are its complex siblings' (`hiddenSiblings`, `compactTies` in `lib/stationTie.ts`), kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
-    instance is scaled to 0 when it has an interior (ready or loading), so it has no marker, and drawn when it has none or its load failed, with a `theme.stationFocus` `FocusRing.tsx` over the trains (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); `markerShape.ts` the marker constants);
+    instance, and its complex siblings' once the interior covering them is loaded (`hiddenSiblings`, `hiddenSiblingIds` in `interiorLoad.ts`: the index's siblings intersected with the model's members), are scaled to 0 (`writeMarkerMatrices`' `hidden` list) when it has an interior (ready or loading), so it has no marker, and drawn when it has none or its load failed, with a `theme.stationFocus` `FocusRing.tsx` over the trains (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, `theme.train` if `routeLineMix.amount` is 1 (mono lines); stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
@@ -204,7 +204,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trackProfile.ts` a shape's vertical profile (knots, `profileAt`, `resampleForProfile`) and
     `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
-    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`) and its
+    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`; `memberSpans` unions a complex's members per shape, the `interiorSpans` that SubwayLines, LineHighlight, usePlatformFade and LiveTrains take instead of a station id) and its
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
     adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
     `lineBreaks`, every extra vertex a drawn line needs (ramps via `rampSampling.ts`, band tapers every 30 m but only once the slot
@@ -239,7 +239,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     station-or-train choice): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
   - `interiorGeometry.ts` interior to strong/fine line buffers (levels, outlines, entrances);
-    `interiorConnectors.ts` stairs, ramps, escalators (a zero-run one gets a 30 degree run along the
+    `interiorConnectors.ts` stairs, ramps, walkways (`drawWalkway`: a flat connector between two areas of one level, two strong outline-colored sides, no end caps, dashed on a generated interior via `ConnectorContext.dash`), escalators (a zero-run one gets a 30 degree run along the
     station axis; on its listing entrance its street end sits there and the run heads toward the plan center,
     down below ground and up at an elevated station; else it is centered, descending toward the center) and elevators (shaft squared to the axis, a stop at each end in that level's pass; machines take
     half the depth fade). An escalator is a band with fine handrails and travel chevrons; an elevator is four
@@ -586,7 +586,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   you-are-here reticle 6.55, above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
-  The focused station (picked or auto-focused by zoom) draws no marker and no
+  The focused station (picked or auto-focused by zoom), and the other members of its complex once the interior that covers them is loaded, draw no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
@@ -635,8 +635,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Picking is screen space, on click only: `ScenePicker` listens on the canvas (never stopping or
   preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),
   projects stations (22 px) and live trains (16 px, dot or car line, read from the slot table) to pixels,
-  and a station wins unless a train is 6 px closer or the station is the open one. A station's target grows
-  to its drawn marker at close zoom; a touch with no station in reach (the open station, whose marker is hidden, doesn't count) gets 22 px
+  and a station wins unless a train is 6 px closer or the station is the open one or a hidden sibling of its complex (`hiddenSiblings`, passed to `choosePick` and `trainHitPx` as a set of indices with the open station; a direct tap on a hidden sibling with no train in reach still picks it). A station's target grows
+  to its drawn marker at close zoom; a touch with no station in reach (the open station and its hidden siblings, whose markers are hidden, don't count) gets 22 px
   for trains; cars are tested
   along their floor and roof lines. No meshes carry r3f pointer handlers.
 - Live train dots and cars are instanced too, with per-slot colors (`routeLineColor` like the lines; car
@@ -690,7 +690,7 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
 - `connectors` (stair, escalator, elevator, ramp, walkway) have `lower`/`upper` endpoints `{x, z, level}` and a
   `width`. An authored `at` end may carry `area`, the id of the platform or slab it stands on (checked against that
   area alone; never on a street end). A walkway (authored only) joins two different areas on one non-street level:
-  both ends `at` with an `area`, a plan run of 1 m or more, and no lower-below-upper rule. Nothing draws walkways yet. Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
+  both ends `at` with an `area`, a plan run of 1 m or more, and no lower-below-upper rule. A walkway draws as two flat sides (`drawWalkway`). Elevators and escalators use the MTA equipment code as `id` ("EL358"), the join key for
   outages. Elevators, and escalators from the E&E inventory, have identical x/z at both ends (the renderer
   gives such an escalator a 30 degree run; when an entrance lists it and it sits there, its street end is pinned
   at the entrance: the upper end below ground, the lower end at an elevated station). An escalator override's
