@@ -38,25 +38,43 @@ const ORDINAL = /^(\d+)(st|nd|rd|th)$/i
 const NUMBERED = /^\d/
 const SINGLE_LETTER = /^[A-Za-z]$/
 
+/** Compass words, long or already short, as a trailing suffix ("Park Avenue South"). */
+const COMPASS: Readonly<Record<string, string>> = { ...DIRECTIONS, n: 'N', s: 'S', e: 'E', w: 'W' }
+/** Words that are always shortened, wherever they stand. */
+const ALWAYS: Readonly<Record<string, string>> = { saint: 'St', fort: 'Ft' }
+
 const keyOf = (word: string) => word.toLowerCase().replace(/\.$/, '')
 
 /**
  * The name as a sign would print it. A type word is shortened when it ends the name ("Bedford Avenue" → "Bedford Av"),
- * or opens a two-word name before a single letter ("Avenue U" → "Av U"); an ordinal loses its suffix before a type
- * word ("5th Avenue" → "5 Av"); a compass word is shortened only before a numbered word ("North 7th Street" →
- * "N 7 St"), so "West End Avenue" and "East Broadway" keep theirs. Other words stay as written.
+ * when only a compass word follows it ("Park Avenue South" → "Park Av S", the compass word shortened too), when
+ * "Service" and a closing type word follow it ("1st Avenue Service Road" → "1 Av Service Rd"), or when it opens a
+ * two-word name before a single letter ("Avenue U" → "Av U"). An ordinal loses its suffix before a shortened type
+ * word ("5th Avenue" → "5 Av"); a leading compass word is shortened only before a numbered word ("North 7th Street"
+ * → "N 7 St"), so "West End Avenue" and "East Broadway" keep theirs. Saint and Fort are always St and Ft. Other
+ * words stay as written.
  */
 export function abbreviateStreet(name: string): string {
   const words = name.trim().split(/\s+/)
-  const isType = (i: number) => i < words.length && TYPE_WORDS[keyOf(words[i]!)] !== undefined
-  const typeAt = (i: number) =>
-    isType(i) && (i === words.length - 1 || (i === 0 && words.length === 2 && SINGLE_LETTER.test(words[1]!)))
+  const n = words.length
+  const key = (i: number) => (i >= 0 && i < n ? keyOf(words[i]!) : '')
+  const isType = (i: number) => TYPE_WORDS[key(i)] !== undefined
+  const typeAt = (i: number): boolean => {
+    if (!isType(i)) return false
+    if (i === n - 1) return true
+    if (i === n - 2 && COMPASS[key(n - 1)] !== undefined) return true
+    if (i === n - 3 && key(i + 1) === 'service' && isType(n - 1)) return true
+    return i === 0 && n === 2 && SINGLE_LETTER.test(words[1]!)
+  }
   const out = words.map((word, i) => {
-    if (typeAt(i)) return TYPE_WORDS[keyOf(word)]!
+    const always = ALWAYS[key(i)]
+    if (always) return always
+    if (typeAt(i)) return TYPE_WORDS[key(i)]!
+    if (i === n - 1 && COMPASS[key(i)] !== undefined && typeAt(i - 1)) return COMPASS[key(i)]!
     const ordinal = ORDINAL.exec(word)
-    if (ordinal && isType(i + 1)) return ordinal[1]!
-    const direction = DIRECTIONS[keyOf(word)]
-    if (direction && i + 1 < words.length && NUMBERED.test(words[i + 1]!)) return direction
+    if (ordinal && typeAt(i + 1)) return ordinal[1]!
+    const direction = DIRECTIONS[key(i)]
+    if (direction && i + 1 < n && NUMBERED.test(words[i + 1]!)) return direction
     return word
   })
   return out.join(' ')
@@ -74,13 +92,13 @@ const SIDE_WORDS: Readonly<Record<Exclude<StreetSide, 'median'>, string>> = {
 }
 
 /** What the entrance label needs from a street file's entrance. */
-export type LabelledEntrance = Pick<StreetEntrance, 'street' | 'cross' | 'side' | 'plaza' | 'type' | 'entry'>
+export type LabelledEntrance = Pick<StreetEntrance, 'street' | 'cross' | 'side' | 'plaza' | 'type' | 'entry' | 'exit'>
 
 /**
  * The text beside an entrance mark, street first: "Bedford Av & N 7 St · NE corner", "Broadway median at W 95 St",
  * "Bedford Av · east side", the street (and cross street) alone when no side is known, or the plaza's name when no
- * street is in range. " · elevator" for an elevator entrance, " · exit only" when it can't be entered. Null when the
- * entrance has neither a street nor a plaza.
+ * street is in range. " · elevator" for an elevator entrance, " · exit only" when it can't be entered, " · entry
+ * only" when it can't be left by. Null when the entrance has neither a street nor a plaza.
  */
 export function entranceLabel(e: LabelledEntrance): string | null {
   let text: string
@@ -98,5 +116,6 @@ export function entranceLabel(e: LabelledEntrance): string | null {
   }
   if (e.type === 'Elevator') text += ' · elevator'
   if (!e.entry) text += ' · exit only'
+  else if (!e.exit) text += ' · entry only'
   return text
 }

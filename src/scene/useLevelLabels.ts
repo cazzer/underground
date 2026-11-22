@@ -2,6 +2,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef, type RefObject } from 'react'
 import { Vector3, type Group } from 'three'
 import type { LevelLabel } from '../lib/interiorFraming'
+import type { LabelBlockers } from '../lib/labelBlockers'
+import { RECT } from '../lib/labelGeometry'
 
 /** A background-colored halo instead of a filled chip, so strokes show through; the street labels share it. */
 export const LABEL_HALO = '[text-shadow:0_0_2px_var(--ug-bg),0_0_2px_var(--ug-bg),0_0_5px_var(--ug-bg)]'
@@ -18,12 +20,19 @@ const lookDir = new Vector3()
  * label and unmounts it inside a layout-effect cleanup, which React 19 reports as "unmount a root while already
  * rendering" whenever the scene commits inside a DOM render (StrictMode's mount cycle at a hash load).
  * `opacity` is read every frame; a label at 0 is hidden, as is one behind the camera. Register it after the frame
- * that scales `group`, so a label never trails its levels by a frame.
+ * that scales `group`, so a label never trails its levels by a frame. Each shown label's canvas rect goes to
+ * `blockers` (its version bumped on any change), so the street labels keep clear of it; the sizes are measured after
+ * mount, after the fonts load and on resize.
  */
-export function useLevelLabels(labels: LevelLabel[], group: RefObject<Group | null>, opacity: RefObject<number>): void {
+export function useLevelLabels(
+  labels: LevelLabel[],
+  group: RefObject<Group | null>,
+  opacity: RefObject<number>,
+  blockers: LabelBlockers,
+): void {
   const host = useThree((s) => s.gl.domElement.parentElement)
   const els = useRef<HTMLDivElement[]>([])
-  const last = useRef<{ x: number; y: number; opacity: number; behind: boolean }[]>([])
+  const last = useRef<{ x: number; y: number; opacity: number; behind: boolean; w: number; h: number }[]>([])
 
   useEffect(() => {
     if (!host) return
@@ -36,14 +45,36 @@ export function useLevelLabels(labels: LevelLabel[], group: RefObject<Group | nu
       host.appendChild(el)
       return el
     })
+    const state = made.map(() => ({ x: NaN, y: NaN, opacity: NaN, behind: false, w: 0, h: 0 }))
+    // One read pass after the writes, so one layout; a label hidden behind the camera keeps its last size.
+    const measure = () => {
+      made.forEach((el, i) => {
+        if (el.offsetWidth > 0) state[i]!.w = el.offsetWidth
+        if (el.offsetHeight > 0) state[i]!.h = el.offsetHeight
+      })
+      blockers.version++
+    }
+    measure()
     els.current = made
-    last.current = made.map(() => ({ x: NaN, y: NaN, opacity: NaN, behind: false }))
+    last.current = state
+    let live = true
+    document.fonts.ready.then(
+      () => {
+        if (live) measure()
+      },
+      (err: unknown) => console.error('Level labels: waiting for fonts failed', err),
+    )
+    window.addEventListener('resize', measure)
     return () => {
+      live = false
+      window.removeEventListener('resize', measure)
       for (const el of made) el.remove()
       els.current = []
       last.current = []
+      blockers.count = 0
+      blockers.version++
     }
-  }, [host, labels])
+  }, [host, labels, blockers])
 
   useFrame(({ camera, size }) => {
     const g = group.current
@@ -53,6 +84,9 @@ export function useLevelLabels(labels: LevelLabel[], group: RefObject<Group | nu
     g.updateWorldMatrix(true, false)
     camera.getWorldDirection(lookDir)
     const o = opacity.current
+    const room = blockers.rects.length / RECT
+    let count = 0
+    let changed = false
     for (let i = 0; i < list.length; i++) {
       const el = list[i]!
       const prev = last.current[i]!
@@ -78,6 +112,27 @@ export function useLevelLabels(labels: LevelLabel[], group: RefObject<Group | nu
         prev.x = x
         prev.y = y
       }
+      // -translate-x-1/2: the label's top edge is centered on (x, y).
+      if (count < room) changed = writeBlocker(blockers.rects, count++, x - prev.w / 2, y, x + prev.w / 2, y + prev.h) || changed
+    }
+    if (changed || count !== blockers.count) {
+      blockers.count = count
+      blockers.version++
     }
   })
+}
+
+/** Writes packed rect `r` and says whether it changed. */
+function writeBlocker(rects: Float32Array, r: number, left: number, top: number, right: number, bottom: number): boolean {
+  const o = r * RECT
+  // Float32 storage: compare after the write's rounding.
+  const was0 = rects[o]
+  const was1 = rects[o + 1]
+  const was2 = rects[o + 2]
+  const was3 = rects[o + 3]
+  rects[o] = left
+  rects[o + 1] = top
+  rects[o + 2] = right
+  rects[o + 3] = bottom
+  return rects[o] !== was0 || rects[o + 1] !== was1 || rects[o + 2] !== was2 || rects[o + 3] !== was3
 }

@@ -4,11 +4,13 @@ import { Matrix4, Vector3 } from 'three'
 import type { StreetLayer } from '../data/useStationStreets'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
+import type { LabelBlockers } from '../lib/labelBlockers'
 import { streetLabelRadiusM } from '../lib/streetLabelReveal'
 import { createLabelPlacement, placeLabels, type LabelPlacement, type PlacementView } from './streetLabelPlacement'
 import { LABEL_HALO } from './useLevelLabels'
 
-const BASE = 'pointer-events-none absolute top-0 left-0 font-mono text-[10px] whitespace-nowrap'
+const WRAPPER_CLASS = 'pointer-events-none absolute inset-0'
+const BASE = 'absolute top-0 left-0 font-mono text-[10px] whitespace-nowrap'
 // Streets read like the level labels; entrances in normal case and full ink, as places to walk to.
 const STREET_CLASS = `${BASE} text-ink-dim uppercase tracking-widest ${LABEL_HALO}`
 const ENTRANCE_CLASS = `${BASE} text-ink ${LABEL_HALO}`
@@ -20,6 +22,8 @@ const a = new Vector3()
 const b = new Vector3()
 
 interface LabelDom {
+  /** Holds every label: its opacity and visibility fade them all at once. */
+  wrapper: HTMLDivElement
   els: HTMLDivElement[]
   place: LabelPlacement
   /** What was last written per label, so a frame only touches what changed. */
@@ -32,6 +36,7 @@ interface LabelDom {
   cam: Matrix4
   proj: Matrix4
   insets: Insets | null
+  levelsVersion: number
   dirty: boolean
   /** The last placement's view (canvas, insets, panel); reused, written field by field, never reallocated. */
   view: PlacementView
@@ -39,22 +44,15 @@ interface LabelDom {
 
 function measure(dom: LabelDom): void {
   // Read every size in one pass after the writes, so it is one layout.
-  dom.els.forEach((el, i) => {
-    dom.place.w[i] = el.offsetWidth
-    dom.place.h[i] = el.offsetHeight
-  })
+  for (let i = 0; i < dom.els.length; i++) {
+    dom.place.w[i] = dom.els[i]!.offsetWidth
+    dom.place.h[i] = dom.els[i]!.offsetHeight
+  }
   dom.dirty = true
 }
 
-function hideAll(dom: LabelDom): void {
-  for (let i = 0; i < dom.els.length; i++) {
-    if (dom.shown[i] === 0) continue
-    dom.els[i]!.style.visibility = 'hidden'
-    dom.shown[i] = 0
-  }
-}
-
-/** Writes each label's place and visibility from the last placement, touching only what changed. */
+/** Writes each label's place and visibility from the last placement, touching only what changed. A placed label
+ *  inherits the wrapper's visibility; an unplaced one is hidden. */
 function writeLabels(dom: LabelDom): void {
   const p = dom.place
   const entrances = p.entrances.length
@@ -63,7 +61,7 @@ function writeLabels(dom: LabelDom): void {
     const k = p.out[i]!
     const show = k >= 0 ? 1 : 0
     if (show !== dom.shown[i]) {
-      el.style.visibility = show ? 'visible' : 'hidden'
+      el.style.visibility = show ? 'inherit' : 'hidden'
       dom.shown[i] = show
     }
     if (!show) continue
@@ -80,18 +78,29 @@ function writeLabels(dom: LabelDom): void {
   }
 }
 
+function makeLabel(wrapper: HTMLDivElement, text: string, className: string): HTMLDivElement {
+  const el = document.createElement('div')
+  el.className = className
+  el.style.visibility = 'hidden'
+  el.textContent = text
+  wrapper.appendChild(el)
+  return el
+}
+
 /**
- * The focused station's street and entrance labels: aria-hidden DOM divs in the canvas's container (z-index 0, under
- * the HUD), as the level labels are (useLevelLabels.ts). Sized once after mount and again once the fonts load. Each
- * frame where the camera, canvas, insets, panel or opacity changed, the candidates are projected and decluttered
- * (entrances first, then streets, longest first), keeping clear of the header, footer and panel; nothing else
- * touches the DOM. `opacity` is read every frame (0 hides them all). Register it after the frame that writes it.
+ * The focused station's street and entrance labels: one aria-hidden wrapper div in the canvas's container (z-index
+ * 0, under the HUD) holding a div per label, as the level labels are placed (useLevelLabels.ts). Sized after mount,
+ * after the fonts load and on resize. Each frame where the camera, canvas, insets, panel, level labels (`levels`,
+ * read a frame late) or opacity changed, the candidates are projected and decluttered (entrances first, then streets,
+ * longest first), keeping clear of the header, footer, panel, entrance marks and level labels; nothing else touches
+ * the DOM. `opacity` is read every frame (0 hides them all). Register it after the frame that writes it.
  */
 export function useStreetLabels(
   layer: StreetLayer,
   opacity: RefObject<number>,
   insets: RefObject<Insets>,
   panel: RefObject<ScreenRect | null>,
+  levels: LabelBlockers,
   markHalfM: number,
 ): void {
   const host = useThree((s) => s.gl.domElement.parentElement)
@@ -100,22 +109,19 @@ export function useStreetLabels(
 
   useEffect(() => {
     if (!host) return
-    const texts = [
-      ...layer.entrances.map((e) => ({ text: e.text, cls: ENTRANCE_CLASS })),
-      ...layer.streets.map((s) => ({ text: s.text, cls: STREET_CLASS })),
+    const wrapper = document.createElement('div')
+    wrapper.className = WRAPPER_CLASS
+    wrapper.style.zIndex = '0'
+    wrapper.style.visibility = 'hidden'
+    wrapper.setAttribute('aria-hidden', 'true')
+    const els = [
+      ...layer.entrances.map((e) => makeLabel(wrapper, e.text, ENTRANCE_CLASS)),
+      ...layer.streets.map((s) => makeLabel(wrapper, s.text, STREET_CLASS)),
     ]
-    const els = texts.map(({ text, cls }) => {
-      const el = document.createElement('div')
-      el.className = cls
-      el.style.zIndex = '0'
-      el.style.visibility = 'hidden'
-      el.setAttribute('aria-hidden', 'true')
-      el.textContent = text
-      host.appendChild(el)
-      return el
-    })
+    host.appendChild(wrapper)
     const n = els.length
     const state: LabelDom = {
+      wrapper,
       els,
       place: createLabelPlacement(layer.entrances, layer.streets),
       x: new Float32Array(n).fill(NaN),
@@ -126,6 +132,7 @@ export function useStreetLabels(
       cam: new Matrix4(),
       proj: new Matrix4(),
       insets: null,
+      levelsVersion: NaN,
       dirty: true,
       view: {
         camera,
@@ -144,16 +151,19 @@ export function useStreetLabels(
     measure(state)
     dom.current = state
     let live = true
-    // A web font arriving later changes every width.
+    // A web font arriving later, or a phone turning, changes the sizes.
     document.fonts.ready.then(
       () => {
         if (live) measure(state)
       },
       (err: unknown) => console.error('Street labels: waiting for fonts failed', err),
     )
+    const onResize = () => measure(state)
+    window.addEventListener('resize', onResize)
     return () => {
       live = false
-      for (const el of els) el.remove()
+      window.removeEventListener('resize', onResize)
+      wrapper.remove()
       dom.current = null
     }
   }, [host, camera, layer, markHalfM])
@@ -163,11 +173,11 @@ export function useStreetLabels(
     if (!d) return
     const o = opacity.current
     if (o !== d.opacity) {
-      for (const el of d.els) el.style.opacity = String(o)
+      d.wrapper.style.opacity = String(o)
+      if ((o > 0) !== (d.opacity > 0)) d.wrapper.style.visibility = o > 0 ? 'visible' : 'hidden'
       d.opacity = o
     }
     if (!(o > 0)) {
-      hideAll(d)
       d.dirty = true
       return
     }
@@ -184,12 +194,14 @@ export function useStreetLabels(
       view.left !== size.left ||
       view.top !== size.top ||
       d.insets !== ins ||
-      view.panel !== pan
+      view.panel !== pan ||
+      d.levelsVersion !== levels.version
     if (!moved) return
     d.dirty = false
     d.cam.copy(camera.matrixWorld)
     d.proj.copy(camera.projectionMatrix)
     d.insets = ins
+    d.levelsVersion = levels.version
     view.width = size.width
     view.height = size.height
     view.left = size.left
@@ -198,8 +210,7 @@ export function useStreetLabels(
     view.insetBottom = ins.bottom
     view.panel = pan
     view.radiusM = streetLabelRadiusM(size)
-    placeLabels(d.place, layer.anchor, view, a, b)
+    placeLabels(d.place, layer.anchor, view, levels, a, b)
     writeLabels(d)
   })
 }
-

@@ -29,13 +29,34 @@ describe('abbreviateStreet', () => {
     expect(abbreviateStreet('South 4th Street')).toBe('S 4 St')
   })
 
+  it('handles the suffixed names the street files carry', () => {
+    expect(abbreviateStreet('7th Avenue South')).toBe('7 Av S')
+    expect(abbreviateStreet('1st Avenue Service Road')).toBe('1 Av Service Rd')
+    expect(abbreviateStreet('East 14th Street Service Road')).toBe('E 14 St Service Rd')
+    expect(abbreviateStreet('Park Avenue South')).toBe('Park Av S')
+    expect(abbreviateStreet('Astoria Boulevard North')).toBe('Astoria Blvd N')
+    expect(abbreviateStreet('Pelham Parkway South')).toBe('Pelham Pkwy S')
+    expect(abbreviateStreet('Hoyt Avenue North')).toBe('Hoyt Av N')
+    expect(abbreviateStreet('Avenue S')).toBe('Av S')
+  })
+
+  it('always shortens Saint and Fort', () => {
+    expect(abbreviateStreet('Saint Nicholas Avenue')).toBe('St Nicholas Av')
+    expect(abbreviateStreet('Fort Hamilton Parkway')).toBe('Ft Hamilton Pkwy')
+  })
+
+  it('keeps an ordinal not followed by a shortened type word', () => {
+    expect(abbreviateStreet('5th Avenue of Art')).toBe('5th Avenue of Art')
+    expect(abbreviateStreet('West Street')).toBe('West St')
+  })
+
   it('leaves names with no type word alone', () => {
     expect(abbreviateStreet('Broadway')).toBe('Broadway')
     expect(abbreviateStreet('  The Bowery ')).toBe('The Bowery')
   })
 })
 
-const base: LabelledEntrance = { street: 'Bedford Avenue', cross: null, side: null, plaza: null, type: 'Stair', entry: true }
+const base: LabelledEntrance = { street: 'Bedford Avenue', cross: null, side: null, plaza: null, type: 'Stair', entry: true, exit: true }
 
 describe('entranceLabel', () => {
   it('names a corner street first, then the corner', () => {
@@ -68,6 +89,7 @@ describe('entranceLabel', () => {
       'Bedford Av & N 7 St · NE corner · elevator',
     )
     expect(entranceLabel({ ...base, side: 'east', entry: false })).toBe('Bedford Av · east side · exit only')
+    expect(entranceLabel({ ...base, side: 'east', exit: false })).toBe('Bedford Av · east side · entry only')
     expect(entranceLabel({ ...base, street: null, plaza: 'Times Square', entry: false })).toBe('Times Square · exit only')
   })
 })

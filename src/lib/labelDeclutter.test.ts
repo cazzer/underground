@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { declutter, type LabelBounds, type LabelCandidates } from './labelDeclutter'
-import { BOX, writeBox } from './labelGeometry'
+import { BOX, RECT, writeBox, writeRect } from './labelGeometry'
 
 const viewport = { left: 0, top: 0, right: 400, bottom: 300 }
 
@@ -19,10 +19,16 @@ function candidates(items: [number, number][][]): LabelCandidates {
   return { boxes, start, size, count: items.length }
 }
 
-function place(c: LabelCandidates, bounds: Partial<LabelBounds> = {}, prefer?: number[]): number[] {
+type Rect = { left: number; top: number; right: number; bottom: number }
+
+function place(c: LabelCandidates, bounds: { rects?: Rect[]; count?: number } = {}, prefer?: number[]): number[] {
   const out = new Int16Array(c.count)
   const p = new Int16Array(prefer ?? new Array<number>(c.count).fill(-1))
-  declutter(c, { viewport, rects: [], count: 0, ...bounds }, p, out)
+  const list = bounds.rects ?? []
+  const rects = new Float32Array(list.length * RECT)
+  list.forEach((r, i) => writeRect(rects, i, r.left, r.top, r.right, r.bottom))
+  const b: LabelBounds = { viewport, rects, count: bounds.count ?? 0 }
+  declutter(c, b, p, out)
   return [...out]
 }
 

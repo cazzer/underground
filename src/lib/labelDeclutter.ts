@@ -15,16 +15,18 @@ export interface LabelCandidates {
   count: number
 }
 
-/** What a label must keep clear of: the first `count` rects of `rects`, and anything outside `viewport`. */
+/** What a label must keep clear of: the first `count` packed rects of `rects` (labelGeometry's RECT floats each), and
+ *  anything outside `viewport`. */
 export interface LabelBounds {
   viewport: ScreenRect
-  rects: readonly ScreenRect[]
+  rects: Float32Array
   count: number
 }
 
 function fits(c: LabelCandidates, bounds: LabelBounds, out: Int16Array, i: number, box: number): boolean {
-  if (!boxInRect(c.boxes, box, bounds.viewport)) return false
-  for (let r = 0; r < bounds.count; r++) if (boxHitsRect(c.boxes, box, bounds.rects[r]!)) return false
+  const v = bounds.viewport
+  if (!boxInRect(c.boxes, box, v.left, v.top, v.right, v.bottom)) return false
+  for (let r = 0; r < bounds.count; r++) if (boxHitsRect(c.boxes, box, bounds.rects, r)) return false
   for (let j = 0; j < i; j++) {
     const k = out[j]!
     if (k >= 0 && boxesOverlap(c.boxes, box, c.start[j]! + k, LABEL_PAD_PX)) return false

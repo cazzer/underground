@@ -54,6 +54,8 @@ const ROLE_TOKEN: Record<InteriorRole, string> = {
 }
 
 const HULL_PAD = 6
+/** Side of the square drawn at each street entrance, meters; the street layer's own entrance marks match it. */
+export const ENTRANCE_SIZE_M = 2.5
 
 /**
  * Linear RGB per role and level: levels farther from the street (deeper, or higher at an elevated station) mix
@@ -109,7 +111,7 @@ function buildLayers(interior: StationInterior, hull: LocalPoint[] | null, outOf
     yScale: interiorLook.yScale,
     stepRise: 0.18,
     railDrop: RAIL_DROP_M,
-    entranceSize: 2.5,
+    entranceSize: ENTRANCE_SIZE_M,
     guides: interiorLook.guides,
     dashStructure: interior.generated !== undefined,
     splitLevel,
