@@ -1,0 +1,48 @@
+{
+  "stationId": "N07",
+  "anchor": {
+    "lat": 40.61182,
+    "lon": -73.98185
+  },
+  "format": 1,
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "osmTimestamp": "2026-11-22T04:33:58Z",
+  "radiusM": 300,
+  "walkRadiusM": 100,
+  "nodeId": [42468960,2,3,1,3,2,7,3,6,13600,2,5772,6747,6017,223,774,2,6973,2,5526,4,4747,14019,2333183420,1452286954,1,1346825231,1,2599,1,313333212,18661,1461994510,16459068,1231420382,1418402565,2,177042874,1987626372,4,26532032,8,1,1,104,52328,1163278,3,5,6714,6,9,46,2,4019387,18,1,34,62818599,21625722,2402505,9033013],
+  "x": [887,359,79,-160,-669,-1250,-1654,-1996,-2129,1090,1405,-1002,-1786,-349,2922,2762,2235,2057,2250,-566,-217,3789,565,-1256,304,108,-2230,-1931,1973,2880,-1881,-2416,-1251,-590,2649,1016,1015,-2603,-1392,-609,173,51,951,154,1799,2642,-2969,-3459,-3951,-620,-644,-523,-165,-301,482,2912,3011,618,976,-1991,-2479,-1452],
+  "z": [-2923,-2255,-1887,-1577,-971,-230,280,709,881,-1668,1307,1662,1775,-1720,-216,-1429,-761,-898,1188,-842,1547,476,1431,-416,1470,1499,821,824,-763,-92,1081,1871,-37,-897,-1520,-1384,-1453,1492,4496,4379,4270,-1643,4161,-1824,4035,3914,-1791,-1168,-550,-762,-805,-959,1448,1468,1358,1093,936,1330,-2853,-3026,-2413,-3696],
+  "ways": [
+    {"id":5677053,"highway":"residential","name":"West 6th Street","oneway":0,"nodes":[9,36,35,10]},
+    {"id":5677581,"highway":"residential","name":"West 9th Street","oneway":1,"nodes":[39,11,32,5]},
+    {"id":5678208,"highway":"residential","name":"West 10th Street","oneway":1,"nodes":[7,27,30,12,38]},
+    {"id":5678632,"highway":"residential","name":"West 4th Street","oneway":1,"nodes":[14,29,56]},
+    {"id":5679739,"highway":"residential","name":"West 8th Street","oneway":1,"nodes":[4,33,19,20,40]},
+    {"id":221441124,"highway":"primary","name":"Bay Parkway","oneway":0,"nodes":[2,3,4,5,6,7,8,37]},
+    {"id":379499860,"highway":"residential","name":"Avenue O","oneway":0,"nodes":[24,22,10]},
+    {"id":379499861,"highway":"residential","name":"Avenue O","oneway":0,"nodes":[25,24]},
+    {"id":533389641,"highway":"residential","name":"Avenue O","oneway":0,"nodes":[31,12,11,20,25]},
+    {"id":545482903,"highway":"residential","name":"23rd Avenue","oneway":0,"nodes":[15,16]},
+    {"id":689027337,"highway":"residential","name":"64th Street","oneway":1,"nodes":[58,34]},
+    {"id":689027338,"highway":"secondary","name":"65th Street","oneway":0,"nodes":[61,1,9,17,16,14,21]},
+    {"id":742380108,"highway":"primary","name":"Bay Parkway","oneway":0,"nodes":[0,1,2]},
+    {"id":1062936766,"highway":"residential","name":"West 6th Street","oneway":0,"nodes":[10,44]},
+    {"id":1062936767,"highway":"residential","name":"Avenue O","oneway":0,"nodes":[10,18,55]},
+    {"id":1218346993,"highway":"residential","name":"67th Street","oneway":1,"nodes":[60,4]},
+    {"id":1218376899,"highway":"residential","name":"68th Street","oneway":1,"nodes":[5,23,46]},
+    {"id":1218377243,"highway":"residential","name":"Bay Ridge Avenue","oneway":1,"nodes":[47,6]},
+    {"id":1218377477,"highway":"residential","name":"66th Street","oneway":1,"nodes":[3,13,59]},
+    {"id":1218377762,"highway":"residential","name":"70th Street","oneway":1,"nodes":[8,26,48]},
+    {"id":1232183329,"highway":"residential","name":"West 7th Street","oneway":1,"nodes":[42,22,2]},
+    {"id":1250690549,"highway":"residential","name":"West 5th Street","oneway":1,"nodes":[45,18,28,17]},
+    {"id":1271516926,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[51,52]},
+    {"id":1271516931,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[54,41]},
+    {"id":1271516933,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[57,43]},
+    {"id":1271647327,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[50,49,53]}
+  ],
+  "entrances": [
+    {"x":-198,"z":-1300,"type":"Station House","entry":true,"exit":true,"stopIds":["N07"],"street":"Bay Parkway","wayId":221441124,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":191,"z":1354,"type":"Station House","entry":true,"exit":true,"stopIds":["N07"],"street":"Avenue O","wayId":379499861,"cross":null,"crossWayId":null,"side":"north","plaza":null}
+  ]
+}

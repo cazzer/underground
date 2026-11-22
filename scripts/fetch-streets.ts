@@ -118,6 +118,7 @@ async function main(): Promise<void> {
     query: streetsQueryParts(RADIUS_M, walk),
     stations: stations.length,
     stationsFeedVersion: feedVersion,
+    stationIds: stations.map((s) => s.id).sort(),
     shards: shards.map((s) => ({ file: shardFileName(s.cell), ways: s.ways.length, nodes: s.nodes.length })),
   }
   const files = [

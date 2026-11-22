@@ -84,5 +84,7 @@ export interface StreetsManifest {
   stations: number
   /** `feedVersion` of the public/data/stations.json the station points came from. */
   stationsFeedVersion: string
+  /** The station ids the fetch covered, sorted: what the pin has ways for. A station added since is not in it. */
+  stationIds: string[]
   shards: ManifestShard[]
 }

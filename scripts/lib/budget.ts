@@ -10,6 +10,11 @@ export const GZIP_BUDGET_BYTES = 60_000
 /** stations/index.json loads after startup (not render-blocking), so it has its own cap outside the budget above. */
 export const INDEX_GZIP_CAP_BYTES = 8_000
 
+/** public/data/streets/<id>.json loads on focus, outside the budget above; each file has this cap... */
+export const STREETS_FILE_GZIP_CAP_BYTES = 16_000
+/** ...and the directory this one: the measured total plus a quarter, rounded up, so growth in the pin shows in review. */
+export const STREETS_TOTAL_GZIP_CAP_BYTES = 1_800_000
+
 export interface RenderedFile {
   name: string
   text: string
@@ -59,4 +64,11 @@ export function checkFileCap(file: RenderedFile, capBytes: number): number {
 /** The station index must fit its own cap; returns its gzip size. */
 export function checkIndexCap(index: RenderedFile): number {
   return checkFileCap(index, INDEX_GZIP_CAP_BYTES)
+}
+
+/** The street files together must fit their total cap; returns their gzip total. */
+export function checkStreetsTotal(files: readonly RenderedFile[], capBytes: number = STREETS_TOTAL_GZIP_CAP_BYTES): number {
+  const total = files.reduce((sum, f) => sum + f.gzip, 0)
+  if (total > capBytes) throw new Error(`The ${files.length} street files total ${total} B gzipped, over the ${capBytes} B cap. Nothing written.`)
+  return total
 }

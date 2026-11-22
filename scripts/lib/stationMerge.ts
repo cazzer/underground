@@ -13,13 +13,17 @@ import type { AuthoredStation, StationSources } from './stationInputs.ts'
 
 const ROW_TOLERANCE_DEG = 1e-6
 const CONTAINMENT_M = 0.5
+export const MTA_CREDIT = 'Metropolitan Transportation Authority, data.ny.gov'
 const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
   osm: '© OpenStreetMap contributors',
-  nyopendata: 'Metropolitan Transportation Authority, data.ny.gov',
+  nyopendata: MTA_CREDIT,
 }
 
 /** Appended after the MTA credit: the nyopendata elements are not ODbL (user's licensing decision, card 9wc.1.1 option A). */
 export const OPEN_NY_NOTE = 'Elements whose sources include nyopendata contain MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
+
+/** The street files' counterpart of OPEN_NY_NOTE: their entrance points are MTA data, the rest of the file is OSM. */
+export const ENTRANCES_OPEN_NY_NOTE = 'Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL'
 
 const byId = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 

@@ -1,0 +1,49 @@
+{
+  "stationId": "N05",
+  "anchor": {
+    "lat": 40.62067,
+    "lon": -73.99041
+  },
+  "format": 1,
+  "license": "ODbL-1.0",
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
+  "osmTimestamp": "2026-11-22T04:33:58Z",
+  "radiusM": 300,
+  "walkRadiusM": 100,
+  "nodeId": [42471453,6080,6732,2,1855,3,14974,4,525,3,2,10689,4,4,2,3785498026,1,1,7272268837,127998387,33,522408796,54205552,5476715,262710,9020669,1,29985,17055,3118674,28072220,5773,1,1905,12230,18709,10260,11075,14144,38358,53430269,2432,9443,580380122,4,3,5],
+  "x": [-2802,-3298,267,2160,-223,1680,-2264,-325,-714,-1207,-1735,2661,1198,712,192,849,1026,-1042,877,1388,-809,2570,728,-1736,1907,592,-1177,677,2434,-1090,3412,-693,1078,2933,3906,-607,1160,-3431,-2881,-3744,-2232,-2723,-3215,2423,-53,-921,437],
+  "z": [420,23,-2356,-851,-1737,-225,846,2387,-1114,-490,179,-1503,403,1036,1711,860,628,-703,-2923,3752,3009,-1576,-2940,-3952,3068,1022,-386,910,2402,-499,1164,-1019,388,1776,539,-1122,282,1219,1627,-1422,-3335,-2704,-2093,-1194,2033,-852,1394],
+  "ways": [
+    {"id":5675871,"highway":"residential","name":"Wallaston Court","oneway":1,"nodes":[37,0]},
+    {"id":5677189,"highway":"residential","name":"61st Street","oneway":1,"nodes":[34,3,2,23]},
+    {"id":5678613,"highway":"residential","name":"66th Street","oneway":1,"nodes":[7,6,0,1]},
+    {"id":247960274,"highway":"residential","name":"60th Street","oneway":0,"nodes":[18,21]},
+    {"id":348697771,"highway":"residential","name":"63rd Street","oneway":1,"nodes":[33,12,8,41]},
+    {"id":379500307,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[16,15]},
+    {"id":379500308,"highway":"residential","name":"17th Avenue","oneway":0,"nodes":[17,9,10,6,38]},
+    {"id":436931742,"highway":"residential","name":"17th Avenue","oneway":0,"nodes":[22,2,4,8,45]},
+    {"id":671828851,"highway":"residential","name":"62nd Street","oneway":1,"nodes":[40,4,5,30]},
+    {"id":689027337,"highway":"residential","name":"64th Street","oneway":1,"nodes":[42,9,13,28]},
+    {"id":698305293,"highway":"secondary","name":"65th Street","oneway":0,"nodes":[39,10,14]},
+    {"id":698305294,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[15,13]},
+    {"id":1218346769,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[44,7]},
+    {"id":1218346812,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[7,20]},
+    {"id":1218377499,"highway":"residential","name":"66th Street","oneway":1,"nodes":[19,7]},
+    {"id":1218377843,"highway":"secondary","name":"65th Street","oneway":0,"nodes":[14,24]},
+    {"id":1272848093,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[29,27]},
+    {"id":1272848506,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[26,25]},
+    {"id":1276508944,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[35,36]},
+    {"id":1276508947,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[32,31]},
+    {"id":1349594566,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[13,46]},
+    {"id":1349594569,"highway":"residential","name":"17th Avenue","oneway":0,"nodes":[45,17]},
+    {"id":1349594573,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[14,44]},
+    {"id":1349594582,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[11,43]},
+    {"id":1349594585,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[3,5,12,16]},
+    {"id":1349594591,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[46,14]},
+    {"id":1349594596,"highway":"tertiary","name":"18th Avenue","oneway":0,"nodes":[43,3]}
+  ],
+  "entrances": [
+    {"x":-894,"z":-707,"type":"Station House","entry":true,"exit":true,"stopIds":["N05"],"street":"17th Avenue","wayId":1349594569,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":831,"z":657,"type":"Station House","entry":true,"exit":true,"stopIds":["N05"],"street":"18th Avenue","wayId":379500307,"cross":null,"crossWayId":null,"side":"west","plaza":null}
+  ]
+}
