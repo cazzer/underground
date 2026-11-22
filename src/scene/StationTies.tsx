@@ -38,8 +38,9 @@ interface StationTiesProps {
  * (tilt.ts): scale.y follows it as the lines' does, so each tie ends on its sunken track; the opacity ramps in
  * once the tie is long enough to read (tieOpacity).
  * A focused station with an interior draws no marker, so its tie is left out too, and so are its complex siblings'
- * (swapped to the end and not drawn). With no interior (focusedMarker) its marker stays and so does its tie; a station with no depth gets a
- * short stub (stationTie.ts) in a spare last slot instead.
+ * (compactTies shifts the ties that remain to the front, in order, and the layer draws only those). With no interior
+ * (focusedMarker) its marker stays and so does its tie; a station with no depth gets a short stub (stationTie.ts)
+ * instead, written in the slot just after the drawn ties.
  */
 export function StationTies({ network, focusedMarker, hiddenSiblings }: StationTiesProps) {
   const { focusedId } = useFocus()
@@ -70,9 +71,9 @@ export function StationTies({ network, focusedMarker, hiddenSiblings }: StationT
   const lines = ties.lines
   const lastDepth = useRef(NaN)
 
-  // Every tie but the hidden ones (the focused station's and its siblings'): each segment trades places with the
-  // last remaining tie, which is then not drawn. A fallback station without a tie gets the stub slot after the
-  // drawn ties (a fallback has no siblings).
+  // Every tie but the hidden ones (the focused station's and its siblings'): the rest shift to the front in order
+  // and only they are drawn. A fallback station without a tie gets the stub written at slot `drawn`, right after
+  // them (a fallback has no siblings, so nothing is dropped then).
   useLayoutEffect(() => {
     const attr = ties.lines.geometry.attributes.instanceStart as InterleavedBufferAttribute
     const buf = attr.data.array as Float32Array

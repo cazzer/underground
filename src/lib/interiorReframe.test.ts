@@ -15,9 +15,8 @@ describe('reframeAction', () => {
 
   it('waits while the flight is under way or the interior has not arrived', () => {
     expect(reframeAction(awaiting, { ...landed, flying: true })).toBe('wait')
+    // A stale interior of another station is not ready: interiorCovers decides that (interiorComplex.test.ts).
     expect(reframeAction(awaiting, { ...landed, interiorReady: false })).toBe('wait')
-    // A stale interior of the station before covers no part of this one: not ready.
-    expect(reframeAction(awaiting, { ...landed, interiorReady: false, focusedId: 'L08' })).toBe('wait')
   })
 
   it('reframes for a complex member the interior covers, whichever member awaited it', () => {

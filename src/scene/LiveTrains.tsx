@@ -67,7 +67,6 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   const selectedDot = useRef<Mesh<CircleGeometry, MeshBasicMaterial>>(null)
   const cars = useTrainCars()
   const spanCars = useSpanCars(cars)
-  const spans = interiorSpans
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
   const selection = useSelectedSlot(table, cars)
   const sm = selection.mix
@@ -230,7 +229,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn, mix < 1)
     const reveal = interiorOpacity(camera)
-    spanCars.write(table, spans, reveal, veilWeight(reveal, view.depth), mix, localS, sel, slotColors, cars.consistOf)
+    spanCars.write(table, interiorSpans, reveal, veilWeight(reveal, view.depth), mix, localS, sel, slotColors, cars.consistOf)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
     range.count = table.high * 16
     d.instanceMatrix.updateRanges.push(range)
