@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import { hiddenSiblingIds, interiorStationIds } from '../data/interiorLoad'
+import { hiddenSiblingIds, interiorStationIds, type IndexLoad } from '../data/interiorLoad'
 import type { LiveLayer } from '../data/useLive'
 import { createBandView } from '../lib/bandOffset'
 import type { Insets } from '../lib/framing'
@@ -40,13 +40,15 @@ interface SceneProps {
   focusedMarker: boolean
   /** The focused station's complex siblings from the index (empty for a lone station); hidden once the interior that covers them is loaded. */
   siblings: readonly string[]
+  /** The station index, from which the camera finds the focused and the closed station's complex. */
+  index: IndexLoad
   /** The station panel's screen rect; interior fly-tos frame beside it. */
   panel: ScreenRect | null
   /** The user's location, once found inside the covered area; null draws no marker. */
   here: { ground: Ground; accuracyM: number } | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, focusedMarker, siblings, panel, here }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, focusedMarker, siblings, index, panel, here }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -83,7 +85,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, fo
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
       <StationStreets />
       {interior && <StationInterior key={interior.stationId} model={interior} network={network} />}
-      <CameraRig network={network} insets={insets} panel={panel} interior={interior} anchor={anchor} />
+      <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
     </Canvas>
   )
 }

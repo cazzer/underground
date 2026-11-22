@@ -2,11 +2,11 @@ import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
-import { interiorCovers } from '../data/interiorLoad'
+import { interiorCovers, type IndexLoad } from '../data/interiorLoad'
 import { useFocus } from '../lib/focus'
 import { newDwell, settled } from '../lib/focusDwell'
 import { groupPositions, shouldReleaseHold, type FocusHold } from '../lib/focusHold'
-import { focusGroupFor, NO_FOCUS_GROUP, nextFocus, type FocusInput } from '../lib/focusMachine'
+import { NO_FOCUS_GROUP, nextFocus, type FocusInput } from '../lib/focusMachine'
 import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '../lib/flight'
 import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
@@ -27,6 +27,7 @@ import {
   type MapControlsImpl,
 } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
+import { useFocusGroups } from './useFocusGroups'
 import { useInteriorReframe } from './useInteriorReframe'
 import { useStationOrbit } from './useStationOrbit'
 import { useTrainFollow } from './useTrainFollow'
@@ -41,13 +42,15 @@ interface CameraRigProps {
   insets: Insets
   /** The focused station's interior once loaded; a click on that station frames it instead. */
   interior: InteriorModel | null
+  /** The station index: the focused and the closed station's complexes come from it. */
+  index: IndexLoad
   /** The station panel's screen rect, kept clear when framing an interior. */
   panel: ScreenRect | null
   /** The selected train's drawn point (LiveTrains writes it at -3): the camera follows it. */
   anchor: FollowAnchor
 }
 
-export function CameraRig({ network, insets, interior, panel, anchor }: CameraRigProps) {
+export function CameraRig({ network, insets, interior, index, panel, anchor }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -66,12 +69,9 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     stations: network.stations,
     settled: false,
     focusGroup: NO_FOCUS_GROUP,
+    dismissedGroup: NO_FOCUS_GROUP,
   })
-  // The focused complex's members (none for a lone station), set when the interior or focus changes, never per frame.
-  const focusGroup = useRef(NO_FOCUS_GROUP)
-  useLayoutEffect(() => {
-    focusGroup.current = input.current.focusGroup = focusGroupFor(interior, focusedId)
-  }, [interior, focusedId])
+  const focusGroup = useFocusGroups(input, index, interior, focusedId, dismissedId)
   // Auto-focus enters only once the view has held still (focusDwell.ts); a gesture in progress never has.
   const dwell = useRef(newDwell())
   const gesture = useRef(false)
@@ -241,7 +241,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
       // Cheap pre-check on the reused input; only a real change pays for a copied target and
       // a functional update, which re-runs the rules against the latest state.
       if (nextFocus(cur) !== cur) {
-        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, cur.settled, cur.focusGroup)
+        updateFromCamera(distance, { x: c.target.x, z: c.target.z }, network.stations, cur.settled, cur.focusGroup, cur.dismissedGroup)
       }
     }
 

@@ -37,6 +37,7 @@ interface FocusValue {
     stations: readonly Station[],
     settled: boolean,
     focusGroup?: ReadonlySet<string>,
+    dismissedGroup?: ReadonlySet<string>,
   ) => void
 }
 
@@ -81,9 +82,9 @@ export function FocusProvider({ children }: FocusProviderProps) {
     [],
   )
   const updateFromCamera = useCallback(
-    (distance: number, target: Ground, stations: readonly Station[], settled: boolean, focusGroup: ReadonlySet<string> = NO_FOCUS_GROUP) =>
+    (distance: number, target: Ground, stations: readonly Station[], settled: boolean, focusGroup: ReadonlySet<string> = NO_FOCUS_GROUP, dismissedGroup: ReadonlySet<string> = NO_FOCUS_GROUP) =>
       setState((prev) => {
-        const next = nextFocus({ ...prev, distance, target, stations, settled, focusGroup })
+        const next = nextFocus({ ...prev, distance, target, stations, settled, focusGroup, dismissedGroup })
         return next.focusedId === prev.focusedId && next.dismissedId === prev.dismissedId
           ? prev
           : { focusedId: next.focusedId, dismissedId: next.dismissedId }

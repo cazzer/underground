@@ -35,7 +35,7 @@ function initialIndexLoad(): IndexLoad {
  */
 export function useStationInterior(
   stationId: string | null,
-): { load: InteriorLoad; retry: () => void; streetMarker: boolean; siblings: readonly string[] } {
+): { load: InteriorLoad; retry: () => void; streetMarker: boolean; siblings: readonly string[]; index: IndexLoad } {
   const [indexLoad, setIndexLoad] = useState<IndexLoad>(initialIndexLoad)
   const [settled, setSettled] = useState<SettledLoad | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -99,5 +99,5 @@ export function useStationInterior(
   const indexed = useMemo(() => siblingIdsOf(stationId, indexLoad), [stationId, indexLoad])
   const siblings = streetMarker ? NO_SIBLINGS : indexed
   // Whether the focused station keeps its street marker and tie (the no-interior fallback; see focusedMarkerShown).
-  return { load, retry, streetMarker, siblings }
+  return { load, retry, streetMarker, siblings, index: indexLoad }
 }
