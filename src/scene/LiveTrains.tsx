@@ -6,6 +6,7 @@ import type { LiveLayer } from '../data/useLive'
 import { clockNow } from '../lib/live/clock'
 import { carMix, carsReach } from '../lib/live/consist'
 import type { BandView } from '../lib/bandOffset'
+import { forgetSlot, selectedMixActive, slotMix, stepSelectedMix } from '../lib/live/selectedMix'
 import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import { addCarry } from '../lib/live/shapeCarry'
@@ -17,13 +18,13 @@ import type { Network } from '../lib/network'
 import { hopDistance } from '../lib/realtime/position'
 import { routeLineColor } from '../lib/routeColor'
 import { tiltT } from '../lib/tilt'
-import { useTrainSelection } from '../lib/trainSelection'
 import { theme } from '../theme'
 import { cameraDistance, getControls, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
 import { SpanCars } from './SpanCars'
 import { TrainCars } from './TrainCars'
 import { trainRadiusPx } from './trainSize'
+import { useSelectedSlot } from './useSelectedSlot'
 import { useSpanCars } from './useSpanCars'
 import { useTrainCars } from './useTrainCars'
 
@@ -64,9 +65,8 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   const spanCars = useSpanCars(cars)
   const spans = (interiorStationId !== null && network.platformSpans.get(interiorStationId)) || null
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
-  const { selectedKey } = useTrainSelection()
-  /** The slot drawn as selected, -1 for none. Read once per frame. */
-  const selectedSlot = useRef(-1)
+  const selection = useSelectedSlot(table, cars)
+  const sm = selection.mix
   /** Each slot's dot color (shared Color objects), so the selected dot can take it without allocating. */
   const slotColors = useMemo(() => new Array<Color | null>(TRAIN_CAPACITY).fill(null), [])
   const point = useMemo(createTrackPoint, [])
@@ -125,17 +125,10 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     cars.prepare()
     spanCars.prepare()
     for (let i = 0; i < TRAIN_CAPACITY; i++) colorSlot(d, i)
-    cars.setSelected(selectedSlot.current)
+    cars.setSelected(selection.slot.current)
     d.instanceColor!.needsUpdate = true
     d.count = h.count = 0
   }, [colorSlot, cars, spanCars])
-
-  useLayoutEffect(() => {
-    trainPick.current = { table, consistOf: cars.consistOf, y: DOT_Y, carHeightM: cars.carHeightM, view }
-    return () => {
-      trainPick.current = null
-    }
-  }, [trainPick, table, cars, view])
 
   useLayoutEffect(() => {
     const d = dots.current
@@ -149,15 +142,17 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     for (const i of needsColor) colorSlot(d, i)
     if (needsColor.length > 0) d.instanceColor!.needsUpdate = true
     if (overflow > 0) console.warn(`Live trains: ${overflow} trips over the ${TRAIN_CAPACITY}-slot capacity are not drawn`)
-  }, [trips, offsetS, table, colorSlot, view])
+    // A slot reused by another trip since the last poll loses the highlight.
+    selection.sync()
+  }, [trips, offsetS, table, colorSlot, view, selection])
 
-  // After the reconcile above, so a slot reused by another trip since the last poll loses the highlight.
   useLayoutEffect(() => {
-    const slot = selectedKey === null ? -1 : (table.byKey.get(selectedKey) ?? -1)
-    if (slot === selectedSlot.current) return
-    cars.setSelected(slot)
-    selectedSlot.current = slot
-  }, [selectedKey, trips, table, cars])
+    const mixOf = (slot: number, base: number) => slotMix(sm, slot, base)
+    trainPick.current = { table, consistOf: cars.consistOf, y: DOT_Y, carHeightM: cars.carHeightM, view, mixOf }
+    return () => {
+      trainPick.current = null
+    }
+  }, [trainPick, table, cars, view, sm])
 
   useFrame((state, dt) => {
     const d = dots.current
@@ -172,13 +167,14 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     const localS = perfMs / 1000
     const camera = cameraDistance(state)
     const mix = carMix(camera)
-    const scale = screenScale(camera, trainRadiusPx(camera), DOT_MIN_METERS) * (1 - mix)
-    const carsOn = mix > 0
+    stepSelectedMix(sm, camera, dt, selection.reducedMotion.matches)
+    const dotScale0 = screenScale(camera, trainRadiusPx(camera), DOT_MIN_METERS)
+    const carsOn = mix > 0 || selectedMixActive(sm)
     if (carsOn) cars.beginFrame(camera, view.depth)
     const center = getControls(state)?.target
     const reach = carsReach(camera, tiltT(camera))
     const out = d.instanceMatrix.array as Float32Array
-    const sel = selectedSlot.current
+    const sel = selection.slot.current
     let dotScale = 0
     let rimRadius = 0
 
@@ -192,17 +188,21 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
       addCarry(table.carry, i, localS, point, shift)
       const y = DOT_Y + point.y
       const k = slotScale(table, i, localS, FADE_S)
+      // The dot shrinks by 1 - m as the train lengthens by m; the selected train has its own m.
+      const m = slotMix(sm, i, mix)
+      const scale = dotScale0 * (1 - m)
       if (k === 0 && isLeaving(table, i)) {
         writeInstanceMatrix(out, i, 0, 0, 0, 0)
         cars.clear(i)
         freeSlot(table, i)
+        forgetSlot(sm, i)
       } else {
         if (i === sel) {
           // Its instance is hidden; the selected meshes draw it above the rest.
           writeInstanceMatrix(out, i, 0, 0, 0, 0)
           dotScale = scale * k * SELECTED_GROWTH
           // Fades out with the dot as the cars (which carry their own rim) unfold.
-          rimRadius = dotScale * HALO_RATIO + screenScale(camera, RIM_PX, 0) * k * (1 - mix)
+          rimRadius = dotScale * HALO_RATIO + screenScale(camera, RIM_PX, 0) * k * (1 - m)
           g.position.set(point.x, y, point.z)
           const color = slotColors[i]
           if (color) sd.material.color.copy(color)
@@ -210,8 +210,9 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
         if (!carsOn) continue
         const dx = center ? point.x - center.x : 0
         const dz = center ? point.z - center.z : 0
-        if (dx * dx + dz * dz < reach * reach) {
-          cars.writeTrain(i, drawn, view, shown, mix, k, shift)
+        // The selected train (and one folding back) is laid out wherever it is; the rest only near the view.
+        if (m > 0 && (i === sel || i === sm.prevSlot || dx * dx + dz * dz < reach * reach)) {
+          cars.writeTrain(i, drawn, view, shown, m, k, shift)
         } else cars.hide(i)
       }
     }
@@ -223,7 +224,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
       sd.scale.setScalar(Math.max(dotScale, 1e-6))
     }
     d.count = h.count = mix >= 1 ? 0 : table.high
-    cars.commit(table.high, carsOn)
+    cars.commit(table.high, carsOn, mix < 1)
     const reveal = interiorOpacity(camera)
     spanCars.write(table, spans, reveal, veilWeight(reveal, view.depth), mix, localS, sel, slotColors, cars.consistOf)
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.

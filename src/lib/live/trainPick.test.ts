@@ -59,7 +59,7 @@ function place(t: SlotTable, i: number, key: string, geometry: ShapeGeometry, sh
 }
 
 function input(t: SlotTable, mix: number): TrainPickInput {
-  return { table: t, consistOf: () => consistFor('1'), y: 0.5, carHeightM: () => 4, view: createBandView(), mix, localS: LOCAL_S }
+  return { table: t, consistOf: () => consistFor('1'), y: 0.5, carHeightM: () => 4, view: createBandView(), mixOf: (_, base) => base, mix, localS: LOCAL_S }
 }
 
 /** The ground point `along` meters past the dot at 1000 m on the northbound shape, shifted `east` meters. */
@@ -113,6 +113,19 @@ describe('nearestTrain', () => {
     expect(nearestTrain(input(t, 1), ortho, near(-70, 5))?.index).toBe(0)
     expect(nearestTrain(input(t, 0), ortho, near(-70, 5))).toBeNull()
     expect(nearestTrain(input(t, 1), ortho, near(-100, 0))).toBeNull()
+  })
+
+  it('hits the selected train on its car line where every other train is a dot', () => {
+    const t = createSlotTable(4)
+    place(t, 0, 'a', NORTH, 1000)
+    place(t, 1, 'b', SOUTH, 600)
+    const selected = { ...input(t, 0), mixOf: (slot: number, base: number) => (slot === 0 ? 1 : base) }
+    expect(nearestTrain(selected, ortho, near(-70, 5))?.index).toBe(0)
+    expect(nearestTrain(input(t, 0), ortho, near(-70, 5))).toBeNull()
+    // The other train is still only its dot.
+    const south = trainScreenPoints(selected, 1, ortho)!
+    expect(south).toMatchObject({ rear: null, front: null })
+    expect(trainScreenPoints(selected, 0, ortho)?.rear).not.toBeNull()
   })
 
   it('misses beside the line', () => {

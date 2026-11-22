@@ -19,10 +19,12 @@ export interface TrainPickSource {
   carHeightM: () => number
   /** The band view the trains were last drawn in (rewritten every frame), so picks test them where they are drawn. */
   view: BandView
+  /** A slot's car mix as drawn, given the shared carMix `base` (the selected train unfolds farther out, selectedMix.ts). */
+  mixOf: (slot: number, base: number) => number
 }
 
 export interface TrainPickInput extends TrainPickSource {
-  /** carMix at the current camera distance: 0 dots, 1 cars. */
+  /** carMix at the current camera distance: 0 dots, 1 cars. Each slot draws mixOf(slot, mix). */
   mix: number
   /** The fades' clock (performance.now() seconds). */
   localS: number
@@ -62,7 +64,7 @@ function consistDistancePx(
 }
 
 /**
- * The train drawn nearest the click, within `hitPx` of its dot or, once cars unfold (mix > 0), of the
+ * The train drawn nearest the click, within `hitPx` of its dot or, once its cars unfold (mixOf > 0), of the
  * chord lines through its car ends at floor and roof height, laid out exactly as writeConsist draws them (track points in the source's view). Skips empty, leaving,
  * not yet placed and mostly faded slots. Returns the slot. Reads the table as of the last frame; no allocation
  * beyond the result.
@@ -81,13 +83,14 @@ export function nearestTrain(src: TrainPickInput, toScreen: ToScreen, click: Scr
     trackPointInto(geometry, shown, view, point)
     carryInto(table.carry, i, localS, shift)
     let d = toScreen(point.x + shift.x, y + point.y + shift.y, point.z + shift.z, next) ? Math.hypot(next.x - click.x, next.y - click.y) : Infinity
-    if (mix > 0) {
+    const m = src.mixOf(i, mix)
+    if (m > 0) {
       // The floor line and the roof line, so at a tilt the whole side of a car is a target. The roof is drawn at
       // the view's depth factor (CarFrame.extrude), so top-down it is the floor line.
       const consist = src.consistOf(i)
-      const roof = y + src.carHeightM() * k * Math.min(1, 4 * mix) * view.depth
-      d = Math.min(d, consistDistancePx(geometry, view, shift, shown, consist, mix * k, y, toScreen, click))
-      d = Math.min(d, consistDistancePx(geometry, view, shift, shown, consist, mix * k, roof, toScreen, click))
+      const roof = y + src.carHeightM() * k * Math.min(1, 4 * m) * view.depth
+      d = Math.min(d, consistDistancePx(geometry, view, shift, shown, consist, m * k, y, toScreen, click))
+      d = Math.min(d, consistDistancePx(geometry, view, shift, shown, consist, m * k, roof, toScreen, click))
     }
     if (d <= hitPx && d < bestD) {
       best = i
@@ -115,8 +118,9 @@ export function trainScreenPoints(
   }
   const dot = at(shown)
   if (!dot) return null
-  if (mix === 0) return { dot, rear: null, front: null }
-  consistSpanInto(span, geometry.line.length, shown, src.consistOf(slot), mix * slotScale(table, slot, localS))
+  const m = src.mixOf(slot, mix)
+  if (m === 0) return { dot, rear: null, front: null }
+  consistSpanInto(span, geometry.line.length, shown, src.consistOf(slot), m * slotScale(table, slot, localS))
   const { rear, cars, step } = span
   return { dot, rear: at(rear), front: at(rear + cars * step) }
 }

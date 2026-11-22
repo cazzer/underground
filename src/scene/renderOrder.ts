@@ -22,6 +22,10 @@ export const RENDER_ORDER = {
   carRim: 5.25,
   carHalo: 5.5,
   cars: 6.5,
+  // While the other trains are still dots (carMix below 1), the selected train's car rim and a copy of its
+  // background gap draw above those dots, under its own shrinking dot (6.1 to 6.2).
+  selectedCarRim: 6.03,
+  selectedCarGap: 6.06,
   // "You are here": the accuracy disc and its edge sit under the lines; the reticle sits over the trains, under the veil.
   hereAccuracy: 0.5,
   hereAccuracyEdge: 0.6,
