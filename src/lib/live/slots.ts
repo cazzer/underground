@@ -94,9 +94,9 @@ const UNBANDED: BandView = createBandView()
  * Chooses how a persisting trip absorbs its new plan (see motion.ts) and records it on the slot. When the
  * trip moved to another shape, the dot's drawn point is projected onto the new shape's drawn line: close enough
  * carries over (shapeCarry.ts eases out the gap, so nothing jumps on screen), otherwise the dot shrinks where it
- * is (on the old shape) and grows on the new one.
+ * is (on the old shape) and grows on the new one. `before` is the trip as of the last poll.
  */
-function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o: ReconcileOptions): void {
+function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, before: LiveTrip, nowS: number, o: ReconcileOptions): void {
   const fadeS = o.fadeS ?? FADE_S
   const { plan, geometry } = trip
   const runningT = t.glideT[slot]!
@@ -134,8 +134,15 @@ function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o:
     t.phaseAt[slot] = nowS
   } else if (c.kind === 'continue') {
     // Continue the running glide on its own curve, rescaled so it starts from the new gap: no restart from rest.
-    t.glideT[slot] = runningT
-    t.glideE0[slot] = (target - shown) / (1 - smoothstep((o.dataNow - t.glideAt[slot]!) / runningT))
+    // `shown` is last frame's: on the same shape it is first moved along the old glide to now, so the frame the poll
+    // lands on keeps the glide's speed instead of standing still.
+    const left = 1 - smoothstep((o.dataNow - t.glideAt[slot]!) / runningT)
+    const from =
+      before.geometry === geometry ? Math.max(shown, hopDistance(before.plan, geometry, o.dataNow) - t.glideE0[slot]! * left) : shown
+    if (from < target) {
+      t.glideT[slot] = runningT
+      t.glideE0[slot] = (target - from) / left
+    }
   } else if (c.kind === 'glide') {
     t.glideE0[slot] = target - shown
     t.glideAt[slot] = o.dataNow
@@ -165,9 +172,10 @@ export function reconcileSlots(
     present.add(trip.key)
     const slot = t.byKey.get(trip.key)
     if (slot !== undefined) {
-      if (t.trips[slot]!.shapeId !== trip.shapeId) needsColor.push(slot)
+      const before = t.trips[slot]!
+      if (before.shapeId !== trip.shapeId) needsColor.push(slot)
       t.trips[slot] = trip
-      absorbPlan(t, slot, trip, nowS, o)
+      absorbPlan(t, slot, trip, before, nowS, o)
       if (isLeaving(t, slot)) {
         // Continue from the scale it has now, so a returning trip doesn't pop.
         t.bornAt[slot] = nowS - (1 - (nowS - t.leavingSince[slot]!) / fadeS) * fadeS

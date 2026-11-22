@@ -74,6 +74,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
+  TEMPORARY: `?runs=linear|eased` (constant speed, or a trapezoid run after the dwell; default eased) until the 6mg.7
+  card is decided; the removal list is in `src/data/runsLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -242,7 +244,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
     poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, a smoothstep-eased
     glide sized from the gap at 60 m/s catch-up within 3-10 s that a new poll continues on its curve rather than
-    restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change (`shapeCarry.ts`) the dot's
+    restarts, moved along the old glide to the poll's time first so that frame keeps its speed, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change (`shapeCarry.ts`) the dot's
     drawn point, in the last frame's `BandView`, is projected onto the new shape's drawn line (`nearestOnTrack`):
     within 25 m and 40 px on screen (`CARRY_MAX_PX`) it carries over and the gap left (a band pitch, or a
     junction's few meters) eases out as a world offset at about 30 px/s on screen (0.6-2 s; dot, cars and picks add
@@ -284,7 +286,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     allocation); `positionAlongShape` is their composition. A trip with no VehiclePosition doesn't advance
     to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
     first `dwellFor(runS)` (30 s, at most 35% of the hop) of every hop is held at its origin stop: the train
-    leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status. The predicted arrival is
+    leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status. The run itself is eased
+    (`runEase.ts` `easeRun`: a trapezoid, 20% accelerating, cruise at 1.25x the average, 20% braking; monotone, at
+    rest at both ends). The predicted arrival is
     capped by the schedule from the trip's last stop (`capArrival` in `stopVisit.ts`): MTA final-approach
     predictions run about 40 s late
   - `stopVisit.ts` `nextVisit`: the last stop a train was seen at (STOPPED_AT time; `here` and `leftAfter` on the

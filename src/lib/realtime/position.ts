@@ -3,6 +3,7 @@ import type { Arrival, VehicleStatus } from '../../data/realtime'
 import type { StopId } from '../../data/schema'
 import type { Ground } from '../projection'
 import { pointAtDistance } from './polyline'
+import { easeRun } from './runEase'
 import type { ShapeGeometry } from './shapeGeometry'
 import { capArrival, type StopVisit } from './stopVisit'
 
@@ -32,6 +33,8 @@ export interface PositionInput {
   visit?: StopVisit | null
   /** The trip's own first stop, where it lays over; defaults to the shape's first stop. */
   origin?: StopId | null
+  /** TEMPORARY (`?runs=`, see src/data/runsLook.ts): false runs at constant speed after the dwell. Default true. */
+  easedRuns?: boolean
 }
 
 export type PositionResult =
@@ -83,6 +86,8 @@ export interface HopPlan {
   departsInS: number | null
   /** `arriveAt` comes from the visit to the last stop (stopVisit.ts), not the feed's prediction; counted in `?debug`. */
   capped: boolean
+  /** The run after the dwell follows `easeRun` (accelerate, cruise, brake); false: constant speed. TEMPORARY (`?runs=`). */
+  eased: boolean
 }
 
 export interface PlanFailure {
@@ -169,6 +174,7 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
     minFraction: hop.fraction === undefined && status === 'INCOMING_AT' ? INCOMING_MIN_FRACTION : 0,
     departsInS: hop.departsInS,
     capped: arriveAt !== hop.arriveAt,
+    eased: input.easedRuns ?? true,
   }
 }
 
@@ -176,7 +182,8 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
 export function hopFraction(plan: HopPlan, now: number): number {
   if (plan.fixedFraction !== null) return plan.fixedFraction
   // The train holds at `from` until `runS - dwellS` before arriving, then runs for the rest of the hop.
-  return Math.max(plan.minFraction, clamp01(1 - (plan.arriveAt! - now) / (plan.runS - plan.dwellS)))
+  const u = clamp01(1 - (plan.arriveAt! - now) / (plan.runS - plan.dwellS))
+  return Math.max(plan.minFraction, plan.eased ? easeRun(u) : u)
 }
 
 /** Meters along the shape at `now`. No allocation: runs per frame. */
@@ -190,8 +197,9 @@ export function hopDistance(plan: HopPlan, geometry: ShapeGeometry, now: number)
  * predicted arrival at its next stop. The first `dwellFor(runS)` seconds of the hop are a dwell
  * at the origin stop (segment times include it), so the train holds there, then runs and still
  * arrives on the predicted time; the same rule for every status, so a status flip never moves
- * the target. The shorter run means a mid-hop revision of the predicted arrival moves the target up
- * to 1/0.65 (about 1.54x) as far as before; the correction layer absorbs it. Overdue trains wait at
+ * the target. The run pulls away, cruises and brakes (`easeRun`: a trapezoid, 1.25x the average speed at
+ * cruise). The shorter, eased run means a mid-hop revision of the predicted arrival moves the target up to
+ * 1.25/0.65 (about 1.9x) as far as a constant-speed run over the whole hop would; the correction layer absorbs it. Overdue trains wait at
  * the next platform, delayed or dwelling ones hold at the previous stop. STOPPED_AT still interpolates toward the next stop,
  * because B-division feeds leave STOPPED_AT set after the train departs.
  */

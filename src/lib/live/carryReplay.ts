@@ -56,6 +56,7 @@ export function heldTrip(geometry: ShapeGeometry, distance: number): LiveTrip {
     minFraction: 0,
     departsInS: null,
     capped: false,
+    eased: false,
   }
   return { key: 'a', shapeId: geometry.shapeId, plan, geometry } as unknown as LiveTrip
 }

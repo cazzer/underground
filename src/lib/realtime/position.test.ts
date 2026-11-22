@@ -67,10 +67,11 @@ describe('positionAlongShape STOPPED_AT', () => {
 
 describe('positionAlongShape in transit', () => {
   it('interpolates toward the next stop', () => {
+    // 17.5 s left of the 70 s run: 75% of the time gone, 81.25% of the way (cruising at 1.25x since 20%).
     const r = ok(at('IN_TRANSIT_TO', '103N', [['103N', NOW + 17.5]]))
-    expect(r.distance).toBeCloseTo(1750)
+    expect(r.distance).toBeCloseTo(1812.5)
     expect(r.point.x).toBeCloseTo(0)
-    expect(r.point.z).toBeCloseTo(-1750)
+    expect(r.point.z).toBeCloseTo(-1812.5)
     expect(r.heading).toBeCloseTo(0)
     expect([r.fromIndex, r.toIndex]).toEqual([1, 2])
   })
@@ -82,7 +83,8 @@ describe('positionAlongShape in transit', () => {
   })
   it('floors INCOMING_AT at 75% of the hop', () => {
     expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 80]])).distance).toBeCloseTo(1750)
-    expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 7]])).distance).toBeCloseTo(1900)
+    // 7 s left: 90% of the time gone, braking: 1 - 1.25 * 0.1² / 0.4 of the way.
+    expect(ok(at('INCOMING_AT', '103N', [['103N', NOW + 7]])).distance).toBeCloseTo(1968.75)
   })
   it('falls back to a run time from distance when the segment is unknown', () => {
     // 1000 m at 8 m/s = 125 s, 30 s of it dwell, so it moves for 95 s; 47.5 s left is halfway.
@@ -111,7 +113,7 @@ describe('positionAlongShape without a status', () => {
     expect(ok(at(null, null, [['102N', NOW - 60], ['103N', NOW - 20]])).distance).toBeCloseTo(2000)
   })
   it('ignores arrivals for stops off the pattern', () => {
-    expect(ok(at(null, null, [['Z99N', NOW + 10], ['103N', NOW + 17.5]])).distance).toBeCloseTo(1750)
+    expect(ok(at(null, null, [['Z99N', NOW + 10], ['103N', NOW + 17.5]])).distance).toBeCloseTo(1812.5)
   })
 })
 

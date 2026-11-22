@@ -11,6 +11,8 @@ export interface StaticRealtimeData {
   lookup: TripLookup
   geometries: ReadonlyMap<ShapeId, ShapeGeometry>
   segments: Readonly<Record<string, number>>
+  /** TEMPORARY (`?runs=`, see src/data/runsLook.ts): passed to planHop; default eased. */
+  easedRuns?: boolean
 }
 
 export interface LiveTrip {
@@ -123,6 +125,7 @@ export function prepareTrips(
         now,
         visit,
         origin,
+        easedRuns: data.easedRuns,
       })
       if ('ok' in plan) {
         dropped[plan.reason]++
