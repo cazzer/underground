@@ -87,3 +87,41 @@ export function trackPointInto(track: DrawnTrack, distance: number, view: BandVi
   out.y = (y0 + (profileAt(track.profile, cumulative[s + 1]!) - y0) * t) * view.depth
   return out
 }
+
+/** The nearest point of a drawn track: its distance along the line and how far (xz meters) it is from the query. */
+export interface TrackHit {
+  distance: number
+  offsetM: number
+}
+
+/**
+ * The drawn point of `track` (as trackPointInto draws it in `view`) nearest `p` in x and z, into `out`: every segment
+ * between two shifted vertices is tested, and the distance on it maps back linearly, as trackPointInto interpolates.
+ * Scans the whole line (called per poll, for a train that changed shape). No allocation.
+ */
+export function nearestOnTrack(track: DrawnTrack, p: TrackPoint, view: BandView, out: TrackHit): TrackHit {
+  const { points, cumulative } = track.line
+  out.distance = 0
+  out.offsetM = Infinity
+  if (points.length === 0) return out
+  shiftedVertex(track, 0, view, a)
+  if (points.length === 1) {
+    out.offsetM = Math.hypot(p.x - a.x, p.z - a.z)
+    return out
+  }
+  for (let s = 0; s < points.length - 1; s++) {
+    shiftedVertex(track, s + 1, view, c)
+    const dx = c.x - a.x
+    const dz = c.z - a.z
+    const len2 = dx * dx + dz * dz
+    const t = len2 > 0 ? Math.min(Math.max(((p.x - a.x) * dx + (p.z - a.z) * dz) / len2, 0), 1) : 0
+    const offsetM = Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t))
+    if (offsetM < out.offsetM) {
+      out.offsetM = offsetM
+      out.distance = cumulative[s]! + t * (cumulative[s + 1]! - cumulative[s]!)
+    }
+    a.x = c.x
+    a.z = c.z
+  }
+  return out
+}

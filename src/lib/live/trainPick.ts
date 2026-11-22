@@ -2,8 +2,9 @@ import type { BandView } from '../bandOffset'
 import { segmentDistancePx, TRAIN_HIT_PX, type PickHit, type ScreenPoint, type ToScreen } from '../pick'
 import type { Consist } from './consist'
 import { consistSpanInto, type ConsistSpan } from './consistLayout'
+import { carryInto } from './shapeCarry'
 import { isLeaving, slotScale, type SlotTable } from './slots'
-import { createTrackPoint, trackPointInto, type DrawnTrack } from './trackPoint'
+import { createTrackPoint, trackPointInto, type DrawnTrack, type TrackPoint } from './trackPoint'
 
 /** A slot faded below this scale (arriving or cross-fading) can't be picked: it is barely drawn. */
 const MIN_PICK_SCALE = 0.5
@@ -28,6 +29,8 @@ export interface TrainPickInput extends TrainPickSource {
 }
 
 const point = createTrackPoint()
+/** The slot's shape-change offset this frame (shapeCarry.ts), added to every point as the dot and cars add it. */
+const shift = createTrackPoint()
 const span: ConsistSpan = { cars: 0, pitch: 0, step: 0, rear: 0 }
 const prev: ScreenPoint = { x: 0, y: 0 }
 const next: ScreenPoint = { x: 0, y: 0 }
@@ -36,6 +39,7 @@ const next: ScreenPoint = { x: 0, y: 0 }
 function consistDistancePx(
   track: DrawnTrack,
   view: BandView,
+  offset: TrackPoint,
   shown: number,
   consist: Consist,
   mixK: number,
@@ -48,7 +52,7 @@ function consistDistancePx(
   let havePrev = false
   for (let c = 0; c <= span.cars; c++) {
     trackPointInto(track, span.rear + c * span.step, view, point)
-    const ok = toScreen(point.x, y + point.y, point.z, next)
+    const ok = toScreen(point.x + offset.x, y + point.y + offset.y, point.z + offset.z, next)
     if (ok && havePrev) best = Math.min(best, segmentDistancePx(click, prev, next))
     havePrev = ok
     prev.x = next.x
@@ -75,14 +79,15 @@ export function nearestTrain(src: TrainPickInput, toScreen: ToScreen, click: Scr
     const k = slotScale(table, i, localS)
     if (k < MIN_PICK_SCALE) continue
     trackPointInto(geometry, shown, view, point)
-    let d = toScreen(point.x, y + point.y, point.z, next) ? Math.hypot(next.x - click.x, next.y - click.y) : Infinity
+    carryInto(table.carry, i, localS, shift)
+    let d = toScreen(point.x + shift.x, y + point.y + shift.y, point.z + shift.z, next) ? Math.hypot(next.x - click.x, next.y - click.y) : Infinity
     if (mix > 0) {
       // The floor line and the roof line, so at a tilt the whole side of a car is a target. The roof is drawn at
       // the view's depth factor (CarFrame.extrude), so top-down it is the floor line.
       const consist = src.consistOf(i)
       const roof = y + src.carHeightM() * k * Math.min(1, 4 * mix) * view.depth
-      d = Math.min(d, consistDistancePx(geometry, view, shown, consist, mix * k, y, toScreen, click))
-      d = Math.min(d, consistDistancePx(geometry, view, shown, consist, mix * k, roof, toScreen, click))
+      d = Math.min(d, consistDistancePx(geometry, view, shift, shown, consist, mix * k, y, toScreen, click))
+      d = Math.min(d, consistDistancePx(geometry, view, shift, shown, consist, mix * k, roof, toScreen, click))
     }
     if (d <= hitPx && d < bestD) {
       best = i
@@ -102,10 +107,11 @@ export function trainScreenPoints(
   const shown = table.displayed[slot]
   const geometry = table.drawGeometry[slot]
   if (shown === undefined || Number.isNaN(shown) || !geometry || geometry.line.points.length === 0) return null
+  carryInto(table.carry, slot, localS, shift)
   const at = (distance: number): ScreenPoint | null => {
     trackPointInto(geometry, distance, view, point)
     const out = { x: 0, y: 0 }
-    return toScreen(point.x, y + point.y, point.z, out) ? out : null
+    return toScreen(point.x + shift.x, y + point.y + shift.y, point.z + shift.z, out) ? out : null
   }
   const dot = at(shown)
   if (!dot) return null

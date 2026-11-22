@@ -52,6 +52,9 @@ export interface ConsistScratch {
   span: ConsistSpan
 }
 
+/** No offset: writeConsist's default `shift`. */
+const NO_SHIFT: TrackPoint = Object.freeze(createTrackPoint())
+
 export function createConsistScratch(): ConsistScratch {
   return { a: createTrackPoint(), b: createTrackPoint(), span: { cars: 0, pitch: 0, step: 0, rear: 0 } }
 }
@@ -65,8 +68,8 @@ export function createConsistScratch(): ConsistScratch {
  * center, so at mix = 0 the train collapses to the dot's point; `k` (the slot's fade) also scales the body
  * section, so a fading train shrinks to nothing while the handoff keeps it legible. Car geometry is unit
  * length along z at full width and height; the halo is a unit plane. `widen` (about 1) enlarges one train's
- * body slightly so two trains on one shape don't z-fight. Instances past the consist get zero matrices.
- * No allocation; never throws.
+ * body slightly so two trains on one shape don't z-fight. `shift` moves the whole train (a shape change's
+ * offset easing out, shapeCarry.ts). Instances past the consist get zero matrices. No allocation; never throws.
  */
 export function writeConsist(
   bodies: Float32Array,
@@ -81,6 +84,7 @@ export function writeConsist(
   widen: number,
   frame: CarFrame,
   scratch: ConsistScratch,
+  shift: TrackPoint = NO_SHIFT,
 ): void {
   const base = slot * MAX_CARS
   const line = track.line
@@ -104,9 +108,9 @@ export function writeConsist(
       const ux = b.x - a.x
       const uy = b.y - a.y
       const uz = b.z - a.z
-      const mx = (a.x + b.x) / 2
-      const my = (a.y + b.y) / 2 + frame.y
-      const mz = (a.z + b.z) / 2
+      const mx = (a.x + b.x) / 2 + shift.x
+      const my = (a.y + b.y) / 2 + frame.y + shift.y
+      const mz = (a.z + b.z) / 2 + shift.z
       writeChordMatrix(bodies, base + c, mx, my, mz, ux, uy, uz, cross, height, bodyLength)
       writeChordMatrix(halos, base + c, mx, my, mz, ux, uy, uz, haloWidth, 1, haloLength)
       const t = a

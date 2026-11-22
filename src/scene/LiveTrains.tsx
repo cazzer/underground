@@ -8,6 +8,7 @@ import { carMix } from '../lib/live/consist'
 import type { BandView } from '../lib/bandOffset'
 import { createSlotTable, FADE_S, freeSlot, isLeaving, reconcileSlots, slotScale, stepSlot, TRAIN_CAPACITY } from '../lib/live/slots'
 import type { TrainPickSource } from '../lib/live/trainPick'
+import { addCarry } from '../lib/live/shapeCarry'
 import { createTrackPoint, trackPointInto } from '../lib/live/trackPoint'
 import { trainRouteId } from '../lib/live/trainRoute'
 import { interiorOpacity, veilWeight } from '../lib/interiorReveal'
@@ -70,6 +71,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   /** Each slot's dot color (shared Color objects), so the selected dot can take it without allocating. */
   const slotColors = useMemo(() => new Array<Color | null>(TRAIN_CAPACITY).fill(null), [])
   const point = useMemo(createTrackPoint, [])
+  const shift = useMemo(createTrackPoint, [])
   const range = useMemo(() => ({ start: 0, count: 0 }), [])
   const geometry = useMemo(
     () => ({
@@ -143,11 +145,12 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     const { needsColor, overflow } = reconcileSlots(table, trips, perfMs / 1000, {
       dataNow: clockNow(offsetS, perfMs),
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      view,
     })
     for (const i of needsColor) colorSlot(d, i)
     if (needsColor.length > 0) d.instanceColor!.needsUpdate = true
     if (overflow > 0) console.warn(`Live trains: ${overflow} trips over the ${TRAIN_CAPACITY}-slot capacity are not drawn`)
-  }, [trips, offsetS, table, colorSlot])
+  }, [trips, offsetS, table, colorSlot, view])
 
   // After the reconcile above, so a slot reused by another trip since the last poll loses the highlight.
   useLayoutEffect(() => {
@@ -187,6 +190,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
       const drawn = table.drawGeometry[i]!
       // On its band, at the track's height: below the street where the line descends to a station.
       trackPointInto(drawn, shown, view, point)
+      addCarry(table.carry, i, localS, point, shift)
       const y = DOT_Y + point.y
       const k = slotScale(table, i, localS, FADE_S)
       if (k === 0 && isLeaving(table, i)) {
@@ -208,7 +212,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
         const dx = center ? point.x - center.x : 0
         const dz = center ? point.z - center.z : 0
         if (dx * dx + dz * dz < reach * reach) {
-          cars.writeTrain(i, drawn, view, shown, mix, k)
+          cars.writeTrain(i, drawn, view, shown, mix, k, shift)
         } else cars.hide(i)
       }
     }
