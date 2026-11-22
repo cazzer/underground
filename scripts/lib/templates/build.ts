@@ -98,9 +98,10 @@ function planLayout(
   const plans = machines.plans.map((p) => (p.entrance === undefined ? p : { ...p, entrance: keptIndex.get(p.entrance)! }))
   const slabs = levels.mezzanine ? mezzanineSlabs(ctx, entrances.map((e) => e.at)) : []
   const { overrides: equipment, notes: machineNotes, platforms: machinePlatforms } = machineOverrides(ctx, plans, entrances, { slabs, platformFor, levelY: levelHeights(levels) })
-  const street = streetStairs(ctx, entrances, slabs, levels, log, machinePlatforms)
+  const tracked = new Set([platformFor.N.index, platformFor.S.index])
+  const street = streetStairs(ctx, entrances, slabs, levels, log, machinePlatforms, tracked)
   const connectors = [...street.connectors, ...(levels.mezzanine ? levelStairs(ctx, slabs, levels.mezzanine, levels.platform) : [])]
-  return { dropped, entrances, plans, slabs, equipment, machineNotes, connectors, unplaced: street.unplaced }
+  return { dropped, entrances, plans, slabs, equipment, machineNotes, connectors, unplaced: street.unplaced, covered: street.covered }
 }
 
 export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inputs: TemplateInputs, log: string[]): GeneratedStation {
@@ -140,7 +141,7 @@ export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inpu
     layout = planLayout(ctx, levels, candidates, slice.sources.equipment.rows, kinds, platformFor, log)
   }
   dropped.push(...layout.dropped)
-  const { entrances, plans, slabs, equipment, machineNotes, connectors } = layout
+  const { entrances, plans, slabs, equipment, machineNotes, connectors, covered } = layout
   checkReachable(levels, connectors, plans)
 
   const platforms = ctx.platforms.flatMap((p) => {
@@ -155,6 +156,7 @@ export function buildFromTemplate(ctx: TemplateCtx, levels: TemplateLevels, inpu
     }))
   })
   const slabName = levels.mezzanine?.name ?? 'Mezzanine'
+  log.push(...covered)
   for (const d of dropped) log.push(`${ctx.stationId} dropped ${d}`)
   for (const n of machineNotes) log.push(`${ctx.stationId} UNVERIFIED ${n}`)
   const notes = [
