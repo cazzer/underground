@@ -64,6 +64,27 @@ describe('joinStationOutages', () => {
       expect(texts).toEqual({ ES257X: 'Mezzanine up to street', ES258X: 'Street down to mezzanine' })
     })
 
+    it("keeps a proper level name's capital: Union Sq's ES219 runs up from the Canarsie platform", () => {
+      const j = joinStationOutages(unionSq, feed([outage('ES219')]), NOW)
+      expect(j.panel).toMatchObject({ outages: [{ id: 'ES219', levels: 'Canarsie platform up to mezzanine' }] })
+    })
+
+    // EL358 runs between the mezzanine (upper) and the platform (lower); name that platform like Union Sq's.
+    const named: StationInterior = {
+      ...l08,
+      levels: l08.levels.map((l) => (l.id === 'platform' ? { ...l, name: 'Canarsie platform' } : l)),
+      connectors: [
+        ...l08.connectors,
+        { ...l08.connectors.find((c) => c.id === 'EL358')!, id: 'ES1', kind: 'escalator', travel: 'down' },
+      ],
+    }
+
+    it('keeps a proper name on a down escalator and an elevator, and lowercases a generic one', () => {
+      expect(levelsOf(named, 'ES1')).toBe('Mezzanine down to Canarsie platform')
+      expect(levelsOf(named, 'EL358')).toBe('Mezzanine to Canarsie platform')
+      expect(levelsOf(l08, 'EL358')).toBe('Mezzanine to platform')
+    })
+
     it('keeps the street-first wording for an escalator with no travel', () => {
       expect(levelsOf(withEscalators({ ES1: undefined }), 'ES1')).toBe('Street to mezzanine')
     })
