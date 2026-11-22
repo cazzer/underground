@@ -77,6 +77,10 @@ jobs:
       - name: Regenerate street files
         run: npm run data:streets 2>&1 | tee -a "$RUNNER_TEMP/data.log"
 
+      # The walk files follow the stations too (same pin, same stations.json); also writes only under public/data/.
+      - name: Regenerate walk files
+        run: npm run data:walk 2>&1 | tee -a "$RUNNER_TEMP/data.log"
+
       - name: Check for changes
         id: diff
         run: |

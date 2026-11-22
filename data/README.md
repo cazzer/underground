@@ -114,6 +114,18 @@ joins every entrance row that lists the station to the street it opens onto. The
 pinned ways lie near it and a `WARNING:` line from the build (not a failure) until `data:streets:fetch` is rerun. The build prints where the join is doubtful
 (no street within 40 m, near misses for a median, bridge and tunnel ways, entrances near the 300 m edge); read it after a refresh.
 
+`npm run data:walk` (offline) turns the same pin into `public/data/walk/<id>.json`, one walk graph per station for routing
+(`src/data/walkSchema.ts`). Rerun it after `data` or `data:streets:fetch`; `walkOutputs.test.ts` fails while the files are stale.
+Each file keeps every walkable pinned way within 300 m, named roads included (as kind `road`; the router prices them), minus
+`foot=no|private|use_sidepath` and `access=no|private` without a `foot` that allows it. Vehicle `oneway` is ignored (the graph is
+undirected). Ways are clipped and rounded to decimeters exactly as the street files do (a node has the same x/z in both),
+simplified to 0.5 m, and cut into edges at every shared node, so junctions are real graph nodes; `steps` edges are the
+step-free flag. Caps are in `scripts/lib/budget.ts` (64 KB per file, 4.5 MB total gzipped), outside the startup budget; the
+build also fails if the startup total moves. A station missing from the pin's `stationIds` gets a `WARNING:` line (its file may
+be partial or empty, not a failure). It prints stations with no walkable way, the number of excluded ways, the largest files, the
+stations whose largest connected piece holds under 90% of the walkable length (dead-end underground footways and
+gaps in OSM; check that list after a refresh) and the totals.
+
 ## Access exceptions
 
 `stations/access-exceptions.json` is hand-written and empty today:
@@ -141,7 +153,8 @@ the unattended refresh isn't blocked (it lands in the refresh PR's data.log); `n
   available under the ODbL 1.0.
 - `streets/` is © OpenStreetMap contributors, available under the ODbL 1.0 (see `../public/data/LICENSE-ODbL.md`).
   The street files built from it (`public/data/streets/`) are ODbL derivatives; their entrance points are MTA data (i9wp-a4ja)
-  under the OPEN-NY Terms of Use, which each file's `attribution` says.
+  under the OPEN-NY Terms of Use, which each file's `attribution` says. The walk files (`public/data/walk/`) are ODbL derivatives
+  of the same pin and carry the OSM credit only (no MTA data).
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.
