@@ -4,6 +4,7 @@ import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
+import { useTrainSelection } from '../lib/trainSelection'
 import { useTrip } from '../lib/trip'
 import { planViews, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
@@ -27,13 +28,14 @@ interface TripPanelProps {
 }
 
 /**
- * Plan a trip: From and To by search, then the journeys leaving now, each marked Scheduled. It sits where the
+ * Plan a trip: From and To by search, then the journeys leaving now, each marked Live, Live and scheduled, or Scheduled. It sits where the
  * station panel does, in front of it and behind a train panel or notice. What a screen reader hears is the HUD's
  * `TripAnnouncer`; the visible message under the ends is hidden from assistive tech to match.
  */
 export function TripPanel({ network, arrivals, locate, onClose, covered, headingRef, ref }: TripPanelProps) {
   const { ends, plan, showLoading, setEnd, swap, retry } = useTrip()
   const { focusedId, select } = useFocus()
+  const { selectTrain } = useTrainSelection()
   const fromSearch = useRef<StationSearchHandle>(null)
   const toSearch = useRef<StationSearchHandle>(null)
   const own = useRef<HTMLElement | null>(null)
@@ -117,7 +119,7 @@ export function TripPanel({ network, arrivals, locate, onClose, covered, heading
             Retry
           </button>
         )}
-        <TripJourneys network={network} views={views} onStation={select} />
+        <TripJourneys network={network} views={views} onStation={select} drawnKeys={arrivals?.drawnKeys ?? null} onShowTrain={selectTrain} />
       </div>
       {more && <div aria-hidden="true" className="pointer-events-none sticky bottom-0 -mx-4 -mb-8 h-8 bg-linear-to-t from-panel to-transparent" />}
       <StationSearch ref={fromSearch} network={network} label="Trip from: search stations" placeholder="From station" onChoose={(id) => setEnd('from', id)} />

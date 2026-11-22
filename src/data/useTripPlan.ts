@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import type { RealtimeSnapshot } from './realtime'
+import type { TripLookup } from '../lib/realtime/tripLookup'
 import { orderJourneys, plannable, tripKey, tripNowS, type TripEnds, type TripPlanState, type TripTrigger } from '../lib/tripView'
 import type { StationsFile } from './schema'
 
@@ -14,8 +16,11 @@ export interface TripPlan {
   retry: () => void
 }
 
-interface ClockSource {
+/** The live clock and the data the overlay reads: an `ArrivalsSource` is one. */
+interface LiveSource {
   offsetS: number
+  snapshot: RealtimeSnapshot
+  lookup: TripLookup
 }
 
 /**
@@ -26,9 +31,10 @@ const router = () => import('./planTrip')
 
 /**
  * Plans the trip between `ends` while the panel is `open`, leaving now (the live clock once a snapshot has set it,
- * else the device's). A reply that arrives after the ends changed is dropped. A failed or no-service plan is its
+ * else the device's), on the schedule with the next 30 minutes from the latest snapshot. A reply that arrives after the ends changed is dropped. A failed or no-service plan is its
  * own state; a failed refresh keeps the journeys already shown. While ready and not `covered` (by a train panel
- * or notice) it replans every REFRESH_MS, silently, and once when the cover goes. Nothing about the ends is
+ * or notice) it replans every REFRESH_MS and whenever `snapshot` is newer than the one planned on, silently, and
+ * once when the cover goes. Nothing about the ends is
  * stored or sent: only the service's timetable files are fetched.
  */
 export function useTripPlan(
@@ -36,13 +42,15 @@ export function useTripPlan(
   ends: TripEnds,
   open: boolean,
   covered: boolean,
-  sourceRef: RefObject<ClockSource | null>,
+  sourceRef: RefObject<LiveSource | null>,
+  snapshot: RealtimeSnapshot | null,
 ): TripPlan {
   const [state, setState] = useState<TripPlanState>({ status: 'idle' })
   const [showLoading, setShowLoading] = useState(false)
   const [retries, setRetries] = useState(0)
   const requestId = useRef(0)
   const attempt = useRef(0)
+  const planned = useRef<RealtimeSnapshot | null>(null)
   const trigger = useRef<TripTrigger>('ends')
   const { from, to } = ends
   const key = plannable(ends) ? tripKey(ends.from, ends.to) : null
@@ -53,15 +61,18 @@ export function useTripPlan(
       const id = ++requestId.current
       const k = tripKey(a, b)
       const atS = nowS()
+      // The device clock may trail the live one, so the overlay is used only on a snapshot's own clock.
+      const src = sourceRef.current
+      planned.current = src?.snapshot ?? null
       try {
         const m = await router()
         try {
-          const { journeys, sameStation } = await m.planTripBetween(stations, a, b, atS)
+          const { journeys, sameStation, overlay } = await m.planTripBetween(stations, a, b, atS, src ? { snapshot: src.snapshot, lookup: src.lookup } : null)
           if (id !== requestId.current) return
-          setState({ status: 'ready', key: k, attempt: attempt.current, trigger: why, atS, journeys: orderJourneys(journeys), sameStation })
+          setState({ status: 'ready', key: k, attempt: attempt.current, trigger: why, atS, journeys: orderJourneys(journeys), sameStation, overlay })
         } catch (e) {
           if (id !== requestId.current) return
-          if (why === 'tick') {
+          if (why === 'tick' || why === 'poll') {
             console.error('Trip refresh failed', e)
             return
           }
@@ -70,12 +81,13 @@ export function useTripPlan(
           else throw e
         }
       } catch (e) {
-        if (id !== requestId.current || why === 'tick') return
-        console.error('Trip planning failed', e)
+        if (id !== requestId.current) return
+        console.error(why === 'tick' || why === 'poll' ? 'Trip refresh failed' : 'Trip planning failed', e)
+        if (why === 'tick' || why === 'poll') return
         setState({ status: 'error', message: e instanceof Error ? e.message : String(e), key: k, attempt: attempt.current, trigger: why })
       }
     },
-    [stations, nowS],
+    [stations, nowS, sourceRef],
   )
 
   // A new pair, a retry or opening the panel: a fresh run the visitor will hear about.
@@ -103,6 +115,13 @@ export function useTripPlan(
     const timer = setInterval(() => void run(from, to, 'tick'), REFRESH_MS)
     return () => clearInterval(timer)
   }, [open, ready, covered, from, to, run])
+
+  // A snapshot newer than the one the shown plan used: replan on it. Runs again when a plan settles or the
+  // cover goes, so a snapshot that came meanwhile is not missed.
+  useEffect(() => {
+    if (!open || !ready || covered || from === null || to === null || snapshot === null || snapshot === planned.current) return
+    void run(from, to, 'poll')
+  }, [open, ready, covered, from, to, run, snapshot])
 
   useEffect(() => {
     setShowLoading(false)

@@ -1,4 +1,6 @@
 import type { LiveDebugInfo } from '../data/useLive'
+import { useTrip } from '../lib/trip'
+import type { OverlayCounts } from '../lib/route/overlay'
 import { SPAN_TRAINS, spanCarStats } from '../scene/useSpanCars'
 
 interface LiveDebugProps {
@@ -10,6 +12,20 @@ interface LiveDebugProps {
 const enabled = import.meta.env.DEV && new URLSearchParams(window.location.search).has('debug')
 
 const fixed = (n: number, digits = 1): string => n.toFixed(digits)
+
+/** The trip planner's last overlay: what it replaced and added, and how long the last one took. */
+function TripOverlayLine() {
+  const { plan } = useTrip()
+  const counts: OverlayCounts | null = plan.status === 'ready' ? (plan.overlay ?? null) : null
+  const ms = performance.getEntriesByName('trip:overlay').at(-1)?.duration
+  if (!counts) return <p>trip overlay none</p>
+  return (
+    <p>
+      trip live {counts.liveFeeds.length} / schedule {counts.scheduleFeeds.length} feeds, replaced {counts.replaced}, cancelled{' '}
+      {counts.cancelled}, oneOff {counts.oneOff}, extended {counts.extended}, {ms === undefined ? 'n/a' : `${fixed(ms)} ms`}
+    </p>
+  )
+}
 
 /** Dev-only `?debug` overlay: what the last poll did. Updates per poll, never per frame. */
 export function LiveDebug({ debug, technical }: LiveDebugProps) {
@@ -48,6 +64,7 @@ export function LiveDebug({ debug, technical }: LiveDebugProps) {
         offset {fixed(debug.offsetS, 2)} / prepare {fixed(debug.prepareMs)} ms / failures {debug.failures}
       </p>
       {/* Read when a poll re-renders this; the scene updates it per frame. */}
+      <TripOverlayLine />
       <p>
         platform lift overflow (peak, over {SPAN_TRAINS}) {spanCarStats.peakOverflow}
       </p>

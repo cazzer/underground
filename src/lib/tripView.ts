@@ -5,6 +5,7 @@ import { stationOfStop } from './live/arrivals'
 import { clockNow } from './live/clock'
 import { nyClockTime, stopEta, stopEtaSpoken } from './live/trainStops'
 import type { Placement } from './locate'
+import type { OverlayCounts } from './route/overlay'
 import type { TripJourney, TripRideLeg } from './route/plan'
 
 export interface TripEnds {
@@ -12,8 +13,8 @@ export interface TripEnds {
   to: StationId | null
 }
 
-/** Why a plan ran: new ends, the 30 s refresh (silent), or the Retry button. */
-export type TripTrigger = 'ends' | 'tick' | 'retry'
+/** Why a plan ran: new ends, the 30 s refresh or a new live snapshot (both silent), or the Retry button. */
+export type TripTrigger = 'ends' | 'tick' | 'poll' | 'retry'
 
 interface Settled {
   /** `tripKey` of the ends it answers. */
@@ -27,7 +28,7 @@ export type TripPlanState =
   | { status: 'idle' }
   | { status: 'loading'; key: string }
   /** `sameStation`: both ends are in one complex, so there is nothing to plan. */
-  | ({ status: 'ready'; atS: number; journeys: TripJourney[]; sameStation?: boolean } & Settled)
+  | ({ status: 'ready'; atS: number; journeys: TripJourney[]; sameStation?: boolean; overlay?: OverlayCounts | null } & Settled)
   | ({ status: 'noService'; date: string } & Settled)
   | ({ status: 'error'; message: string } & Settled)
 
@@ -104,6 +105,8 @@ export interface RideLegView {
   kind: 'ride'
   routeId: RouteId
   tripId: string
+  /** The leg's times are realtime predictions. */
+  live: boolean
   /** The train's destination: the pattern's last stop, which may lie past where the rider gets off. */
   headsign: string
   board: PlaceTime
@@ -125,9 +128,26 @@ export interface WalkLegView {
 }
 export type LegView = RideLegView | ChangeLegView | WalkLegView
 
-/** Where a journey's times come from; the live overlay adds its own values. */
-export type JourneySource = 'scheduled'
-const SOURCE_TEXT: Record<JourneySource, string> = { scheduled: 'Scheduled' }
+/** Where a journey's times come from: every train live, some, or none. */
+export type JourneySource = 'live' | 'mixed' | 'scheduled'
+const SOURCE_TEXT: Record<JourneySource, string> = { live: 'Live', mixed: 'Live and scheduled', scheduled: 'Scheduled' }
+
+/**
+ * What a journey is, not which trains it rides: each ride's route, board and alight stops, each walk's stops. A
+ * poll that swaps a scheduled train for its live twin (a new trip id) keeps the key, so the disclosure the visitor
+ * toggled, and focus inside it, stay put.
+ */
+export function journeyKey(j: TripJourney): string {
+  return j.legs.map((l) => (l.kind === 'ride' ? `${l.routeId}:${l.boardStop}:${l.alightStop}` : `walk:${l.fromStop}:${l.toStop}`)).join('>')
+}
+
+/** A journey's source by its ride legs (a walk-only journey has no train to be live). */
+export function journeySource(j: TripJourney): JourneySource {
+  const rides = j.legs.filter((l): l is TripRideLeg => l.kind === 'ride')
+  const live = rides.filter((r) => r.live).length
+  if (live === 0) return 'scheduled'
+  return live === rides.length ? 'live' : 'mixed'
+}
 
 export interface JourneyView {
   /** Stable across refreshes: the trips it rides. */
@@ -161,6 +181,7 @@ function legViews(j: TripJourney, names: TripNames): LegView[] {
         kind: 'ride',
         routeId: leg.routeId,
         tripId: leg.tripId,
+        live: leg.live === true,
         headsign: names.station(stationOfStop(leg.terminalStop)),
         board: at(leg.boardStop, leg.departAt),
         alight: at(leg.alightStop, leg.arriveAt),
@@ -191,20 +212,21 @@ export function journeyView(j: TripJourney, nowS: number, names: TripNames): Jou
   const routes = rides.map((r) => r.routeId)
   const transfersText = transfersTextOf(j.transfers)
   const arriveClock = nyClockTime(j.arriveAt)
+  const source = journeySource(j)
   const via = routes.length > 0 ? `: ${routes.map((r) => routeSpokenName(names.route(r))).join(', then ')}` : ''
   const spoken =
     `Leaves ${stopEtaSpoken(eta)}. Arrives ${arriveClock}. ${plural(minutes, 'minute')}, ${transfersText.toLowerCase()}${via}. ` +
-    `${SOURCE_TEXT.scheduled}.`
+    `${SOURCE_TEXT[source]}.`
   return {
-    key: rides.length > 0 ? rides.map((r) => r.tripId).join('>') : `walk:${j.departAt}`,
+    key: journeyKey(j),
     departClock: eta.clock,
     departAway: eta.away,
     arriveClock,
     minutes,
     transfersText,
     routes,
-    source: 'scheduled',
-    sourceText: SOURCE_TEXT.scheduled,
+    source,
+    sourceText: SOURCE_TEXT[source],
     legs: legViews(j, names),
     spoken,
   }
@@ -225,7 +247,7 @@ export function tripAnnounceId(plan: TripPlanState): string | null {
 /** A settled plan the visitor asked for and has not heard yet; a refresh stays silent. */
 export function shouldAnnounceTrip(plan: TripPlanState, lastAnnouncedId: string | null): boolean {
   const id = tripAnnounceId(plan)
-  return id !== null && id !== lastAnnouncedId && plan.status !== 'idle' && plan.status !== 'loading' && plan.trigger !== 'tick'
+  return id !== null && id !== lastAnnouncedId && plan.status !== 'idle' && plan.status !== 'loading' && plan.trigger !== 'tick' && plan.trigger !== 'poll'
 }
 
 /** Names for the views from the map's station and route tables. */
@@ -241,7 +263,15 @@ export function tripNamesOf(network: {
 
 /** The journeys of a ready plan as views; none otherwise. */
 export function planViews(plan: TripPlanState, nowS: number, names: TripNames): JourneyView[] {
-  return plan.status === 'ready' ? plan.journeys.map((j) => journeyView(j, nowS, names)) : []
+  if (plan.status !== 'ready') return []
+  // Two journeys with the same legs on different trains would share a key: the later ones get a suffix.
+  const seen = new Map<string, number>()
+  return plan.journeys.map((j) => {
+    const view = journeyView(j, nowS, names)
+    const n = seen.get(view.key) ?? 0
+    seen.set(view.key, n + 1)
+    return n === 0 ? view : { ...view, key: `${view.key}#${n}` }
+  })
 }
 
 /** After a result settles, a station focused behind the panel stays unannounced this long, so it can't talk over it. */
