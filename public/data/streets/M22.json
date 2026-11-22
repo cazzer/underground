@@ -183,6 +183,17 @@
     {"id":1532510272,"highway":"secondary","name":"Church Street","oneway":1,"nodes":[28,186]}
   ],
   "entrances": [
+    {"x":-2288,"z":656,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["418"],"street":"Cortlandt Street","wayId":5670668,"cross":"Broadway","crossWayId":1158491838,"side":"SW","plaza":null},
+    {"x":-2033,"z":746,"type":"Stair","entry":true,"exit":true,"stopIds":["418"],"street":"Broadway","wayId":1158491838,"cross":"Maiden Lane","crossWayId":46154327,"side":"SE","plaza":null},
+    {"x":-1775,"z":-17,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["418"],"street":"Broadway","wayId":837943499,"cross":"Dey Street","crossWayId":5673211,"side":"SW","plaza":null},
+    {"x":-1539,"z":-848,"type":"Stair","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":835694480,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-1518,"z":-653,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":835694480,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1427,"z":-99,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"Broadway","wayId":835694479,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-1358,"z":-737,"type":"Stair","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":835694480,"cross":"Broadway","crossWayId":222299275,"side":"NW","plaza":null},
+    {"x":-1350,"z":228,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"John Street","wayId":5670877,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-1221,"z":-422,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":1334200288,"cross":"Broadway","crossWayId":835694479,"side":"SE","plaza":null},
+    {"x":-1155,"z":-417,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":1334200288,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-856,"z":-211,"type":"Station House","entry":true,"exit":true,"stopIds":["418"],"street":"Fulton Street","wayId":1334200288,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-640,"z":925,"type":"Stair","entry":true,"exit":true,"stopIds":["M22"],"street":"John Street","wayId":5670877,"cross":"Nassau Street","crossWayId":46160365,"side":"NE","plaza":null},
     {"x":-617,"z":1186,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["M22"],"street":"John Street","wayId":5670877,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-604,"z":1103,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["M22"],"street":"John Street","wayId":5670877,"cross":null,"crossWayId":null,"side":"south","plaza":null},
@@ -190,6 +201,15 @@
     {"x":-285,"z":-23,"type":"Stair","entry":true,"exit":true,"stopIds":["M22"],"street":"Fulton Street","wayId":541345307,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-22,"z":319,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["M22"],"street":"Fulton Street","wayId":46160225,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-13,"z":168,"type":"Stair","entry":true,"exit":true,"stopIds":["M22"],"street":"Fulton Street","wayId":46160225,"cross":"Nassau Street","crossWayId":46160365,"side":"NE","plaza":null},
-    {"x":130,"z":230,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["M22"],"street":"Fulton Street","wayId":46160225,"cross":null,"crossWayId":null,"side":"north","plaza":null}
+    {"x":130,"z":230,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["M22"],"street":"Fulton Street","wayId":46160225,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":510,"z":1595,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["229"],"street":"William Street","wayId":526839040,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":544,"z":2013,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"John Street","wayId":1151033591,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":667,"z":1364,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"William Street","wayId":526839040,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":761,"z":858,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"Fulton Street","wayId":1335306157,"cross":"William Street","crossWayId":526839040,"side":"SW","plaza":null},
+    {"x":833,"z":905,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"Fulton Street","wayId":1335306157,"cross":"William Street","crossWayId":526839040,"side":"SW","plaza":null},
+    {"x":846,"z":942,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"William Street","wayId":526839040,"cross":"Fulton Street","crossWayId":1335306157,"side":"SW","plaza":null},
+    {"x":1027,"z":1030,"type":"Stair","entry":true,"exit":true,"stopIds":["229"],"street":"Fulton Street","wayId":1335306158,"cross":"William Street","crossWayId":526839040,"side":"SE","plaza":null},
+    {"x":1146,"z":761,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"William Street","wayId":1151033361,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":1284,"z":1012,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["229"],"street":"Fulton Street","wayId":1335306158,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

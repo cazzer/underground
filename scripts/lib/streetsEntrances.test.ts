@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StreetWay } from '../../src/data/streetSchema.ts'
 import { toLatLon } from '../../src/lib/projection.ts'
-import { buildEntrances, entrancesByStation, median, parseEntranceRows, type EntranceInput, type FileStreets } from './streetsEntrances.ts'
+import { buildEntrances, entrancesByStation, median, parseComplexOf, parseEntranceRows, type EntranceInput, type FileStreets } from './streetsEntrances.ts'
 import { MEDIAN_MAX_M } from './entranceStreet.ts'
 import { STATION } from './streetsFixture.ts'
 
@@ -46,6 +46,91 @@ describe('parseEntranceRows and entrancesByStation', () => {
 
   it('names the bad field of a malformed row', () => {
     expect(() => parseEntranceRows({ rows: [{ ...json.rows[0], lat: 'x' }] })).toThrow(/rows\[0\]\.lat/)
+  })
+})
+
+describe('entrancesByStation over a complex', () => {
+  const at = (id: string, lat: number): EntranceInput => ({ type: 'Stair', entry: true, exit: true, lat, lon: -74, gtfsStopIds: [id] })
+  const rows = [at('A1', 40.1), at('A1', 40.2), at('B2', 40.3), at('C3', 40.4), { ...at('A1', 40.5), gtfsStopIds: ['A1', 'B2'] }]
+  const complexOf = parseComplexOf({
+    rows: [
+      { gtfsStopId: 'A1', complexId: '7' },
+      { gtfsStopId: 'B2', complexId: '7' },
+      { gtfsStopId: 'C3', complexId: '8' },
+      { gtfsStopId: 'D4', complexId: '7' },
+    ],
+  })
+  const lats = (by: Map<string, EntranceInput[]>, id: string) => by.get(id)?.map((r) => r.lat)
+
+  it("reads each stop's complex from the catalog stations", () => {
+    expect(complexOf.get('B2')).toBe('7')
+    expect(complexOf.get('C3')).toBe('8')
+    expect(() => parseComplexOf({ rows: [{ gtfsStopId: 'A1' }] })).toThrow(/rows\[0\]\.complexId/)
+    expect(() => parseComplexOf({ rows: [{ gtfsStopId: 'A1', complexId: '7' }, { gtfsStopId: 'A1', complexId: '8' }] })).toThrow(/rows\[1\]\.gtfsStopId: "A1" is listed twice/)
+  })
+
+  it("gives every member of a complex the complex's rows, each once, and a member with none of its own too", () => {
+    const by = entrancesByStation(rows, complexOf)
+    const whole = [40.1, 40.2, 40.3, 40.5]
+    expect(lats(by, 'A1')).toEqual(whole)
+    expect(lats(by, 'B2')).toEqual(whole)
+    expect(lats(by, 'D4')).toEqual(whole)
+  })
+
+  it('leaves another complex alone, and keeps each row as the catalog lists it', () => {
+    const by = entrancesByStation(rows, complexOf)
+    expect(lats(by, 'C3')).toEqual([40.4])
+    expect(by.get('B2')![0]!.gtfsStopIds).toEqual(['A1'])
+  })
+
+  it('without a complex map, or for a stop it lacks, groups by listed stop only', () => {
+    const plain = entrancesByStation(rows)
+    expect(lats(plain, 'A1')).toEqual([40.1, 40.2, 40.5])
+    expect(lats(plain, 'B2')).toEqual([40.3, 40.5])
+    expect(plain.get('D4')).toBeUndefined()
+    const partial = entrancesByStation(rows, new Map([['C3', '8']]))
+    expect(lats(partial, 'A1')).toEqual([40.1, 40.2, 40.5])
+  })
+
+  it("puts each member's positions around its own anchor", () => {
+    const file = fileOf([horizontal(1, 'Main St', 0)])
+    const r = row([20, 5])
+    const here = buildEntrances(STATION, [r], file).entrances[0]!
+    const other = { ...STATION, ...toLatLon({ x: 50, z: 0 }, STATION) }
+    const there = buildEntrances(other, [r], file).entrances[0]!
+    expect([here.x, here.z]).toEqual([200, 50])
+    expect([there.x, there.z]).toEqual([-300, 50])
+  })
+})
+
+describe('buildEntrances over a complex', () => {
+  const file = fileOf([horizontal(1, 'Main St', 0)])
+
+  it('drops a row shared from another member beyond 260 m, never one that lists the station', () => {
+    const own = row([20, 5])
+    const sharedNear = row([100, 5], { gtfsStopIds: ['T02'] })
+    const sharedEdge = row([270, 5], { gtfsStopIds: ['T02'] })
+    const sharedFar = row([310, 5], { gtfsStopIds: ['T02'] })
+    const ownFar = row([320, 5], { gtfsStopIds: ['T01', 'T02'] })
+    const { entrances, log } = buildEntrances(STATION, [own, sharedNear, sharedEdge, sharedFar, ownFar], file)
+    expect(entrances.map((e) => e.x)).toEqual([200, 1000, 3200])
+    const dropped = log.filter((l) => l.kind === 'shared-dropped')
+    expect(dropped).toHaveLength(1)
+    expect(dropped[0]!.line).toContain('dropped 2 shared complex entrance(s) (0 elevator(s), 2 beyond 260 m)')
+  })
+
+  it('drops every shared elevator, near or far, and keeps one that lists the station', () => {
+    const ownLift = row([60, 5], { type: 'Elevator' })
+    const sharedLift = row([50, 5], { type: 'Elevator', gtfsStopIds: ['T02'] })
+    const sharedFarLift = row([400, 5], { type: 'Elevator', gtfsStopIds: ['T02'] })
+    const sharedStair = row([70, 5], { gtfsStopIds: ['T02'] })
+    const { entrances, log } = buildEntrances(STATION, [ownLift, sharedLift, sharedFarLift, sharedStair], file)
+    expect(entrances.map((e) => [e.x, e.type])).toEqual([[600, 'Elevator'], [700, 'Stair']])
+    expect(log.find((l) => l.kind === 'shared-dropped')!.line).toContain('dropped 2 shared complex entrance(s) (2 elevator(s), 0 beyond 260 m)')
+  })
+
+  it('logs nothing when no shared row is far', () => {
+    expect(buildEntrances(STATION, [row([20, 5]), row([30, 5], { gtfsStopIds: ['T02'] })], file).log.filter((l) => l.kind === 'shared-dropped')).toEqual([])
   })
 })
 

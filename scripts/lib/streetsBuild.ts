@@ -148,7 +148,7 @@ export function buildStationStreets(station: Station, pin: Pin, rows: readonly E
     anchor: { lat: station.lat, lon: station.lon },
     format: 1,
     license: 'ODbL-1.0',
-    attribution: [OSM_CREDIT, ...(rows.length > 0 ? [MTA_CREDIT, ENTRANCES_OPEN_NY_NOTE] : [])],
+    attribution: [OSM_CREDIT, ...(joined.entrances.length > 0 ? [MTA_CREDIT, ENTRANCES_OPEN_NY_NOTE] : [])],
     osmTimestamp: pin.baseTimestamp,
     radiusM: RADIUS_M,
     walkRadiusM: WALK_RADIUS_M,

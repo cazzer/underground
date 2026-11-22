@@ -128,6 +128,9 @@
     {"x":233,"z":-138,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A27"],"street":"8th Avenue","wayId":125480075,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":480,"z":-1413,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A27"],"street":"West 44th Street","wayId":226041027,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":602,"z":-1540,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":"West 44th Street","wayId":226041027,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":888,"z":-1196,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":"West 44th Street","wayId":1198594027,"cross":null,"crossWayId":null,"side":"south","plaza":null}
+    {"x":888,"z":-1196,"type":"Stair","entry":true,"exit":true,"stopIds":["A27"],"street":"West 44th Street","wayId":1198594027,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":1733,"z":1932,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 41st Street","wayId":195743209,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":1866,"z":1310,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 42nd Street","wayId":525729008,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":2052,"z":1068,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["127"],"street":"West 42nd Street","wayId":525729008,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

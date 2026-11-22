@@ -6,7 +6,7 @@
   },
   "format": 1,
   "license": "ODbL-1.0",
-  "attribution": ["© OpenStreetMap contributors"],
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
   "osmTimestamp": "2026-11-22T04:33:58Z",
   "radiusM": 300,
   "walkRadiusM": 100,
@@ -111,5 +111,9 @@
     {"id":1189755425,"highway":"footway","footway":"crossing","name":null,"oneway":0,"nodes":[155,156]},
     {"id":1322462911,"highway":"primary","name":"Myrtle Avenue","oneway":0,"nodes":[159,17]}
   ],
-  "entrances": []
+  "entrances": [
+    {"x":866,"z":-409,"type":"Stair","entry":true,"exit":true,"stopIds":["L17"],"street":"Wyckoff Avenue","wayId":221694870,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":1165,"z":-339,"type":"Station House","entry":true,"exit":true,"stopIds":["L17"],"street":"Palmetto Street","wayId":5705067,"cross":"Myrtle Avenue","crossWayId":905891580,"side":"NW","plaza":null},
+    {"x":1407,"z":-110,"type":"Stair","entry":true,"exit":true,"stopIds":["L17"],"street":"Myrtle Avenue","wayId":1322462911,"cross":"Wyckoff Avenue","crossWayId":1098116206,"side":"SE","plaza":null}
+  ]
 }

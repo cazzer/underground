@@ -201,6 +201,13 @@
     {"x":116,"z":806,"type":"Stair","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":852459539,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":146,"z":12,"type":"Stair","entry":true,"exit":true,"stopIds":["A41"],"street":"Willoughby Street","wayId":717725269,"cross":"Jay Street","crossWayId":386201385,"side":"NE","plaza":null},
     {"x":153,"z":-136,"type":"Stair","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":386201385,"cross":null,"crossWayId":null,"side":"east","plaza":null},
-    {"x":280,"z":-1381,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A41"],"street":"Myrtle Avenue","wayId":747375310,"cross":"Jay Street","crossWayId":630677037,"side":"SE","plaza":null}
+    {"x":280,"z":-1381,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A41"],"street":"Myrtle Avenue","wayId":747375310,"cross":"Jay Street","crossWayId":630677037,"side":"SE","plaza":null},
+    {"x":969,"z":320,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Lawrence Street","wayId":222246977,"cross":"Willoughby Street","crossWayId":5678195,"side":"SE","plaza":null},
+    {"x":982,"z":-21,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Lawrence Street","wayId":802705820,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":1067,"z":240,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Willoughby Street","wayId":5678195,"cross":"Lawrence Street","crossWayId":222246977,"side":"SE","plaza":null},
+    {"x":1078,"z":79,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Willoughby Street","wayId":5678195,"cross":"Lawrence Street","crossWayId":802705820,"side":"NE","plaza":null},
+    {"x":1640,"z":344,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Bridge Street","wayId":222246980,"cross":"Willoughby Street","crossWayId":5678195,"side":"SW","plaza":null},
+    {"x":1828,"z":28,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Bridge Street","wayId":222246980,"cross":"Willoughby Street","crossWayId":5678195,"side":"NE","plaza":null},
+    {"x":1829,"z":306,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["R29"],"street":"Bridge Street","wayId":222246980,"cross":"Willoughby Street","crossWayId":5678195,"side":"SE","plaza":null}
   ]
 }

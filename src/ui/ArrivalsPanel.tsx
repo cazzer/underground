@@ -1,8 +1,9 @@
-import type { Ref, RefObject } from 'react'
+import { useMemo, type Ref, type RefObject } from 'react'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { OutagePanelView } from '../lib/live/eneText'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { useStationStreets } from '../data/useStationStreets'
+import { listsStationFn } from '../lib/entranceList'
 import type { Network } from '../lib/network'
 import { PartialAccessNote, StationName } from './AccessIcon'
 import { ArrivalsList } from './ArrivalsList'
@@ -27,6 +28,7 @@ interface ArrivalsPanelProps {
 export function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, outages, ref, headingRef }: ArrivalsPanelProps) {
   // The street file loads on focus only (the scene's streets share it through the cache); nothing shows until it is in.
   const streets = useStationStreets(stationId)
+  const listsStation = useMemo(() => (streets ? listsStationFn(streets.file.entrances, stationId) : undefined), [streets, stationId])
   const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   return (
@@ -52,7 +54,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, onClose, int
       <InteriorStatus info={interior} />
       <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
       <ArrivalsList key={`arrivals-${stationId}`} network={network} station={station} source={arrivals} status={live} onFocusLost={() => headingRef.current?.focus()} />
-      <EntranceList key={stationId} entrances={streets?.entrances ?? null} onFocusLost={() => headingRef.current?.focus()} />
+      <EntranceList key={stationId} entrances={streets?.entrances ?? null} listsStation={listsStation} onFocusLost={() => headingRef.current?.focus()} />
     </aside>
   )
 }

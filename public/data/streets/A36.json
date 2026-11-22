@@ -172,7 +172,13 @@
     {"id":1549124950,"highway":"residential","name":"Warren Street","oneway":1,"nodes":[249,88]}
   ],
   "entrances": [
+    {"x":-1492,"z":2042,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Vesey Street","wayId":44225576,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-1122,"z":1608,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Church Street","wayId":1227588718,"cross":"Barclay Street","crossWayId":222299238,"side":"SW","plaza":null},
+    {"x":-821,"z":890,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Park Place","wayId":1334995999,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-613,"z":760,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Church Street","wayId":587038051,"cross":"Park Place","crossWayId":1334995999,"side":"NW","plaza":null},
     {"x":-410,"z":417,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Church Street","wayId":1149017114,"cross":"Murray Street","crossWayId":222299272,"side":"SW","plaza":null},
+    {"x":-378,"z":1169,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Park Place","wayId":1330602154,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-366,"z":832,"type":"Stair","entry":true,"exit":true,"stopIds":["E01"],"street":"Church Street","wayId":1149017144,"cross":"Park Place","crossWayId":1330602154,"side":"NE","plaza":null},
     {"x":-343,"z":164,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Murray Street","wayId":222299272,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-36,"z":-215,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Church Street","wayId":222299254,"cross":"Warren Street","crossWayId":413050335,"side":"SW","plaza":null},
     {"x":135,"z":-499,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Church Street","wayId":483707770,"cross":"Warren Street","crossWayId":413050335,"side":"NW","plaza":null},
@@ -180,6 +186,7 @@
     {"x":343,"z":-846,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Church Street","wayId":483707770,"cross":"Chambers Street","crossWayId":524816751,"side":"SW","plaza":null},
     {"x":506,"z":-1120,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Church Street","wayId":413054286,"cross":"Chambers Street","crossWayId":524816751,"side":"NW","plaza":null},
     {"x":575,"z":-742,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Church Street","wayId":483707770,"cross":"Chambers Street","crossWayId":1333725593,"side":"SE","plaza":null},
+    {"x":699,"z":1561,"type":"Stair","entry":true,"exit":true,"stopIds":["228"],"street":"Park Place","wayId":587038050,"cross":"Broadway","crossWayId":1061993519,"side":"NW","plaza":null},
     {"x":741,"z":-1021,"type":"Stair","entry":true,"exit":true,"stopIds":["A36"],"street":"Church Street","wayId":413054286,"cross":"Chambers Street","crossWayId":1333725593,"side":"NE","plaza":null}
   ]
 }

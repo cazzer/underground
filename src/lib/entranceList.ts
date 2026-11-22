@@ -64,11 +64,15 @@ export function entranceCountSpoken(count: number): string {
  * The labelled entrances as rows: elevators first, then by street (the label's head: its street, or street pair in
  * the station's one sign order, so by street then cross street), then by the rest of the text. Same-text entrances
  * within MERGE_M are already one label with a count, as on the map.
+ * A complex's members share one entrance set, so with `listsStation` the rows whose entrance lists the focused
+ * station come first, then the rest, each group in the order above.
  */
-export function entranceRows(texts: readonly EntranceText[]): EntranceRow[] {
+export function entranceRows(texts: readonly EntranceText[], listsStation?: (text: EntranceText) => boolean): EntranceRow[] {
+  const own = (t: EntranceText): number => (listsStation === undefined || listsStation(t) ? 0 : 1)
   return [...texts]
     .sort(
       (a, b) =>
+        own(a) - own(b) ||
         Number(b.elevator) - Number(a.elevator) ||
         byName(a.head, b.head) ||
         byName(a.tail, b.tail) ||
@@ -81,6 +85,15 @@ export function entranceRows(texts: readonly EntranceText[]): EntranceRow[] {
       elevator: t.elevator,
       count: t.count,
     }))
+}
+
+/** Whether a label's entrance lists `stationId`: one of the file entrances it stands for (`members`) has the station
+ *  among its `stopIds` (the catalog row's own stops; a complex's other members' rows list other stops). */
+export function listsStationFn(
+  fileEntrances: readonly { stopIds: readonly string[] }[],
+  stationId: string,
+): (text: EntranceText) => boolean {
+  return (t) => t.members.some((i) => fileEntrances[i]?.stopIds.includes(stationId) ?? false)
 }
 
 /** How many entrances the rows stand for. */

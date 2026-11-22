@@ -16,8 +16,11 @@ import { RADIUS_M } from './streetsOsm.ts'
 export const NEAR_MISS_SLACK_M = JOIN_RADIUS_M - MEDIAN_MAX_M
 /** An entrance this close to the pin's radius edge may have streets cut off beyond it. */
 export const EDGE_MARGIN_M = 40
+/** A shared complex entrance farther than this from the member's point is dropped (the far-entrance log's threshold). */
+export const SHARED_MAX_M = RADIUS_M - EDGE_MARGIN_M
+const ELEVATOR = 'Elevator'
 
-export type LogKind = 'no-street' | 'near-miss' | 'bridge-tunnel' | 'far-entrance' | 'no-entrances' | 'no-ways' | 'whole-way' | 'oneway'
+export type LogKind = 'no-street' | 'near-miss' | 'bridge-tunnel' | 'far-entrance' | 'no-entrances' | 'shared-dropped' | 'no-ways' | 'whole-way' | 'oneway'
 
 export interface BuildLog {
   kind: LogKind
@@ -62,10 +65,42 @@ export function parseEntranceRows(json: unknown): EntranceInput[] {
   })
 }
 
-/** Rows grouped by every station id they list, so a two-stop row reaches both stations. */
-export function entrancesByStation(rows: readonly EntranceInput[]): Map<StationId, EntranceInput[]> {
+/** The catalog's complex of each stop: `gtfsStopId` to `complexId` over data/stations/catalog/stations.json (the
+ *  catalog's own membership; stations.json carries none). */
+export function parseComplexOf(json: unknown): Map<StationId, string> {
+  const rows = list(record(json, 'catalog/stations.json').rows, 'catalog/stations.json.rows')
+  const out = new Map<StationId, string>()
+  rows.forEach((raw, i) => {
+    const at = `catalog/stations.json.rows[${i}]`
+    const row = record(raw, at)
+    const id = text(row.gtfsStopId, `${at}.gtfsStopId`)
+    if (out.has(id)) throw new Error(`${at}.gtfsStopId: "${id}" is listed twice`)
+    out.set(id, text(row.complexId, `${at}.complexId`))
+  })
+  return out
+}
+
+/** Rows grouped by every station id they list, so a two-stop row reaches both stations. With `complexOf`, every
+ *  station of a complex also gets every row that lists any of its members: a complex's entrances are one set, and
+ *  each member's file draws all of them (positions are relative to that member's own anchor, in `buildEntrances`).
+ *  A row's own `complexId` is not used: a few rows carry another complex's id (R20's four stairs say 607), while
+ *  the stop ids they list are right. A station `complexOf` lacks keeps only the rows that list it. */
+export function entrancesByStation(rows: readonly EntranceInput[], complexOf?: ReadonlyMap<StationId, string>): Map<StationId, EntranceInput[]> {
   const out = new Map<StationId, EntranceInput[]>()
-  for (const row of rows) for (const id of new Set(row.gtfsStopIds)) out.set(id, [...(out.get(id) ?? []), row])
+  const add = (id: StationId, row: EntranceInput): void => {
+    const have = out.get(id)
+    if (have === undefined) out.set(id, [row])
+    else if (!have.includes(row)) have.push(row)
+  }
+  const members = new Map<string, StationId[]>()
+  for (const [id, complex] of complexOf ?? []) members.set(complex, [...(members.get(complex) ?? []), id])
+  for (const row of rows) {
+    for (const id of new Set(row.gtfsStopIds)) {
+      add(id, row)
+      const complex = complexOf?.get(id)
+      if (complex !== undefined) for (const member of members.get(complex)!) add(member, row)
+    }
+  }
   return out
 }
 
@@ -113,15 +148,34 @@ function nearMissGapM(p: [number, number], wayId: number, ways: readonly JoinWay
 }
 
 /** The station's entrances on the file's decimeter grid, joined to their streets, sorted by x, z, then type.
- *  `station` is its stations.json row; `rows` the catalog rows that list it (`entrancesByStation`). */
+ *  `station` is its stations.json row; `allRows` its catalog rows (`entrancesByStation`): those that list it, and the
+ *  complex's other rows, of which elevators and those past SHARED_MAX_M are dropped (logged once per station). */
 export function buildEntrances(
   station: { id: StationId; name: string } & LatLon,
-  rows: readonly EntranceInput[],
+  allRows: readonly EntranceInput[],
   file: FileStreets,
 ): { entrances: StreetEntrance[]; log: BuildLog[] } {
   const ways = toJoinWays(file)
   const log: BuildLog[] = []
   const who = `${station.id} ${station.name}`
+  // A row shared from another member of the complex (it does not list this station) is dropped when it is an elevator
+  // (one that does not list a member does not serve its trains, and an elevator ranks first on the map and in the list)
+  // or when it lies near or past the street radius: the streets there are cut off or gone, so it would be a mark
+  // without a label. The rows that list the station always stay.
+  const far = (row: EntranceInput): boolean => {
+    const g = toGround({ lat: row.lat, lon: row.lon }, station)
+    return Math.hypot(Math.round(g.x * 10), Math.round(g.z * 10)) / 10 > SHARED_MAX_M
+  }
+  const shared = (row: EntranceInput): boolean => !row.gtfsStopIds.includes(station.id)
+  const elevators = allRows.filter((row) => shared(row) && row.type === ELEVATOR).length
+  const rows = allRows.filter((row) => !shared(row) || (row.type !== ELEVATOR && !far(row)))
+  if (rows.length < allRows.length) {
+    const beyond = allRows.length - rows.length - elevators
+    log.push({
+      kind: 'shared-dropped',
+      line: `dropped ${allRows.length - rows.length} shared complex entrance(s) (${elevators} elevator(s), ${beyond} beyond ${SHARED_MAX_M} m): ${who}`,
+    })
+  }
   if (rows.length === 0) log.push({ kind: 'no-entrances', line: `no entrances in the catalog: ${who}` })
   const entrances = rows.map((row): StreetEntrance => {
     const g = toGround({ lat: row.lat, lon: row.lon }, station)

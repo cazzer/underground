@@ -209,7 +209,9 @@
     {"id":1528848125,"highway":"pedestrian","name":null,"oneway":0,"nodes":[204,200,199,198,197,196,195,391,390,194,193,192,409,411,408,163,164,165,422,423,166,179,184,183,182,181,419,180,72,70,71,36,75,77,420,421,225,224,431,221,223,222,428,430,429,426,425,427,220,219,218,214,217,216,215,191,424,76,74,37,210,209,418,417,413,415,416,412,414,212,68,69,73,201,202,203,204]}
   ],
   "entrances": [
+    {"x":-1273,"z":323,"type":"Stair","entry":true,"exit":true,"stopIds":["142"],"street":"State Street","wayId":413212450,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":-288,"z":-1179,"type":"Stair","entry":true,"exit":true,"stopIds":["R27"],"street":"Broadway","wayId":757359118,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-270,"z":1241,"type":"Escalator","entry":true,"exit":true,"stopIds":["142"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null},
     {"x":-267,"z":-1007,"type":"Stair","entry":true,"exit":true,"stopIds":["R27"],"street":"Whitehall Street","wayId":46160406,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":6,"z":-1143,"type":"Stair","entry":true,"exit":true,"stopIds":["R27"],"street":"Stone Street","wayId":5670920,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":24,"z":1572,"type":"Stair/Escalator","entry":true,"exit":true,"stopIds":["R27"],"street":"Whitehall Street","wayId":32934351,"cross":null,"crossWayId":null,"side":"west","plaza":null},

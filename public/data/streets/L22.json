@@ -6,7 +6,7 @@
   },
   "format": 1,
   "license": "ODbL-1.0",
-  "attribution": ["© OpenStreetMap contributors"],
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
   "osmTimestamp": "2026-11-22T04:33:58Z",
   "radiusM": 300,
   "walkRadiusM": 100,
@@ -132,5 +132,7 @@
     {"id":1556698188,"highway":"footway","name":null,"oneway":0,"nodes":[177,174,180,169,173,176,168,175,171]},
     {"id":1577561366,"highway":"tertiary","name":"Van Sinderen Avenue","oneway":0,"nodes":[2,96,181]}
   ],
-  "entrances": []
+  "entrances": [
+    {"x":-585,"z":564,"type":"Station House","entry":true,"exit":true,"stopIds":["A51"],"street":null,"wayId":null,"cross":null,"crossWayId":null,"side":null,"plaza":null}
+  ]
 }

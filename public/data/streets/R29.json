@@ -150,6 +150,16 @@
     {"id":1536590987,"highway":"residential","name":"Livingston Street","oneway":0,"nodes":[211,71]}
   ],
   "entrances": [
+    {"x":-1388,"z":-327,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":386201385,"cross":"Willoughby Street","crossWayId":324751028,"side":"NW","plaza":null},
+    {"x":-1307,"z":-1151,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":460576121,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-1300,"z":-368,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":386201385,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-1282,"z":534,"type":"Stair","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":852459539,"cross":"Fulton Mall","crossWayId":46121867,"side":"NW","plaza":null},
+    {"x":-1280,"z":-193,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A41"],"street":"Willoughby Street","wayId":324751028,"cross":"Jay Street","crossWayId":386201385,"side":"NW","plaza":null},
+    {"x":-1272,"z":-1110,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":460576121,"cross":null,"crossWayId":null,"side":"west","plaza":null},
+    {"x":-1064,"z":629,"type":"Stair","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":852459539,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-1034,"z":-166,"type":"Stair","entry":true,"exit":true,"stopIds":["A41"],"street":"Willoughby Street","wayId":717725269,"cross":"Jay Street","crossWayId":386201385,"side":"NE","plaza":null},
+    {"x":-1027,"z":-314,"type":"Stair","entry":true,"exit":true,"stopIds":["A41"],"street":"Jay Street","wayId":386201385,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-900,"z":-1559,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["A41"],"street":"Myrtle Avenue","wayId":747375310,"cross":"Jay Street","crossWayId":630677037,"side":"SE","plaza":null},
     {"x":-212,"z":142,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Lawrence Street","wayId":222246977,"cross":"Willoughby Street","crossWayId":5678195,"side":"SE","plaza":null},
     {"x":-198,"z":-198,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Lawrence Street","wayId":802705820,"cross":null,"crossWayId":null,"side":"east","plaza":null},
     {"x":-113,"z":62,"type":"Stair","entry":true,"exit":true,"stopIds":["R29"],"street":"Willoughby Street","wayId":5678195,"cross":"Lawrence Street","crossWayId":222246977,"side":"SE","plaza":null},

@@ -96,6 +96,11 @@
     {"id":1530562216,"highway":"secondary","name":"Meeker Avenue","oneway":1,"nodes":[7,78]}
   ],
   "entrances": [
+    {"x":-1258,"z":347,"type":"Stair","entry":true,"exit":true,"stopIds":["G29"],"street":"Keap Street","wayId":448657729,"cross":"Union Avenue","crossWayId":1109542392,"side":"NW","plaza":null},
+    {"x":-1226,"z":133,"type":"Stair","entry":true,"exit":true,"stopIds":["G29"],"street":"Union Avenue","wayId":1109542392,"cross":"Metropolitan Avenue","crossWayId":441918283,"side":"SW","plaza":null},
+    {"x":-981,"z":322,"type":"Stair","entry":true,"exit":true,"stopIds":["G29"],"street":"Union Avenue","wayId":1109542392,"cross":"Keap Street","crossWayId":448657729,"side":"SE","plaza":null},
+    {"x":-837,"z":-126,"type":"Stair","entry":true,"exit":true,"stopIds":["G29"],"street":"Metropolitan Avenue","wayId":1205112614,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-643,"z":2519,"type":"Stair","entry":true,"exit":true,"stopIds":["G29"],"street":"Powers Street","wayId":685311603,"cross":"Union Avenue","crossWayId":46359897,"side":"NE","plaza":null},
     {"x":693,"z":102,"type":"Stair","entry":true,"exit":true,"stopIds":["L10"],"street":"Lorimer Street","wayId":1205112615,"cross":"Metropolitan Avenue","crossWayId":1205112614,"side":"SW","plaza":null},
     {"x":694,"z":-212,"type":"Elevator","entry":true,"exit":true,"stopIds":["L10"],"street":"Lorimer Street","wayId":1034698262,"cross":null,"crossWayId":null,"side":"west","plaza":null},
     {"x":815,"z":-167,"type":"Stair","entry":true,"exit":true,"stopIds":["L10"],"street":"Lorimer Street","wayId":1034698262,"cross":"Metropolitan Avenue","crossWayId":198924599,"side":"NE","plaza":null},

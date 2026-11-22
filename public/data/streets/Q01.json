@@ -6,7 +6,7 @@
   },
   "format": 1,
   "license": "ODbL-1.0",
-  "attribution": ["© OpenStreetMap contributors"],
+  "attribution": ["© OpenStreetMap contributors","Metropolitan Transportation Authority, data.ny.gov","Entrances are MTA data from data.ny.gov under the OPEN-NY Terms of Use, not ODbL"],
   "osmTimestamp": "2026-11-22T04:33:58Z",
   "radiusM": 300,
   "walkRadiusM": 100,
@@ -147,5 +147,19 @@
     {"id":1571069429,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[126,127]},
     {"id":1571069430,"highway":"footway","footway":"sidewalk","name":null,"oneway":0,"nodes":[128,125]}
   ],
-  "entrances": []
+  "entrances": [
+    {"x":-1527,"z":-1244,"type":"Stair","entry":true,"exit":true,"stopIds":["R23"],"street":"Canal Street","wayId":467222856,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-1430,"z":-1155,"type":"Stair","entry":true,"exit":true,"stopIds":["R23"],"street":"Canal Street","wayId":467222856,"cross":"Broadway","crossWayId":1531851227,"side":"SW","plaza":null},
+    {"x":-1313,"z":-1428,"type":"Stair","entry":true,"exit":true,"stopIds":["R23"],"street":"Canal Street","wayId":467222856,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-1220,"z":-1342,"type":"Stair","entry":true,"exit":true,"stopIds":["R23"],"street":"Broadway","wayId":963551551,"cross":"Canal Street","crossWayId":467222856,"side":"NW","plaza":null},
+    {"x":-1166,"z":-911,"type":"Stair","entry":true,"exit":true,"stopIds":["R23"],"street":"Canal Street","wayId":505598707,"cross":"Broadway","crossWayId":1531851227,"side":"SE","plaza":null},
+    {"x":-1114,"z":-857,"type":"Stair","entry":true,"exit":true,"stopIds":["R23"],"street":"Canal Street","wayId":505598707,"cross":"Broadway","crossWayId":1531851227,"side":"SE","plaza":null},
+    {"x":-976,"z":-1266,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["R23"],"street":"Broadway","wayId":963551551,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":-328,"z":-162,"type":"Stair","entry":true,"exit":true,"stopIds":["639"],"street":"Canal Street","wayId":591772210,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-210,"z":-346,"type":"Stair","entry":true,"exit":true,"stopIds":["639"],"street":"Canal Street","wayId":591772210,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":61,"z":203,"type":"Stair","entry":true,"exit":true,"stopIds":["639"],"street":"Canal Street","wayId":591772210,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":123,"z":268,"type":"Stair","entry":true,"exit":true,"stopIds":["639"],"street":"Canal Street","wayId":591772210,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":155,"z":603,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["M20"],"street":"Centre Street","wayId":1318001658,"cross":"Walker Street","crossWayId":1372100664,"side":"NW","plaza":null},
+    {"x":194,"z":42,"type":"Stair","entry":true,"exit":true,"stopIds":["639"],"street":"Canal Street","wayId":591772210,"cross":null,"crossWayId":null,"side":"north","plaza":null}
+  ]
 }

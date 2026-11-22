@@ -9,7 +9,7 @@ import type { StationsFile } from '../src/data/schema.ts'
 import { checkFileCap, checkStreetsTotal, committedGzip, GZIP_BUDGET_BYTES, renderedFile, STREETS_FILE_GZIP_CAP_BYTES, STREETS_TOTAL_GZIP_CAP_BYTES } from './lib/budget.ts'
 import { toStableJson } from './lib/stableJson.ts'
 import { buildAllStreets, WALK_RADIUS_M } from './lib/streetsBuild.ts'
-import { entrancesByStation, median, parseEntranceRows, type BuildLog, type LogKind } from './lib/streetsEntrances.ts'
+import { entrancesByStation, median, parseComplexOf, parseEntranceRows, type BuildLog, type LogKind } from './lib/streetsEntrances.ts'
 import { RADIUS_M } from './lib/streetsOsm.ts'
 import { loadPin } from './lib/streetsPin.ts'
 import type { StreetShard, StreetsManifest } from './lib/streetsShard.ts'
@@ -18,6 +18,7 @@ const PIN_DIR = new URL('../data/streets/', import.meta.url)
 const DATA_DIR = new URL('../public/data/', import.meta.url)
 const OUT_DIR = new URL('../public/data/streets/', import.meta.url)
 const ENTRANCES = new URL('../data/stations/catalog/entrances.json', import.meta.url)
+const CATALOG_STATIONS = new URL('../data/stations/catalog/stations.json', import.meta.url)
 const FILE_RE = /^[A-Za-z0-9]+\.json$/
 const TOP_FILES = 5
 
@@ -31,7 +32,7 @@ function main(): void {
   const shards = new Map(manifest.shards.map((s) => [s.file, readJson(new URL(s.file, PIN_DIR)) as StreetShard]))
   const pin = loadPin(manifest, shards)
   const stationsFile = readJson(new URL('stations.json', DATA_DIR)) as StationsFile
-  const rowsOf = entrancesByStation(parseEntranceRows(readJson(ENTRANCES)))
+  const rowsOf = entrancesByStation(parseEntranceRows(readJson(ENTRANCES)), parseComplexOf(readJson(CATALOG_STATIONS)))
   const unknown = [...rowsOf.keys()].filter((id) => !stationsFile.stations.some((s) => s.id === id))
   if (unknown.length > 0) console.log(`entrances: rows list ${unknown.length} stop id(s) that are not stations (ignored): ${unknown.join(', ')}`)
 
@@ -66,7 +67,7 @@ function main(): void {
   for (const l of log) console.log(`${l.kind === 'no-ways' ? '' : 'streets: '}${l.line}`)
   const gaps = byKind('near-miss').map((l) => l.gapM!)
   console.log('streets: log counts')
-  for (const kind of ['no-street', 'near-miss', 'bridge-tunnel', 'far-entrance', 'no-entrances', 'no-ways', 'whole-way', 'oneway'] as const) {
+  for (const kind of ['no-street', 'near-miss', 'bridge-tunnel', 'far-entrance', 'no-entrances', 'shared-dropped', 'no-ways', 'whole-way', 'oneway'] as const) {
     const extra = kind === 'near-miss' && gaps.length > 0 ? ` (median gap ${median(gaps).toFixed(1)} m)` : ''
     console.log(`  ${kind}: ${byKind(kind).length}${extra}`)
   }

@@ -148,6 +148,12 @@
   "entrances": [
     {"x":-58,"z":-261,"type":"Stair","entry":true,"exit":true,"stopIds":["R31"],"street":"Pacific Street","wayId":145079213,"cross":"4th Avenue","crossWayId":420883002,"side":"NW","plaza":null},
     {"x":272,"z":-150,"type":"Elevator","entry":true,"exit":true,"stopIds":["R31"],"street":"Pacific Street","wayId":5682175,"cross":"4th Avenue","crossWayId":420883003,"side":"NE","plaza":null},
-    {"x":336,"z":-287,"type":"Stair","entry":true,"exit":true,"stopIds":["R31"],"street":"4th Avenue","wayId":420883003,"cross":null,"crossWayId":null,"side":"east","plaza":null}
+    {"x":336,"z":-287,"type":"Stair","entry":true,"exit":true,"stopIds":["R31"],"street":"4th Avenue","wayId":420883003,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":911,"z":-1237,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["235"],"street":"Flatbush Avenue","wayId":1121724623,"cross":null,"crossWayId":null,"side":"east","plaza":null},
+    {"x":1080,"z":-1529,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["235"],"street":"Hanson Place","wayId":1164493976,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":1087,"z":-1767,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["D24"],"street":"Hanson Place","wayId":1164493976,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":1091,"z":-1295,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["235"],"street":"Flatbush Avenue","wayId":1121724623,"cross":"Hanson Place","crossWayId":1164493976,"side":"SE","plaza":null},
+    {"x":1235,"z":-1474,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["235"],"street":"Hanson Place","wayId":1557434108,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":1945,"z":286,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["D24"],"street":"Atlantic Avenue","wayId":1204329827,"cross":null,"crossWayId":null,"side":"south","plaza":null}
   ]
 }

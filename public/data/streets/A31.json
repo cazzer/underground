@@ -104,8 +104,10 @@
     {"id":1526313337,"highway":"residential","name":"West 19th Street","oneway":1,"nodes":[13,116]}
   ],
   "entrances": [
+    {"x":-962,"z":1274,"type":"Stair","entry":true,"exit":true,"stopIds":["L01"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"south","plaza":null},
     {"x":-871,"z":1049,"type":"Elevator","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-832,"z":1029,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":458106348,"cross":null,"crossWayId":null,"side":"north","plaza":null},
+    {"x":-580,"z":1485,"type":"Stair","entry":true,"exit":true,"stopIds":["L01"],"street":"West 14th Street","wayId":1080982439,"cross":"8th Avenue","crossWayId":465098295,"side":"SE","plaza":null},
     {"x":-449,"z":1240,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 14th Street","wayId":1080982439,"cross":"8th Avenue","crossWayId":194923811,"side":"NE","plaza":null},
     {"x":-441,"z":308,"type":"Stair","entry":true,"exit":true,"stopIds":["A31"],"street":"West 15th Street","wayId":458106347,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":-132,"z":-122,"type":"Easement - Passage","entry":true,"exit":true,"stopIds":["A31"],"street":"8th Avenue","wayId":420598345,"cross":"West 16th Street","crossWayId":348477348,"side":"SW","plaza":null},

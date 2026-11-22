@@ -93,7 +93,12 @@
   "entrances": [
     {"x":-1045,"z":-116,"type":"Stair","entry":true,"exit":true,"stopIds":["F09"],"street":"21st Street","wayId":1204543480,"cross":"44th Drive","crossWayId":1089784563,"side":"SE","plaza":null},
     {"x":-976,"z":-395,"type":"Stair","entry":true,"exit":true,"stopIds":["F09"],"street":"21st Street","wayId":108297469,"cross":"44th Drive","crossWayId":1089784563,"side":"NE","plaza":null},
+    {"x":204,"z":1802,"type":"Stair","entry":true,"exit":true,"stopIds":["719"],"street":"45th Road","wayId":1419755025,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":573,"z":1889,"type":"Stair","entry":true,"exit":true,"stopIds":["719"],"street":"Jackson Avenue","wayId":308337558,"cross":"23rd Street","crossWayId":198924715,"side":"NE","plaza":null},
+    {"x":961,"z":1766,"type":"Stair","entry":true,"exit":true,"stopIds":["G22"],"street":"Jackson Avenue","wayId":308337558,"cross":null,"crossWayId":null,"side":"north","plaza":null},
     {"x":1105,"z":125,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1089784562,"cross":null,"crossWayId":null,"side":"north","plaza":null},
-    {"x":1456,"z":533,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1581232330,"cross":null,"crossWayId":null,"side":"south","plaza":null}
+    {"x":1456,"z":533,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["F09"],"street":"44th Drive","wayId":1581232330,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":1676,"z":1787,"type":"Stair","entry":true,"exit":true,"stopIds":["G22"],"street":"Court Square West","wayId":5704813,"cross":"Jackson Avenue","crossWayId":293571889,"side":"SW","plaza":null},
+    {"x":2092,"z":1072,"type":"Easement - Street","entry":true,"exit":true,"stopIds":["G22"],"street":"Jackson Avenue","wayId":1089780546,"cross":null,"crossWayId":null,"side":"north","plaza":null}
   ]
 }

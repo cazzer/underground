@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EntranceText } from './entranceText'
-import { entranceCountSpoken, entranceRows, entranceTotal, glueStreetNumbers, NOWRAP_MAX, rowParts } from './entranceList'
+import { entranceCountSpoken, entranceRows, listsStationFn, entranceTotal, glueStreetNumbers, NOWRAP_MAX, rowParts } from './entranceList'
 
 function text(index: number, head: string, tail: string, o: Partial<EntranceText> = {}): EntranceText {
   return {
@@ -92,5 +92,27 @@ describe('entranceCountSpoken', () => {
   it('says nothing for one entrance', () => {
     expect(entranceCountSpoken(1)).toBe('')
     expect(entranceCountSpoken(2)).toBe(', 2 entrances')
+  })
+})
+
+describe('rows of a complex member', () => {
+  const file = [{ stopIds: ['A1'] }, { stopIds: ['B2'] }, { stopIds: ['A1', 'B2'] }, { stopIds: ['B2'] }]
+  const input = [
+    text(0, 'Broadway', 'north side'),
+    text(1, 'Amsterdam Av', 'exit only', { elevator: true }),
+    text(2, 'Zed St', ''),
+    text(3, 'Aaa St', '', { members: [1, 3] }),
+  ]
+
+  it("puts the rows that list the focused station first, each group in the usual order", () => {
+    const rows = entranceRows(input, listsStationFn(file, 'A1'))
+    expect(rows.map((r) => r.key)).toEqual(['0', '2', '1', '3'])
+    expect(entranceRows(input, listsStationFn(file, 'B2')).map((r) => r.key)).toEqual(['1', '3', '2', '0'])
+  })
+
+  it('keeps the usual order without a station, and a merged row counts if any of its entrances lists it', () => {
+    expect(entranceRows(input).map((r) => r.key)).toEqual(['1', '3', '0', '2'])
+    expect(listsStationFn(file, 'A1')(input[3]!)).toBe(false)
+    expect(listsStationFn(file, 'B2')(input[3]!)).toBe(true)
   })
 })
