@@ -23,9 +23,9 @@ export interface ListScroll<L extends HTMLElement = HTMLOListElement> {
  * While the panel is stacked over the map (`isStackedPanel`), caps the list at whole rows (at most five, and at most a quarter of the screen, but
  * never fewer than the collapsed three), so the panel stays short enough to leave the map in view
  * (the train's stop list, the station's entrance list). A side-column panel gets no cap. `rowCount` re-measures when rows come and go; resizes and wrapping are
- * observed.
+ * observed. The rows are the list's children, or the elements `rowSelector` matches inside it (a list of lists).
  */
-export function useListScroll<L extends HTMLElement = HTMLOListElement>(rowCount: number): ListScroll<L> {
+export function useListScroll<L extends HTMLElement = HTMLOListElement>(rowCount: number, rowSelector?: string): ListScroll<L> {
   const scroller = useRef<HTMLDivElement>(null)
   const list = useRef<L>(null)
   const [capPx, setCapPx] = useState<number | null>(null)
@@ -41,7 +41,7 @@ export function useListScroll<L extends HTMLElement = HTMLOListElement>(rowCount
     const ol = list.current
     // Hidden (a collapsed panel's body): every rect is 0, so keep the last cap rather than measure a 0 one.
     if (!ol || ol.getClientRects().length === 0) return
-    const rows = [...ol.children]
+    const rows = rowSelector ? [...ol.querySelectorAll(rowSelector)] : [...ol.children]
     let cap: number | null = null
     if (isStackedPanel() && rows.length > MIN_ROWS) {
       const top = ol.getBoundingClientRect().top
@@ -53,7 +53,7 @@ export function useListScroll<L extends HTMLElement = HTMLOListElement>(rowCount
       if (fit < rows.length) cap = Math.ceil(rows[fit - 1]!.getBoundingClientRect().bottom - top)
     }
     setCapPx(cap)
-  }, [])
+  }, [rowSelector])
 
   useLayoutEffect(() => {
     measureCap()
