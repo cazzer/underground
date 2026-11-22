@@ -25,8 +25,8 @@ describe('inflateIfGzip', () => {
 
   it('hands the worker the same tile decoded whether it is stored plain or gzipped, as tiles are during the switch', async () => {
     const gz = gzipSync(raw, { level: 9, mtime: 0 })
-    const plain = decodeTile(await inflateIfGzip(raw), 15, 9647, 12320, ['roads'])
-    const fromGzip = decodeTile(await inflateIfGzip(gz), 15, 9647, 12320, ['roads'])
+    const plain = decodeTile(await inflateIfGzip(raw), 15, 9647, 12320, ['roads'], null)
+    const fromGzip = decodeTile(await inflateIfGzip(gz), 15, 9647, 12320, ['roads'], null)
     expect(fromGzip).toEqual(plain)
     expect(fromGzip.path).toHaveLength(6)
   })
