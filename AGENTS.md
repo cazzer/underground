@@ -62,7 +62,7 @@ so dev and preview serve under that path.
 - `npm run data:walk`: offline; builds `public/data/walk/<stationId>.json` (the walk graph: every walkable pinned way within
   300 m, junctions shared, OSM node ids, x/z in dm around the stations.json point, edges with kind and length; oneway ignored)
   for every station from the street pin. Rerun after `data` or `data:streets:fetch`; `walkOutputs.test.ts` fails while stale.
-  Caps in `budget.ts` (64 KB per file, 4.5 MB total), outside the startup budget.
+  Caps in `budget.ts` (64 KB per file, 4.6 MB total), outside the startup budget.
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages).

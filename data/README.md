@@ -121,7 +121,7 @@ Each file keeps every walkable pinned way within 300 m, named roads included (as
 undirected). Ways are clipped with the street files' method, at 300 m for every class (the street files clip footways at 100 m), and rounded to decimeters
 as they are (a node has the same x/z in both),
 simplified to 0.5 m, and cut into edges at every shared node, so junctions are real graph nodes; `steps` edges are the
-step-free flag. Caps are in `scripts/lib/budget.ts` (64 KB per file, 4.5 MB total gzipped), outside the startup budget; the
+step-free flag. Caps are in `scripts/lib/budget.ts` (64 KB per file, 4.6 MB total gzipped), outside the startup budget; the
 build also fails if the startup total moves. A station missing from the pin's `stationIds` gets a `WARNING:` line (its file may
 be partial or empty, not a failure). It prints stations with no walkable way, the number of excluded ways, the largest files, the
 stations whose largest connected piece holds under 90% of the walkable length (dead-end underground footways and
