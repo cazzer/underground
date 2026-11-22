@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import routesRaw from '../../../public/data/routes.json?raw'
 import { FEED_IDS, RT_SCHEMA_VERSION, STALE_AFTER_S, type FeedId, type RealtimeSnapshot } from '../../data/realtime'
 import type { RoutesFile } from '../../data/schema'
+import pollsRaw from '../../test-fixtures/rt-polls.json?raw'
 import { ROUTE_FEED, stationFeedHealth } from './feedHealth'
 
 const NOW = 1_795_228_554
@@ -25,6 +26,27 @@ describe('ROUTE_FEED', () => {
   it('names no route that routes.json lacks', () => {
     const ids = new Set(routes.map((r) => r.id))
     for (const id of Object.keys(ROUTE_FEED)) expect(ids.has(id), id).toBe(true)
+  })
+})
+
+describe('ROUTE_FEED against recorded polls', () => {
+  const polls = (JSON.parse(pollsRaw) as { polls: { snapshot: RealtimeSnapshot }[] }).polls
+
+  it('maps every recorded trip route to the feed it came in on', () => {
+    let trips = 0
+    for (const { snapshot: snap } of polls) {
+      for (const feed of FEED_IDS) {
+        for (const trip of snap.feeds[feed].trips) {
+          trips += 1
+          expect(ROUTE_FEED[trip.route], `${trip.route} in ${feed}`).toBe(feed)
+        }
+      }
+    }
+    expect(trips).toBeGreaterThan(0)
+  })
+
+  it('pins the routes that share a feed with a different name', () => {
+    expect(ROUTE_FEED).toMatchObject({ GS: '1234567', FS: 'ace', H: 'ace', W: 'nqrw', Z: 'jz', FX: 'bdfm' })
   })
 })
 

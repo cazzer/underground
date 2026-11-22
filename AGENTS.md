@@ -335,7 +335,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `stops.ts` `buildStopIndex` (child stops, stations, footpaths in CSR: a stop's own station at its change time,
     `DEFAULT_CHANGE_S` 180, plus each `transfers.json` link) and `stopsOfStations` (a complex is every member station)
   - `patterns.ts` `makePatterns` (validates, sorts trips, splits overtaking trips into FIFO sub-patterns `key#1`, ...) and
-    `buildTimetable` (the stop to pattern CSR; 2q7.8 swaps patterns and rebuilds it)
+    `buildTimetable` (the stop to pattern CSR; the overlay swaps patterns and rebuilds it). `Pattern.live` (per trip) and
+    `RideLeg.live` say whether a trip's times are realtime predictions (`TripInput.live`)
   - `raptor.ts` `route(tt, from, to, departS, { maxTransfers })`: two labels per round, `arr` (stepped off a train) and
     `ready` (can board, after a same-station change or a walk between stations), so the change time also holds on the
     same platform; Pareto on arrival and transfers (a round's journey is returned only if it beats every earlier
@@ -349,13 +350,25 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `<label>/<file index>` so split lanes stay apart, trip id `<key>/<trip>`, label `<date>:<service>`; unknown
     stops and stations are skipped with one `console.warn`); `plan.ts` `planOn` runs `route` for epoch seconds and
     returns `TripJourney`s (`departAt`/`arriveAt`/`startAt`/`endAt` in epoch seconds)
+  - `overlay.ts` `overlayRealtime(scheduled, { snapshot, nowS, day, lookup })`: for each healthy feed (not stale, no
+    error; a snapshot over `SNAPSHOT_MAX_AGE_S` old overlays nothing) replaces the scheduled trips running or leaving in
+    the next `REPLACEMENT_WINDOW_S` (30 min) with the feed's trips at predicted times, cancels the ones it lacks, and
+    returns `{ timetable, counts }` (the scheduled timetable itself when nothing changed). Per trip: `matchScheduled`
+    (`joinTrip.ts`, shared) names its scheduled key, `overlayMatch.ts` `assignTwins` pairs it with a row (same route
+    and direction, first departure within 120 s, stop run in the row's sequence preferred, one to one, feeds
+    ignored), `overlayRows.ts` fits the predicted stops on a stop sequence (`rowOnPattern`: before them the twin's
+    shifted times capped at now, after them its run times only when the feed's horizon cut the predictions off, else a
+    short turn and a pattern of its own `rt:<stop ids>`), `overlayGroups.ts` regroups lanes (`key` minus `#j`) and
+    rebuilds only the changed ones. Ids are `<feed>:<tripId>`, never a loader id. Feeds come from `ROUTE_FEED`
+    (`live/feedHealth.ts`). Not wired yet (2q7.9); `overlayFixture.ts` is the tests' scheduled evening and snapshots
   - Times are integer seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days; may be negative or past 86400, |t| < 2^29); a loader shifts other
     service days itself and keeps their patterns separate
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
   - `tripLookup.ts` trip-index to per-service trip-key maps and primary shapes
-  - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware), then the route's pattern
+  - `joinTrip.ts` realtime trip to shape: path code, then origin key (startDate-aware; `matchScheduled` returns that hit
+    as day, service, origin, route and shapes, which the router overlay shares), then the route's pattern
     that calls at the train's stop and covers most of its predicted stops (ties go to the primary)
   - `polyline.ts` cumulative length, point/heading at distance, forward-only projection
   - `shapeGeometry.ts` each pattern's track line, the map's own (the banded `shapeById`: same vertices, profile and

@@ -54,6 +54,7 @@ describe('route', () => {
         stops: ['101N', '102N', '103N'],
         departS: m(0),
         arriveS: m(4.5),
+        live: false,
       },
     ])
   })

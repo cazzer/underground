@@ -1,5 +1,5 @@
-import { parseTripId, shapeIdOf, tripKey } from '../../data/codec'
-import type { Direction, ShapeId } from '../../data/schema'
+import { parseTripId, shapeIdOf, tripKey, type ParsedTripId } from '../../data/codec'
+import type { Direction, ServiceId, ShapeId } from '../../data/schema'
 import type { RealtimeTrip } from '../../data/realtime'
 import { addDays, nyDate, servicesOn } from './serviceDate'
 import { primaryKey, type TripLookup } from './tripLookup'
@@ -68,22 +68,33 @@ function bestPattern(
   return best
 }
 
-export function joinTrip(
-  trip: Pick<RealtimeTrip, 'tripId' | 'route' | 'startDate' | 'stopId'> & Partial<Pick<RealtimeTrip, 'arrivals'>>,
+/** The routes a trip id can be keyed under: the id's own, then the feed's when it differs (W runs on "N"). */
+function routesOf(p: ParsedTripId, route: string): string[] {
+  return p.route === route ? [p.route] : [p.route, route]
+}
+
+export interface ScheduledMatch {
+  /** Service day (YYYYMMDD) the origin counts from: the trip's start date, or the day before for a 24:xx static origin. */
+  day: string
+  service: ServiceId
+  /** Hundredths of a minute after `day`'s service-day start (past 144000 for 24:xx). */
+  origin: number
+  /** Route of the key that hit (the id's route, else the feed's). */
+  route: string
+  shapes: readonly ShapeId[]
+}
+
+/**
+ * The scheduled trips a realtime id's origin time names: the first (date, service, route) whose key
+ * `origin_route..direction` is in the trip index, else null. Shared by `joinTrip` and the router overlay.
+ */
+export function matchScheduled(
+  trip: Pick<RealtimeTrip, 'route' | 'startDate'>,
+  p: ParsedTripId,
   lookup: TripLookup,
   now: number,
-  /** The shape this trip was placed on last poll, to break ties between equally good fallback shapes. */
-  previousShape?: ShapeId,
-): JoinResult {
-  const p = parseTripId(trip.tripId)
-  if (!p) return { matched: false, reason: 'unparseable-id' }
-
-  if (p.path !== '') {
-    const shapeId = shapeIdOf(p)
-    if (lookup.patterns[shapeId]) return { matched: true, shapeId, stage: 'path' }
-  }
-
-  const routes = p.route === trip.route ? [p.route] : [p.route, trip.route]
+): ScheduledMatch | null {
+  const routes = routesOf(p, trip.route)
   let dates: string[]
   if (trip.startDate) dates = [trip.startDate]
   else {
@@ -99,15 +110,33 @@ export function joinTrip(
       for (const service of servicesOn(day, lookup.calendar, lookup.exceptions)) {
         for (const route of routes) {
           const shapes = lookup.keys.get(service)?.get(tripKey(origin, route, p.direction))
-          if (shapes) {
-            return { matched: true, shapeId: pickShape(shapes, trip, route, p.direction, lookup), stage: 'tripKey' }
-          }
+          if (shapes) return { day, service, origin, route, shapes }
         }
       }
     }
   }
+  return null
+}
 
-  for (const route of routes.toReversed()) {
+export function joinTrip(
+  trip: Pick<RealtimeTrip, 'tripId' | 'route' | 'startDate' | 'stopId'> & Partial<Pick<RealtimeTrip, 'arrivals'>>,
+  lookup: TripLookup,
+  now: number,
+  /** The shape this trip was placed on last poll, to break ties between equally good fallback shapes. */
+  previousShape?: ShapeId,
+): JoinResult {
+  const p = parseTripId(trip.tripId)
+  if (!p) return { matched: false, reason: 'unparseable-id' }
+
+  if (p.path !== '') {
+    const shapeId = shapeIdOf(p)
+    if (lookup.patterns[shapeId]) return { matched: true, shapeId, stage: 'path' }
+  }
+
+  const hit = matchScheduled(trip, p, lookup, now)
+  if (hit) return { matched: true, shapeId: pickShape(hit.shapes, trip, hit.route, p.direction, lookup), stage: 'tripKey' }
+
+  for (const route of routesOf(p, trip.route).toReversed()) {
     const primary = lookup.primary.get(primaryKey(route, p.direction))
     if (primary) return { matched: true, shapeId: bestPattern(primary, route, p.direction, trip, lookup, previousShape), stage: 'primary' }
   }

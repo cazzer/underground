@@ -37,6 +37,7 @@ function rideLeg(tt: Timetable, labels: Labels, r: number, p: number): RideLeg {
     stops: Array.from(pat.stops.subarray(boardPos, alightPos + 1), (s) => stopIds[s]!),
     departS: pat.dep[trip * n + boardPos]!,
     arriveS,
+    live: pat.live[trip] === 1,
   }
 }
 

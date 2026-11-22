@@ -7,6 +7,8 @@ export interface TripInput {
   /** Seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days), one per stop. */
   arr: ArrayLike<number>
   dep: ArrayLike<number>
+  /** The times are realtime predictions (overlay.ts); default false. */
+  live?: boolean
 }
 
 export interface PatternInput {
@@ -43,7 +45,15 @@ function toPattern(key: string, stops: Int32Array, trips: readonly TripInput[]):
       dep[row * n + i] = trip.dep[i]!
     }
   })
-  return { key, stops, tripIds: trips.map((t) => t.id), routeIds: trips.map((t) => t.routeId), arr, dep }
+  return {
+    key,
+    stops,
+    tripIds: trips.map((t) => t.id),
+    routeIds: trips.map((t) => t.routeId),
+    arr,
+    dep,
+    live: Uint8Array.from(trips, (t) => (t.live ? 1 : 0)),
+  }
 }
 
 /** One input pattern as FIFO patterns: trips sorted by first departure, then split greedily into chains where no
