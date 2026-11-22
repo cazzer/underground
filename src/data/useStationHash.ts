@@ -40,7 +40,11 @@ export function useStationHash(network: Network): StationHash {
         replaceHash(focused.current)
         return
       }
-      if (focused.current !== station.id) select(station.id)
+      // A complex is one station: any member's link opens its lead (the write below then rewrites the hash to it).
+      const id = network.groupById.get(station.id)?.id ?? station.id
+      if (focused.current !== id) select(id)
+      // Already focused (the edited hash named another member of it): no focus change rewrites the hash, so do it here.
+      else if (station.id !== id) replaceHash(id)
     }
     read()
     window.addEventListener('hashchange', read)

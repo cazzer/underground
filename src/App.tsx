@@ -7,8 +7,8 @@ import { useLive } from './data/useLive'
 import { useNetwork } from './data/useNetwork'
 import { useLocate } from './data/useLocate'
 import { useStationHash } from './data/useStationHash'
+import { NO_SIBLINGS } from './data/interiorLoad'
 import { useStationInterior } from './data/useStationInterior'
-import { siblingIdsOf } from './data/interiorLoad'
 import { useTripExit } from './data/useTripExit'
 import { useTripTransfers } from './data/useTripTransfers'
 import { FocusProvider, useFocus } from './lib/focus'
@@ -75,9 +75,13 @@ function MapView({ network, bands, live }: MapViewProps) {
     () => [...(exitDraw && exitInterior ? [{ interiorId: exitInterior, choice: exitDraw }] : []), ...tripTransfers.drawn],
     [exitDraw, exitInterior, tripTransfers.drawn],
   )
-  const focusSiblings = useMemo(() => siblingIdsOf(focusedId, interior.index), [focusedId, interior.index])
-  const siblingsOf = useCallback((id: string) => siblingIdsOf(id, interior.index), [interior.index])
-  const accessible = focusedId !== null && (network.stationById.get(focusedId)?.access.status ?? 'none') !== 'none'
+  // A complex is one station (the catalog's complex): its other members, for the trip panel and directions.
+  const siblingsOf = useCallback(
+    (id: string): readonly string[] => network.groupById.get(id)?.memberIds.filter((m) => m !== id) ?? NO_SIBLINGS,
+    [network],
+  )
+  const focusSiblings = useMemo(() => (focusedId === null ? NO_SIBLINGS : siblingsOf(focusedId)), [focusedId, siblingsOf])
+  const accessible = focusedId !== null && (network.groupById.get(focusedId)?.access.status ?? 'none') !== 'none'
   const outKey = outages.outIds.join(',')
   const unknownStatus = outages.closed === null
   // Searches the interior's graph, so it reruns only when the machines out (or whether that is known) change.
@@ -139,9 +143,9 @@ export function App() {
     load.status === 'ready' ? load.bands : null,
   )
   return (
-    <FocusProvider>
-      <main className="relative h-full w-full bg-canvas">
-        {load.status === 'ready' ? (
+    <main className="relative h-full w-full bg-canvas">
+      {load.status === 'ready' ? (
+        <FocusProvider groups={load.network.groupById}>
           <TrainSelectionProvider layer={live.layer} network={load.network}>
             <TripProvider stations={load.files.stations} arrivals={live.arrivals}>
               <PanelCollapseProvider>
@@ -149,10 +153,10 @@ export function App() {
               </PanelCollapseProvider>
             </TripProvider>
           </TrainSelectionProvider>
-        ) : (
-          <LoadStatus load={load} onRetry={retry} />
-        )}
-      </main>
-    </FocusProvider>
+        </FocusProvider>
+      ) : (
+        <LoadStatus load={load} onRetry={retry} />
+      )}
+    </main>
   )
 }

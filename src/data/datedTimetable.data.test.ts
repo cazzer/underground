@@ -11,7 +11,7 @@ import type { DatedTimetableIndex, TimetableFile } from './timetableSchema'
 
 const read = <T>(path: string): T => JSON.parse(readFileSync(`public/data/${path}`, 'utf8')) as T
 const stations = read<StationsFile>('stations.json')
-const transfers = read<TransfersFile>('transfers.json').transfers
+const transfers = read<TransfersFile>('route/transfers.json').transfers
 const index = read<DatedTimetableIndex>('timetable/dated/index.json')
 
 describe('the committed dated timetables', () => {

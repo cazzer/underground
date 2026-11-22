@@ -7,7 +7,8 @@ wireframe map with small dots for moving trains. Pinch/scroll zooms. Zooming tow
 a station continuously tilts the camera from top-down to isometric; later that view
 shows the station's levels, stairways, and upcoming arrivals.
 
-Status: the real static network (every route shape and station from `public/data/`) renders, and
+Status: the real static network (every route shape and station from `public/data/`) renders, a station complex (the catalog's
+complex_id: Times Sq with 42 St-Port Authority, Union Sq, Atlantic Av) is one station (one search row, focus and panel; every member keeps its own marker on its line, and a tap on any selects the complex), and
 trains are live: the client polls the deployed realtime Worker (`worker/`) and draws dots from the
 pure realtime library. The station panel shows real arrivals. Bedford Av (L08) has a hand-authored interior, the 14 St-Union Sq complex
 (`data/stations/635.authored.json`, members 635, L03, R20) an authored approximate one from OSM stairs and elevators, and
@@ -39,13 +40,17 @@ so dev and preview serve under that path.
   `dated/index.json` (the dates): the day's regular service plus planned work, each file under the same 48 KB cap and the
   directory under `TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES`; a failed supplemented download, more than 14 such dates, a
   date that isn't a real YYYYMMDD or a stop `stations.json` lacks fails the whole run; other dated files are removed.
-  Also reads the pinned `data/stations/catalog/stations.json` for each station's borough and ADA status;
-  after `data:catalog:fetch` run `npm run data:access` instead (offline).
+  Also reads the pinned `data/stations/catalog/stations.json` for each station's borough and ADA status, and writes its
+  `complex_id` groups as `complexes` in stations.json (`scripts/lib/stationComplexes.ts`: lead first, the member nearest the
+  members' centroid, distances within 1 m tying, then more routes, then lower id; `stationComplexes.test.ts` checks the committed
+  file is fresh); the router's `transfers.json` goes to `public/data/route/transfers.json` (loaded by the trip planner, outside the
+  startup budget, under `TRANSFERS_GZIP_CAP_BYTES`); after `data:catalog:fetch` run `npm run data:access` instead (offline).
   A station the catalog lacks, or an orphan catalog row, needs an entry in
   `data/stations/access-exceptions.json` (see `data/README.md`); the join fails loudly otherwise.
-- `npm run data:access`: offline; reruns the borough/ADA join on the committed `public/data/stations.json`
-  with the pinned catalog and exceptions, prints the gzip total against the budget.
-- `npm run data:stations`: merge `data/stations/*.authored.json` with the pinned `*.sources.json`
+- `npm run data:access`: offline; reruns the borough/ADA join and the `complexes` on the committed `public/data/stations.json`
+  with the pinned catalog and exceptions, prints the gzip total against the budget (a catalog member stations.json lacks throws).
+- `npm run data:stations`: (it also fails unless every interior covering a complex member covers its lead, `checkComplexLeads`)
+  merge `data/stations/*.authored.json` with the pinned `*.sources.json`
   into `public/data/stations/*.json`, generate the template stations from `data/stations/catalog/` plus the
   committed `public/data/shapes.json` and `stations.json` (a hand-authored station wins; it prints each skipped
   candidate with its reason and each dropped source row), write `public/data/stations/equipment.json` (every revenue elevator and
@@ -370,6 +375,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `OrbitHint.tsx` the header's muted turn hint under the status lines (right- or Shift-drag; two fingers on a
   coarse pointer), shown while a station is focused and no train is followed, until the session's first user turn (about 17° of an armed gesture on one focused station; flights, springs and the cap don't count; `src/lib/orbitTurned.ts`)
 - `src/lib/`: pure logic
+  - `stationGroups.ts` a complex as one station (`StationGroup`: the lead's id, point, borough and leadId; the most common member name,
+    `otherNames` the rest; routes and stops the union; `groupAccess`: all full is full, else a partly accessible note naming the fully
+    accessible routes and each partial member's own; `stationLeads` validates stations.json `complexes`); `Network.stationGroups`
+    (one per station as the UI shows it: search rows, focus; the markers are `Network.stations`, one per member), `Network.groupById` (every member id to its group) and `Station.leadId`. Over it: `stationSearch.ts` matches a group's `otherNames` too (`ALIAS_PENALTY` 0.5 below its own name) and
+    `SearchResult` shows a dim "with …" line; `locate.ts` `nearestStation` / `placeFix` and `placeLabel.ts` `placePick` lift the nearest member
+    to its group (id, name, point; the distance stays the member's); `arrivalsAt` takes a group's `stops` and `memberIds` (a trip once at its
+    soonest member, one ending at any member skipped, north first then soonest); the panel, announcers and trip bar name the group;
+    `useStationHash` writes the lead and resolves any member id to it;
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths without bands, bounds,
     `trackLines` for the corridor search; `drawnPath` resamples one shape); `networkBands.ts` `bandShapes` redraws
@@ -509,7 +522,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `useCollapseReframe` does);
     `usePanelCollapseControls()` is the panels' (`usePanelToggle`). The trip flag resets silently when the trip panel closes, and `tripRequested` (a directions pick, never a `seq`
     bump) expands a collapsed trip panel. `tripBar.ts` `tripBarText`: the trip bar's "A → B", "From A", "To B" or "Trip" and its spoken form
-  - `focus.tsx` focused/dismissed-station React context (not pure); it also carries point flights
+  - `focus.tsx` focused/dismissed-station React context (not pure; `FocusProvider groups` is `Network.groupById`: `select` focuses and
+    flies to a member's lead, so `focusedId` is always a lead, and `membersOf` gives the complex); it also carries point flights
     (`flyToPoint(center, radiusM, source)`, `source` `'locate'` or `'place'`, returns the request's nonce; used by the location button and a
     searched place; drops focus, so an orbited view springs back north-up during the flight; `select` and `flyToPoint` share one nonce counter,
     so `usePlaceLine` can tell whether its flight is still the latest) and `viewCenter()`, the camera target read on demand (registered by
@@ -703,7 +717,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (no history entries): reads on mount and `hashchange`, writes on every focus change; an unknown id clears the
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
 - `src/data/loadTimetable.ts` (`expectTimetable`, `expectDatedIndex`, `expectServiceCalendar`; one lazy cached promise per file via
-  `interiorCache.ts`: `timetable/<service>.json`, `timetable/dated/<date>.json` and its `index.json`, `transfers.json`, and the calendar from `trip-index.json`) and
+  `interiorCache.ts`: `timetable/<service>.json`, `timetable/dated/<date>.json` and its `index.json`, `route/transfers.json`, and the calendar from `trip-index.json`) and
   `planTrip.ts` (`planTripLive(stations, from, to, atS, live)`: reads the calendar and the dated index (fetched together; a failed
   index fetch rejects the plan, retried by the next one, never a silent fallback), picks the window, fetches the files it
   needs (a date the index lists reads its dated file, not its service files), builds one `RouterTimetable` per window and `feedVersion`, kept as a single cache entry, then `planOnLive`
@@ -718,7 +732,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   id, replans every 30 s, and on each snapshot newer than the one planned on (trigger `poll`, never announced), while open and not covered by a train panel or notice (silent; once more when the cover goes), on the schedule with the next 30 minutes from the latest snapshot (`overlay` counts ride the ready plan; `?debug` prints them), warms the
   timetable on open and shows "Finding trips…" only after 250 ms. It loads `planTrip.ts` by dynamic `import()`, so the router and its
   loaders are their own chunk, not the startup bundle. `planTripBetween` expands each end to its complex (`lib/route/ends.ts`
-  `complexMembers`: same-named stations linked in transfers.json) so a trip never starts or ends with a walk to a same-named station;
+  `complexMembers(complexes, id)`: stations.json `complexes`) so a trip never starts or ends with a walk to another member;
   `journeySource` tags a journey Live (every ride leg live), Live and scheduled (a dim "scheduled" on the others) or Scheduled, in the summary ("Leaves in 4 min · Live") and as the spoken sentence's last words; a live ride leg the map draws (`ArrivalsSource.drawnKeys`) has a "Show train" button calling `selectTrain`, so the train panel covers the trip and its × returns focus to the trip heading. A journey's key is its legs' routes and stops, not trip ids, so a scheduled-to-live swap keeps its disclosure and focus; the "Show train" button, once offered, stays as an `aria-disabled` no-op while the train is off the map. A silent poll that first turns a journey's tag from Scheduled to Live (or mixed) stays silent, like any refresh. `journeyView` still words a mid-trip walk between same-named stations as a change.
   `src/lib/tripView.ts` (pure, tested; `tripOnMap.ts` holds `shouldAnnounceOnMap`): `tripMessage`, `orderJourneys`, `journeyView` (a journey departs with its first train), the spoken text, and the
   announce rules (`shouldAnnounceTrip`: a settled plan once, not a refresh). `TripAnnouncer.tsx` is the one polite live region for it,
@@ -728,7 +742,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   repeated sentence is spoken again. `TripPanel.tsx` (`aside` "Trip"; the directions pick's focus target (heading or the empty end's row) takes focus; a down chevron instead of × collapses it to a bar, `tripBarText`'s From → To, in the same aside, body hidden and kept; tapping the bar expands it; a "Close trip" text button beside the chevron closes it (no ×, 2q7.34; the collapsed bar has none) and a directions pick reopens or expands it; closing keeps the ends; `useScrollHint.ts` a "more below" fade
   while the capped panel scrolls) with `TripEnds.tsx` (From/To rows take focus, then open their own `StationSearch`; a shortcut that fills an
   end returns focus to that row; "Nearest to you" never offers a From equal to To; "On the map" is not offered, nor announced, for
-  a station sharing a complex with an end, `isTripEnd` in `lib/tripEnds.ts` over the App's `siblingIdsOf`) and `TripJourneys.tsx` (disclosures, first open; a
+  a station sharing a complex with an end, `isTripEnd` in `lib/tripEnds.ts` over the App's `siblingsOf`, the group's other members) and `TripJourneys.tsx` (disclosures, first open; a
   station name calls `select`, the only camera move; a journey ending on a train ends with `TripExitLine.tsx`, its way out: the
   visible text and note aria-hidden, one sr-only sentence, never a live region; a change through a hand-authored complex has
   `TripTransferLine.tsx` under its "Change at …" row, the same way). A directions pick closes a train panel or notice in front of it first. No control carries the
@@ -1036,7 +1050,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   vertices that keep the drawn chords within 0.5 m of the ease (`rampSampling.ts`, densest where it curves most;
   flat runs add none), and the platform fade one per ramp end; trains take y on the drawn chord between those vertices
   (`trackPointInto`), so they sit exactly on their line. Top-down everything is flat.
-- Station markers are instanced: matrices are rewritten only when the scale or focus changes.
+- Station markers are instanced: matrices are rewritten only when the scale or focus changes. A complex keeps one marker and tie per
+  member, each on its own line; a tap on any selects the complex (`select` focuses its lead), and auto-focus enters from any member
+  (`nextFocus` maps the nearest member to its lead and measures the exit from the nearest member). With the complex's interior
+  loaded every member's marker and tie hide (`hiddenSiblings`); a bare focused complex keeps them all, the lead with the focus ring.
 - Picking is screen space, on click only: `ScenePicker` listens on the canvas (never stopping or
   preventing MapControls' events; multi-touch and moves past 6 px mouse / 10 px touch are not clicks),
   projects stations (22 px) and live trains (16 px, dot or car line, read from the slot table) to pixels,
@@ -1107,7 +1124,8 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   `slabs` are mezzanines and other walkable floors (`paid: true` marks one inside fare control; absent = not stated).
 - A station complex is one file named after its lowest-sorted member (`stationId`; Union Sq is `635.json`, members 635,
   L03, R20) with `memberStationIds` (every member, sorted, 2+, `stationId` first; absent for an ordinary station). Track
-  stops may belong to any member. Authored only; a generated interior for any member is dropped. No complex ships yet.
+  stops may belong to any member. Authored only; a generated interior for any member is dropped. A complex file must cover its catalog complex's lead
+  (`data:stations` checks), since the map focuses only leads.
 - `connectors` (stair, escalator, elevator, ramp, walkway) have `lower`/`upper` endpoints `{x, z, level}` and a
   `width`. An authored `at` end may carry `area`, the id of the platform or slab it stands on (checked against that
   area alone; never on a street end). A walkway (authored only) joins two different areas on one non-street level:
@@ -1251,8 +1269,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json` and the supplemented zip into `public/data/timetable/dated/`. The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
-  every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.8 KB today,
-  about 150 B of headroom; the depths file is about 1.6 KB of it); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), and 36 KB per `public/data/search/streets/` shard with a total, 16 KB for `public/data/stations/equipment.json`).
+  every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.2 KB today,
+  about 800 B of headroom; the depths file is about 1.6 KB of it; `route/transfers.json` is on demand, in the trip planner's chunk, with its own cap); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), and 36 KB per `public/data/search/streets/` shard with a total, 16 KB for `public/data/stations/equipment.json`).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` (its title and body name the dated timetable files, `first..last(count)`
   or `none`; the dated files roll daily, so nearly every day has a PR) when `npm run data`, then `npm run data:stations` (the

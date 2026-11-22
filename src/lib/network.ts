@@ -8,6 +8,7 @@ import { vertexBandInputs } from './lineBuffers'
 import { toGround, type Ground } from './projection'
 import { platformSpans, type PlatformSpan } from './platformSpan'
 import { buildPolyline, type Polyline } from './realtime/polyline'
+import { buildStationGroups, stationLeads, type StationGroup } from './stationGroups'
 import { profileRuns } from './trackAnchors'
 import { trackLine } from './trackLine'
 import { lineBreaks } from './trackBreaks'
@@ -25,6 +26,8 @@ export interface Station {
   /** Undefined when an older cached stations.json predates the field. */
   borough?: Borough
   access: StationAccessInfo
+  /** The complex's lead (the id the UI uses for the whole complex); its own id outside a complex. */
+  leadId: StationId
 }
 
 /** ADA status; `note` is the MTA's direction text for a partly accessible station ("Downtown only"). */
@@ -88,6 +91,10 @@ export interface Network {
   /** Sorted by id. */
   stations: readonly Station[]
   stationById: ReadonlyMap<StationId, Station>
+  /** One per station as the UI shows it, a complex once (its lead's place); sorted by id; search rows and focus (the markers are `stations`, one per member). */
+  stationGroups: readonly StationGroup[]
+  /** Every station id, a complex member too, to its group. */
+  groupById: ReadonlyMap<StationId, StationGroup>
   /** In route_sort_order. */
   routes: readonly Route[]
   routeById: ReadonlyMap<RouteId, Route>
@@ -176,12 +183,28 @@ export function buildNetwork(
   )
   const routeById = new Map(routes.map((r) => [r.id, r]))
 
+  const leads = stationLeads(stationsFile.complexes ?? [], new Set(stationsFile.stations.map((s) => s.id)))
   const bounds: Bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
   const stations = stationsFile.stations.map((s): Station => {
     const pos = toGround(s)
     extend(bounds, pos)
-    return { id: s.id, name: s.name, pos, routeIds: s.routes, stops: s.stops, borough: s.borough, access: stationAccess(s) }
+    return {
+      id: s.id,
+      name: s.name,
+      pos,
+      routeIds: s.routes,
+      stops: s.stops,
+      borough: s.borough,
+      access: stationAccess(s),
+      leadId: leads.get(s.id) ?? s.id,
+    }
   })
+  const { groups, groupById } = buildStationGroups(
+    stations,
+    stationsFile.complexes ?? [],
+    new Map(routes.map((r, i) => [r.id, i])),
+    (id) => routeById.get(id)?.shortName ?? id,
+  )
 
   const lines = shapesFile.shapes.map((s) => {
     if (!routeById.has(s.routeId)) throw new Error(`Shape ${s.id} references unknown route "${s.routeId}"`)
@@ -226,6 +249,8 @@ export function buildNetwork(
     feedVersion,
     stations,
     stationById: new Map(stations.map((s) => [s.id, s])),
+    stationGroups: groups,
+    groupById,
     routes,
     routeById,
     shapes,

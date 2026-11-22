@@ -49,6 +49,10 @@ export interface Station extends StationAccess {
 }
 export interface StationsFile extends DataFile {
   stations: Station[] // sorted by id
+  /** Station complexes (the catalog's complex_id) of 2+ stations: the lead first (the id the map uses for the whole
+   *  complex), then the rest by id; sorted by lead; a station is in at most one. The build always writes it; absent
+   *  (test fixtures) reads as none. */
+  complexes?: StationId[][]
 }
 
 export interface Route {

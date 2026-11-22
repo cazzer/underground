@@ -45,7 +45,7 @@ function stubFetch(failures = 0, datedDates: string[] = [], indexFailures = 0): 
         }
         return new Response(JSON.stringify(timetable(timetableOf)))
       }
-      if (url.endsWith('data/transfers.json')) return new Response(JSON.stringify({ feedVersion: 'test', transfers: [] }))
+      if (url.endsWith('data/route/transfers.json')) return new Response(JSON.stringify({ feedVersion: 'test', transfers: [] }))
       if (url.endsWith('data/trip-index.json')) return new Response(JSON.stringify(index))
       return new Response('?', { status: 404 })
     }),

@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { ENTER_DISTANCE, ENTER_RADIUS, EXIT_DISTANCE, EXIT_RADIUS, focusGroupOf, NO_FOCUS_GROUP, nextFocus, type FocusState } from './focusMachine'
-import type { IndexLoad } from '../data/interiorLoad'
 import type { Station } from './network'
 
-const station = (id: string, x: number, z: number): Station => ({ id, name: id, pos: { x, z }, routeIds: [], stops: [], access: { status: 'none' } })
+const station = (id: string, x: number, z: number, leadId = id): Station => ({ id, name: id, pos: { x, z }, routeIds: [], stops: [], access: { status: 'none' }, leadId })
 const A = station('A', 0, 0)
 const B = station('B', 1000, 0)
 const C = station('C', 0, EXIT_RADIUS + 150)
@@ -211,34 +210,49 @@ describe('nextFocus after closing a complex member', () => {
   })
 })
 
-describe('focusGroupOf', () => {
-  const index: IndexLoad = {
-    status: 'ready',
-    index: {
-      stations: {
-        L08: { provenance: 'authored' },
-        T01: { provenance: 'authored' },
-        U01: { provenance: 'authored', file: 'T01' },
-        V01: { provenance: 'authored', file: 'T01' },
-      },
-    },
-  }
+describe('nextFocus over a non-lead complex member', () => {
+  // The lead is the centre; M2 is 250 m off and enters as its lead.
+  const L = station('L', 0, 0)
+  const M2 = station('M2', 250, 0, 'L')
+  const group = new Set(['L', 'M2'])
 
-  it('is the complex from the index, from any member, with no interior loaded (as after the panel closes)', () => {
-    expect(focusGroupOf('U01', index, null)).toEqual(new Set(['T01', 'U01', 'V01']))
-    expect(focusGroupOf('T01', index, null)).toEqual(new Set(['T01', 'U01', 'V01']))
+  it('focuses the lead when the view is centered on a non-lead member', () => {
+    expect(run(NONE, 200, 250, 0, [L, M2]).next).toEqual(focused('L'))
+  })
+
+  it('never switches within the group, and measures the exit from the nearest member', () => {
+    const over = run(focused('L'), 200, 250, 0, [L, M2], true, group)
+    expect(over.next).toBe(over.input)
+    // 250 m from the lead, 400 m from nothing else: the nearest member (M2) holds the focus.
+    const far = run(focused('L'), 400, 250 + 300, 0, [L, M2], true, group)
+    expect(far.next).toBe(far.input)
+    expect(run(focused('L'), 400, 250 + EXIT_RADIUS + 10, 0, [L, M2], true, group).next).toEqual(NONE)
+  })
+
+  it('keeps a dismissed group closed from any member, and a lone station is its own lead', () => {
+    const closed = run(dismissed('L'), 200, 250, 0, [L, M2], true, NO_FOCUS_GROUP, group)
+    expect(closed.next).toBe(closed.input)
+    expect(run(NONE, 200, 50, 0, [A]).next).toEqual(focused('A'))
+  })
+})
+
+describe('focusGroupOf', () => {
+  const members = ['T01', 'U01', 'V01']
+
+  it('is the complex from its members, whichever one is asked about, with no interior loaded (as after the panel closes)', () => {
+    expect(focusGroupOf('U01', members, null)).toEqual(new Set(['T01', 'U01', 'V01']))
+    expect(focusGroupOf('T01', members, null)).toEqual(new Set(['T01', 'U01', 'V01']))
   })
 
   it('is cut to the members the loaded interior covers', () => {
-    expect(focusGroupOf('T01', index, { stationId: 'T01', memberStationIds: ['T01', 'U01'] })).toEqual(new Set(['T01', 'U01']))
+    expect(focusGroupOf('T01', members, { stationId: 'T01', memberStationIds: ['T01', 'U01'] })).toEqual(new Set(['T01', 'U01']))
     // An interior that covers only the station itself leaves no complex.
-    expect(focusGroupOf('T01', index, { stationId: 'T01', memberStationIds: ['T01'] })).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupOf('T01', members, { stationId: 'T01', memberStationIds: ['T01'] })).toBe(NO_FOCUS_GROUP)
   })
 
-  it('is the shared empty group for a lone or unlisted station, no station, or an index that is not ready', () => {
-    expect(focusGroupOf('L08', index, null)).toBe(NO_FOCUS_GROUP)
-    expect(focusGroupOf('X99', index, null)).toBe(NO_FOCUS_GROUP)
-    expect(focusGroupOf(null, index, null)).toBe(NO_FOCUS_GROUP)
-    expect(focusGroupOf('T01', { status: 'loading' }, null)).toBe(NO_FOCUS_GROUP)
+  it('is the shared empty group for a lone station, no members or no station', () => {
+    expect(focusGroupOf('L08', ['L08'], null)).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupOf('X99', [], null)).toBe(NO_FOCUS_GROUP)
+    expect(focusGroupOf(null, members, null)).toBe(NO_FOCUS_GROUP)
   })
 })

@@ -1,7 +1,8 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react'
 import { GEOCODE_ATTRIBUTION, type GeocodeSource } from '../data/realtime'
 import { GEOCODE_ERROR_TEXT, type GeocodeView } from '../lib/geocodeView'
-import type { Network, Station } from '../lib/network'
+import type { Network } from '../lib/network'
+import type { StationGroup } from '../lib/stationGroups'
 import type { SearchItem } from '../lib/searchItems'
 import { rowName, type RowAction } from '../lib/searchRowActions'
 import type { TripEnd } from '../lib/trip'
@@ -10,7 +11,7 @@ import { SearchResult } from './SearchResult'
 
 interface SearchResultsProps {
   network: Network
-  items: readonly SearchItem<Station>[]
+  items: readonly SearchItem<StationGroup>[]
   /** Enter in the input picks the first row: mark it while text is typed and the input has focus. */
   highlightFirst: boolean
   /** Each row's buttons (`rowActions`). */
@@ -19,8 +20,8 @@ interface SearchResultsProps {
   view: GeocodeView
   emptyText: string | null
   keyboardInset: number
-  onChoose: (item: SearchItem<Station>) => void
-  onDirections: (item: SearchItem<Station>, end: TripEnd) => void
+  onChoose: (item: SearchItem<StationGroup>) => void
+  onDirections: (item: SearchItem<StationGroup>, end: TripEnd) => void
   /** Arrow, Home, End and printable keys from a row's buttons. */
   onRowKey: (e: KeyboardEvent<HTMLElement>) => void
 }

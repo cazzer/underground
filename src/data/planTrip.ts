@@ -85,8 +85,8 @@ export async function planTrip(
 }
 
 /**
- * Journeys between two stations the visitor chose, each standing for its complex (same-named stations linked by
- * transfers), so a trip never begins or ends with a walk to a station of the same name. Two ends in one complex are
+ * Journeys between two stations the visitor chose, each standing for its complex (stations.json `complexes`), so a
+ * trip never begins or ends with a walk to another member of it. Two ends in one complex are
  * one place: no journeys, and `sameStation` says why.
  */
 export async function planTripBetween(
@@ -97,9 +97,8 @@ export async function planTripBetween(
   live: LiveInput | null = null,
   opts?: RouteOptions,
 ): Promise<LivePlan & { sameStation: boolean }> {
-  const { transfers } = await transfersFile()
-  const fromSet = complexMembers(stations.stations, from, transfers)
-  const toSet = complexMembers(stations.stations, to, transfers)
+  const fromSet = complexMembers(stations.complexes ?? [], from)
+  const toSet = complexMembers(stations.complexes ?? [], to)
   if (fromSet.some((id) => toSet.includes(id))) return { journeys: [], overlay: null, sameStation: true }
   return { ...(await planTripLive(stations, fromSet, toSet, atS, live, opts)), sameStation: false }
 }

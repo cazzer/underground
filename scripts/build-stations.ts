@@ -11,6 +11,7 @@ import type { ShapesFile, StationsFile } from '../src/data/schema.ts'
 import type { StationInterior } from '../src/data/stationSchema.ts'
 import { TRACK_OFFSET_M } from '../src/lib/trackOffset.ts'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
+import { checkComplexLeads } from './lib/stationComplexes.ts'
 import { checkBudget, checkEquipmentCap, checkIndexCap, committedGzip, EQUIPMENT_GZIP_CAP_BYTES, GZIP_BUDGET_BYTES, INDEX_GZIP_CAP_BYTES, renderedFile } from './lib/budget.ts'
 import { buildEquipmentIndex } from './lib/equipmentIndex.ts'
 import { drawnLines, PACK_TOL_M, packStationDepths, renderPackedDepths } from './lib/depthsPack.ts'
@@ -81,6 +82,7 @@ function main(): void {
     .filter((g) => !authoredIds.has(g.authored.stationId))
     .map((g) => markGenerated(buildStationInterior(g.authored, g.sources), g.meta))
   const interiors = [...authoredInteriors, ...generatedInteriors]
+  checkComplexLeads(interiors, stationsFile.complexes ?? [])
 
   // Every interior's depths load up front, packed against the stations and drawn lines the client builds.
   const packed = packStationDepths(buildStationDepths(interiors), stationsFile, drawnLines(shapesFile.shapes, TRACK_OFFSET_M))

@@ -16,7 +16,7 @@ interface TripAnnouncerProps {
   arrivals: ArrivalsSource | null
   /** A train panel or the gone notice is in front of the trip panel. */
   covered: boolean
-  /** The focused station's complex siblings (siblingIdsOf): a member of an end's complex counts as that end. */
+  /** The focused station's complex siblings (its group's other members): a member of an end's complex counts as that end. */
   focusSiblings: readonly string[]
 }
 
@@ -82,7 +82,7 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
   useEffect(() => {
     const previousId = lastFocused.current
     lastFocused.current = focusedId
-    const station = focusedId !== null ? network.stationById.get(focusedId) : undefined
+    const station = focusedId !== null ? network.groupById.get(focusedId) : undefined
     if (!station) return
     const timer = window.setTimeout(() => {
       const { ends: now, plan: current, focusSiblings: siblings } = latest.current

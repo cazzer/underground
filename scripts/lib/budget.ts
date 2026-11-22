@@ -1,8 +1,8 @@
 /**
  * The gzip budget of the top-level public/data/*.json the client loads up front (GTFS files and
  * station-depths.json), shared by build-data.ts, build-access.ts and build-stations.ts: the one size limit.
- * Per-station interiors (public/data/stations/), street files (streets/) and timetables (timetable/) load on
- * demand and don't count.
+ * Per-station interiors (public/data/stations/), street files (streets/), timetables (timetable/) and the router's
+ * transfers (route/transfers.json) load on demand and don't count.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
@@ -13,6 +13,10 @@ export const INDEX_GZIP_CAP_BYTES = 8_000
 /** stations/equipment.json loads on the first station focus, outside the budget above, with its own cap: the measured
  *  12,896 B (node zlib level 9, fall 2026) plus about a quarter. */
 export const EQUIPMENT_GZIP_CAP_BYTES = 16_000
+
+/** public/data/route/transfers.json loads when the trip panel plans, outside the budget above: the measured 970 B
+ *  (node zlib level 9, fall 2026) plus about a quarter. */
+export const TRANSFERS_GZIP_CAP_BYTES = 1_250
 
 /** public/data/streets/<id>.json loads on focus, outside the budget above; each file has this cap... */
 export const STREETS_FILE_GZIP_CAP_BYTES = 16_000

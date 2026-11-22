@@ -16,6 +16,11 @@
  *  (39hk-dx4f; refresh it with `npm run data:catalog:fetch`, then run the offline `npm run data:access`)
  *  and data/stations/access-exceptions.json.
  *
+ *  The router's transfers go to public/data/route/transfers.json: loaded when the trip panel plans, outside the budget,
+ *  under TRANSFERS_GZIP_CAP_BYTES.
+ *
+ *  stations.json also carries `complexes`, the catalog's complex_id groups (lead first; see lib/stationComplexes.ts).
+ *
  *  Also writes public/data/timetable/<serviceId>.json, one per service: loaded on demand, outside the budget, each
  *  under TIMETABLE_FILE_GZIP_CAP_BYTES. A file there for a service the feed no longer has is removed. Likewise
  *  timetable/dated/<YYYYMMDD>.json plus index.json (each under that cap, the directory under
@@ -35,10 +40,12 @@ import { readFeed, type GtfsFeed } from './lib/gtfs.ts'
 import { buildRoutes, buildStations, buildTransfers } from './lib/network.ts'
 import { addAccess } from './lib/stationAccess.ts'
 import { readAccessExceptions, readCatalogStations } from './lib/accessInputs.ts'
+import { buildComplexes } from './lib/stationComplexes.ts'
 import {
   GZIP_BUDGET_BYTES,
   TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES,
   TIMETABLE_FILE_GZIP_CAP_BYTES,
+  TRANSFERS_GZIP_CAP_BYTES,
   checkBudget,
   checkDatedTimetableTotal,
   checkFileCap,
@@ -56,6 +63,7 @@ import { buildTripIndex } from './lib/tripIndex.ts'
 const FEED_URL = 'https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip'
 const SUPPLEMENTED_URL = 'https://rrgtfsfeeds.s3.amazonaws.com/gtfs_supplemented.zip'
 const OUT_DIR = new URL('../public/data/', import.meta.url)
+const ROUTE_DIR = new URL('route/', OUT_DIR)
 const TIMETABLE_DIR = new URL('timetable/', OUT_DIR)
 const DATED_DIR = new URL('dated/', TIMETABLE_DIR)
 const SIMPLIFY_TOLERANCE_M = 3
@@ -97,23 +105,29 @@ async function buildRegular(zip: Uint8Array) {
 
   const { segments, skipped: skippedSegments } = buildSegments(feed.stopTimes)
   const { file: tripIndex, skippedNoShape } = buildTripIndex(feed)
-  const access = addAccess(buildStations(feed), readCatalogStations(), readAccessExceptions())
+  const catalogStations = readCatalogStations()
+  const exceptions = readAccessExceptions()
+  const access = addAccess(buildStations(feed), catalogStations, exceptions)
   for (const warning of access.warnings) console.warn(`WARNING: ${warning}`)
+  const complexes = buildComplexes(access.stations, catalogStations, exceptions.orphans)
+  for (const warning of complexes.warnings) console.warn(`WARNING: ${warning}`)
   const timetables = buildTimetables(feed)
   const outputs: [string, unknown, number][] = [
-    ['stations.json', { feedVersion, stations: access.stations }, 2],
+    ['stations.json', { feedVersion, stations: access.stations, complexes: complexes.complexes }, 2],
     ['routes.json', { feedVersion, routes: buildRoutes(feed) }, 2],
     ['shapes.json', { feedVersion, shapes: buildShapes(feed, SIMPLIFY_TOLERANCE_M) }, 2],
     ['segments.json', { feedVersion, segments }, 2],
-    ['transfers.json', { feedVersion, transfers: buildTransfers(feed) }, 2],
     ['trip-index.json', { feedVersion, ...tripIndex }, 3],
   ]
   const rendered = outputs.map(([name, value, lineDepth]) => renderedFile(name, toStableJson(value, lineDepth)))
+  // route/transfers.json loads when the trip panel plans, so it is outside the startup budget (its own cap).
+  const transfers = renderedFile('transfers.json', toStableJson({ feedVersion, transfers: buildTransfers(feed) }, 2))
   const timetableFiles = timetables.files.map(({ serviceId, file }) => renderedFile(`${serviceId}.json`, toStableJson(file, 4)))
   const patterns = timetables.files.flatMap(({ file }) => file.patterns)
   return {
     feedVersion,
     rendered,
+    transfers,
     timetableFiles,
     // Every child stop stations.json lists: the dated files may call at no other.
     knownStops: new Set<StopId>(access.stations.flatMap((s) => s.stops)),
@@ -167,16 +181,19 @@ async function main(): Promise<void> {
   const suppZip = await loadZip(values['supplemented-zip'] ?? process.env.GTFS_SUPPLEMENTED_ZIP, SUPPLEMENTED_URL)
   const dated = buildDated(readFeed(decodeTables(suppZip, false), { shapes: false }), regular)
 
-  const { rendered, timetableFiles } = regular
+  const { rendered, transfers, timetableFiles } = regular
   // station-depths.json (data:stations) counts too: the shared budget covers everything loaded up front.
   const others = committedGzip(OUT_DIR, new Set(rendered.map((f) => f.name)))
   const totalGzip = checkBudget(rendered, others)
+  checkFileCap(transfers, TRANSFERS_GZIP_CAP_BYTES)
   for (const f of timetableFiles) checkFileCap(f, TIMETABLE_FILE_GZIP_CAP_BYTES)
   for (const f of dated.files) checkFileCap(f, TIMETABLE_FILE_GZIP_CAP_BYTES)
   const datedGzip = checkDatedTimetableTotal(dated.files)
 
   mkdirSync(OUT_DIR, { recursive: true })
   for (const f of rendered) writeFileSync(new URL(f.name, OUT_DIR), f.text)
+  mkdirSync(ROUTE_DIR, { recursive: true })
+  writeFileSync(new URL(transfers.name, ROUTE_DIR), transfers.text)
   mkdirSync(TIMETABLE_DIR, { recursive: true })
   for (const f of timetableFiles) writeFileSync(new URL(f.name, TIMETABLE_DIR), f.text)
   pruneJson(TIMETABLE_DIR, new Set(timetableFiles.map((f) => f.name)), 'timetable/', 'no such service any more')
@@ -190,6 +207,7 @@ async function main(): Promise<void> {
     ...Object.entries(others).map(([file, gzip]) => ({ file: `${file} (committed)`, 'raw B': null, 'gzip B': gzip })),
   ])
   console.log(`Total gzip: ${totalGzip} B (budget ${GZIP_BUDGET_BYTES} B)`)
+  console.log(`route/transfers.json: ${transfers.raw} B raw, ${transfers.gzip} B gzip (cap ${TRANSFERS_GZIP_CAP_BYTES} B, outside the budget)`)
   console.table(timetableFiles.map((f) => ({ file: `timetable/${f.name}`, 'raw B': f.raw, 'gzip B': f.gzip, 'cap B': TIMETABLE_FILE_GZIP_CAP_BYTES })))
   console.log(regular.stats)
   console.table(datedOut.map((f) => ({ file: `timetable/dated/${f.name}`, 'raw B': f.raw, 'gzip B': f.gzip, 'cap B': TIMETABLE_FILE_GZIP_CAP_BYTES })))

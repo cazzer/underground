@@ -11,7 +11,7 @@ interface TripEndsProps {
   places: TripPlaces
   /** The station under the camera, offered as an end while it is neither. */
   focusedId: string | null
-  /** The focused station's complex siblings (siblingIdsOf): while one is an end, the focused station isn't offered either. */
+  /** The focused station's complex siblings (its group's other members): while one is an end, the focused station isn't offered either. */
   focusSiblings: readonly string[]
   /** The station nearest a marked fix, offered as From while it is neither end. In memory only. */
   nearestId: string | null
@@ -69,7 +69,7 @@ function EndRow({ label, name, near, onPress, ref }: EndRowProps) {
  * is used, so focus moves to the row it filled, one frame later (after the row's new name has rendered).
  */
 export function TripEnds({ network, ends, places, focusedId, focusSiblings, nearestId, rows, onPick, onSet, onSwap }: TripEndsProps) {
-  const nameOf = (id: string | null) => (id ? (network.stationById.get(id)?.name ?? null) : null)
+  const nameOf = (id: string | null) => (id ? (network.groupById.get(id)?.name ?? null) : null)
   const press = (end: TripEnd) => (button: HTMLButtonElement) => {
     button.focus({ preventScroll: true })
     onPick(end)

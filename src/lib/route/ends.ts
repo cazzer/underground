@@ -2,33 +2,12 @@
 import type { StationId } from '../../data/schema'
 
 /**
- * The chosen station and every station that shares its name and is linked to it by a transfer (directly or through
- * another same-named one): the members of a complex such as 14 St-Union Sq. Routing from or to all of them means a trip
- * never starts or ends with a walk to a station of the same name. The chosen one comes first, the rest by id.
+ * The chosen station and every other member of its complex (stations.json `complexes`, the catalog's complex_id): a
+ * trip from or to Times Sq also starts or ends at the A/C/E platforms, so it never begins or ends with a walk to
+ * another member. The chosen one comes first, the rest by id; a station in no complex stands alone.
  */
-export function complexMembers(
-  stations: readonly { id: StationId; name: string }[],
-  id: StationId,
-  transfers: readonly { from: StationId; to: StationId }[],
-): StationId[] {
-  const name = stations.find((s) => s.id === id)?.name
-  if (name === undefined) return [id]
-  const sameName = new Set(stations.filter((s) => s.name === name).map((s) => s.id))
-  const linked = new Map<StationId, StationId[]>()
-  for (const t of transfers) {
-    if (!sameName.has(t.from) || !sameName.has(t.to) || t.from === t.to) continue
-    linked.set(t.from, [...(linked.get(t.from) ?? []), t.to])
-    linked.set(t.to, [...(linked.get(t.to) ?? []), t.from])
-  }
-  const seen = new Set<StationId>([id])
-  const queue = [id]
-  for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
-    for (const n of linked.get(next) ?? []) {
-      if (!seen.has(n)) {
-        seen.add(n)
-        queue.push(n)
-      }
-    }
-  }
-  return [id, ...[...seen].filter((s) => s !== id).sort()]
+export function complexMembers(complexes: readonly (readonly StationId[])[], id: StationId): StationId[] {
+  const group = complexes.find((members) => members.includes(id))
+  if (group === undefined) return [id]
+  return [id, ...group.filter((m) => m !== id).sort()]
 }

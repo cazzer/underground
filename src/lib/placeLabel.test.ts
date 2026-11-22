@@ -65,21 +65,30 @@ describe('distanceText', () => {
 })
 
 function station(id: string, name: string, lat: number, lon: number): Station {
-  return { id, name, pos: toGround({ lat, lon }), routeIds: [], stops: [], access: { status: 'none' } }
+  return { id, name, pos: toGround({ lat, lon }), routeIds: [], stops: [], access: { status: 'none' }, leadId: id }
 }
 
 describe('placePick', () => {
   const stations = [station('A', 'Wall St', 40.7074, -74.0113), station('B', 'Union Sq', 40.7347, -73.9906)]
+  const groups = new Map(stations.map((s) => [s.id, { ...s, memberIds: [s.id], otherNames: [] }]))
 
   it('names the nearest station by straight line', () => {
     const r = result('120 BROADWAY, Manhattan')
-    const pick = placePick(r, placeText(r), stations)
+    const pick = placePick(r, placeText(r), stations, groups)
     expect(pick).toMatchObject({ name: '120 Broadway', label: '120 Broadway, Manhattan', kind: 'address', nearest: { id: 'A' } })
     expect(pick?.nearest.distanceM).toBeLessThan(50)
   })
 
+  it('names the complex when the nearest station is one of its members', () => {
+    const member = { ...station('A2', 'Wall St Annex', 40.7075, -74.0114), leadId: 'A' }
+    const group = { ...stations[0]!, memberIds: ['A', 'A2'], otherNames: ['Wall St Annex'] }
+    const r = result('120 BROADWAY, Manhattan')
+    const pick = placePick(r, placeText(r), [...stations, member], new Map([['A', group], ['A2', group]]))
+    expect(pick?.nearest).toMatchObject({ id: 'A', name: 'Wall St' })
+  })
+
   it('is null for an empty network', () => {
     const r = result('X')
-    expect(placePick(r, placeText(r), [])).toBeNull()
+    expect(placePick(r, placeText(r), [], groups)).toBeNull()
   })
 })
