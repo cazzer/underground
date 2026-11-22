@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { ArrivalGroup } from './arrivals'
 import {
-  arrivalLines,
   filterArrivals,
   lineFilterAnnouncement,
   lineKey,
   lineOf,
+  linesDue,
   NO_FILTER,
-  resolveLine,
+  stationLines,
   toggledFilter,
 } from './lineFilter'
 
@@ -31,29 +31,29 @@ describe('lineKey', () => {
   })
 })
 
-describe('arrivalLines', () => {
+describe('stationLines', () => {
   const order = ['A', 'C', 'F', 'FX', '6', '6X']
 
-  it('lists the lines with arrivals in route order, one chip for a line and its express', () => {
-    const groups = [group('6X'), group('F'), group('FX'), group('A'), group('6')]
-    expect(arrivalLines(order, groups).map((c) => c.key)).toEqual(['A', 'F', '6'])
-    expect(arrivalLines(order, groups).find((c) => c.key === 'F')).toEqual({ key: 'F', routeId: 'F', routeIds: ['F', 'FX'] })
+  it("lists the station's lines in route order, one chip for a line and its express", () => {
+    expect(stationLines(order).map((c) => c.key)).toEqual(['A', 'C', 'F', '6'])
+    expect(stationLines(order).find((c) => c.key === 'F')).toEqual({ key: 'F', routeId: 'F', routeIds: ['F', 'FX'] })
   })
 
-  it('draws the express variant when it is the only one running', () => {
-    const [, six] = arrivalLines(order, [group('A'), group('6X')])
-    expect(six).toEqual({ key: '6', routeId: '6X', routeIds: ['6X'] })
+  it('draws the express variant when the station has only that', () => {
+    expect(stationLines(['A', '6X'])[1]).toEqual({ key: '6', routeId: '6X', routeIds: ['6X'] })
   })
 
-  it('drops a line without arrivals, and offers nothing for under two lines', () => {
-    expect(arrivalLines(order, [group('A'), group('C')]).map((c) => c.key)).toEqual(['A', 'C'])
-    expect(arrivalLines(order, [group('A'), group('A', 'Y')])).toEqual([])
-    expect(arrivalLines(order, [group('F'), group('FX')])).toEqual([])
-    expect(arrivalLines(order, [])).toEqual([])
+  it('offers nothing for under two lines', () => {
+    expect(stationLines(['A'])).toEqual([])
+    expect(stationLines(['F', 'FX'])).toEqual([])
+    expect(stationLines([])).toEqual([])
   })
+})
 
-  it('puts a route the station does not list last', () => {
-    expect(arrivalLines(['A', 'C'], [group('Q'), group('C'), group('A')]).map((c) => c.key)).toEqual(['A', 'C', 'Q'])
+describe('linesDue', () => {
+  it('names the lines with a group, an express under its line', () => {
+    expect([...linesDue([group('6X'), group('A'), group('6')])].sort()).toEqual(['6', 'A'])
+    expect(linesDue([]).size).toBe(0)
   })
 })
 
@@ -74,14 +74,13 @@ describe('toggledFilter', () => {
   })
 })
 
-describe('resolveLine', () => {
-  const choices = arrivalLines(['A', 'C'], [group('A'), group('C')])
-
-  it('keeps a line that has a chip and falls back to every line when it has none', () => {
-    expect(resolveLine('A', choices)).toBe('A')
-    expect(resolveLine('E', choices)).toBeNull()
-    expect(resolveLine('A', [])).toBeNull()
-    expect(resolveLine(null, choices)).toBeNull()
+describe('a chosen line that goes quiet', () => {
+  it('stays chosen (only a toggle or another station ends it) and filters to nothing', () => {
+    const state = toggledFilter(NO_FILTER, '635', 'A')
+    const quiet = [group('C'), group('6')]
+    expect(lineOf(state, '635')).toBe('A')
+    expect(filterArrivals(quiet, lineOf(state, '635'))).toEqual([])
+    expect(linesDue(quiet).has('A')).toBe(false)
   })
 })
 
@@ -101,8 +100,10 @@ describe('filterArrivals', () => {
 })
 
 describe('lineFilterAnnouncement', () => {
-  it('names the line or all trains', () => {
-    expect(lineFilterAnnouncement('A')).toBe('Showing A trains')
-    expect(lineFilterAnnouncement(null)).toBe('Showing all trains')
+  it('names the line with its destinations, or all trains', () => {
+    expect(lineFilterAnnouncement('A', 3)).toBe('Showing A trains, 3 destinations')
+    expect(lineFilterAnnouncement('A', 1)).toBe('Showing A trains, 1 destination')
+    expect(lineFilterAnnouncement('A', 0)).toBe('Showing A trains, none due')
+    expect(lineFilterAnnouncement(null, 7)).toBe('Showing all trains')
   })
 })

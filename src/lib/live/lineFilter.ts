@@ -4,9 +4,9 @@ import type { ArrivalGroup } from './arrivals'
 /** One chip of the station panel's line filter: a line, with its express variant folded in (6X into 6). */
 export interface LineChoice {
   key: string
-  /** The route the chip draws: the line's own route when it has arrivals, else its express variant. */
+  /** The route the chip draws: the line's own route, else its express variant. */
   routeId: RouteId
-  /** Every route of the line that has arrivals, in the station's route order. */
+  /** Every route of the line at the station, in route order. */
   routeIds: readonly RouteId[]
 }
 
@@ -17,14 +17,12 @@ export function lineKey(routeId: RouteId): string {
 }
 
 /**
- * The lines with arrivals in `groups`, in `routeOrder` (the station's routes; a route it lacks goes last, in the
- * order the groups name it). Empty when under two lines: there is nothing to choose between.
+ * The station's lines, in `routeOrder` (its routes; for a complex, every member's), an express folded into its line.
+ * Fixed by the station, never by arrivals, so a poll can't move a chip. Empty under two lines: nothing to choose between.
  */
-export function arrivalLines(routeOrder: readonly RouteId[], groups: readonly ArrivalGroup[]): LineChoice[] {
-  const present = new Set(groups.map((g) => g.routeId))
-  const ids = [...routeOrder.filter((id) => present.has(id)), ...[...present].filter((id) => !routeOrder.includes(id))]
+export function stationLines(routeOrder: readonly RouteId[]): LineChoice[] {
   const byKey = new Map<string, RouteId[]>()
-  for (const id of ids) {
+  for (const id of routeOrder) {
     const key = lineKey(id)
     const list = byKey.get(key)
     if (list) list.push(id)
@@ -32,6 +30,11 @@ export function arrivalLines(routeOrder: readonly RouteId[], groups: readonly Ar
   }
   if (byKey.size < 2) return []
   return [...byKey].map(([key, routeIds]) => ({ key, routeId: routeIds.find((id) => id === key) ?? routeIds[0]!, routeIds }))
+}
+
+/** The lines that have a group in `groups` (unfiltered), so a chip can say none is due. */
+export function linesDue(groups: readonly ArrivalGroup[]): Set<string> {
+  return new Set(groups.map((g) => lineKey(g.routeId)))
 }
 
 /** The filter's state: a line and the station it was chosen at, so it reads as unset anywhere else. */
@@ -52,17 +55,14 @@ export function toggledFilter(state: LineFilterState, stationId: string, key: st
   return lineOf(state, stationId) === key ? { stationId, line: null } : { stationId, line: key }
 }
 
-/** The line to filter by: `line` while it has a chip (arrivals), else null, so a line that went quiet shows every line. */
-export function resolveLine(line: string | null, choices: readonly LineChoice[]): string | null {
-  return line !== null && choices.some((c) => c.key === line) ? line : null
-}
-
 /** The groups of one line (express variants included), in their order; every group for a null line. */
 export function filterArrivals(groups: readonly ArrivalGroup[], line: string | null): ArrivalGroup[] {
   return line === null ? [...groups] : groups.filter((g) => lineKey(g.routeId) === line)
 }
 
-/** What the filter's polite line says after a tap: the chosen line's spoken name, or null for every line. */
-export function lineFilterAnnouncement(spoken: string | null): string {
-  return spoken === null ? 'Showing all trains' : `Showing ${spoken} trains`
+/** What the filter's polite line says after a tap: the chosen line's spoken name and its destinations, or all trains. */
+export function lineFilterAnnouncement(spoken: string | null, destinations: number): string {
+  if (spoken === null) return 'Showing all trains'
+  if (destinations === 0) return `Showing ${spoken} trains, none due`
+  return `Showing ${spoken} trains, ${destinations} ${destinations === 1 ? 'destination' : 'destinations'}`
 }

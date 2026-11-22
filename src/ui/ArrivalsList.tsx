@@ -4,7 +4,7 @@ import { arrivalGroupCount, arrivalGroupKey, COLLAPSED_ARRIVALS, soonestSections
 import { deriveArrivalsView } from '../lib/live/arrivalsView'
 import { clockNow } from '../lib/live/clock'
 import { stationFeedHealth } from '../lib/live/feedHealth'
-import { arrivalLines, filterArrivals, lineFilterAnnouncement, lineKey, resolveLine } from '../lib/live/lineFilter'
+import { filterArrivals, lineFilterAnnouncement, lineKey, linesDue, stationLines, type LineChoice } from '../lib/live/lineFilter'
 import type { LiveStatus } from '../lib/live/liveStatus'
 import { routeSpokenName } from '../lib/labels'
 import type { Network } from '../lib/network'
@@ -53,6 +53,9 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
   const [expanded, setExpanded] = useState(false)
   const [focused, setFocused] = useState<string | null>(null)
   const [spoken, setSpoken] = useState('')
+  // The scroller is a focusable region only while it overflows, but it keeps that while it holds focus, so a poll
+  // that shrinks the list below the cap doesn't drop focus to the page.
+  const [scrollerFocused, setScrollerFocused] = useState(false)
   const spokenTimer = useRef(0)
   const listId = useId()
   const headingId = useId()
@@ -63,38 +66,38 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
   }, [])
   useEffect(() => () => window.clearTimeout(spokenTimer.current), [])
 
+  // The chips are the station's lines (a complex's, every member's): fixed, so no poll moves one.
+  const lines = useMemo(() => stationLines(station.routeIds), [station])
+  const chosen = lineFilter.line
+  const chosenChip = chosen === null ? undefined : lines.find((c) => c.key === chosen)
+  const spokenName = (chip: LineChoice) => routeSpokenName(network.routeById.get(chip.routeId)?.shortName ?? chip.routeId)
+
   // `tick` is not read: it is what makes this recompute against the advancing clock.
-  const { nowS, groups, health, lines, line } = useMemo(() => {
-    if (!source) return { nowS: 0, groups: null, health: null, lines: [], line: null }
+  const { nowS, everything, groups, health } = useMemo(() => {
+    if (!source) return { nowS: 0, everything: null, groups: null, health: null }
     const now = clockNow(source.offsetS, performance.now())
     const found = arrivalsAt(source.snapshot, station, now, {
       lookup: source.lookup,
       routeById: network.routeById,
       stationName: (id) => network.stationById.get(id)?.name,
     })
-    const choices = arrivalLines(station.routeIds, found)
-    const chosen = resolveLine(lineFilter.line, choices)
     const routeIds = chosen === null ? station.routeIds : station.routeIds.filter((id) => lineKey(id) === chosen)
     return {
       nowS: now,
+      everything: found,
       groups: filterArrivals(found, chosen),
       health: stationFeedHealth(source.snapshot, routeIds, source.failures, now),
-      lines: choices,
-      line: chosen,
     }
-  }, [source, station, network, lineFilter.line, tick])
-
-  // A line that went quiet falls back to every line (above); drop the choice too, so it doesn't return with the line.
-  const { clear } = lineFilter
-  const staleChoice = lineFilter.line !== null && line === null && groups !== null
-  useEffect(() => {
-    if (staleChoice) clear()
-  }, [staleChoice, clear])
+  }, [source, station, network, chosen, tick])
+  const due = useMemo(() => (everything === null ? null : linesDue(everything)), [everything])
 
   const toggle = (key: string) => {
     const chip = lines.find((c) => c.key === key)
-    const name = chip ? routeSpokenName(network.routeById.get(chip.routeId)?.shortName ?? chip.routeId) : key
-    setSpoken(lineFilterAnnouncement(line === key ? null : name))
+    setSpoken(
+      chosen === key || !chip
+        ? lineFilterAnnouncement(null, 0)
+        : lineFilterAnnouncement(spokenName(chip), filterArrivals(everything ?? [], key).length),
+    )
     window.clearTimeout(spokenTimer.current)
     spokenTimer.current = window.setTimeout(() => setSpoken(''), ANNOUNCE_CLEAR_MS)
     lineFilter.toggle(key)
@@ -106,7 +109,8 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
   const announce = status.kind !== 'stale' ? ({ role: 'status', 'aria-live': 'polite' } as const) : {}
   const all = view.kind === 'rows' ? view.sections : []
   const total = arrivalGroupCount(all)
-  const collapsed = stacked && !expanded && view.kind === 'rows'
+  // A chosen line with nothing due keeps the collapsed height, so a poll doesn't shrink the panel.
+  const collapsed = stacked && !expanded && (view.kind === 'rows' || (view.kind === 'empty' && chosen !== null))
   const sections = collapsed ? soonestSections(all, COLLAPSED_ARRIVALS, focused) : all
   const showToggle = stacked && (expanded || total > COLLAPSED_ARRIVALS)
   const { scroller, list, capPx, overflows, atEnd, onScroll } = useListScroll<HTMLDivElement>(arrivalGroupCount(sections), 'li[data-group]')
@@ -120,7 +124,7 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
         Arrivals
       </h3>
       {view.kind !== 'message' && (
-        <LineFilter lines={lines} pressed={line} routeById={network.routeById} onToggle={toggle} onFocusLost={onFocusLost} />
+        <LineFilter lines={lines} pressed={chosen} due={due} routeById={network.routeById} onToggle={toggle} onFocusLost={onFocusLost} />
       )}
       <p role="status" className="sr-only">
         {spoken}
@@ -132,7 +136,9 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
           </p>
         ))}
       </div>
-      {view.kind === 'empty' && <p className="mt-1 text-sm">No upcoming trains</p>}
+      {view.kind === 'empty' && (
+        <p className="mt-1 text-sm">{chosenChip ? `No upcoming ${spokenName(chosenChip)} trains` : 'No upcoming trains'}</p>
+      )}
       <div className="relative">
         {/* Capped at whole rows while the stacked panel is expanded (useListScroll); a focusable region only while it
             scrolls. The negative margin and padding give the rows' hover fill and focus ring room inside the clip. */}
@@ -140,7 +146,9 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
           ref={scroller}
           onScroll={onScroll}
           style={capPx === null ? undefined : { maxHeight: capPx }}
-          {...(overflows ? ({ role: 'region', 'aria-labelledby': headingId, tabIndex: 0 } as const) : {})}
+          onFocus={(e) => e.target === e.currentTarget && setScrollerFocused(true)}
+          onBlur={(e) => e.target === e.currentTarget && setScrollerFocused(false)}
+          {...(overflows || scrollerFocused ? ({ role: 'region', 'aria-labelledby': headingId, tabIndex: 0 } as const) : {})}
           className="relative -mx-1 overflow-y-auto overscroll-contain px-1 focus-visible:outline-2 focus-visible:outline-focus"
         >
           <div className="grid">
