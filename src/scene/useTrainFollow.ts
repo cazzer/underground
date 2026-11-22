@@ -9,11 +9,10 @@ import type { ScreenRect } from '../lib/interiorCamera'
 import { consistFor } from '../lib/live/consist'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Ground } from '../lib/projection'
+import { prefersReducedMotion } from '../lib/reducedMotion'
 import { tiltForDistance } from '../lib/tilt'
 import { useTrainSelection } from '../lib/trainSelection'
 import type { Destination, Flight, MapControlsImpl } from './cameraFlight'
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
 interface TrainFollowOptions {
   controls: RefObject<MapControlsImpl | null>
@@ -186,7 +185,7 @@ export function useTrainFollow({
     inp.dt = dt
     inp.cut = anchor.cut
     inp.freeChanged = lastFree.current !== l.free
-    inp.reducedMotion = reduceMotion.matches
+    inp.reducedMotion = prefersReducedMotion()
     lastFree.current = l.free
     const out = next.current
     const result = stepFollow(state, inp, out)

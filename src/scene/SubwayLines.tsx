@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import type { StationId } from '../data/schema'
 import { writeBandView, type BandView } from '../lib/bandOffset'
+import { prefersReducedMotion } from '../lib/reducedMotion'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { Network, ShapePath } from '../lib/network'
@@ -15,7 +16,6 @@ import { usePlatformFade } from './usePlatformFade'
 
 /** Bands ease in over this long when they arrive after the first paint (networkBands.ts). */
 const BAND_EASE_MS = 300
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
 interface SubwayLinesProps {
   network: Network
@@ -46,7 +46,7 @@ export function SubwayLines({ network, paths, interiorStationId, view }: SubwayL
     camera.updateMatrixWorld()
     const now = performance.now()
     if (swapped.current?.paths !== paths) swapped.current = { paths, atMs: swapped.current ? now : -Infinity }
-    const t = reduceMotion.matches ? 1 : Math.min((now - swapped.current.atMs) / BAND_EASE_MS, 1)
+    const t = prefersReducedMotion() ? 1 : Math.min((now - swapped.current.atMs) / BAND_EASE_MS, 1)
     const ease = t * t * (3 - 2 * t)
     const distance = cameraDistance(state)
     const p11 = camera.projectionMatrix.elements[5]!

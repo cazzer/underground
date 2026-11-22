@@ -13,24 +13,24 @@ import {
   rotateArmed,
   screenOffsetTo,
   softClampToRadius,
-  wrapAngle,
   type AzimuthBounds,
   type AzimuthInput,
 } from '../lib/orbitLimits'
 import { markTurned } from '../lib/orbitTurned'
 import type { Ground } from '../lib/projection'
+import { prefersReducedMotion } from '../lib/reducedMotion'
 import { depthFactor, ISO_POLAR, tiltT } from '../lib/tilt'
+import { addTurn, createTurnMeter, resetTurn } from '../lib/turnMeter'
 import type { InteriorModel } from './interiorModel'
 
 type MapControlsImpl = ComponentRef<typeof MapControls>
 
 const TAN_ISO = Math.tan(ISO_POLAR)
 /**
- * Turn (radians, summed over armed gestures on one focused station) that counts as the visitor's first
- * turn and retires the hint: about 17°.
+ * Net turn (radians, from the azimuth when the station was focused, armed gestures only) that counts as the
+ * visitor's first turn and retires the hint: about 17°.
  */
 const TURN_SEEN = 0.3
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
 interface StationOrbitOptions {
   controls: RefObject<MapControlsImpl | null>
@@ -100,12 +100,12 @@ export function useStationOrbit({
   const clamped = useRef<Ground>({ x: 0, z: 0 })
   const armed = useRef(false)
   const armedFor = useRef<Ground | null>(null)
-  const turnedBy = useRef(0)
+  const turnedBy = useRef(createTurnMeter())
   const turnedFor = useRef<Ground | null>(null)
   const wasFlying = useRef(false)
   const rotating = useRef(false)
-  /** Turn summed over armed gestures while following a train (reset when the follow ends). */
-  const followTurn = useRef(0)
+  /** Net turn over armed gestures while following a train (reset when the follow ends). */
+  const followTurn = useRef(createTurnMeter())
   const focusRef = useRef(focusPos)
   useLayoutEffect(() => {
     focusRef.current = focusPos
@@ -136,7 +136,7 @@ export function useStationOrbit({
     inp.focused = focusPos !== null || holdAzimuth() || following()
     inp.tilt = tiltT(camera.position.distanceTo(c.target))
     inp.dt = delta
-    inp.reducedMotion = reduceMotion.matches
+    inp.reducedMotion = prefersReducedMotion()
     const b = azimuthBounds(inp, bounds.current)
     // enableRotate stays on: OrbitControls seeds a rotate only when it is on at gesture start, so
     // toggling it mid-gesture applied a stale start (a pinch into a station swung the view). The
@@ -159,10 +159,9 @@ export function useStationOrbit({
     if (following()) {
       // The follow pivots the turn on the train; an armed turn still counts as the visitor's first.
       if (rotating.current && theta !== theta0) {
-        followTurn.current += Math.abs(wrapAngle(theta - theta0))
-        if (followTurn.current > TURN_SEEN) markTurned()
+        if (addTurn(followTurn.current, theta - theta0) > TURN_SEEN) markTurned()
       }
-    } else followTurn.current = 0
+    } else resetTurn(followTurn.current)
     const f = focus
     if (!f) {
       armed.current = false
@@ -171,7 +170,7 @@ export function useStationOrbit({
     }
     if (turnedFor.current !== focusPos) {
       turnedFor.current = focusPos
-      turnedBy.current = 0
+      resetTurn(turnedBy.current)
     }
     const isBusy = busy()
     const isFlying = flying()
@@ -198,8 +197,7 @@ export function useStationOrbit({
         }
       }
       if (rotating.current) {
-        turnedBy.current += Math.abs(wrapAngle(theta - theta0))
-        if (turnedBy.current > TURN_SEEN) markTurned()
+        if (addTurn(turnedBy.current, theta - theta0) > TURN_SEEN) markTurned()
       }
       const m = pivotShift(ps.right, ps.toward, theta0, theta, move.current)
       c.target.x += m.x
