@@ -10,6 +10,8 @@ interface TripPanelArgs {
   locate: LocateControls
   /** The bottom panel's element (the trip panel's when it is in front): × and Esc move focus only from inside it. */
   panel: RefObject<HTMLElement | null>
+  /** The trip panel's heading: brought into focus when the button brings a covered panel to the front. */
+  tripHeading: RefObject<HTMLElement | null>
   /** The station panel's heading: where focus goes when the trip panel closes over an open station. */
   stationHeading: RefObject<HTMLElement | null>
   tripButton: RefObject<HTMLElement | null>
@@ -34,7 +36,7 @@ export interface TripPanelControls {
  * the focused element, so when focus was inside the panel, one frame later (a station panel underneath has
  * mounted by then) it goes to the station heading, else back to the button that opened the panel.
  */
-export function useTripPanel({ locate, panel, stationHeading, tripButton }: TripPanelArgs): TripPanelControls {
+export function useTripPanel({ locate, panel, stationHeading, tripHeading, tripButton }: TripPanelArgs): TripPanelControls {
   const { open, setOpen } = useTrip()
   const { focusedId } = useFocus()
   const { selectedSummary, notice, clearTrain, dismissNotice } = useTrainSelection()
@@ -50,7 +52,9 @@ export function useTripPanel({ locate, panel, stationHeading, tripButton }: Trip
     if (selectedSummary !== null) clearTrain()
     if (notice !== null) dismissNotice()
     setOpen(true, open ? undefined : defaultEnds(focusedId, placement))
-  }, [open, covered, selectedSummary, notice, clearTrain, dismissNotice, setOpen, focusedId, placement, tripButton])
+    // The panel is already mounted (hidden) when it was only covered; a fresh open focuses its heading on mount.
+    if (open) requestAnimationFrame(() => tripHeading.current?.focus({ preventScroll: true }))
+  }, [open, covered, selectedSummary, notice, clearTrain, dismissNotice, setOpen, focusedId, placement, tripButton, tripHeading])
   const closeTrip = useCallback(() => {
     const hadFocus = panel.current?.contains(document.activeElement) ?? false
     setOpen(false)

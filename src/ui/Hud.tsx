@@ -61,7 +61,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const stationHeading = useRef<HTMLHeadingElement>(null)
   const tripHeading = useRef<HTMLHeadingElement>(null)
   const tripButton = useRef<HTMLButtonElement>(null)
-  const { tripOpen, tripShown, toggleTrip, closeTrip } = useTripPanel({ locate, panel, stationHeading, tripButton })
+  const { tripOpen, tripShown, toggleTrip, closeTrip } = useTripPanel({ locate, panel, stationHeading, tripHeading, tripButton })
   // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
   // heading, else the station panel's, else the Search button; the auto-dismissed notice leaves focus alone. It waits one
   // frame so a station panel that auto-focus mounts as the train closes is found and wins; it is read once,
@@ -226,9 +226,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
           />
         ) : notice ? (
           <TrainGonePanel notice={notice} onDismiss={closeNotice} ref={panel} />
-        ) : tripOpen ? (
-          <TripPanel network={network} arrivals={arrivals} locate={locate} onClose={closeTrip} headingRef={tripHeading} ref={panel} />
-        ) : focusedId ? (
+        ) : focusedId && !tripOpen ? (
           <ArrivalsPanel
             network={network}
             stationId={focusedId}
@@ -241,6 +239,18 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             headingRef={stationHeading}
           />
         ) : null}
+        {/* Kept mounted (hidden) under a train panel or notice, so its journeys, scroll and focus survive. */}
+        {tripOpen && (
+          <TripPanel
+            network={network}
+            arrivals={arrivals}
+            locate={locate}
+            onClose={closeTrip}
+            headingRef={tripHeading}
+            covered={trainOpen || noticeOpen}
+            ref={trainOpen || noticeOpen ? null : panel}
+          />
+        )}
       </div>
       <StationSearch ref={search} network={network} onChoose={onSearchChoose} onClose={onSearchClosed} />
     </div>

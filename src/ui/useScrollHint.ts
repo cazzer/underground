@@ -8,10 +8,11 @@ export interface ScrollHint {
 
 /**
  * Whether a height-capped scroller has more below its visible part (the pattern of the next-stops list's fade),
- * re-checked after every render, on scroll and when the element is resized. It sets state only when the answer
+ * re-checked after every render, on scroll and when the element or its `content` wrapper is resized (the scroller's
+ * own box doesn't change when a section inside it expands). It sets state only when the answer
  * changes.
  */
-export function useScrollHint(scroller: RefObject<HTMLElement | null>): ScrollHint {
+export function useScrollHint(scroller: RefObject<HTMLElement | null>, content: RefObject<HTMLElement | null>): ScrollHint {
   const [more, setMore] = useState(false)
   const measure = useCallback(() => {
     const el = scroller.current
@@ -26,7 +27,8 @@ export function useScrollHint(scroller: RefObject<HTMLElement | null>): ScrollHi
     if (!el) return
     const observer = new ResizeObserver(measure)
     observer.observe(el)
+    if (content.current) observer.observe(content.current)
     return () => observer.disconnect()
-  }, [scroller, measure])
+  }, [scroller, content, measure])
   return { more, onScroll: measure }
 }

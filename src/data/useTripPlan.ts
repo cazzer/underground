@@ -56,9 +56,9 @@ export function useTripPlan(
       try {
         const m = await router()
         try {
-          const journeys = await m.planTripBetween(stations, a, b, atS)
+          const { journeys, sameStation } = await m.planTripBetween(stations, a, b, atS)
           if (id !== requestId.current) return
-          setState({ status: 'ready', key: k, attempt: attempt.current, trigger: why, atS, journeys: orderJourneys(journeys) })
+          setState({ status: 'ready', key: k, attempt: attempt.current, trigger: why, atS, journeys: orderJourneys(journeys), sameStation })
         } catch (e) {
           if (id !== requestId.current) return
           if (why === 'tick') {

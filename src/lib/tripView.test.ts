@@ -4,7 +4,9 @@ import type { TripJourney, TripLeg } from './route/plan'
 import {
   defaultEnds,
   journeyView,
+  ON_MAP_QUIET_MS,
   orderJourneys,
+  shouldAnnounceOnMap,
   shouldAnnounceTrip,
   tripAnnouncement,
   tripMessage,
@@ -184,6 +186,9 @@ describe('tripMessage', () => {
     expect(tripMessage(both, ready([one]), true)).toBeNull()
     expect(tripMessage(both, ready([]), true)).toBe('No trip found between these stations')
   })
+  it('names two ends in one complex as the same station, not an empty result', () => {
+    expect(tripMessage(both, { ...ready([]), sameStation: true } as TripPlanState, false)).toBe('From and To are the same station')
+  })
   it('names the date with no timetable, and a load failure', () => {
     const base = { key: 'A>B', attempt: 1, trigger: 'ends' as const }
     expect(tripMessage(both, { status: 'noService', date: '20261201', ...base }, false)).toBe(
@@ -250,5 +255,26 @@ describe('tripNowS', () => {
   it('reads the live clock when a snapshot has set it, else the device clock', () => {
     expect(tripNowS({ offsetS: 1000 }, 5000, 9e12)).toBe(1005)
     expect(tripNowS(null, 5000, 1_800_000_000_000)).toBe(1_800_000_000)
+  })
+})
+
+describe('shouldAnnounceOnMap', () => {
+  const base = { focusedId: 'X', previousId: 'Y', shown: true, isEnd: false, planLoading: false, sinceSettledMs: null }
+  it('says a station that newly took focus while the panel is in front', () => {
+    expect(shouldAnnounceOnMap(base)).toBe(true)
+    expect(shouldAnnounceOnMap({ ...base, previousId: null })).toBe(true)
+  })
+  it('stays silent when focus did not change (opening, a swap, an end pick, the cover going)', () => {
+    expect(shouldAnnounceOnMap({ ...base, previousId: 'X' })).toBe(false)
+  })
+  it('stays silent with nothing focused, the panel not in front, or an end focused', () => {
+    expect(shouldAnnounceOnMap({ ...base, focusedId: null })).toBe(false)
+    expect(shouldAnnounceOnMap({ ...base, shown: false })).toBe(false)
+    expect(shouldAnnounceOnMap({ ...base, isEnd: true })).toBe(false)
+  })
+  it('never talks over a loading or just-settled result', () => {
+    expect(shouldAnnounceOnMap({ ...base, planLoading: true })).toBe(false)
+    expect(shouldAnnounceOnMap({ ...base, sinceSettledMs: ON_MAP_QUIET_MS - 1 })).toBe(false)
+    expect(shouldAnnounceOnMap({ ...base, sinceSettledMs: ON_MAP_QUIET_MS })).toBe(true)
   })
 })

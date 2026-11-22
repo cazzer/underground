@@ -4,7 +4,7 @@ import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { Network } from '../lib/network'
 import { useTrip } from '../lib/trip'
-import { planViews, shouldAnnounceTrip, tripAnnounceId, tripAnnouncement, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
+import { planViews, shouldAnnounceOnMap, shouldAnnounceTrip, tripAnnounceId, tripAnnouncement, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
 
 /** A gap between clearing the region and refilling it, so the same sentence twice is spoken twice. */
 const REFILL_MS = 80
@@ -32,6 +32,10 @@ export function TripAnnouncer({ network, arrivals, covered }: TripAnnouncerProps
   const lastEnds = useRef('')
   const wasOpen = useRef(false)
   const refill = useRef(0)
+  const lastFocused = useRef<string | null>(focusedId)
+  const settledAt = useRef<number | null>(null)
+  const latest = useRef({ ends, plan })
+  latest.current = { ends, plan }
 
   const say = (next: string | null) => {
     window.clearTimeout(refill.current)
@@ -59,6 +63,7 @@ export function TripAnnouncer({ network, arrivals, covered }: TripAnnouncerProps
       say(null)
       return
     }
+    settledAt.current = performance.now()
     if (shouldAnnounceTrip(plan, lastId.current)) {
       lastId.current = tripAnnounceId(plan)
       const names = tripNamesOf(network)
@@ -67,13 +72,32 @@ export function TripAnnouncer({ network, arrivals, covered }: TripAnnouncerProps
     // The plan answers the ends; it is what settles, so it is the trigger.
   }, [open, plan, ends.from, ends.to])
 
-  // A station focused behind the panel (a search pick, a map tap, the camera) is named once it has held.
+  // A station that newly takes focus behind the panel is named once it has held. Only a change of focus counts:
+  // opening, a swap, an end pick or the cover going leave `focusedId` as it was and say nothing.
+  const shown = open && !covered
   useEffect(() => {
-    const station = open && !covered && focusedId !== null ? network.stationById.get(focusedId) : undefined
-    if (!station || focusedId === ends.from || focusedId === ends.to) return
-    const timer = window.setTimeout(() => say(`On the map: ${station.name}`), ANNOUNCE_DELAY_MS)
+    const previousId = lastFocused.current
+    lastFocused.current = focusedId
+    const station = focusedId !== null ? network.stationById.get(focusedId) : undefined
+    if (!station) return
+    const timer = window.setTimeout(() => {
+      const { ends: now, plan: current } = latest.current
+      const settled = settledAt.current
+      if (
+        shouldAnnounceOnMap({
+          focusedId,
+          previousId,
+          shown,
+          isEnd: focusedId === now.from || focusedId === now.to,
+          planLoading: current.status === 'loading',
+          sinceSettledMs: settled === null ? null : performance.now() - settled,
+        })
+      ) {
+        say(`On the map: ${station.name}`)
+      }
+    }, ANNOUNCE_DELAY_MS)
     return () => window.clearTimeout(timer)
-  }, [open, covered, focusedId, network, ends.from, ends.to])
+  }, [focusedId, shown])
 
   useEffect(() => () => window.clearTimeout(refill.current), [])
 
