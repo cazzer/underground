@@ -25,7 +25,11 @@ export interface InteriorModel {
   /** The levels above the platform the lifted trains ride, drawn over those trains (empty in look C). */
   overStrong: Buffers
   overFine: Buffers
-  /** Draw every layer with a dashed material, cutting the segments `distances` marks (generated interiors, approximate slabs). */
+  /**
+   * Draw every layer with a dashed material, cutting the segments `distances` marks (generated interiors, approximate
+   * slabs). One approximate slab dashes every material in the interior, so its solid strokes lose their round caps
+   * (the same trade-off generated interiors ship).
+   */
   dashed: boolean
   /** Generated from an archetype template, or authored and marked approximate: the panel says it is estimated. */
   approximate: boolean

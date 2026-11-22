@@ -2,7 +2,7 @@
  *  StationInterior contract. Hand-edited input is read through the path-labelled checkers, so a bad
  *  field fails with its JSON path. No IO. */
 import type {
-  Connector, Entrance, FareLine, Level, LocalPoint, Platform, Slab, StationInterior,
+  Connector, DepthSource, Entrance, FareLine, Level, LocalPoint, Platform, Slab, StationInterior,
 } from '../../src/data/stationSchema.ts'
 import { bool, finite, list, oneOf, pair, record, text } from './check.ts'
 import type { Ctx } from './stationCtx.ts'
@@ -13,7 +13,7 @@ import { makeFrame, openRing } from './stationGeometry.ts'
 import type { AuthoredStation, StationSources } from './stationInputs.ts'
 import { checkMembers, trackOwner } from './stationMembers.ts'
 
-const DEPTH_SOURCES = ['ee-rise', 'deep-list', 'osm-level', 'structure-default'] as const
+const DEPTH_SOURCES = ['ee-rise', 'deep-list', 'osm-level', 'structure-default'] as const satisfies readonly DepthSource[]
 const ROW_TOLERANCE_DEG = 1e-6
 export const MTA_CREDIT = 'Metropolitan Transportation Authority, data.ny.gov'
 const ATTRIBUTION: Record<'osm' | 'nyopendata', string> = {
