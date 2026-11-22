@@ -115,6 +115,8 @@ export interface Connector {
   width: number
   /** Escalators only, when the serving text names one direction of travel; omitted for "both directions". */
   travel?: 'up' | 'down'
+  /** Authored only, when the connector follows a pinned OSM element: "way/N" or "node/N". The client ignores it. */
+  osmRef?: string
   sources: InteriorSource[]
 }
 /** Street-level point (y = 0). */

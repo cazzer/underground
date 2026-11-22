@@ -49,3 +49,8 @@ export function onlyKeys(obj: Record<string, unknown>, allowed: readonly string[
   const extra = Object.keys(obj).filter((k) => !allowed.includes(k))
   if (extra.length > 0) throw new Error(`${path}: unknown key ${extra.map((k) => JSON.stringify(k)).join(', ')} (allowed: ${allowed.join(', ')})`)
 }
+
+/** A string, or null when the field is absent; present but empty or not a string still throws. */
+export function optText(v: unknown, path: string): string | null {
+  return v === undefined ? null : text(v, path)
+}

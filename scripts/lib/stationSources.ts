@@ -1,7 +1,7 @@
 /** Pure trimming and validation of the raw Overpass and SODA responses. Everything fetched is
  *  untrusted: each field is checked at this boundary and failures name the row or element. */
 import type { LevelKind } from '../../src/data/stationSchema.ts'
-import { finite, list, oneOf, record, text } from './check.ts'
+import { finite, list, oneOf, optText, record, text } from './check.ts'
 import type { EntranceRow, EquipmentRow, OsmWay } from './stationInputs.ts'
 
 const KEPT_TAGS = ['level', 'name', 'railway']
@@ -68,7 +68,7 @@ export function trimEntrances(rows: unknown): EntranceRow[] {
 }
 
 /** SODA 94fv-bak7 rows, sorted by code. The dataset's x_coordinate holds latitude and
- *  y_coordinate holds longitude. */
+ *  y_coordinate holds longitude. A row with no notes has a null serving. */
 export function trimEquipment(rows: unknown): EquipmentRow[] {
   return list(rows, 'equipment')
     .map((r, i): EquipmentRow => {
@@ -80,7 +80,7 @@ export function trimEquipment(rows: unknown): EquipmentRow[] {
         kind: kind === 'Elevator' ? 'elevator' : 'escalator',
         lat: num(row.x_coordinate, `${at}.x_coordinate`),
         lon: num(row.y_coordinate, `${at}.y_coordinate`),
-        serving: text(row.notes, `${at}.notes`),
+        serving: optText(row.notes, `${at}.notes`),
       }
     })
     .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0))
@@ -105,6 +105,16 @@ export function parseServing(serving: string): Serving {
   const parts = serving.split(/ to /i)
   if (parts.length < 2) throw new Error(`serving text has no " to ": ${JSON.stringify(serving)}`)
   if (parts.length > 2) throw new Error(`serving text has more than one " to " (multi-landing machines are unsupported): ${JSON.stringify(serving)}`)
+  return { from: sideKind(parts[0]!), to: sideKind(parts[1]!), bothDirections: /both directions/i.test(serving) }
+}
+
+/** For a machine whose `levels` override names its two levels, so the text only has to give a direction: parseServing
+ *  when the text has exactly one " to "; else the text cut at its first " for " if that leaves exactly one " to ";
+ *  else null (no direction, never an error). Without `levels` use parseServing, which stays strict. */
+export function parseServingLenient(serving: string): Serving | null {
+  if (serving.split(/ to /i).length === 2) return parseServing(serving)
+  const parts = serving.split(/ for /i)[0]!.split(/ to /i)
+  if (parts.length !== 2) return null
   return { from: sideKind(parts[0]!), to: sideKind(parts[1]!), bothDirections: /both directions/i.test(serving) }
 }
 

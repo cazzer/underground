@@ -56,6 +56,23 @@ be accurate.
 4. Commit the sources, the authored file, and `public/data/stations/` together. A test fails if the
    committed output is stale.
 
+## Citing OSM stairs and elevators
+
+`fetch.osmLines` (open or closed OSM ways: stairs, an elevator's way) and `fetch.osmNodes` (a street elevator) pin
+more OSM elements next to the platform `osmWays`. The fetch then asks for `(way(id:ways,lines);node(id:nodes););`
+instead of the plain `way(id:...)` query, and `sources.json` gains `osm.lines` and `osm.nodes` (id, version,
+timestamp, the tags `level`, `highway`, `incline`, `step_count`, and the geometry). A station that lists neither keeps
+the plain query and its sources unchanged.
+
+An authored connector or an `equipment` override may carry `osmRef` (`"way/N"` or `"node/N"`). The merge looks it up
+among the pinned ways, lines and nodes, requires at least one authored `at` end (an entrance end does not count; for a
+machine its `at`, or an escalator's `ends`) within 1 m of the element (a closed way counts as its area), adds `osm` to
+the connector's `sources` and writes `osmRef`. The client ignores it. An unknown ref, or an end too far, fails the build.
+
+An E&E row can have no notes, so no serving text. It needs a `levels` override or the merge fails. With `levels`, a
+serving text that is not "A to B" (two " to ", none) is accepted: the direction of an escalator is read from the text cut
+at its first " for " if that leaves exactly one " to ", else it has none. Without `levels` the strict reading is unchanged.
+
 ## Station complexes
 
 One authored file can cover a station complex (a transfer between several GTFS stations). Name the file after the

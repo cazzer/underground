@@ -44,7 +44,8 @@ so dev and preview serve under that path.
   interior tracks no drawn line rides (packed as no track, so the client stays quiet about them), and fails if any
   track packs more than 2 m off its runs. Offline.
 - `npm run data:stations:fetch -- --station L08`: uses the network (Overpass, data.ny.gov); refreshes the
-  pinned `data/stations/L08.sources.json`. Review the diff, then rerun `data:stations`. A complex's `fetch` lists
+  pinned `data/stations/L08.sources.json` (an authored `fetch.osmLines` / `osmNodes` also pins open ways and nodes,
+  which connectors and machines cite by `osmRef`; see `data/README.md`). Review the diff, then rerun `data:stations`. A complex's `fetch` lists
   one GTFS stop id and one station MRN per member (arrays; one `$where ... in(...)` filter, duplicates dropped).
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
   `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors

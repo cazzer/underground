@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
+import { overpassQuery, trimOverpassLines, trimOverpassNodes } from './lib/stationOsmElements.ts'
 import { dedupeEntrances, dedupeEquipment, epochToIso, rowsOfStops, sodaFilter, trimEntrances, trimEquipment, trimOverpassWays } from './lib/stationSources.ts'
 import { toStableJson } from './lib/stableJson.ts'
 
@@ -44,7 +45,7 @@ async function main(): Promise<void> {
   const id = values.station
   const { fetch: wanted } = JSON.parse(readFileSync(new URL(`${id}.authored.json`, DIR), 'utf8')) as AuthoredStation
 
-  const query = `[out:json][timeout:60];way(id:${wanted.osmWays.join(',')});out geom meta;`
+  const query = overpassQuery(wanted)
   const overpass = await getJson(OVERPASS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -58,15 +59,17 @@ async function main(): Promise<void> {
   assertNotTruncated(equipmentRows, '94fv-bak7')
 
   const osm = trimOverpassWays(overpass, wanted.osmWays)
+  const lines = wanted.osmLines?.length ? trimOverpassLines(overpass, wanted.osmLines) : undefined
+  const nodes = wanted.osmNodes?.length ? trimOverpassNodes(overpass, wanted.osmNodes) : undefined
   const sources: StationSources = {
     stationId: id,
     fetchedAt: new Date().toISOString(),
-    osm: { license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors', query, ...osm },
+    osm: { license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors', query, ...osm, ...(lines ? { lines } : {}), ...(nodes ? { nodes } : {}) },
     entrances: { dataset: 'i9wp-a4ja', url: entrancesUrl, rowsUpdatedAt: await rowsUpdatedAt('i9wp-a4ja'), rows: dedupeEntrances(trimEntrances(rowsOfStops(entranceRows, wanted.entrancesGtfsStopId))) },
     equipment: { dataset: '94fv-bak7', url: equipmentUrl, rowsUpdatedAt: await rowsUpdatedAt('94fv-bak7'), rows: dedupeEquipment(trimEquipment(equipmentRows)) },
   }
   writeFileSync(new URL(`${id}.sources.json`, DIR), toStableJson(sources, 3))
-  console.log(`${id}: ${sources.osm.ways.length} ways, ${sources.entrances.rows.length} entrance rows, ${sources.equipment.rows.length} equipment rows`)
+  console.log(`${id}: ${sources.osm.ways.length} ways, ${lines?.length ?? 0} lines, ${nodes?.length ?? 0} nodes, ${sources.entrances.rows.length} entrance rows, ${sources.equipment.rows.length} equipment rows`)
   console.log('Review the diff of data/stations/, then run npm run data:stations')
 }
 

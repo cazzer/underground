@@ -54,6 +54,10 @@ export function planMachines(
   const dropped: string[] = []
   const used = new Set<number>()
   for (const row of rows) {
+    if (row.serving === null) {
+      dropped.push(`${row.code}: no serving text`)
+      continue
+    }
     let kinds: [LevelKind, LevelKind]
     try {
       const s = parseServing(row.serving)
