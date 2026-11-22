@@ -92,8 +92,8 @@ jobs:
     permissions:
       contents: read
     outputs:
-      # Size of the basemap in the artifact; empty while data/basemap/basemap.json has no pin.
-      basemap_bytes: ${{ steps.basemap.outputs.bytes }}
+      # The probe tiles' sizes in the artifact, as JSON; empty while data/basemap/basemap.json has no (current) pin.
+      basemap_probe: ${{ steps.basemap.outputs.probe }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -107,31 +107,60 @@ jobs:
         env:
           # Repo variable: the deployed Worker's /rt URL. Unset builds the "Live trains off" site.
           VITE_RT_URL: ${{ vars.VITE_RT_URL }}
-      # The NYC basemap is never in git: basemap.yml publishes it as a release asset, and the pin in
-      # data/basemap/basemap.json names it. Copied in after the build (vite empties dist), sha256-checked, and
-      # fetched by the browser only on demand.
+      # The NYC basemap is never in git: basemap.yml publishes a tarball of tiles as a release asset, and the pin in
+      # data/basemap/basemap.json names it. fetch-basemap.ts downloads it after the build (vite empties dist), checks its
+      # size and sha256, and unpacks it into dist/basemap/tiles/<z>/<x>/<y>.mvt, refusing any entry that is not a tile
+      # file; the unpacked tree is then checked again against the pin's file count and byte total. The browser fetches
+      # tiles only on demand. A pin from before the tile format (no `asset`) is skipped, so main stays deployable
+      # until the new release is pinned.
       - name: Add the basemap
         id: basemap
         run: |
-          if [ "$(jq '.pin' data/basemap/basemap.json)" = null ]; then
+          # The default shell has no pipefail, and the node scripts below are piped to tee.
+          set -o pipefail
+          state=$(jq -r 'if .pin == null then "none" elif .pin.asset == null then "legacy" else "tiles" end' data/basemap/basemap.json)
+          if [ "$state" = none ]; then
             echo "::warning::data/basemap/basemap.json has no pin; deploying without the basemap."
-            echo "bytes=" >> "$GITHUB_OUTPUT"
+          elif [ "$state" = legacy ]; then
+            echo "::warning::data/basemap/basemap.json pins the old nyc.pmtiles release; deploying without the basemap until the tile tarball release is pinned."
           else
-            node scripts/fetch-basemap.ts --out dist/basemap/nyc.pmtiles
-            echo "bytes=$(jq '.pin.bytes' data/basemap/basemap.json)" >> "$GITHUB_OUTPUT"
+            start=$(date +%s.%N)
+            node scripts/fetch-basemap.ts --out dist/basemap | tee fetch.log
+            secs=$(awk -v a="$start" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
+            rm -f dist/basemap/.tiles-sha256
+            node scripts/basemap-tiles.ts check dist/basemap/tiles \
+              --files "$(jq '.pin.files' data/basemap/basemap.json)" --tile-bytes "$(jq '.pin.tileBytes' data/basemap/basemap.json)" \
+              --max-zoom "$(jq '.spec.maxzoom' data/basemap/basemap.json)" | tee tiles-report.txt
+            {
+              echo "### Basemap tiles"
+              echo "Download, check and unpack took ${secs} s: $(jq -r '.pin.files' data/basemap/basemap.json) tile files, $(jq -r '.pin.tileBytes' data/basemap/basemap.json) bytes, from the $(jq -r '.pin.bytes' data/basemap/basemap.json)-byte tarball of release $(jq -r '.pin.release' data/basemap/basemap.json)."
+              echo
+              echo '```'
+              cat fetch.log tiles-report.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            probe=$(node scripts/basemap-tiles.ts probe-sizes dist/basemap/tiles)
+            echo "probe=$probe" >> "$GITHUB_OUTPUT"
           fi
       # GitHub Pages sites are limited to 1 GB.
       - name: Check the artifact size
         run: |
           size=$(du -sb dist | cut -f1)
-          echo "The Pages artifact is $size bytes." | tee -a "$GITHUB_STEP_SUMMARY"
+          files=$(find dist -type f | wc -l)
+          echo "The Pages artifact is $size bytes in $files files." | tee -a "$GITHUB_STEP_SUMMARY"
           if [ "$size" -gt 900000000 ]; then
             echo "::error::dist is $size bytes, over the 900 MB cap"
             exit 1
           fi
+      # The artifact upload is timed because the basemap adds thousands of small files; it is one tar, so the file count
+      # should not matter much, and the summary shows whether it did.
+      - name: Start the upload clock
+        run: echo "UPLOAD_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
+      - name: Report the upload time
+        run: echo "upload-pages-artifact took $(( $(date +%s) - UPLOAD_START )) s." | tee -a "$GITHUB_STEP_SUMMARY"
 
   deploy:
     needs: build
@@ -148,11 +177,12 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v5
 
-  # Measures Range on the live site once the basemap is deployed (skipped while there is no pin): the
-  # PMTiles client reads the archive in ranges, so the site must answer a correct uncompressed 206.
+  # Fetches a few tiles from the live site once the basemap is deployed (skipped while there is no current pin), with and
+  # without the Accept-Encoding a browser sends: each must answer 200 with the tile's exact bytes, decoded. Pages may
+  # compress a tile; the browser decodes it, so the headers are only recorded. There is no Range read anywhere.
   verify-basemap:
     needs: [build, deploy]
-    if: needs.build.outputs.basemap_bytes != ''
+    if: needs.build.outputs.basemap_probe != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -166,5 +196,5 @@ jobs:
           node-version: 22
       - env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-          BYTES: ${{ needs.build.outputs.basemap_bytes }}
-        run: node scripts/verify-basemap.ts "${PAGE_URL%/}/basemap/nyc.pmtiles" "$BYTES"
+          PROBE: ${{ needs.build.outputs.basemap_probe }}
+        run: node scripts/verify-basemap.ts "${PAGE_URL%/}/basemap/tiles" "$PROBE"

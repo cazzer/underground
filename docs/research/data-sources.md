@@ -233,21 +233,34 @@ files (ost.3) are what ship.
 
 ### 5.3 Basemap tiles
 
-The citywide basemap (epic ost.9: streets, water and parks from a same-origin PMTiles file) is vector tiles cut from a
+The citywide basemap (epic ost.9: streets, water and parks from same-origin vector tiles) is cut from a
 Protomaps daily build ([build.protomaps.com](https://build.protomaps.com), planetiler, basemap schema 4.15.2 at the time
-of writing). The file is on demand only: no startup file mentions it, and the client reads it in HTTP Range requests (ost.9.2).
-It is never in git (`.gitignore`: `public/basemap/`, `*.pmtiles`).
+of writing). It is served as a static directory of uncompressed Mapbox Vector Tiles, `basemap/tiles/{z}/{x}/{y}.mvt`, fetched
+on demand only (no startup file mentions it; the client loads tiles in ost.9.2). Nothing reads a byte range: GitHub Pages
+gzips a Range answer with a wrong total (section 6), which is why the first design, one `nyc.pmtiles` read in ranges, was
+dropped (ost.9.4). It is never in git (`.gitignore`: `public/basemap/`, `*.pmtiles`).
 
 **Pipeline.** `.github/workflows/basemap.yml` (manual) runs `pmtiles extract` (go-pmtiles v1.31.2, sha256-checked) for the five
 boroughs' bbox (`-74.2591,40.4774,-73.7004,40.9176`) up to z15 (`data/basemap/basemap.json` `spec`), checks the source
 metadata against the terms below (`scripts/gate-basemap.ts`), drops the unused layers with tippecanoe's `tile-join` (tag
-2.79.0, built from source in that workflow only), verifies the result with `pmtiles verify`, checks the output metadata
-again, and publishes it as a GitHub Release (`basemap-<build>-<sha8>`, asset `nyc.pmtiles`, with the licence notes in the
-release text). The release is our own copy because Protomaps asks not to hotlink builds and keeps them only about a week.
-A normal PR then sets the `pin` in `data/basemap/basemap.json` (build, release, sha256, bytes); `deploy.yml` downloads that
-asset into `dist/basemap/nyc.pmtiles` (sha256-checked, skipped with a warning while the pin is null), and its
-`verify-basemap` job measures Range on the live site. `npm run basemap:fetch` fetches the same file into the gitignored
-`public/basemap/` for dev (offline after the first fetch).
+2.79.0, built from source in that workflow only) and verifies the subset with `pmtiles verify`, checks the output metadata
+again, then writes the tile directory from that subset (`tile-join -pC -e`: one uncompressed tile per file, named
+`<z>/<x>/<y>.pbf`, XYZ rows; renamed `.mvt`; its `metadata.json` is left out, the gate having read the metadata already).
+`scripts/basemap-tiles.ts check` reads every tile (each must be an MVT, named on its zoom's grid, at most z15) before the tree is
+packed into one deterministic tarball (sorted names, files only, mtime 0, owner 0, ustar, `gzip -9n`), which is unpacked again
+with the deploy's own extractor and compared with the tree. The tarball, `nyc-tiles.tar.gz`, is published as a GitHub Release
+(`basemap-<build>-<sha8>`, with the licence notes and the counts in the release text). The release is our own copy because
+Protomaps asks not to hotlink builds and keeps them only about a week.
+A normal PR then sets the `pin` in `data/basemap/basemap.json` (build, release, asset, sha256 and bytes of the tarball, `files`
+and `tileBytes` of the unpacked tree); `deploy.yml` runs `scripts/fetch-basemap.ts --out dist/basemap`, which downloads the
+asset (sha256 and size checked, byte-limited), refuses any tar entry that is not exactly `tiles/<z>/<x>/<y>.mvt` as a regular file
+(an allowlist: no absolute path, `..`, link, directory entry or extension; nothing is written before every entry and the file
+count and byte total pass), and unpacks to `dist/basemap/tiles/`; the unpacked tree is checked again against the pin. A pin
+without `asset` (the first, `nyc.pmtiles` format) is skipped with a warning, as is a null pin. Its `verify-basemap` job
+fetches three tiles from the live site (z0, a z15 tile over Midtown and one over Brooklyn), with and without a browser's
+`Accept-Encoding`, and fails unless each is a 200 with the tile's exact bytes. `npm run basemap:fetch` fetches the same tree
+into the gitignored `public/basemap/tiles/` for dev (offline after the first fetch; vite serves it, but answers a tile that
+is not in the tree with the app's `index.html` and status 200, so a dev client must check the content type).
 
 **Layers.** Kept: `earth`, `water`, `landuse`, `roads`. Dropped: `buildings`, `landcover`, `places`, `pois`, `boundaries`
 (`tile-join -l` for each kept layer; note `-x` is *attribute* exclusion, not layer exclusion). The gate fails the workflow if
@@ -265,8 +278,9 @@ test fixture).
 | ESA WorldCover (Daylight landcover) | CC BY 4.0, needs its own credit | `landcover` (z0 to z7) | **no: dropped.** Shipping it would need a licensing card |
 | Tangrams (Mapzen) icons | MIT | `pois` icons for the default styles only | no |
 
-The archive's own `attribution` is the OSM link and nothing else, so `Attribution.tsx` needs no change. The release file is an
-ODbL derivative database; its notes carry the notice.
+The archive's own `attribution` is the OSM link and nothing else, so `Attribution.tsx` needs no change. The tiles are an
+ODbL derivative database; the release notes carry the notice (the tile directory has no metadata file, so a client must hold the
+attribution itself, which the footer already does).
 
 **Sizes** (build 20261121, tile bytes as stored, gzip; the same bbox and z15):
 
@@ -291,7 +305,16 @@ ODbL derivative database; its notes carry the notice.
 | file | | 95,736,212 | 32,962,204 |
 
 The subset is about 33 MB, a third of the full extract, and z15 is under half of it, so z15 stays. The workflow prints the same
-table to its job summary and fails above 200 MB. The Pages artifact limit is 1 GB (the deploy fails above 900 MB).
+table to its job summary and fails above 200 MB.
+
+**The tile directory** (built locally from the same subset with tippecanoe 2.79.0 `tile-join -f -pk -pg -pC -e`, 2026-11-22):
+3,820 files (1 each at z0 to z8, 2, 6, 16, 56, 195, 728 and 2,808 at z9 to z15), 44,878,229 bytes unpacked (z15 19.9 MB, z14 12.7 MB,
+z13 5.9 MB), larger than the 33 MB `.pmtiles` because that stores each tile gzipped and these are plain. The tarball is
+31,372,949 bytes (`gzip -9n`). Unpacking takes about 0.6 s with `scripts/basemap-tiles.ts unpack` (2.4 s for the deploy's whole
+`ensureTiles`, which also hashes and scans). Pages sends each file gzipped to a client that offers it (measured on `.pmtiles`,
+also `application/octet-stream`; section 6), so a tile costs about what its entry in the `.pmtiles` did. The Pages artifact limit is
+1 GB (the deploy fails above 900 MB and prints the artifact's size and file count); the tiles add 45 MB to it. The artifact is
+uploaded as a single tar, so the 3,820 files should not slow `upload-pages-artifact` (the job summary times it).
 
 **tile-join side effects** (checked on the real output): it rewrites the metadata `version` to "2" and `type` to "overlay",
 adds `format`, `generator` and `generator_options`, and resets `bounds` to the whole world (the tiles are only the bbox's);
@@ -322,32 +345,43 @@ GitHub Actions cron runs at most every 5 minutes, so it can't provide realtime. 
 
 That totals about 170 KB raw, or about 35 KB gzipped. Refresh it with a scheduled Action whenever the zip's `Last-Modified` changes.
 
-**Range requests on Pages (the basemap, ost.9.1).** The PMTiles client reads `nyc.pmtiles` in ranges, so GitHub Pages must
-answer a correct uncompressed 206. Measured on the live site with curl (2026-11-22) on a JSON file of the same size class
-(`data/shapes.json`, 211,122 bytes), since `.pmtiles` is not deployed yet:
+**Range requests on Pages (the basemap, ost.9.1, measured; why it ships as tiles, ost.9.4).** The first basemap design read
+`nyc.pmtiles` in HTTP Range requests, so GitHub Pages had to answer a correct uncompressed 206. Measured twice.
 
-- `Range: bytes=0-126`, `Accept-Encoding: identity`: `206`, `content-range: bytes 0-126/211122`, `content-length: 127`, no
-  `content-encoding`, `etag: "6b027b5f-338b2"`, `accept-ranges: bytes`, `cache-control: max-age=600`,
-  `vary: Accept-Encoding`, `content-type: application/json; charset=utf-8`.
-- The same with `Accept-Encoding: gzip, deflate, br, zstd` (what a browser sends): `206` but `content-encoding: gzip`,
-  `content-range: bytes 0-126/22952` (the real file is 211,122 bytes; 22,952 is its gzipped size), a weak `etag: W/"..."`.
-  `bytes=0-16383` the same (`content-range: bytes 0-16383/22952`, `content-length: 16384`), and a range at the real end
-  (`bytes=211122-`) gets `416` with `content-range: bytes */22952`. So Pages applies a range to the gzipped body and reports
-  the gzipped total.
-- Who sends which header: a page's JavaScript cannot set `Accept-Encoding` (it is a forbidden header), and spec-following
-  browsers send `identity` on a Range request, so the client normally gets the correct answer. Firefox before 148 reportedly
-  sends gzip on a Range request (UNVERIFIED here); that cannot be fixed client-side. The only lever is the server's choice of
-  compression by `content-type`: the deploy's `verify-basemap` records the `.pmtiles` content-type and prints "BLOCKS ost.9.2
-  if the .pmtiles is compressed on the wire" (a warning, not a job failure) when the gzip probe differs from the identity one.
-  Because a gzipped answer reports a total other than the file's, **ost.9.2 should treat a `content-range` total different
-  from `pin.bytes` as a hard error**, never read the archive from it.
-- Cache: `cache-control: max-age=600`, so a cached range can go stale for up to 10 minutes after a deploy; the `etag` changes
-  with each deploy. The CDN varies on `Accept-Encoding`.
-- Vite dev (sirv) answered `bytes=0-126` on the real file with a correct uncompressed 206 (checked with
-  `verify-basemap`); `vite preview` compresses only text and JSON. Neither is Pages.
+Before deploying the file, with curl (2026-11-22) on a JSON file of the same size class (`data/shapes.json`, 211,122 bytes):
 
-The headers for `.pmtiles` itself are recorded here after the first deploy with a pin (`verify-basemap` writes them to the
-job summary): TODO fill in from that run.
+- `Range: bytes=0-126`, `Accept-Encoding: identity`: `206`, `content-range: bytes 0-126/211122`, no `content-encoding`,
+  `etag: "6b027b5f-338b2"`, `accept-ranges: bytes`, `cache-control: max-age=600`, `vary: Accept-Encoding`.
+- The same with `Accept-Encoding: gzip, deflate, br, zstd`: `206` but `content-encoding: gzip`, `content-range: bytes 0-126/22952`
+  (22,952 is the gzipped size), a weak `etag`; `bytes=211122-` gets `416` with `content-range: bytes */22952`. Pages applies a
+  range to the gzipped body and reports the gzipped total.
+
+On the deployed `nyc.pmtiles` (the first pinned deploy, Actions run 44989770200, `content-type: application/octet-stream`,
+32,962,122 bytes, `cache-control: max-age=600`, `accept-ranges: bytes`):
+
+| Request | Result |
+|---|---|
+| identity, `bytes=0-126`, `bytes=32961995-32962121`, `bytes=0-16383` | `206`, `content-range: bytes <a>-<b>/32962122`, exact lengths, no `content-encoding`: correct |
+| browser-style Accept-Encoding, `bytes=0-126` | `206`, `content-encoding: gzip`, `content-range: bytes 0-126/32958802` (the gzipped total), weak etag |
+| the same, `bytes=0-16383` | the same, `bytes 0-16383/32958802` |
+| the same, the real last 127 bytes | `416`, `content-range: bytes */32958802` |
+
+So Pages gzips `application/octet-stream` and applies the range to the compressed body. A client that sends gzip on a Range request
+(Firefox before 148 reportedly does; UNVERIFIED here) would read a gzip fragment as the archive, and nothing client-side can fix it:
+`Accept-Encoding` is a forbidden header, and the server's compression is not ours to turn off. The user approved dropping Range
+altogether (ost.9.4): the basemap is a directory of plain tile files, each fetched whole, which Pages may compress and every
+browser decodes transparently. There is no Range dependency anywhere now (`scripts/lib/rangeProbe.ts` is gone).
+
+- Cache: `cache-control: max-age=600` (an `etag` changes with each deploy), so a tile can be stale for up to 10 minutes after a
+  deploy; the CDN varies on `Accept-Encoding`.
+- Each deploy's `verify-basemap` job records the tiles' headers (content-type, content-encoding, cache-control, etag) in its summary:
+  TODO fill in from the first deploy with a tile pin. It also asks for a tile the pack lacks (z15, x 0, y 0), recorded not judged:
+  Pages should answer `404`, which the client must treat as an empty tile.
+- Vite dev (sirv) serves `public/basemap/tiles/...` uncompressed with an empty content type; `vite preview` compresses only text and
+  JSON. Neither is Pages.
+- The build job's `upload-pages-artifact` step is timed in the job summary. Baseline, run 44989770200 (one 33 MB file, a 42 MB
+  artifact): the upload step started 05:32:12 and the deploy job started 05:32:24, so upload plus job teardown took under 12 s;
+  deploy-pages took 5 s.
 
 ## Gaps / UNVERIFIED
 - The exact feed publish interval; polling aliased it, and 5–10 s is what was observed.

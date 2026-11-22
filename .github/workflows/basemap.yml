@@ -1,12 +1,19 @@
 name: Build the NYC basemap
 
 # Cuts the NYC basemap out of a Protomaps daily build and publishes it as a GitHub Release asset, which
-# deploy.yml then copies into the Pages artifact (the daily builds expire after about a week, and Protomaps asks
+# deploy.yml then unpacks into the Pages artifact (the daily builds expire after about a week, and Protomaps asks
 # not to hotlink them). Manual only: run it when the basemap should change, then pin the release in a normal PR.
+#
+# The site serves the tiles as static files, tiles/<z>/<x>/<y>.mvt, uncompressed on disk (GitHub Pages compresses each
+# one itself and the browser decodes it): a single .pmtiles read in Range requests fails when Pages gzips a range, with a
+# wrong content-range total (measured in deploy run 44989770200, docs/research/data-sources.md). The one release asset
+# is a tarball of that directory, nyc-tiles.tar.gz.
 #
 #   generate  read-only; extracts the bbox and zoom range with go-pmtiles, checks the source metadata against the
 #             reviewed licence terms (scripts/gate-basemap.ts), drops the layers the site doesn't use with
-#             tippecanoe's tile-join, verifies the result and its size, uploads it as an artifact
+#             tippecanoe's tile-join, verifies the result and its size, writes it as a tile directory (tile-join -e),
+#             checks every tile, packs a deterministic tarball, unpacks it again with the deploy's own extractor and
+#             compares, uploads it as an artifact
 #   publish   write token; never runs npm or repo code; creates the release (tag basemap-<build>-<sha8>) and prints
 #             the pin to put in data/basemap/basemap.json
 #
@@ -36,7 +43,8 @@ env:
   GO_PMTILES_SHA256: 3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f
   TIPPECANOE_TAG: 2.79.0
   TIPPECANOE_COMMIT: 68ab8dcc229f95b8b25877697d5e8d66783af503
-  # The artifact must stay far below the 1 GB Pages limit; the NYC subset measured about 33 MB at z15.
+  # The deployed tiles must stay far below the 1 GB Pages limit; the NYC subset measured about 33 MB as a .pmtiles and
+  # 45 MB as 3,820 uncompressed tile files at z15 (the tarball 31 MB).
   BASEMAP_MAX_BYTES: 200000000
 
 jobs:
@@ -50,8 +58,10 @@ jobs:
     outputs:
       build: ${{ steps.build.outputs.build }}
       basemap_version: ${{ steps.gate.outputs.basemap_version }}
-      sha256: ${{ steps.result.outputs.sha256 }}
-      bytes: ${{ steps.result.outputs.bytes }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+      bytes: ${{ steps.pack.outputs.bytes }}
+      files: ${{ steps.pack.outputs.files }}
+      tile_bytes: ${{ steps.pack.outputs.tile_bytes }}
       layers: ${{ steps.build.outputs.layers }}
     steps:
       - uses: actions/checkout@v7
@@ -130,7 +140,6 @@ jobs:
           node scripts/gate-basemap.ts output output-metadata.json
 
       - name: Check the size and report it per zoom
-        id: result
         env:
           BUILD: ${{ steps.build.outputs.build }}
           BASEMAP_VERSION: ${{ steps.gate.outputs.basemap_version }}
@@ -157,14 +166,71 @@ jobs:
               order by a.z;" | awk -F'|' '{ printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4 }'
             echo
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "sha256=$(sha256sum nyc.pmtiles | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
+
+      # tile-join -e writes one tile per file, -pC uncompressed (Pages gzips each file itself); it names them <z>/<x>/<y>.pbf
+      # and adds a metadata.json, which the gate already read and the client doesn't need, so neither ships: the
+      # tiles are renamed .mvt and the tree is checked before anything is packed (scripts/basemap-tiles.ts check: every
+      # file an MVT, named on its zoom's grid, zoom within the spec's maxzoom).
+      - name: Write the tile directory
+        id: tiles
+        run: |
+          rm -rf raw stage
+          mkdir stage
+          tile-join -f -pk -pg -pC -e raw nyc.pmtiles
+          test -f raw/metadata.json
+          mv raw stage/tiles
+          rm stage/tiles/metadata.json
+          find stage/tiles -name '*.pbf' | while IFS= read -r f; do mv "$f" "${f%.pbf}.mvt"; done
+          maxzoom=$(jq -r '.spec.maxzoom' data/basemap/basemap.json)
+          node scripts/basemap-tiles.ts check stage/tiles --max-zoom "$maxzoom" | tee tiles-report.txt
+          node scripts/basemap-tiles.ts probe-sizes stage/tiles
+          tile_bytes=$(sed -n 's/^.* tile files, \([0-9]*\) bytes$/\1/p' tiles-report.txt | head -n1)
+          if [ "$tile_bytes" -gt "$BASEMAP_MAX_BYTES" ]; then
+            echo "::error::the tiles are $tile_bytes bytes, over the $BASEMAP_MAX_BYTES cap"
+            exit 1
+          fi
+
+      # Deterministic, so the same tiles give the same sha256: sorted names, files only (no directory entries), mtime 0,
+      # owner 0, fixed modes, ustar (what the deploy's reader accepts), gzip without a name or time. The round trip uses
+      # the deploy's extractor (scripts/basemap-tiles.ts unpack), so a tarball it would refuse fails here.
+      - name: Pack the tiles
+        id: pack
+        run: |
+          (cd stage && find tiles -type f | LC_ALL=C sort) > "$PWD/files.txt"
+          files=$(wc -l < files.txt | tr -d ' ')
+          tile_bytes=$(sed -n 's/^.* tile files, \([0-9]*\) bytes$/\1/p' tiles-report.txt | head -n1)
+          tar --format=ustar --numeric-owner --owner=0 --group=0 --mtime=@0 --mode='u=rw,go=r' -C stage -T "$PWD/files.txt" -cf - | gzip -9n > nyc-tiles.tar.gz
+          bytes=$(stat -c %s nyc-tiles.tar.gz)
+          if [ "$bytes" -gt "$BASEMAP_MAX_BYTES" ]; then
+            echo "::error::nyc-tiles.tar.gz is $bytes bytes, over the $BASEMAP_MAX_BYTES cap"
+            exit 1
+          fi
+          rm -rf unpacked
+          start=$(date +%s.%N)
+          node scripts/basemap-tiles.ts unpack nyc-tiles.tar.gz unpacked --files "$files" --tile-bytes "$tile_bytes" --max-zoom "$(jq -r '.spec.maxzoom' data/basemap/basemap.json)"
+          secs=$(awk -v a="$start" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
+          diff -r stage/tiles unpacked/tiles
+          sha256=$(sha256sum nyc-tiles.tar.gz | cut -d' ' -f1)
+          {
+            echo "### Tile tarball"
+            echo "${files} tile files, ${tile_bytes} bytes unpacked; nyc-tiles.tar.gz ${bytes} bytes, sha256 \`${sha256}\`. The deploy's extractor unpacked it in ${secs} s and it matches the directory."
+            echo
+            echo '```'
+            cat tiles-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "sha256=$sha256"
+            echo "bytes=$bytes"
+            echo "files=$files"
+            echo "tile_bytes=$tile_bytes"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
         with:
           name: basemap
           path: |
-            nyc.pmtiles
+            nyc-tiles.tar.gz
             source-metadata.json
           if-no-files-found: error
           retention-days: 7
@@ -179,6 +245,8 @@ jobs:
       BASEMAP_VERSION: ${{ needs.generate.outputs.basemap_version }}
       SHA256: ${{ needs.generate.outputs.sha256 }}
       BYTES: ${{ needs.generate.outputs.bytes }}
+      FILES: ${{ needs.generate.outputs.files }}
+      TILE_BYTES: ${{ needs.generate.outputs.tile_bytes }}
       LAYERS: ${{ needs.generate.outputs.layers }}
     steps:
       - uses: actions/download-artifact@v8
@@ -187,8 +255,8 @@ jobs:
 
       - name: Check what was uploaded
         run: |
-          test "$(sha256sum nyc.pmtiles | cut -d' ' -f1)" = "$SHA256"
-          test "$(stat -c %s nyc.pmtiles)" = "$BYTES"
+          test "$(sha256sum nyc-tiles.tar.gz | cut -d' ' -f1)" = "$SHA256"
+          test "$(stat -c %s nyc-tiles.tar.gz)" = "$BYTES"
 
       - name: Create the release
         id: release
@@ -200,18 +268,21 @@ jobs:
           NYC basemap tiles for the underground map: the Protomaps basemap build ${BUILD} (basemap ${BASEMAP_VERSION}),
           cut to the five boroughs, zoom 0 to 15, with only the ${LAYERS} layers.
 
+          - Asset: \`nyc-tiles.tar.gz\`, a tarball of ${FILES} uncompressed Mapbox Vector Tiles at \`tiles/<z>/<x>/<y>.mvt\`
+            (${TILE_BYTES} bytes unpacked), cut from a PMTiles extract by tippecanoe's tile-join (\`-e -pC\`); the site serves
+            them as static files
           - Source: https://build.protomaps.com/${BUILD}.pmtiles (https://docs.protomaps.com/basemaps/downloads)
-          - sha256: \`${SHA256}\`, ${BYTES} bytes
+          - sha256: \`${SHA256}\`, ${BYTES} bytes (the tarball)
           - Pin: \`data/basemap/basemap.json\`; built by the \`basemap\` workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
 
           Licence and credits: © OpenStreetMap contributors, available under the Open Database License 1.0
-          (https://opendatacommons.org/licenses/odbl/1-0/); this file is a derivative database under the ODbL.
+          (https://opendatacommons.org/licenses/odbl/1-0/); these tiles are a derivative database under the ODbL.
           The earth and water layers also hold Natural Earth data at low zooms (public domain) and OSM-derived polygons
           (osmdata.openstreetmap.de, ODbL). The landcover layer (ESA WorldCover, CC BY 4.0), the places layer (minzoom values
           derived from Tilezen and Natural Earth) and the pois, buildings and boundaries layers are removed. The metadata's
           own attribution reads "© OpenStreetMap". Protomaps' terms: https://github.com/protomaps/basemaps/blob/main/LICENSE_DATA.md.
           EOF
-          gh release create "$tag" nyc.pmtiles \
+          gh release create "$tag" nyc-tiles.tar.gz \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "NYC basemap ${BUILD}" --notes-file notes.md
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -220,8 +291,8 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
-          pin=$(jq -n --arg build "$BUILD" --arg v "$BASEMAP_VERSION" --arg release "$TAG" --arg sha "$SHA256" --argjson bytes "$BYTES" \
-            '{build: $build, basemapVersion: $v, release: $release, sha256: $sha, bytes: $bytes}')
+          pin=$(jq -n --arg build "$BUILD" --arg v "$BASEMAP_VERSION" --arg release "$TAG" --arg sha "$SHA256" --argjson bytes "$BYTES" --argjson files "$FILES" --argjson tileBytes "$TILE_BYTES" \
+            '{build: $build, basemapVersion: $v, release: $release, asset: "nyc-tiles.tar.gz", sha256: $sha, bytes: $bytes, files: $files, tileBytes: $tileBytes}')
           {
             echo "### Pin"
             echo "Release \`$TAG\` is published. Set \`pin\` in \`data/basemap/basemap.json\` to this, in a normal PR:"
