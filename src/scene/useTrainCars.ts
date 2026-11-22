@@ -9,15 +9,26 @@ import type { DrawnTrack, TrackPoint } from '../lib/live/trackPoint'
 import { theme } from '../theme'
 import { screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
-import { CAR_FLOOR_M, CAR_HEIGHT_M, CAR_WIDTH_M, createCarBodyGeometry, createCarHaloGeometry } from './carGeometry'
+import {
+  CAR_FLOOR_M,
+  CAR_HEIGHT_M,
+  CAR_WIDTH_M,
+  createCarBodyGeometry,
+  createCarHaloGeometry,
+  createCarOutlineGeometry,
+} from './carGeometry'
 
 export const CAR_CAPACITY = TRAIN_CAPACITY * MAX_CARS
 /** Gap between car bodies and the halo rim around them: real meters zoomed in, a few pixels farther out. */
 const GAP = { px: 1.5, minM: 1.2 }
 const RIM = { px: 1, minM: 0.5 }
-/** The selected train: a background gap around its cars, then a rim in the selection color outside it. */
-const SELECTED_GAP = { px: 2, minM: 0.8 }
-const SELECTED_RIM = { px: 2.5, minM: 1 }
+/**
+ * The selected train's outline: a background gap around its cars' silhouettes, then a rim in the selection color.
+ * Screen pixels at any zoom, floored in meters so it grows a little as the cars do at street zoom (at 42 m the floors
+ * are about 4 and 5 px).
+ */
+const SELECTED_GAP = { px: 2, minM: 0.12 }
+const SELECTED_RIM = { px: 2.5, minM: 0.16 }
 /** A car body is never narrower than this on screen, so a train still reads through the dot handoff. */
 const MIN_WIDTH_PX = 5
 /**
@@ -39,14 +50,11 @@ const BRIDGE_SLOTS = 16
 export interface TrainCarsLayer {
   bodies: RefObject<InstancedMesh | null>
   halos: RefObject<InstancedMesh | null>
-  /** The selected train's rim footprints, MAX_CARS instances drawn under the car halos. */
+  /** The selected train's outline rim: MAX_CARS shells (`geometry.outline`, back faces) around its cars. */
   rims: RefObject<InstancedMesh | null>
-  /**
-   * The selected train's background footprints again, MAX_CARS instances, drawn with its rim above the other trains'
-   * dots while those are still drawn (see commit).
-   */
+  /** The background gap inside that rim: MAX_CARS smaller shells, drawn after the rim (see commit). */
   gaps: RefObject<InstancedMesh | null>
-  geometry: { body: BufferGeometry; halo: BufferGeometry }
+  geometry: { body: BufferGeometry; halo: BufferGeometry; outline: BufferGeometry }
   /** Before the first frame: dynamic usage, cleared matrices, nothing drawn. */
   prepare(): void
   /** A slot's route changed: its consist and the color of its cars. */
@@ -70,8 +78,8 @@ export interface TrainCarsLayer {
   hide(i: number): void
   /**
    * Draws slots [0, high) and uploads the ones written since the last upload, or draws none when inactive. With
-   * `overDots` (the other trains are still dots, carMix below 1) the selected train's rim and gap draw above those
-   * dots; otherwise at the car layers' own orders, under the other cars' footprints.
+   * `overDots` (the other trains are still dots, carMix below 1) the selected train's outline draws above those
+   * dots, before the bodies; otherwise just after the bodies, depth-tested against them.
    */
   commit(high: number, active: boolean, overDots: boolean): void
 }
@@ -86,6 +94,7 @@ export function useTrainCars(): TrainCarsLayer {
     () => ({
       body: createCarBodyGeometry(theme.trainCarSideShade, theme.trainCarEndShade),
       halo: createCarHaloGeometry(),
+      outline: createCarOutlineGeometry(),
     }),
     [],
   )
@@ -94,6 +103,7 @@ export function useTrainCars(): TrainCarsLayer {
     () => () => {
       geometry.body.dispose()
       geometry.halo.dispose()
+      geometry.outline.dispose()
     },
     [geometry],
   )
@@ -102,17 +112,18 @@ export function useTrainCars(): TrainCarsLayer {
     const consists = new Array<Consist>(TRAIN_CAPACITY).fill(DEFAULT_CONSIST)
     const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: CAR_WIDTH_M, crossScale: 1, y: CAR_FLOOR_M, extrude: 1 }
     const gapFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM, y: CAR_FLOOR_M + SELECTED_LIFT_M }
-    const rimFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM + SELECTED_RIM.minM }
-    /** writeConsist writes bodies with the footprints; the rim's bodies land here and are never drawn. */
-    const rimBodies = new Float32Array(MAX_CARS * 16)
+    /** The outline shells around the selected train's bodies (gapFrame's), grown by the gap, and by gap plus rim. */
+    const gapShell: CarFrame = { ...gapFrame, outlineM: SELECTED_GAP.minM }
+    const rimShell: CarFrame = { ...gapFrame, outlineM: SELECTED_GAP.minM + SELECTED_RIM.minM }
+    /** writeConsist writes footprints with the bodies; the shells' footprints land here and are never drawn. */
+    const shellHalos = new Float32Array(MAX_CARS * 16)
     let selected = -1
     let rimDirty = false
     const zeroRim = (): void => {
       const r = rims.current
       const g = gaps.current
       if (!r || !g) return
-      clearCars(rimBodies, r.instanceMatrix.array as Float32Array, 0)
-      ;(g.instanceMatrix.array as Float32Array).fill(0)
+      clearCars(r.instanceMatrix.array as Float32Array, g.instanceMatrix.array as Float32Array, 0)
       rimDirty = true
     }
     const scratch = createConsistScratch()
@@ -161,13 +172,14 @@ export function useTrainCars(): TrainCarsLayer {
       },
       carHeightM: () => CAR_HEIGHT_M * frame.crossScale,
       beginFrame(cameraDistance, depth) {
-        frame.extrude = gapFrame.extrude = rimFrame.extrude = depth
-        frame.gapM = gapFrame.gapM = rimFrame.gapM = screenScale(cameraDistance, GAP.px, GAP.minM)
+        frame.extrude = gapFrame.extrude = gapShell.extrude = rimShell.extrude = depth
+        frame.gapM = gapFrame.gapM = gapShell.gapM = rimShell.gapM = screenScale(cameraDistance, GAP.px, GAP.minM)
         frame.rimM = screenScale(cameraDistance, RIM.px, RIM.minM)
-        gapFrame.rimM = screenScale(cameraDistance, SELECTED_GAP.px, SELECTED_GAP.minM)
-        rimFrame.rimM = gapFrame.rimM + screenScale(cameraDistance, SELECTED_RIM.px, SELECTED_RIM.minM)
+        const gap = screenScale(cameraDistance, SELECTED_GAP.px, SELECTED_GAP.minM)
+        gapFrame.rimM = gapShell.outlineM = gap
+        rimShell.outlineM = gap + screenScale(cameraDistance, SELECTED_RIM.px, SELECTED_RIM.minM)
         frame.crossScale = screenScale(cameraDistance, MIN_WIDTH_PX, CAR_WIDTH_M) / CAR_WIDTH_M
-        gapFrame.crossScale = rimFrame.crossScale = frame.crossScale
+        gapFrame.crossScale = gapShell.crossScale = rimShell.crossScale = frame.crossScale
       },
       writeTrain(i, track, view, shown, mix, k, shift) {
         const b = bodies.current
@@ -180,11 +192,8 @@ export function useTrainCars(): TrainCarsLayer {
         const r = rims.current
         const g = gaps.current
         if (i === selected && r && g) {
-          writeConsist(rimBodies, r.instanceMatrix.array as Float32Array, 0, track, view, shown, consist, mix, k, widen, rimFrame, scratch, shift)
-          // The gap footprints just written to the shared halos, copied for the pass over the dots.
-          const from = h.instanceMatrix.array as Float32Array
-          const to = g.instanceMatrix.array as Float32Array
-          for (let j = 0, o = i * STRIDE; j < STRIDE; j++) to[j] = from[o + j]!
+          writeConsist(r.instanceMatrix.array as Float32Array, shellHalos, 0, track, view, shown, consist, mix, k, widen, rimShell, scratch, shift)
+          writeConsist(g.instanceMatrix.array as Float32Array, shellHalos, 0, track, view, shown, consist, mix, k, widen, gapShell, scratch, shift)
           rimDirty = true
         }
         hidden[i] = 0
@@ -201,10 +210,9 @@ export function useTrainCars(): TrainCarsLayer {
         const g = gaps.current
         if (!b || !h || !r || !g) return
         b.count = h.count = active ? high * MAX_CARS : 0
-        r.count = active && selected >= 0 ? MAX_CARS : 0
-        // Over the dots the gap has its own pass (the shared halos sit under the dots); else the shared halos are it.
-        g.count = active && selected >= 0 && overDots ? MAX_CARS : 0
+        r.count = g.count = active && selected >= 0 ? MAX_CARS : 0
         r.renderOrder = overDots ? RENDER_ORDER.selectedCarRim : RENDER_ORDER.carRim
+        g.renderOrder = overDots ? RENDER_ORDER.selectedCarGap : RENDER_ORDER.carGap
         if (!active) return
         if (rimDirty) r.instanceMatrix.needsUpdate = g.instanceMatrix.needsUpdate = true
         rimDirty = false

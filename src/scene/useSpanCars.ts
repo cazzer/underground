@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useMemo, useRef } from 'react'
-import { type BufferGeometry, Color, DynamicDrawUsage, type InstancedMesh, type MeshBasicMaterial } from 'three'
+import { BackSide, type BufferGeometry, Color, DynamicDrawUsage, type InstancedMesh, MeshBasicMaterial } from 'three'
 import { type Consist, MAX_CARS } from '../lib/live/consist'
 import { consistSpanInto, type ConsistSpan } from '../lib/live/consistLayout'
 import { slotScale, TRAIN_CAPACITY, type SlotTable } from '../lib/live/slots'
@@ -28,10 +28,15 @@ export const spanCarStats = { peakOverflow: 0 }
 export interface SpanCarsLayer {
   bodies: RefObject<InstancedMesh | null>
   halos: RefObject<InstancedMesh | null>
+  /** The selected train's outline shells (useTrainCars' rims and gaps), copied for its lifted cars. */
   rims: RefObject<InstancedMesh | null>
-  /** The copies' geometry and materials: bodies and rims carry a per-instance veil tint (veilTint.ts). */
-  geometry: { body: BufferGeometry; halo: BufferGeometry; rim: BufferGeometry }
-  material: { body: MeshBasicMaterial; rim: MeshBasicMaterial }
+  gaps: RefObject<InstancedMesh | null>
+  /**
+   * The copies' geometry and materials: bodies and rims carry a per-instance veil tint (veilTint.ts); the gap is the
+   * background, which the tint would mix toward itself.
+   */
+  geometry: { body: BufferGeometry; halo: BufferGeometry; rim: BufferGeometry; gap: BufferGeometry }
+  material: { body: MeshBasicMaterial; rim: MeshBasicMaterial; gap: MeshBasicMaterial }
   /** Before the first frame: dynamic usage, instance colors allocated, nothing drawn. */
   prepare(): void
   /**
@@ -70,16 +75,19 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
   const bodies = useRef<InstancedMesh>(null)
   const halos = useRef<InstancedMesh>(null)
   const rims = useRef<InstancedMesh>(null)
+  const gaps = useRef<InstancedMesh>(null)
   const parts = useMemo(() => {
     const body = withTintAttribute(cars.geometry.body, SPAN_CARS)
-    const rim = withTintAttribute(cars.geometry.halo, MAX_CARS)
+    const rim = withTintAttribute(cars.geometry.outline, MAX_CARS)
+    const shell = { transparent: true, depthTest: true, depthWrite: false, side: BackSide }
     return {
-      geometry: { body: body.geometry, halo: cars.geometry.halo, rim: rim.geometry },
+      geometry: { body: body.geometry, halo: cars.geometry.halo, rim: rim.geometry, gap: cars.geometry.outline },
       tint: { body: body.tint, rim: rim.tint },
       material: {
         // White: vertex shading times the per-instance route color, as the street cars.
         body: veilTintMaterial({ vertexColors: true, transparent: true, depthTest: true, depthWrite: true }),
-        rim: veilTintMaterial({ color: theme.trainSelectedRim, transparent: true, depthTest: false, depthWrite: false }),
+        rim: veilTintMaterial({ color: theme.trainSelectedRim, ...shell }),
+        gap: new MeshBasicMaterial({ color: theme.background, ...shell }),
       },
     }
   }, [cars])
@@ -90,6 +98,7 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
       parts.geometry.rim.dispose()
       parts.material.body.dispose()
       parts.material.rim.dispose()
+      parts.material.gap.dispose()
     },
     [parts],
   )
@@ -106,7 +115,7 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
     const carWeight = (c: number, s: { d0: number; d1: number }): number => trainSpanWeight(span.rear + (c + 0.5) * span.step, s)
     return {
       prepare() {
-        for (const m of [bodies.current, halos.current, rims.current]) {
+        for (const m of [bodies.current, halos.current, rims.current, gaps.current]) {
           if (!m) continue
           m.instanceMatrix.setUsage(DynamicDrawUsage)
           m.count = 0
@@ -122,10 +131,12 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
         const b = bodies.current
         const h = halos.current
         const r = rims.current
+        const gp = gaps.current
         const srcB = cars.bodies.current
         const srcH = cars.halos.current
         const srcR = cars.rims.current
-        if (!b || !h || !r || !srcB || !srcH || !srcR || !b.instanceColor) return
+        const srcG = cars.gaps.current
+        if (!b || !h || !r || !gp || !srcB || !srcH || !srcR || !srcG || !b.instanceColor) return
         let n = 0
         let rimN = 0
         if (SPAN_LIFT && spans && reveal > 0) {
@@ -156,6 +167,7 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
           const outB = b.instanceMatrix.array as Float32Array
           const outH = h.instanceMatrix.array as Float32Array
           const outR = r.instanceMatrix.array as Float32Array
+          const outG = gp.instanceMatrix.array as Float32Array
           const bodyColors = b.instanceColor.array as Float32Array
           for (let t = 0; t < Math.min(found, SPAN_TRAINS); t++) {
             const i = candidates[t]!
@@ -175,12 +187,13 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
               n++
               if (i !== selected) continue
               copyMatrix(srcR.instanceMatrix.array, c, outR, rimN)
+              copyMatrix(srcG.instanceMatrix.array, c, outG, rimN)
               parts.tint.rim[rimN++] = tint
             }
           }
         }
         b.count = h.count = n
-        r.count = rimN
+        r.count = gp.count = rimN
         if (n === 0) return
         // A few KB per frame, only while cars are lifted.
         b.instanceMatrix.needsUpdate = true
@@ -188,11 +201,11 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
         b.instanceColor.needsUpdate = true
         parts.geometry.body.getAttribute(VEIL_TINT_ATTRIBUTE).needsUpdate = true
         if (rimN === 0) return
-        r.instanceMatrix.needsUpdate = true
+        r.instanceMatrix.needsUpdate = gp.instanceMatrix.needsUpdate = true
         parts.geometry.rim.getAttribute(VEIL_TINT_ATTRIBUTE).needsUpdate = true
       },
     }
   }, [cars, parts])
 
-  return useMemo(() => ({ bodies, halos, rims, geometry: parts.geometry, material: parts.material, ...layer }), [parts, layer])
+  return useMemo(() => ({ bodies, halos, rims, gaps, geometry: parts.geometry, material: parts.material, ...layer }), [parts, layer])
 }

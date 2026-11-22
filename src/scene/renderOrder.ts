@@ -19,11 +19,14 @@ export const RENDER_ORDER = {
   selectedTrainHalo: 6.15,
   selectedTrain: 6.2,
   // Zoomed in, each train is a consist of cars: background-colored footprints, then the bodies.
-  carRim: 5.25,
   carHalo: 5.5,
   cars: 6.5,
-  // While the other trains are still dots (carMix below 1), the selected train's car rim and a copy of its
-  // background gap draw above those dots, under its own shrinking dot (6.1 to 6.2).
+  // The selected train's outline: back faces of two shells around its cars, the rim then a background gap inside
+  // it, depth-tested against the bodies so only the band outside each silhouette shows (and a nearer car hides it).
+  carRim: 6.51,
+  carGap: 6.52,
+  // While the other trains are still dots (carMix below 1), the same shells draw above those dots, under its own
+  // shrinking dot (6.1 to 6.2), before any body, so the bodies paint over their inside.
   selectedCarRim: 6.03,
   selectedCarGap: 6.06,
   // "You are here": the accuracy disc and its edge sit under the lines; the reticle sits over the trains, under the veil.
@@ -39,9 +42,10 @@ export const RENDER_ORDER = {
   interiorVeil: 7,
   interiorFine: 8,
   interior: 9,
-  // Trains on a revealed station's platforms, redrawn above the veil and those strokes: rim, footprints, bodies
-  // (depth-tested against the street cars they copy).
+  // Trains on a revealed station's platforms, redrawn above the veil and those strokes: the selected outline's rim
+  // and gap shells, footprints, bodies (all but the footprints depth-tested against the street cars they copy).
   spanCarRim: 9.4,
+  spanCarGap: 9.42,
   spanCarHalo: 9.45,
   spanCars: 9.5,
   // The interior's levels above that platform (mezzanines, their stairs, escalators and shafts, the street), fine
