@@ -12,6 +12,7 @@ import { flightDistance, flightProgress, rebasedProgress, remainingPan } from '.
 import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
 import type { PriorityFrame } from '../lib/pathFrame'
+import type { CollapsePending } from '../lib/collapseReframe'
 import type { AwaitingInterior } from '../lib/interiorReframe'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
@@ -19,6 +20,7 @@ import { prefersReducedMotion } from '../lib/reducedMotion'
 import { tiltForDistance } from '../lib/tilt'
 import { flushMotion, newFlight, turnOffset, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
+import { useCollapseReframe } from './useCollapseReframe'
 import { usePathProbe } from './usePathProbe'
 import { useFocusGroups } from './useFocusGroups'
 import { useInteriorReframe } from './useInteriorReframe'
@@ -77,6 +79,8 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
   const gestureEnded = useRef(false)
   /** A station flight that set off before its interior (or bare streets) was known: reframed after landing (useInteriorReframe). */
   const awaiting = useRef<AwaitingInterior | null>(null)
+  /** A user collapse or expand of the panel settling before it reframes (useCollapseReframe). */
+  const collapse = useRef<CollapsePending | null>(null)
 
   // Fit the whole city once; resizing later keeps the user's view.
   useLayoutEffect(() => {
@@ -111,6 +115,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
       if (!c) return
       hold.current = null
       awaiting.current = null
+      collapse.current = null
       flushMotion(c, camera)
       flight.current = newFlight(dest, c, camera, prefersReducedMotion())
     },
@@ -137,6 +142,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     camera,
     flight,
     awaiting,
+    collapse,
     layout: latest,
     interior,
     streets,
@@ -146,6 +152,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     focusedId,
     following: follow.active,
   })
+  useCollapseReframe({ controls, camera, flight, collapse, layout: latest, panel, focusedId, flyRequest, following: follow.active, recheck: landed })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((state, delta) => {
@@ -219,6 +226,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     }
     flight.current = null
     awaiting.current = null
+    collapse.current = null
     gesture.current = true
     onGestureStart()
     follow.onGestureStart()

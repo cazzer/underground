@@ -22,7 +22,6 @@ import {
   type MapControlsImpl,
 } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
-import { landingLook } from './landingLook'
 import type { ReframeLayout } from './useInteriorReframe'
 
 /** What a fly request frames with, read when it fires (CameraRig's `latest`). */
@@ -105,7 +104,7 @@ export function useStationFlights({
     else if (!stationIsBare(station.id, l.index)) awaiting.current = { stationId: station.id, kind: 'interior', reduced }
     else awaiting.current = l.streets === undefined ? { stationId: station.id, kind: 'streets', reduced } : null
     const dest = known
-      ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced, l.frame, landingLook === 'half')
+      ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced, l.frame)
       : stationFlight(network, station.id, points, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
     flight.current = newFlight(dest, c, camera, reduced, known !== null || reduced)
   }, [flyRequest, network, camera, controls, flight, hold, awaiting, layout])
@@ -138,7 +137,7 @@ export function useStationFlights({
       // Later: too late to fold in without a lurch; the flight lands as it is and the reframe takes over.
       if (turn === 'later') return
       // Keep: frame for the azimuth already chosen (the landing turn, or the current one when there is none).
-      dest = interiorFlight(f.stationId, interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide', frame, landingLook === 'half')
+      dest = interiorFlight(f.stationId, interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide', frame)
       if (turn === 'keep') dest.azimuth = f.azimuth
       f.turnDecided = true
       awaiting.current = nextAwaiting(awaiting.current, layout.current.tripOpen)

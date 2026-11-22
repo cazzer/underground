@@ -144,8 +144,6 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   1 px, so width marks only the subway) and distances (`src/lib/colorMetrics.ts`, shared with `theme.test.ts`).
   TEMPORARY: `?basemap=off` draws no basemap and loads no tiles until ost.9.3's look is signed off; the removal list is
   in `src/scene/basemapLook.ts`
-  TEMPORARY: `?landturn=half` lets a landing on an interior with a priority frame (trip path, machines out of service) turn half
-  way round when the far side shows more of it (`priorityTurn` in `lib/pathFrame.ts`; south up at Pelham Pkwy on a phone) until the
   2q7.25 landing-turn card is decided (default off: the usual landing turn); the removal list is in `src/scene/landingLook.ts`
   TEMPORARY: `?twist=both` lets a two-finger touch that locked to rotate keep zooming (a twist and a pinch at once) until the
   pah.6 twist card is decided (default `lock`: a rotate lock holds zoom until the lift); the removal list is in `src/scene/twistLook.ts`
@@ -158,7 +156,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `Scene.tsx` canvas; `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `interiorFlight` takes the focused station id, which for a complex member is not the file's `stationId`, so the focus hold follows the member; `follows` marks a flight to the selected
-    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; `interiorFlight` frames the interior's priority frame when there is one, `priorityLanding`, and under TEMPORARY `?landturn=half` may land half a turn round, `priorityTurn`), `newFlight`, `flushMotion` and the landing turn;
+    train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; `interiorFlight` frames the interior's priority frame when there is one, `priorityLanding`), `newFlight`, `flushMotion` and the landing turn;
     `useStationFlights.ts` the fly-request effect and the mid-flight retarget (interior, bare streets, the trip's path frame, panel size);
     `useEntranceProbe.ts` dev-only `__underground.entrancesAt()` (entrance marks and station in viewport px, free rect);
     `usePathProbe.ts` dev-only `__underground.stationPathAt()` (the priority frame's path marker ends and centerline, and its out-of-service machines' ends, in viewport px, free rect);
@@ -168,7 +166,19 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `useInteriorReframe.ts` frames an interior that loaded too late for its station flight (after LATE_TURN_PROGRESS
     or after landing): once landed, a 0.6-1 s eased flight onto it with the landing turn decided then (reduced motion
     snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `ready` is `interiorReadyFor`, `interiorCovers(interior, awaited station)`, so a complex's other member reframes too, or for a bare station awaiting its streets (`kind: 'streets'`) `streetsReadyFor`: the same reframe onto its entrances, no turn; with the trip panel open a framed interior goes on
-    awaiting its priority frame (`kind: 'frame'`, `nextAwaiting`, `frameReadyFor`; the trip's path, then the machines out of service): its arrival, a change to it or a panel move reframes onto it, no turn, until a gesture, a focus change, a follow or the panel closing; with the trip panel closed the landing (which frames the machines out, as known by then, the late-interior reframe included) is final, so a later /ene poll, an outage list expanded or the trip panel opened never moves the camera (on a phone the expanded list leaves about 32 px above the panel, too little to frame anyway); a reframe with nothing to move is skipped);
+    awaiting its priority frame (`kind: 'frame'`, `nextAwaiting`, `frameReadyFor`; the trip's path, then the machines out of service): its arrival, a change to it or a panel move reframes onto it, no turn, until a gesture, a focus change, a follow or the panel closing; with the trip panel closed the landing (which frames the machines out, as known by then, the late-interior reframe included) is final, so a later /ene poll, an outage list expanded or the trip panel opened never moves the camera (on a phone the expanded list leaves about 32 px above the panel, too little to frame anyway); a reframe with nothing to move is skipped; while a panel toggle settles, `CameraRig`'s `collapse` ref, every check waits and `useCollapseReframe` asks again after);
+    `useCollapseReframe.ts` the collapse reframe: only a user collapse or expand of the panel in front (`usePanelCollapse().seq`; never
+    `collapsed`, a panel size change, an /ene poll or arrival rows) arms it, unless a flight is under way (its retarget takes the new
+    panel) or a train is followed; once the panel's rect holds still 150 ms (at most 600 ms after the toggle; `lib/collapseReframe.ts`,
+    pure: `collapseDueIn`, `reframeGains`, `collapseAction`) a 0.6-1 s eased flight, no turn, onto the focused interior's priority frame
+    (`interiorFlight` with the frame: trip path, then machines out of service) or a bare station's point and entrance marks
+    (`stationFlight`) in the new free rect; reduced motion snaps. It moves only when the view doesn't already frame every priority
+    point there and the new framing shows no less (`reframeGains` over `framedCount` per tier; a tie moves, so an expand returns to
+    the open panel's landing); an interior with no priority frame, or one still loading, stays. A gesture, another flight or fly
+    request, a follow or a focus change cancels it. A desktop collapse frees no room (the free rect ends at the panel's left edge),
+    so the landed view already frames it and nothing moves. On a 390×844 phone the bar leaves the free rect's bottom at 690 px
+    (`collapseFixture.ts`): collapsed, Union Sq's Lexington and Canarsie ways out fit (635N reframes onto a 600 m frame; the others
+    already show) and Pelham Pkwy's station-house machines already show (`pathFrame.data.test.ts`, `outageFrame.data.test.ts`);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
@@ -448,7 +458,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`panelCollapseState.ts`, pure: `frontPanel` mirrors Hud's bottom slot order, `collapseReducer`, `collapsedFront`).
     `usePanelCollapse(): { collapsed, seq }` is the scene's read-only view (memoised): `collapsed` is true only while the panel in front is a
     collapsed station or trip panel (false with none, and with a train panel or notice in front), and `seq` increments only on a user collapse or expand of
-    the panel in front (never on a size change, a station change, a panel closing or a cover; `collapsed` can change without it, so key on `seq`);
+    the panel in front (never on a size change, a station change, a panel closing or a cover; `collapsed` can change without it, so key on `seq`;
+    `useCollapseReframe` does);
     `usePanelCollapseControls()` is the panels' (`usePanelToggle`). The trip flag resets silently when the trip panel closes (opening Trip
     is a request to plan, so it opens expanded). `tripBar.ts` `tripBarText`: the trip bar's "A → B", "From A", "To B" or "Trip" and its spoken form
   - `focus.tsx` focused/dismissed-station React context (not pure); it also carries point flights
@@ -1011,12 +1022,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   panel open the trip's path there, its way out or a change of trains, then the machines out of service, `outageFrame.ts`; wanted in that
   order: path marker ends at rail height, the centerline, the machines' ends, the outline per level, an
   exit's walk) lands as usual when that already shows the whole path and every machine, else on `freeFrame`'s frame of it (400 to 600 m, the
-  target within 100 m of a member) when that shows more of the path, or as much of it and more machines (`priorityLanding`); under the
-  TEMPORARY `?landturn=half` (`landingLook.ts`), deciding its landing turn it also tries half a turn round and takes that when it shows
-  more by the same rule (`priorityTurn`). Above a phone's panel the target sits 130 m or
+  target within 100 m of a member) when that shows more of the path, or as much of it and more machines (`priorityLanding`). Above a phone's panel the target sits 130 m or
   more toward the camera from what the free area shows, so at Union Sq the Lexington and Canarsie paths, and the station-house
   machines at Pelham Pkwy (211), can't be framed within 100 m looking north and land as usual, part of them under the panel
-  (with `?landturn=half` they land half a turn round, where the far side fits; `pathFrame.data.test.ts`, `outageFrame.data.test.ts`; a phone panel with the outage list expanded leaves too little free area
+  (collapsing the panel to its bar frames them, `useCollapseReframe.ts`; `pathFrame.data.test.ts`, `outageFrame.data.test.ts`; a phone panel with the outage list expanded leaves too little free area
   for any frame); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior). Both
   retarget mid-flight when the interior, a bare station's streets (or the index, for a deep link) or the panel's final size arrives. An interior arriving after 90% of the
   flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,

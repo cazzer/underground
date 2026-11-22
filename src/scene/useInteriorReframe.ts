@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 
 import type { PerspectiveCamera } from 'three'
 import type { IndexLoad } from '../data/interiorLoad'
 import type { StreetLayer } from '../data/useStationStreets'
+import type { CollapsePending } from '../lib/collapseReframe'
 import type { PriorityFrame } from '../lib/pathFrame'
 import type { Insets, Viewport } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
@@ -20,7 +21,6 @@ import type { Network } from '../lib/network'
 import { wrapAngle } from '../lib/orbitLimits'
 import { bareStationPoints, flushMotion, interiorFlight, newFlight, stationFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
-import { landingLook } from './landingLook'
 
 /** What the reframe frames with, read when it starts (CameraRig's `latest`). */
 export interface ReframeLayout {
@@ -42,6 +42,8 @@ interface InteriorReframeOptions {
   flight: RefObject<Flight | null>
   /** CameraRig sets it on a station flight whose interior isn't known, and clears it on a gesture or another flight. */
   awaiting: RefObject<AwaitingInterior | null>
+  /** A panel toggle settling (useCollapseReframe): every ask waits until it has, so a toggle is one move. */
+  collapse: RefObject<CollapsePending | null>
   layout: RefObject<ReframeLayout>
   interior: InteriorModel | null
   streets: StreetLayer | null | undefined
@@ -59,7 +61,8 @@ interface InteriorReframeOptions {
  * of its entrances (no turn). Either way the interior's priority frame (the trip's path, the machines out of service)
  * is what it frames. While the trip panel is open a framed interior goes on awaiting that frame: its arrival, a change
  * to it or a move of the panel reframes onto it (no turn), until a gesture, a focus change, a follow, another flight or
- * the panel closing; with it closed the landing is final. Asked when the interior, the streets, the
+ * the panel closing; with it closed the landing is final. While a panel toggle settles it waits (useCollapseReframe
+ * asks again after). Asked when the interior, the streets, the
  * index, the panel, the frame or the focus changes, and on landing; returns the landing call, which is stable (underground-by0). Runs per event, never per frame.
  */
 export function useInteriorReframe({
@@ -67,6 +70,7 @@ export function useInteriorReframe({
   camera,
   flight,
   awaiting,
+  collapse,
   layout,
   interior,
   streets,
@@ -82,6 +86,8 @@ export function useInteriorReframe({
   }, [focusedId])
 
   const check = useCallback(() => {
+    // The toggle's own reframe asks again once it has settled (useCollapseReframe).
+    if (collapse.current) return
     const l = layout.current
     // A flight that set off before the index loaded (a deep link) learns here that its station is bare.
     const a = classifyAwaiting(awaiting.current, l.index)
@@ -112,7 +118,7 @@ export function useInteriorReframe({
     } else {
       if (!l.interior) return
       // Only the interior's first framing decides a landing turn; the priority frame keeps the view's azimuth.
-      dest = interiorFlight(a.stationId, l.interior, l.size, l.insets, l.panel, camera.fov, az, eased && a.kind === 'interior', l.frame, landingLook === 'half')
+      dest = interiorFlight(a.stationId, l.interior, l.size, l.insets, l.panel, camera.fov, az, eased && a.kind === 'interior', l.frame)
     }
     // A reframe may pull back as well as pan: the bigger of the two sets its pace.
     const move = Math.max(c.target.distanceTo(dest.target), Math.abs(dest.distance - camera.position.distanceTo(c.target)))
@@ -126,7 +132,7 @@ export function useInteriorReframe({
     const f = newFlight(dest, c, camera, false)
     f.duration = duration
     flight.current = f
-  }, [controls, camera, flight, awaiting, layout, following])
+  }, [controls, camera, flight, awaiting, collapse, layout, following])
 
   // Passive, after CameraRig's layout effects: a fly request has armed `awaiting` and `layout` is current.
   useEffect(check, [interior, streets, index, panel, frame, focusedId, check])
