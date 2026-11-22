@@ -6,6 +6,8 @@
  */
 export const RENDER_ORDER = {
   grid: -1,
+  // The focused station's streets, at street level under the location disc and the route lines.
+  streets: 0.35,
   lines: 1,
   // From a station marker down to its sunken platform tracks, under the marker disc.
   stationTie: 1.5,
@@ -32,10 +34,6 @@ export const RENDER_ORDER = {
   // "You are here": the accuracy disc and its edge sit under the lines; the reticle sits over the trains, under the veil.
   hereAccuracy: 0.5,
   hereAccuracyEdge: 0.6,
-  // The focused station's streets, at street level under the location disc and the route lines.
-  streets: 0.35,
-  // TEMPORARY (?streets=over, streetsLook.ts): the streets above the interior veil, under the interior strokes.
-  streetsOver: 7.5,
   hereHalo: 6.4,
   here: 6.55,
   // Station interior. Look C (?interior=c, temporary) draws it under the street layers.
@@ -44,6 +42,8 @@ export const RENDER_ORDER = {
   // The veil dims everything above (live trains included), then fine and strong interior strokes of the platform level
   // the lifted trains ride and the levels below it.
   interiorVeil: 7,
+  // TEMPORARY (?streets=over, streetsLook.ts): the streets above the interior veil, under the interior strokes.
+  streetsOver: 7.5,
   interiorFine: 8,
   interior: 9,
   // Trains on a revealed station's platforms, redrawn above the veil and those strokes: footprints, bodies

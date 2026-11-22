@@ -81,11 +81,14 @@ describe('here token', () => {
   })
 })
 
+/** Smallest sRGB distance between the street stroke and a color it must not pass for. */
+const MIN_STREET_DISTANCE = 60
+
 describe('street tokens', () => {
   it('read at 2.5:1 on the background and stay apart from the selected-train rim', async () => {
     for (const t of Object.values(await themes())) {
       expect(contrastRatio(t.streetStroke, t.background), `${t.name} ${t.streetStroke}`).toBeGreaterThanOrEqual(2.5)
-      expect(colorDistance(t.streetStroke, t.trainSelectedRim), `${t.name} street vs rim`).toBeGreaterThanOrEqual(MIN_HERE_DISTANCE)
+      expect(colorDistance(t.streetStroke, t.trainSelectedRim), `${t.name} street vs rim`).toBeGreaterThanOrEqual(MIN_STREET_DISTANCE)
     }
   })
 })

@@ -3,9 +3,14 @@
  * under): `under` draws the streets at street level under the route lines, so the interior veil dims them; `over`
  * draws them above the veil, under the interior strokes. Once decided, remove together:
  * - this file
- * - renderOrder.ts: `streetsOver` (if under wins) or `streets` (if over wins)
- * - StationStreets.tsx: the `streetsLook` render-order switch
- * - AGENTS.md: the `?streets=` TEMPORARY note
+ * - StationStreets.tsx: the `streetsLook` import and the `ORDER` switch (use the chosen render order directly)
+ * - renderOrder.ts: `streetsOver` and its TEMPORARY comment (if under wins), or `streets` and its comment (if over
+ *   wins; move `streetsOver` to a permanent name and comment)
+ * - theme.ts: the `streetStroke` doc's draw-order wording and its veil reasoning (the veiled-contrast bound only
+ *   applies under the veil, so if over wins drop it there and in theme.test.ts)
+ * - AGENTS.md, three places: the `?streets=` TEMPORARY note in the theme bullets, "`streetsLook.ts` TEMPORARY
+ *   draw-order switch" in the StationStreets.tsx directory entry, and "(7.5 under the TEMPORARY `?streets=over`)"
+ *   in the render-order list
  */
 export type StreetsLook = 'under' | 'over'
 
