@@ -93,6 +93,23 @@ describe('entranceTexts', () => {
   })
 })
 
+describe('entranceTexts with extra lines', () => {
+  const far = entrance(200, 200, { street: 'Eighth Avenue', side: 'east' })
+  const extra = [{ name: 'West 41st Street', key: 'w 41 st', points: [[150, 205], [260, 205]] as [number, number][] }]
+
+  it('names an entrance by a street only the extra lines have, the file’s own ways being too far', () => {
+    const [t] = entranceTexts(file([far]), extra)
+    expect(t!.head).toBe('Eighth Av')
+    expect(t!.text).toBe('Eighth Av · east side at W 41 St')
+    expect(t!.keys[1]).toBe('w 41 st')
+  })
+
+  it('leaves the labels alone by default', () => {
+    expect(entranceTexts(file([far]))[0]!.text).toBe('Eighth Av · east side')
+    expect(entranceTexts(file([far]), [])).toEqual(entranceTexts(file([far])))
+  })
+})
+
 describe('pairRank', () => {
   it('puts avenues before streets before the rest', () => {
     expect(pairRank('7th Avenue')).toBe(0)
