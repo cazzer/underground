@@ -83,7 +83,7 @@ describe('an out-of-service escalator', () => {
 
 describe('an out-of-service machine through the split', () => {
   const interior = fixture([STAIR, ELEVATOR, ESCALATOR])
-  const split = buildInteriorBuffers(interior, opts({ splitLevel: 2, ...out('EL1', 'ES1') }))
+  const split = buildInteriorBuffers(interior, opts({ decks: [2], ...out('EL1', 'ES1') }))
 
   it('colors the segments on both sides of the cut, and none keep a working machine color', () => {
     for (const layer of ['strong', 'overStrong'] as const) {
@@ -96,7 +96,7 @@ describe('an out-of-service machine through the split', () => {
   })
 
   it('keeps each elevator stop with its level: the platform stop under the trains, the mezzanine stop over', () => {
-    const only = buildInteriorBuffers(fixture([STAIR, ELEVATOR]), opts({ splitLevel: 2, ...out('EL1') }))
+    const only = buildInteriorBuffers(fixture([STAIR, ELEVATOR]), opts({ decks: [2], ...out('EL1') }))
     /** y of each strong diagonal of the outage role: flat strokes that change both x and z. */
     const diagonalYs = (b: Buffers) =>
       Array.from({ length: count(b) }, (_, k) => k)

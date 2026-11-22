@@ -3,13 +3,15 @@
  * station view: the live layer lifts trains there above the interior veil, and the map track there gives way to
  * the interior's own track. Pure; no allocation in the weight functions (they run per frame).
  */
-import type { ShapeId, StationId } from '../data/schema'
+import type { ShapeId, StationId, StopId } from '../data/schema'
 import type { ProfileRun } from './trackProfile'
 
 /** Distances [d0, d1] (d0 <= d1) along a shape's track line covered by one station's platform tracks. */
 export interface PlatformSpan {
   d0: number
   d1: number
+  /** The platform track's stop id (the first run's, should the span union several): which deck it rides. */
+  stopId?: StopId
 }
 
 export type StationSpans = ReadonlyMap<ShapeId, PlatformSpan>
@@ -37,7 +39,7 @@ export function platformSpans(kept: Iterable<readonly [ShapeId, readonly Profile
       if (span) {
         span.d0 = Math.min(span.d0, run.d0)
         span.d1 = Math.max(span.d1, run.d1)
-      } else byShape.set(shapeId, { d0: run.d0, d1: run.d1 })
+      } else byShape.set(shapeId, spanOf(run.d0, run.d1, run.stopId))
     }
   }
   return out
@@ -58,8 +60,39 @@ export function memberSpans(all: ReadonlyMap<StationId, StationSpans>, ids: read
     out ??= new Map()
     for (const [shapeId, s] of spans) {
       const have = out.get(shapeId)
-      out.set(shapeId, have ? { d0: Math.min(have.d0, s.d0), d1: Math.max(have.d1, s.d1) } : { d0: s.d0, d1: s.d1 })
+      out.set(shapeId, have ? spanOf(Math.min(have.d0, s.d0), Math.max(have.d1, s.d1), have.stopId) : spanOf(s.d0, s.d1, s.stopId))
     }
+  }
+  return out
+}
+
+const spanOf = (d0: number, d1: number, stopId: StopId | undefined): PlatformSpan =>
+  stopId === undefined ? { d0, d1 } : { d0, d1, stopId }
+
+const warnedStops = new Set<string>()
+
+/**
+ * An interior's spans split by deck (`deckOf`: a track's stop id to its deck, interiorDecks.ts), deepest first, so each
+ * deck's lifted trains draw between its own strokes and the next band's. Null spans give [null]; one deck or none gives
+ * [spans], the same map. Otherwise one map per deck holding the same span objects; a span whose stop has no deck goes
+ * to the shallowest (its trains draw over every deck's strokes, as before 2q7.28) and logs once.
+ */
+export function deckSpans(spans: StationSpans | null, deckOf: ReadonlyMap<StopId, number>, deckCount: number): (StationSpans | null)[] {
+  if (spans === null) return [null]
+  if (deckCount <= 1) return [spans]
+  const out = Array.from({ length: deckCount }, () => new Map<ShapeId, PlatformSpan>())
+  for (const [shapeId, s] of spans) {
+    const deck = s.stopId === undefined ? undefined : deckOf.get(s.stopId)
+    if (deck !== undefined && deck >= 0 && deck < deckCount) {
+      out[deck]!.set(shapeId, s)
+      continue
+    }
+    const key = s.stopId ?? shapeId
+    if (!warnedStops.has(key)) {
+      warnedStops.add(key)
+      console.warn(`Platform trains: shape ${shapeId} (stop ${s.stopId ?? 'none'}) has no deck; drawn with the shallowest`)
+    }
+    out[deckCount - 1]!.set(shapeId, s)
   }
   return out
 }

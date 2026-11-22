@@ -37,7 +37,7 @@ const START = { segment: 0, t: 0 }
 /**
  * A shape rides a track when its route serves the track's station, its direction is the stop id's suffix
  * (L08N is northbound), and both track ends project onto its line within MATCH_TOL_M. The run spans the two
- * projected distances, tagged with the station. Shapes passing the station once (all of them today) project correctly from the start.
+ * projected distances, tagged with the station and the track's stop id. Shapes passing the station once (all of them today) project correctly from the start.
  */
 export function profileRuns(
   depths: StationDepthsFile,
@@ -64,6 +64,7 @@ export function profileRuns(
           d1: Math.max(hitA.distance, hitB.distance),
           yReal: track.railY,
           stationId: station.stationId,
+          stopId: track.stopId,
         }
         const list = runs.get(shape.id)
         if (list) list.push(run)

@@ -30,6 +30,7 @@ describe('profileRuns', () => {
     expect(run!.d1).toBeCloseTo(1085, 9)
     expect(run!.yReal).toBe(-10.2)
     expect(run!.stationId).toBe('L08')
+    expect(run!.stopId).toBe('L08N')
   })
 
   it('orders the run even when the shape runs against the authored direction', () => {

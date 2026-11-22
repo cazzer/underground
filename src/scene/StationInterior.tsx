@@ -11,7 +11,7 @@ import { cameraDistance } from './cameraDistance'
 import { interiorLook } from './interiorLook'
 import { interiorLayers, type InteriorModel } from './interiorModel'
 import { InteriorVeil } from './InteriorVeil'
-import { RENDER_ORDER } from './renderOrder'
+import { RENDER_ORDER, strokeOrders } from './renderOrder'
 import { useLineLayer, type LineDash } from './useLineLayer'
 import { useLevelLabels } from './useLevelLabels'
 
@@ -27,8 +27,9 @@ interface StationInteriorProps {
 }
 
 /**
- * The focused station's interior as merged line layers in a group at its anchor: fine, then strong, for the platform
- * the lifted trains ride and below, and the same pair for the levels above, drawn after those trains. Plus the street
+ * The focused station's interior as merged line layers in a group at its anchor: fine, then strong, for each stroke
+ * band (interiorDecks.ts): the deepest deck and below, the bands between decks (Union Sq has one), and the levels above
+ * the shallowest deck, each band drawn after the lifted trains of the deck below it. Plus the street
  * veil and DOM level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
@@ -61,7 +62,17 @@ export function StationInterior({ model, network, outOfService, labelBlockers }:
     theme.interiorFineWidth,
     dash,
   )
-  // Levels above the lifted platform trains (SpanCars), drawn after them; look C leaves these empty.
+  // Bands between decks, after the lower deck's lifted trains (SpanCars): two fixed pairs, so the hook count never
+  // changes; a station with fewer decks leaves them null.
+  const bandCount = layers.mid.length + 2
+  const mid0 = layers.mid[0]
+  const mid1 = layers.mid[1]
+  const mid0Strong = useLineLayer(mid0?.strong ?? null, mid0 ? strokeOrders(1, bandCount).strong : 0, theme.interiorLineWidth, dash)
+  const mid0Fine = useLineLayer(mid0?.fine ?? null, mid0 ? strokeOrders(1, bandCount).fine : 0, theme.interiorFineWidth, dash)
+  const mid1Strong = useLineLayer(mid1?.strong ?? null, mid1 ? strokeOrders(2, bandCount).strong : 0, theme.interiorLineWidth, dash)
+  const mid1Fine = useLineLayer(mid1?.fine ?? null, mid1 ? strokeOrders(2, bandCount).fine : 0, theme.interiorFineWidth, dash)
+  if (layers.mid.length > 2) throw new Error(`Interior ${model.stationId} has ${layers.mid.length} bands between decks; at most 2 draw`)
+  // Levels above the shallowest deck's lifted trains, drawn after them; look C leaves these empty.
   const overStrong = useLineLayer(layers.overStrong, RENDER_ORDER.interiorOver, theme.interiorLineWidth, dash)
   const overFine = useLineLayer(layers.overFine, RENDER_ORDER.interiorOverFine, theme.interiorFineWidth, dash)
 
@@ -80,6 +91,10 @@ export function StationInterior({ model, network, outOfService, labelBlockers }:
     g.scale.y = depthScaleY(depth)
     if (strong) strong.material.opacity = o
     if (fine) fine.material.opacity = o
+    if (mid0Strong) mid0Strong.material.opacity = o
+    if (mid0Fine) mid0Fine.material.opacity = o
+    if (mid1Strong) mid1Strong.material.opacity = o
+    if (mid1Fine) mid1Fine.material.opacity = o
     if (overStrong) overStrong.material.opacity = o
     if (overFine) overFine.material.opacity = o
     if (veil.current) (veil.current.material as MeshBasicMaterial).opacity = interiorLook.veilOpacity * veilWeight(o, depth)
@@ -94,6 +109,10 @@ export function StationInterior({ model, network, outOfService, labelBlockers }:
       {interiorLook.veil !== 'none' && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
       {strong && <primitive object={strong} />}
+      {mid0Fine && <primitive object={mid0Fine} />}
+      {mid0Strong && <primitive object={mid0Strong} />}
+      {mid1Fine && <primitive object={mid1Fine} />}
+      {mid1Strong && <primitive object={mid1Strong} />}
       {overFine && <primitive object={overFine} />}
       {overStrong && <primitive object={overStrong} />}
       </group>

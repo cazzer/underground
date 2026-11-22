@@ -38,7 +38,7 @@ export interface Buffers {
   distances: Float32Array
 }
 
-/** Where connector strokes are written: a SegmentWriter, or a SplitAtY over two of them. */
+/** Where connector strokes are written: a SegmentWriter, or a SplitAtY over two sinks (which may be splits too). */
 export interface SegmentSink {
   segment(a: Vec3, b: Vec3, ca: Rgb, cb?: Rgb, dashed?: boolean): void
   loop(points: readonly LocalPoint[], y: number, c: Rgb, dashed?: boolean): void
@@ -84,14 +84,15 @@ export class SegmentWriter implements SegmentSink {
 /**
  * Writes the part of each segment at or below `y` to `below` and the rest to `above`, cutting a segment that crosses
  * it there (colors interpolated). Only solid connector strokes go through it today; a dashed caller's two parts would
- * each restart on a dash (the phase isn't carried across the cut).
+ * each restart on a dash (the phase isn't carried across the cut). `above` may be another split at a greater y, so a
+ * stroke rising through several decks is cut at each of their roofs.
  */
 export class SplitAtY implements SegmentSink {
-  private readonly below: SegmentWriter
-  private readonly above: SegmentWriter
+  private readonly below: SegmentSink
+  private readonly above: SegmentSink
   private readonly y: number
 
-  constructor(below: SegmentWriter, above: SegmentWriter, y: number) {
+  constructor(below: SegmentSink, above: SegmentSink, y: number) {
     this.below = below
     this.above = above
     this.y = y

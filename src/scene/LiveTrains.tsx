@@ -43,8 +43,11 @@ interface LiveTrainsProps extends LiveLayer {
   network: Network
   /** Filled while mounted, so a click can be tested against the trains as drawn. */
   trainPick: RefObject<TrainPickSource | null>
-  /** The loaded interior's platform spans, every member of a complex unioned (null for none): trains on them draw above the veil as it reveals. */
-  interiorSpans: StationSpans | null
+  /**
+   * The loaded interior's platform spans by deck (deckSpans: every member of a complex unioned, then split by the deck
+   * each track rides; [null] for none): trains on them draw above the veil as it reveals, each deck in its own layer.
+   */
+  deckSpans: readonly (StationSpans | null)[]
   /** This frame's band view, written by SubwayLines before this frame runs: dots, cars and picks sit on the drawn bands. */
   view: BandView
   /** Filled at priority -3 with the selected train's drawn point, for the camera follow. */
@@ -57,7 +60,7 @@ interface LiveTrainsProps extends LiveLayer {
  * poll's hop plan at the live clock and writes matrices without allocating. Zoomed in, each dot
  * unfolds into its train's cars (carMix): the dot shrinks by 1 - mix as the train lengthens by mix.
  */
-export function LiveTrains({ trips, offsetS, patterns, network, trainPick, interiorSpans, view, anchor }: LiveTrainsProps) {
+export function LiveTrains({ trips, offsetS, patterns, network, trainPick, deckSpans, view, anchor }: LiveTrainsProps) {
   const dots = useRef<InstancedMesh>(null)
   const halo = useRef<InstancedMesh>(null)
   // The selected train's dot is drawn on its own, above every other dot: rim, background gap, then the dot.
@@ -66,7 +69,12 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
   const selectedHalo = useRef<Mesh>(null)
   const selectedDot = useRef<Mesh<CircleGeometry, MeshBasicMaterial>>(null)
   const cars = useTrainCars()
-  const spanCars = useSpanCars(cars)
+  // One lifted layer per platform deck, up to MAX_DECKS: a fixed hook count.
+  const span0 = useSpanCars(cars)
+  const span1 = useSpanCars(cars)
+  const span2 = useSpanCars(cars)
+  const spanLayers = useMemo(() => [span0, span1, span2], [span0, span1, span2])
+  if (deckSpans.length > spanLayers.length) throw new Error(`${deckSpans.length} platform decks; at most ${spanLayers.length} lift`)
   const table = useMemo(() => createSlotTable(TRAIN_CAPACITY), [])
   const selection = useSelectedSlot(table, cars)
   const sm = selection.mix
@@ -128,12 +136,11 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     d.instanceMatrix.setUsage(DynamicDrawUsage)
     h.instanceMatrix.setUsage(DynamicDrawUsage)
     cars.prepare()
-    spanCars.prepare()
     for (let i = 0; i < TRAIN_CAPACITY; i++) colorSlot(d, i)
     cars.setSelected(selection.slot.current)
     d.instanceColor!.needsUpdate = true
     d.count = h.count = 0
-  }, [colorSlot, cars, spanCars])
+  }, [colorSlot, cars])
 
   useLayoutEffect(() => {
     const d = dots.current
@@ -229,7 +236,10 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn, mix < 1)
     const reveal = interiorOpacity(camera)
-    spanCars.write(table, interiorSpans, reveal, veilWeight(reveal, view.depth), mix, localS, sel, slotColors, cars.consistOf)
+    const veil = veilWeight(reveal, view.depth)
+    for (let k = 0; k < deckSpans.length; k++) {
+      spanLayers[k]!.write(table, deckSpans[k] ?? null, reveal, veil, mix, localS, sel, slotColors, cars.consistOf)
+    }
     // Upload only the slots in use. three empties the ranges after each upload, so the (reused) range goes back in.
     range.count = table.high * 16
     d.instanceMatrix.updateRanges.push(range)
@@ -269,7 +279,9 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
         </mesh>
       </group>
       <TrainCars layer={cars} />
-      <SpanCars layer={spanCars} />
+      {deckSpans.map((_, k) => (
+        <SpanCars key={k} layer={spanLayers[k]!} deck={k} />
+      ))}
     </>
   )
 }

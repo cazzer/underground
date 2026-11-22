@@ -4,7 +4,8 @@ import { stationAxis } from '../lib/interiorAxis'
 import { levelFadeShares } from '../lib/interiorFade'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { outlineSamples, type OutlineSamples } from '../lib/interiorOutline'
-import { buildInteriorBuffers, RAIL_DROP_M, trainLevelIndex, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
+import { interiorDecks, strokeBandOf, trackDecks } from '../lib/interiorDecks'
+import { buildInteriorBuffers, RAIL_DROP_M, type BandBuffers, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
 import { toGround, type Ground } from '../lib/projection'
 import { mixHex } from '../lib/routeColor'
 import { ISO_POLAR } from '../lib/tilt'
@@ -20,11 +21,18 @@ export interface InteriorModel {
   memberStationIds?: readonly string[]
   /** Scene position of the interior's local origin (its anchor). */
   origin: Ground
+  /** Stroke band 0: the deepest deck and the levels below it (everything, with no deck or in look C). */
   strong: Buffers
   fine: Buffers
-  /** The levels above the platform the lifted trains ride, drawn over those trains (empty in look C). */
+  /** The bands between decks (a multi-deck interior; empty with one), each drawn over the lifted trains of the deck below. */
+  mid: BandBuffers[]
+  /** The levels above the shallowest deck, drawn over every lifted train (empty in look C). */
   overStrong: Buffers
   overFine: Buffers
+  /** The platform decks (interiorDecks: level indices, deepest first); empty in look C, which lifts no trains. */
+  decks: readonly number[]
+  /** Each platform track's deck by stop id (trackDecks): which lifted layer its trains draw in. */
+  trackDecks: ReadonlyMap<string, number>
   /**
    * Draw every layer with a dashed material, cutting the segments `distances` marks (generated interiors, approximate
    * slabs). One approximate slab dashes every material in the interior, so its solid strokes lose their round caps
@@ -88,7 +96,7 @@ function colorTable(levels: readonly Level[]): (role: InteriorRole, levelIndex: 
   }
 }
 
-/** Look B's cut line: the hull loop at street level, appended to the fine strokes. */
+/** Look B's cut line: the hull loop at street level, appended to a band's fine strokes. */
 function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buffers {
   const n = hull.length
   const positions = new Float32Array(fine.positions.length + n * 6)
@@ -108,13 +116,15 @@ function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buff
   return { positions, colors, distances }
 }
 
-type Layers = Pick<InteriorModel, 'strong' | 'fine' | 'overStrong' | 'overFine'>
+type Layers = Pick<InteriorModel, 'strong' | 'fine' | 'mid' | 'overStrong' | 'overFine'>
 
-/** The four line layers, with `outOfService` machines drawn as such (and Look B's cut line when there is a hull). */
+/** Look C draws the interior under the street and lifts no trains, so nothing needs to go over them. */
+const decksOf = (interior: StationInterior): number[] => (interiorLook.under ? [] : interiorDecks(interior))
+
+/** The line layers, with `outOfService` machines drawn as such (and Look B's cut line when there is a hull). */
 function buildLayers(interior: StationInterior, hull: LocalPoint[] | null, outOfService: ReadonlySet<string>): Layers {
   const colorOf = colorTable(interior.levels)
-  // Look C draws the interior under the street and lifts no trains, so nothing needs to go over them.
-  const splitLevel = interiorLook.under ? undefined : trainLevelIndex(interior)
+  const decks = decksOf(interior)
   const built = buildInteriorBuffers(interior, {
     yScale: interiorLook.yScale,
     stepRise: 0.18,
@@ -122,18 +132,17 @@ function buildLayers(interior: StationInterior, hull: LocalPoint[] | null, outOf
     entranceSize: ENTRANCE_SIZE_M,
     guides: interiorLook.guides,
     dashStructure: interior.generated !== undefined,
-    splitLevel,
+    decks,
     outOfService: (id) => outOfService.has(id),
     colorOf,
   })
-  // Look B's cut line is at the street, so it goes over the trains when the street does (below ground).
-  const cutInOver = splitLevel !== undefined && interior.levels.findIndex((l) => l.kind === 'street') < splitLevel
-  return {
-    strong: built.strong,
-    fine: hull && !cutInOver ? withCutLine(built.fine, hull, colorOf('fare', 0)) : built.fine,
-    overStrong: built.overStrong,
-    overFine: hull && cutInOver ? withCutLine(built.overFine, hull, colorOf('fare', 0)) : built.overFine,
-  }
+  if (!hull) return built
+  // Look B's cut line is at the street, so it goes in the street level's band (the top one, below ground).
+  const cut = (fine: Buffers) => withCutLine(fine, hull, colorOf('fare', 0))
+  const band = strokeBandOf(interior.levels.findIndex((l) => l.kind === 'street'), decks)
+  if (band === 0) return { ...built, fine: cut(built.fine) }
+  if (band === decks.length) return { ...built, overFine: cut(built.overFine) }
+  return { ...built, mid: built.mid.map((m, i) => (i === band - 1 ? { ...m, fine: cut(m.fine) } : m)) }
 }
 
 /**
@@ -157,6 +166,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const generated = interior.generated !== undefined
   const approximate = generated || interior.approximate === true
   const origin = toGround(interior.anchor)
+  const decks = decksOf(interior)
   const hull =
     interiorLook.veil === 'footprint'
       ? paddedHull([...interior.platforms.flatMap((p) => p.outline), ...interior.slabs.flatMap((s) => s.outline)], HULL_PAD)
@@ -167,6 +177,8 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     ...(interior.memberStationIds ? { memberStationIds: interior.memberStationIds } : {}),
     origin,
     ...buildLayers(interior, hull, new Set()),
+    decks,
+    trackDecks: trackDecks(interior, decks),
     dashed: generated || interior.slabs.some((s) => s.approximate === true),
     approximate,
     labels: levelLabels(interior, yScale),
