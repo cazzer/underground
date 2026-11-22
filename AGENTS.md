@@ -103,12 +103,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, `theme.train` if `routeLineMix.amount` is 1 (mono lines); stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
     `theme.trainSelectedRim` rim. Its dot is drawn on its own above every other dot; its cars get the top widen
-    level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints, and it is cars at any zoom
+    level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and an outline, and it is cars at any zoom
     to 12 km (`selectedCarMix`, laid out wherever it is; `useSelectedSlot.ts` maps the selected trip to its slot and
     eases it on and off over 0.4 s, `src/lib/live/selectedMix.ts`; picks read the same per-slot mix through
     `TrainPickSource.mixOf`); wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
-    their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body (its dimension constants live in `src/lib/carDims.ts`));
+    their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body (its dimension constants live in `src/lib/carDims.ts`)
+    and the open outline tube plus its end face. The selected outline is two shells per car (`CarFrame.outlineM`: grown by the gap,
+    then gap plus rim, joined across the joints), drawn as back faces, so only a band around the train's silhouette shows at any
+    tilt or turn; the tubes are open so no end face crosses a joint, and two 2-instance cap meshes (`writeEndCaps`) close the train's two ends);
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
@@ -457,11 +460,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
-  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
-  car halo 5.5, trains 6, the selected train's car rim 6.03 and gap 6.06 (only while the other trains are still dots, carMix
-  below 1: the rim mesh switches from 5.25 and a copy of its footprints draws over the dots; otherwise 5.25 and 5.5),
-  selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies),
+  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5,
+  car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
+  (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
+  depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
+  you-are-here reticle 6.55, above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom) draws no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
@@ -469,7 +472,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
   (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior) has depthTest false.
   The above-veil platform car bodies (9.5) test and write depth too: they copy their street cars' matrices, so
-  they pass where those drew and a nearer street car stays in front.
+  they pass where those drew and a nearer street car stays in front. The selected outline shells (street and platform)
+  test depth but never write it.
   drei's Grid is transparent, and three.js draws all opaque objects before all transparent
   ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.

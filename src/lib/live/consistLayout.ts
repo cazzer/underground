@@ -1,4 +1,5 @@
 import type { BandView } from '../bandOffset'
+import { CAR_HEIGHT_M, CAR_WIDTH_M } from '../carDims'
 import { writeChordMatrix } from '../markerMatrices'
 import { consistCenter, MAX_CARS, type Consist } from './consist'
 import { createTrackPoint, trackPointInto, type DrawnTrack, type TrackPoint } from './trackPoint'
@@ -20,7 +21,18 @@ export interface CarFrame {
    * the floor, so a top-down view has no height, and the cars grow into 3D as the camera tips.
    */
   extrude: number
+  /**
+   * Set for the selected train's outline shells (carGeometry's open tube): each body grows by this much on every
+   * side, and at a joint between two cars reaches past the gap's middle, so one train's shells join into one outline.
+   */
+  outlineM?: number
 }
+
+/**
+ * How far a shell reaches past the middle of a joint, at least, so a curve leaves no notch at the outer corner; it
+ * also reaches the outline's own width past it, which covers a tight curve.
+ */
+const JOIN_OVERLAP_M = 0.25
 
 /** Where a train's cars sit along its shape: car c spans [rear + c * step, rear + (c + 1) * step]. */
 export interface ConsistSpan {
@@ -69,7 +81,9 @@ export function createConsistScratch(): ConsistScratch {
  * section, so a fading train shrinks to nothing while the handoff keeps it legible. Car geometry is unit
  * length along z at full width and height; the halo is a unit plane. `widen` (about 1) enlarges one train's
  * body slightly so two trains on one shape don't z-fight. `shift` moves the whole train (a shape change's
- * offset easing out, shapeCarry.ts). Instances past the consist get zero matrices. No allocation; never throws.
+ * offset easing out, shapeCarry.ts). With `frame.outlineM` the bodies are written as outline shells, grown by it
+ * (times `mix * k`) on every side and joined across the gaps. Instances past the consist get zero matrices. No
+ * allocation; never throws.
  */
 export function writeConsist(
   bodies: Float32Array,
@@ -100,6 +114,8 @@ export function writeConsist(
     const bodyLength = u * Math.min(widen * fullLength, Math.max(fullLength, pitch - 0.5 * frame.gapM))
     const haloWidth = cross * frame.widthM + 2 * u * frame.rimM
     const haloLength = step + 2 * u * frame.rimM
+    const grow = u * (frame.outlineM ?? 0)
+    const halfGap = (step - bodyLength) / 2 + Math.max(JOIN_OVERLAP_M, grow)
     let a = scratch.a
     let b = scratch.b
     trackPointInto(track, rear, view, a)
@@ -111,7 +127,16 @@ export function writeConsist(
       const mx = (a.x + b.x) / 2 + shift.x
       const my = (a.y + b.y) / 2 + frame.y + shift.y
       const mz = (a.z + b.z) / 2 + shift.z
-      writeChordMatrix(bodies, base + c, mx, my, mz, ux, uy, uz, cross, height, bodyLength)
+      if (grow > 0) {
+        // Ends of the train grow by `grow`; a joint reaches its neighbour. The center moves to keep the ends put.
+        const back = c === 0 ? grow : Math.max(grow, halfGap)
+        const front = c === n - 1 ? grow : Math.max(grow, halfGap)
+        const len = Math.hypot(ux, uy, uz)
+        const along = len > 0 ? (front - back) / (2 * len) : 0
+        const sx = cross + (2 * grow) / CAR_WIDTH_M
+        const sy = height + (2 * grow) / CAR_HEIGHT_M
+        writeChordMatrix(bodies, base + c, mx + ux * along, my - grow + uy * along, mz + uz * along, ux, uy, uz, sx, sy, bodyLength + back + front)
+      } else writeChordMatrix(bodies, base + c, mx, my, mz, ux, uy, uz, cross, height, bodyLength)
       writeChordMatrix(halos, base + c, mx, my, mz, ux, uy, uz, haloWidth, 1, haloLength)
       const t = a
       a = b
@@ -119,6 +144,25 @@ export function writeConsist(
     }
   }
   clearCars(bodies, halos, slot, n)
+}
+
+/**
+ * The two end faces of one train's outline shells (`shells`, slot 0, as writeConsist wrote them with `outlineM`):
+ * instance 0 closes the rear car's rear end, instance 1 the front car's front end (its shell turned half a turn about
+ * its up axis, which the section's symmetry allows and which keeps the face's winding). Zeroed for no cars. No allocation.
+ */
+export function writeEndCaps(shells: Float32Array, caps: Float32Array): void {
+  let last = -1
+  for (let c = 0; c < MAX_CARS; c++) if (shells[c * 16 + 15] !== 0) last = c
+  if (last < 0) {
+    caps.fill(0, 0, 32)
+    return
+  }
+  const f = last * 16
+  for (let j = 0; j < 16; j++) {
+    caps[j] = shells[j]!
+    caps[16 + j] = (j < 3 || (j >= 8 && j < 11) ? -1 : 1) * shells[f + j]!
+  }
 }
 
 /** Zeroes the slot's instances from car `from` on (all of them by default). */
