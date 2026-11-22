@@ -21,6 +21,7 @@
     "basemap:fetch": "node scripts/fetch-basemap.ts",
     "basemap:gate": "node scripts/gate-basemap.ts",
     "basemap:verify": "node scripts/verify-basemap.ts",
+    "basemap:tiles": "node scripts/basemap-tiles.ts",
     "data:walk": "node scripts/build-walk.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts"
   },
