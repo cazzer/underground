@@ -57,7 +57,8 @@ export function strokeBandOf(levelIndex: number, decks: readonly number[]): numb
 
 /**
  * Where a connector crossing bands is cut, drawn y (group-local, before the depth factor): cut j, between band j and
- * band j + 1, is deck j's train roof. Rising with j while the decks are more than about a meter apart (all shipped ones).
+ * band j + 1, is deck j's train roof. Always rising with j (trainRoofY grows with level y); decks under about a meter
+ * apart would put cut j above deck j + 1's floor, so its strokes would land in band j (none ship).
  */
 export function bandCutYs(interior: StationInterior, decks: readonly number[], railDrop: number, yScale: number): number[] {
   return decks.map((d) => trainRoofY(interior.levels[d]!, railDrop, yScale))

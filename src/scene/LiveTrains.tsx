@@ -69,7 +69,8 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, deckS
   const selectedHalo = useRef<Mesh>(null)
   const selectedDot = useRef<Mesh<CircleGeometry, MeshBasicMaterial>>(null)
   const cars = useTrainCars()
-  // One lifted layer per platform deck, up to MAX_DECKS: a fixed hook count.
+  // One lifted layer per platform deck, up to MAX_DECKS: a fixed hook count. Layers 1 and 2 compile their shaders on
+  // the first multi-deck focus (Union Sq), a one-off hitch.
   const span0 = useSpanCars(cars)
   const span1 = useSpanCars(cars)
   const span2 = useSpanCars(cars)

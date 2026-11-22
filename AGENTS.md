@@ -286,7 +286,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trackProfile.ts` a shape's vertical profile (knots, `profileAt`, `resampleForProfile`) and
     `trackAnchors.ts` `profileRuns` (which shapes ride which authored platform track, and where); both use
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
-    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`; `memberSpans` unions a complex's members per shape, the `interiorSpans` that SubwayLines, LineHighlight, usePlatformFade and LiveTrains take instead of a station id) and its
+    `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`; `memberSpans` unions a complex's members per shape, the `interiorSpans` that SubwayLines, LineHighlight and usePlatformFade take instead of a station; `deckSpans` splits them by `PlatformSpan.stopId` per deck for LiveTrains id) and its
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
     adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
     `lineBreaks`, every extra vertex a drawn line needs (ramps via `rampSampling.ts`, band tapers every 30 m but only once the slot
