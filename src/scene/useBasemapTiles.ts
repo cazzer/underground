@@ -81,8 +81,8 @@ export function useBasemapTiles(config: BasemapConfig): BasemapTiles {
     const step = (e: CapEvent) => stepCap(cap.current, store, e)
     const onDown = (e: PointerEvent) => step({ type: 'down', id: e.pointerId, x: e.clientX, y: e.clientY, touch: touch(e), primary: e.isPrimary })
     const onMove = (e: PointerEvent) => {
-      // A mouse with no button held is hovering, not dragging.
-      if (e.pointerType === 'mouse' && e.buttons === 0) return
+      // A mouse or pen with no button held is hovering, not dragging.
+      if (e.pointerType !== 'touch' && e.buttons === 0) return
       step({ type: 'move', id: e.pointerId, x: e.clientX, y: e.clientY })
     }
     const onBlur = () => step({ type: 'blur' })
