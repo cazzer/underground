@@ -302,6 +302,20 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`consistSpanInto`, shared with picking), each on its chord between two track points (pitched on the profile), unfolding from the dot point (spacing and length by mix, section by the slot fade);
     `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within `carsReach` of the view center
     ((1 + 2 × tilt) camera distances plus 300 m, so 1 top-down and 3 at full tilt) are laid out; the rest are zeroed once
+- `src/lib/route/`: pure RAPTOR trip router (no fetch, React or three.js), not wired to the UI yet; tests colocated,
+  `timetableFixture.ts` is the tests' mini timetable on `realtime/fixture.ts`'s stations
+  - `types.ts` `Timetable` (immutable typed arrays), `Journey`/legs and the per-round `Labels`; `NO_TIME`
+  - `stops.ts` `buildStopIndex` (child stops, stations, footpaths in CSR: a stop's own station at its change time,
+    `DEFAULT_CHANGE_S` 180, plus each `transfers.json` link) and `stopsOfStations` (a complex is every member station)
+  - `patterns.ts` `makePatterns` (validates, sorts trips, splits overtaking trips into FIFO sub-patterns `key#1`, ...) and
+    `buildTimetable` (the stop to pattern CSR; 2q7.8 swaps patterns and rebuilds it)
+  - `raptor.ts` `route(tt, from, to, departS, { maxTransfers })`: two labels per round, `arr` (stepped off a train) and
+    `ready` (can board, after a same-station change or a walk between stations), so the change time also holds on the
+    same platform; Pareto on arrival and transfers (a round's journey is returned only if it beats every earlier
+    round); `seed.ts` its round-0 seeding and egress walks; `journey.ts` rebuilds legs from the labels (every change
+    is a walk leg, possibly 0 s) and keeps only the Pareto set on (arrival, transfers)
+  - Times are integer seconds since the query day's midnight (may be negative or past 86400, |t| < 2^29); a loader shifts other
+    service days itself and keeps their patterns separate
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
   - `serviceDate.ts` addDays, servicesOn (calendar + exceptions), nyDate
