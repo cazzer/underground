@@ -8,22 +8,29 @@ const composed = (x: number, y: number, z: number, s: number) =>
 describe('writeMarkerMatrices', () => {
   it('matches Matrix4.compose for a scaled, translated instance', () => {
     const out = new Float32Array(16).fill(7)
-    writeMarkerMatrices(out, [{ x: 12, z: -30 }], 0.2, 5, -1, 1.4)
+    writeMarkerMatrices(out, [{ x: 12, z: -30 }], 0.2, 5, [])
     expect([...out]).toEqual(composed(12, 0.2, -30, 5).map(Math.fround))
   })
 
-  it('scales the focused instance by the focus scale', () => {
-    const out = new Float32Array(32)
-    writeMarkerMatrices(out, [{ x: 0, z: 0 }, { x: 1, z: 1 }], 0, 10, 1, 1.5)
-    expect(out[0]).toBe(10)
-    expect(out[16]).toBe(15)
-    expect(out[16 + 10]).toBe(15)
+  it('collapses every hidden instance to scale 0 at its own position, and no other', () => {
+    const out = new Float32Array(48)
+    writeMarkerMatrices(out, [{ x: 0, z: 0 }, { x: 1, z: 1 }, { x: 2, z: 3 }], 0.2, 10, [2, 0])
+    expect(out[0]).toBe(0)
+    expect(out[16]).toBe(10)
+    expect(out[16 + 10]).toBe(10)
+    expect([out[32], out[32 + 5], out[32 + 10], out[32 + 12], out[32 + 14], out[32 + 15]]).toEqual([0, 0, 0, 2, 3, 1])
+  })
+
+  it('ignores a hidden index past the positions', () => {
+    const out = new Float32Array(16)
+    writeMarkerMatrices(out, [{ x: 0, z: 0 }], 0, 4, [3])
+    expect(out[0]).toBe(4)
   })
 
   it('writes in place and leaves elements past the count untouched', () => {
     const out = new Float32Array(32).fill(9)
     const ref = out
-    writeMarkerMatrices(out, [{ x: 1, z: 2 }], 0, 1, -1, 1)
+    writeMarkerMatrices(out, [{ x: 1, z: 2 }], 0, 1, [])
     expect(out).toBe(ref)
     expect([...out.subarray(16)]).toEqual(new Array(16).fill(9))
   })

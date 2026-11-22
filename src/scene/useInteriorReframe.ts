@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { PerspectiveCamera } from 'three'
+import { interiorCovers } from '../data/interiorLoad'
 import type { Insets, Viewport } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { reframeAction, reframeDuration, type AwaitingInterior } from '../lib/interiorReframe'
@@ -50,20 +51,21 @@ export function useInteriorReframe({
 
   const check = useCallback(() => {
     const l = layout.current
-    const action = reframeAction(awaiting.current, {
+    const a = awaiting.current
+    const action = reframeAction(a, {
       flying: flight.current !== null,
       following: following(),
       focusedId: focused.current,
-      interiorId: l.interior?.stationId ?? null,
+      interiorReady: a !== null && interiorCovers(l.interior, a.stationId),
     })
     if (action === 'none' || action === 'wait') return
     awaiting.current = null
     const c = controls.current
-    if (action === 'drop' || !c || !l.interior) return
+    if (action === 'drop' || !c || !l.interior || !a) return
     flushMotion(c, camera)
     const az = c.getAzimuthalAngle()
     const turn = action === 'reframe'
-    const dest = interiorFlight(l.interior, l.size, l.insets, l.panel, camera.fov, az, turn)
+    const dest = interiorFlight(a.stationId, l.interior, l.size, l.insets, l.panel, camera.fov, az, turn)
     if (!turn) {
       flight.current = newFlight(dest, c, camera, true)
       return

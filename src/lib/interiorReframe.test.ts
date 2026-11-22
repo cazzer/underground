@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { reframeAction, reframeDuration, REFRAME_MAX_S, REFRAME_MIN_S, type ReframeInput } from './interiorReframe'
 
-const landed: ReframeInput = { flying: false, following: false, focusedId: 'L08', interiorId: 'L08' }
+const landed: ReframeInput = { flying: false, following: false, focusedId: 'L08', interiorReady: true }
 const awaiting = { stationId: 'L08', reduced: false }
 
 describe('reframeAction', () => {
@@ -15,14 +15,20 @@ describe('reframeAction', () => {
 
   it('waits while the flight is under way or the interior has not arrived', () => {
     expect(reframeAction(awaiting, { ...landed, flying: true })).toBe('wait')
-    expect(reframeAction(awaiting, { ...landed, interiorId: null })).toBe('wait')
-    // A stale interior of the station before is not this one.
-    expect(reframeAction(awaiting, { ...landed, interiorId: 'L06' })).toBe('wait')
+    expect(reframeAction(awaiting, { ...landed, interiorReady: false })).toBe('wait')
+    // A stale interior of the station before covers no part of this one: not ready.
+    expect(reframeAction(awaiting, { ...landed, interiorReady: false, focusedId: 'L08' })).toBe('wait')
+  })
+
+  it('reframes for a complex member the interior covers, whichever member awaited it', () => {
+    // The caller decides interiorReady with interiorCovers; the awaited station is the focused member, not the file id.
+    expect(reframeAction({ stationId: 'U01', reduced: false }, { ...landed, focusedId: 'U01' })).toBe('reframe')
+    expect(reframeAction({ stationId: 'U01', reduced: false }, { ...landed, focusedId: 'T01' })).toBe('drop')
   })
 
   it('drops the reframe when focus moves on or a train is followed, even mid-flight', () => {
     expect(reframeAction(awaiting, { ...landed, focusedId: null })).toBe('drop')
-    expect(reframeAction(awaiting, { ...landed, focusedId: 'L06', interiorId: 'L06' })).toBe('drop')
+    expect(reframeAction(awaiting, { ...landed, focusedId: 'L06' })).toBe('drop')
     expect(reframeAction(awaiting, { ...landed, following: true })).toBe('drop')
     expect(reframeAction(awaiting, { ...landed, following: true, flying: true })).toBe('drop')
   })

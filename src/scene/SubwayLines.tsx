@@ -1,11 +1,11 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import type { StationId } from '../data/schema'
 import { writeBandView, type BandView } from '../lib/bandOffset'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { Network, ShapePath } from '../lib/network'
+import type { StationSpans } from '../lib/platformSpan'
 import { baseLineMix, linesMode, theme } from '../theme'
 import { BAND_UNIFORMS } from './bandLineMaterial'
 import { cameraDistance } from './cameraDistance'
@@ -21,8 +21,8 @@ interface SubwayLinesProps {
   network: Network
   /** The shapes to draw: network.shapes (no bands) until the banded ones arrive. */
   paths: readonly ShapePath[]
-  /** The station whose interior is loaded (null for none): its platform tracks fade out as the interior reveals. */
-  interiorStationId: StationId | null
+  /** The loaded interior's platform spans, every member of a complex unioned (null for none): that track fades out as the interior reveals. */
+  interiorSpans: StationSpans | null
   /** This frame's band view (incl. its depth factor), written here for every band layer and for the trains (LiveTrains reads it). */
   view: BandView
 }
@@ -32,10 +32,10 @@ interface SubwayLinesProps {
  * the loaded interior's platforms the map track fades out as the interior reveals (platformMask.ts), since the
  * interior draws its own track there.
  */
-export function SubwayLines({ network, paths, interiorStationId, view }: SubwayLinesProps) {
+export function SubwayLines({ network, paths, interiorSpans, view }: SubwayLinesProps) {
   const buffers = useMemo(() => routeLineBuffers(network, paths, baseLineMix(theme, linesMode), true), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lines)
-  usePlatformFade(lines, buffers, paths, network, interiorStationId)
+  usePlatformFade(lines, buffers, paths, interiorSpans)
   /** When `paths` last changed: new bands ease in from 0 (BandView.ease), which draws exactly as no bands. */
   const swapped = useRef<{ paths: readonly ShapePath[]; atMs: number } | null>(null)
 
@@ -57,14 +57,14 @@ export function SubwayLines({ network, paths, interiorStationId, view }: SubwayL
     BAND_UNIFORMS.bandPitchPx.value = view.pitchPx
     BAND_UNIFORMS.bandEase.value = view.ease
     BAND_UNIFORMS.trackOffsetM.value = view.trackOffsetM
-    BAND_UNIFORMS.platformFade.value = interiorStationId === null ? 0 : interiorOpacity(distance)
+    BAND_UNIFORMS.platformFade.value = interiorSpans === null ? 0 : interiorOpacity(distance)
   }, -0.25)
 
   return (
     <>
       {lines && <primitive object={lines} />}
-      {linesMode === 'a' && <LineHighlight network={network} paths={paths} interiorStationId={interiorStationId} />}
-      {linesMode === 'c' && <LineFade network={network} paths={paths} interiorStationId={interiorStationId} />}
+      {linesMode === 'a' && <LineHighlight network={network} paths={paths} interiorSpans={interiorSpans} />}
+      {linesMode === 'c' && <LineFade network={network} paths={paths} interiorSpans={interiorSpans} />}
     </>
   )
 }

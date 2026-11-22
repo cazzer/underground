@@ -15,20 +15,23 @@ export function writeInstanceMatrix(out: Float32Array, i: number, x: number, y: 
 
 /**
  * Writes one scale-plus-translate 4x4 matrix (column-major, as three.js stores them) per
- * position into `out`. The instance at `focusedIndex` (-1 for none) is scaled by
- * `focusScale` as well. Runs per frame, so it does not allocate.
+ * position into `out`. The instances at the `hidden` indices are scaled to 0, so neither their fill nor their ring
+ * draws. Runs per frame, so it does not allocate.
  */
 export function writeMarkerMatrices(
   out: Float32Array,
   positions: readonly Ground[],
   y: number,
   scale: number,
-  focusedIndex: number,
-  focusScale: number,
+  hidden: readonly number[],
 ): void {
   for (let i = 0; i < positions.length; i++) {
     const p = positions[i]!
-    writeInstanceMatrix(out, i, p.x, y, p.z, i === focusedIndex ? scale * focusScale : scale)
+    writeInstanceMatrix(out, i, p.x, y, p.z, scale)
+  }
+  for (const i of hidden) {
+    const p = positions[i]
+    if (p) writeInstanceMatrix(out, i, p.x, y, p.z, 0)
   }
 }
 

@@ -44,6 +44,27 @@ export function platformSpans(kept: Iterable<readonly [ShapeId, readonly Profile
 }
 
 /**
+ * The platform spans an interior covers, for its members `ids` (a complex's stations, else one): a single id gives
+ * its own map (same identity) or null; several give a new map holding each shape's union over the members, so the
+ * track fades and the cars lift along every member's platforms. A shape that rides two members gets one span over
+ * both, any gap between them included (as `platformSpans` does for one station). Null when none has spans.
+ */
+export function memberSpans(all: ReadonlyMap<StationId, StationSpans>, ids: readonly StationId[]): StationSpans | null {
+  if (ids.length === 1) return all.get(ids[0]!) ?? null
+  let out: Map<ShapeId, PlatformSpan> | null = null
+  for (const id of ids) {
+    const spans = all.get(id)
+    if (!spans) continue
+    out ??= new Map()
+    for (const [shapeId, s] of spans) {
+      const have = out.get(shapeId)
+      out.set(shapeId, have ? { d0: Math.min(have.d0, s.d0), d1: Math.max(have.d1, s.d1) } : { d0: s.d0, d1: s.d1 })
+    }
+  }
+  return out
+}
+
+/**
  * 1 on [start, end], easing (smoothstep) to 0 at `rampM` outside it. With start > end (a span shorter than two
  * insets) the peak, midway, stays below 1. Continuous in d; rampM must be positive.
  */

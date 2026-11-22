@@ -5,7 +5,7 @@ import { useFocus } from '../lib/focus'
 import { carMix } from '../lib/live/consist'
 import { nearestTrain, trainScreenPoints, type TrainPickInput, type TrainPickSource } from '../lib/live/trainPick'
 import type { Station } from '../lib/network'
-import { choosePick, nearestStation, trainHitPx, type ScenePick, type ScreenPoint, type ToScreen } from '../lib/pick'
+import { choosePick, nearestStation, NO_STATIONS, trainHitPx, type ScenePick, type ScreenPoint, type ToScreen } from '../lib/pick'
 import { useTrainSelection } from '../lib/trainSelection'
 import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
 import { MARKER_MIN_METERS } from './markerShape'
@@ -17,6 +17,8 @@ interface ScenePickerProps {
   stations: readonly Station[]
   /** The live layer's slots, while it is mounted. */
   trainPick: RefObject<TrainPickSource | null>
+  /** The focused station's complex siblings whose interior is loaded: no marker is drawn for them either. */
+  hiddenSiblings: readonly string[]
 }
 
 interface Press {
@@ -31,17 +33,24 @@ interface Press {
  * unless a train is clearly closer, or the station is already open). Listens on the canvas alongside MapControls without ever stopping
  * or preventing its events, and ignores multi-touch gestures. Hovering a target shows a pointer cursor.
  */
-export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
+export function ScenePicker({ stations, trainPick, hiddenSiblings }: ScenePickerProps) {
   const gl = useThree((s) => s.gl)
   const get = useThree((s) => s.get)
   const { focusedId, select } = useFocus()
   const { selectTrain } = useTrainSelection()
   const positions = useMemo(() => stations.map((s) => s.pos), [stations])
   // Read at pick time, so a focus change doesn't re-subscribe the listeners mid-press.
-  const focusedIndex = useRef(-1)
+  // The open station and its hidden siblings (indices): none draws a marker, so none counts as a station in reach.
+  const open = useRef<ReadonlySet<number>>(NO_STATIONS)
   useEffect(() => {
-    focusedIndex.current = focusedId ? stations.findIndex((s) => s.id === focusedId) : -1
-  }, [focusedId, stations])
+    const ids = new Set(hiddenSiblings)
+    if (focusedId) ids.add(focusedId)
+    const indices = new Set<number>()
+    stations.forEach((s, i) => {
+      if (ids.has(s.id)) indices.add(i)
+    })
+    open.current = indices
+  }, [focusedId, hiddenSiblings, stations])
 
   const picker = useMemo(() => {
     const v = new Vector3()
@@ -59,7 +68,7 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
       return true
     }
     // The markers as Stations.tsx sizes them, so the whole drawn marker is a target when it outgrows STATION_HIT_PX.
-    // The focused one isn't drawn but keeps the same target, so it can still be tapped.
+    // The focused one (and its hidden siblings) isn't drawn but keeps the same target, so it can still be tapped.
     const radiusM = (): number => marker.scale
     /** Canvas size (r3f measures it on resize) and this moment's pick input; null trains without a live layer. */
     const begin = (): TrainPickInput | null => {
@@ -87,8 +96,8 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
       click.x = clientX - view.left
       click.y = clientY - view.top
       const station = nearestStation(positions, toScreen, click, radiusM)
-      const train = trains ? nearestTrain(trains, toScreen, click, trainHitPx(touch, station, focusedIndex.current)) : null
-      return choosePick(station, train, focusedIndex.current)
+      const train = trains ? nearestTrain(trains, toScreen, click, trainHitPx(touch, station, open.current)) : null
+      return choosePick(station, train, open.current)
     }
     const trainAt = (key: string) => {
       const trains = begin()

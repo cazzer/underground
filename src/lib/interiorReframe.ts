@@ -17,8 +17,8 @@ export interface ReframeInput {
   /** The camera follows a train. */
   following: boolean
   focusedId: string | null
-  /** The station whose interior is loaded, or null. */
-  interiorId: string | null
+  /** The loaded interior covers the awaited station (it is its own, or the station is a member of its complex). */
+  interiorReady: boolean
 }
 
 /**
@@ -30,7 +30,7 @@ export type ReframeAction = 'none' | 'wait' | 'drop' | 'reframe' | 'snap'
 export function reframeAction(awaiting: AwaitingInterior | null, s: ReframeInput): ReframeAction {
   if (!awaiting) return 'none'
   if (s.following || s.focusedId !== awaiting.stationId) return 'drop'
-  if (s.flying || s.interiorId !== awaiting.stationId) return 'wait'
+  if (s.flying || !s.interiorReady) return 'wait'
   return awaiting.reduced ? 'snap' : 'reframe'
 }
 

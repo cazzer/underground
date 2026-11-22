@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
+import { interiorStationIds } from '../data/interiorLoad'
 import type { Network } from '../lib/network'
 import { interiorOpacity, labelOpacity, veilWeight } from '../lib/interiorReveal'
 import { depthFactor, depthScaleY } from '../lib/tilt'
@@ -27,8 +28,10 @@ interface StationInteriorProps {
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
 export function StationInterior({ model, network }: StationInteriorProps) {
-  const station = network.stationById.get(model.stationId)
-  if (!station) throw new Error(`Interior for unknown station "${model.stationId}"`)
+  // Every station the interior covers must be on the map: its spans, markers and camera all look them up.
+  for (const id of interiorStationIds(model)) {
+    if (!network.stationById.has(id)) throw new Error(`Interior ${model.stationId} covers unknown station "${id}"`)
+  }
   const group = useRef<Group>(null)
   const veil = useRef<Mesh>(null)
   const shown = useRef(-1)

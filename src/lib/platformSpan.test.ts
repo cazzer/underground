@@ -7,6 +7,7 @@ import { buildNetwork } from './network'
 import {
   MASK_INSET_M,
   maskSpanWeight,
+  memberSpans,
   platformSpans,
   rampWeight,
   TRAIN_RAMP_M,
@@ -122,5 +123,35 @@ describe('Bedford Av (L08) platform spans, committed data', () => {
         expect(Math.hypot(p.x - q.x, p.z - q.z), `${shape.id} at ${t}`).toBeLessThan(3)
       }
     }
+  })
+})
+
+describe('memberSpans', () => {
+  const all = new Map([
+    ['T01', new Map([['a', { d0: 100, d1: 200 }], ['b', { d0: 5, d1: 9 }]])],
+    ['U01', new Map([['a', { d0: 150, d1: 320 }], ['c', { d0: 40, d1: 60 }]])],
+  ])
+
+  it("is the station's own map, same identity, for a lone station, and null for one with no spans", () => {
+    expect(memberSpans(all, ['T01'])).toBe(all.get('T01'))
+    expect(memberSpans(all, ['X99'])).toBeNull()
+  })
+
+  it("unions each shape over a complex's members, so every member's platforms get the fade and the lift", () => {
+    const spans = memberSpans(all, ['T01', 'U01'])!
+    expect([...spans.keys()].sort()).toEqual(['a', 'b', 'c'])
+    expect(spans.get('a')).toEqual({ d0: 100, d1: 320 })
+    expect(spans.get('b')).toEqual({ d0: 5, d1: 9 })
+    expect(spans.get('c')).toEqual({ d0: 40, d1: 60 })
+    // A car at U01's end of the shared shape is lifted fully, though only T01 is the file id.
+    expect(trainSpanWeight(320, spans.get('a')!)).toBe(1)
+    expect(maskSpanWeight(250, spans.get('a')!)).toBe(1)
+  })
+
+  it("leaves the stations' own spans alone, and skips a member without any", () => {
+    memberSpans(all, ['T01', 'U01'])
+    expect(all.get('T01')!.get('a')).toEqual({ d0: 100, d1: 200 })
+    expect(memberSpans(all, ['T01', 'X99'])!.get('a')).toEqual({ d0: 100, d1: 200 })
+    expect(memberSpans(all, ['X98', 'X99'])).toBeNull()
   })
 })

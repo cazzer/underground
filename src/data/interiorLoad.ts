@@ -68,6 +68,17 @@ export function siblingIdsOf(stationId: string | null, index: IndexLoad): readon
 }
 
 /**
+ * The siblings whose markers and ties the scene hides: those the loaded interior really covers. The index says which
+ * stations share a file, the model says which it draws; a stale or mixed deploy where they disagree hides nothing it
+ * doesn't draw. Nothing is hidden before the model loads.
+ */
+export function hiddenSiblingIds(siblings: readonly string[], model: { stationId: string; memberStationIds?: readonly string[] } | null): readonly string[] {
+  if (!model || siblings.length === 0) return NO_SIBLINGS
+  const covered = siblings.filter((id) => interiorCovers(model, id))
+  return covered.length > 0 ? covered : NO_SIBLINGS
+}
+
+/**
  * What to show for station `stationId` (null: no station focused). Until the index is ready, or if it
  * failed, there is nothing to say about the station (almost no station has an interior, so a panel
  * would be wrong for nearly all of them); a station the index doesn't list has none either. Then a

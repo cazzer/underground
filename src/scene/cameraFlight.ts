@@ -85,9 +85,11 @@ export function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void
 /**
  * Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal, framed for
  * `azimuth`. With `turn`, a portrait free area first picks a landing azimuth that runs the platforms
- * nearly up the screen (landingAzimuth); the result's `azimuth` is that turn, or null for none.
+ * nearly up the screen (landingAzimuth); the result's `azimuth` is that turn, or null for none. `stationId` is the
+ * focused station, which for a complex member is not the model's own (file) id: the flight's focus hold follows it.
  */
 export function interiorFlight(
+  stationId: string,
   model: InteriorModel,
   viewport: Viewport,
   insets: Insets,
@@ -100,7 +102,7 @@ export function interiorFlight(
   const land = turn ? landingAzimuth(model.axis, azimuth, free) : azimuth
   const { distance, target } = frameInterior({ ...model.focusAnchor, azimuth: land, viewport, free, fovDeg })
   return {
-    stationId: model.stationId,
+    stationId,
     target: new Vector3(target.x, 0, target.z),
     distance,
     azimuth: land === azimuth ? null : land,

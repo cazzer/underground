@@ -14,14 +14,17 @@ interface StationsProps {
   stations: readonly Station[]
   /** Draw the focused station's marker too (it has no interior, or its load failed). */
   focusedMarker: boolean
+  /** The focused station's complex siblings whose interior is loaded: their markers hide with the focused one's. */
+  hiddenSiblings: readonly string[]
 }
 
 /**
  * All station markers as two instanced meshes (fill, then ring). The focused station's marker is hidden
- * (its panel and interior mark it); it stays pickable, since ScenePicker picks in screen space. A station with no
+ * (its panel and interior mark it), and so are its complex siblings' (the one interior covers them); they stay
+ * pickable, since ScenePicker picks in screen space. A station with no
  * interior (`focusedMarker`) keeps its marker, plus a `theme.stationFocus` FocusRing above the trains.
  */
-export function Stations({ stations, focusedMarker }: StationsProps) {
+export function Stations({ stations, focusedMarker, hiddenSiblings }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
   const { focusedId } = useFocus()
@@ -29,6 +32,17 @@ export function Stations({ stations, focusedMarker }: StationsProps) {
     () => (focusedId ? stations.findIndex((s) => s.id === focusedId) : -1),
     [stations, focusedId],
   )
+  /** Marker instances to collapse: the focused one unless it is drawn as the fallback, and every hidden sibling. */
+  const hidden = useMemo(() => {
+    const indexOf = new Map(stations.map((s, i) => [s.id, i]))
+    const out: number[] = []
+    if (focusedIndex >= 0 && !focusedMarker) out.push(focusedIndex)
+    for (const id of hiddenSiblings) {
+      const i = indexOf.get(id)
+      if (i !== undefined) out.push(i)
+    }
+    return out
+  }, [stations, focusedIndex, focusedMarker, hiddenSiblings])
   const positions = useMemo(() => stations.map((s) => s.pos), [stations])
   // Pre-rotated flat on the ground, so each instance matrix is only scale plus translate.
   const geometry = useMemo(
@@ -39,7 +53,7 @@ export function Stations({ stations, focusedMarker }: StationsProps) {
     [],
   )
   const stroke = useMemo(() => new Color(theme.stationStroke), [])
-  const drawn = useRef({ scale: NaN, focusedIndex: -1, focusedMarker: false })
+  const drawn = useRef<{ scale: number; hidden: readonly number[] | null }>({ scale: NaN, hidden: null })
 
   useEffect(
     () => () => {
@@ -68,12 +82,11 @@ export function Stations({ stations, focusedMarker }: StationsProps) {
     const d = cameraDistance(state)
     const scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
     const last = drawn.current
-    if (scale === last.scale && focusedIndex === last.focusedIndex && focusedMarker === last.focusedMarker) return
+    if (scale === last.scale && hidden === last.hidden) return
     last.scale = scale
-    last.focusedIndex = focusedIndex
-    last.focusedMarker = focusedMarker
-    // Focus scale 0 collapses the focused instance, so neither its fill nor its ring draws.
-    writeMarkerMatrices(f.instanceMatrix.array as Float32Array, positions, MARKER_Y, scale, focusedIndex, focusedMarker ? 1 : 0)
+    last.hidden = hidden
+    // Scale 0 collapses a hidden instance, so neither its fill nor its ring draws.
+    writeMarkerMatrices(f.instanceMatrix.array as Float32Array, positions, MARKER_Y, scale, hidden)
     r.instanceMatrix.array.set(f.instanceMatrix.array)
     f.instanceMatrix.needsUpdate = true
     r.instanceMatrix.needsUpdate = true

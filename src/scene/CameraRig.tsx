@@ -2,6 +2,7 @@ import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
+import { interiorCovers } from '../data/interiorLoad'
 import { useFocus } from '../lib/focus'
 import { newDwell, settled } from '../lib/focusDwell'
 import { shouldReleaseHold, type FocusHold } from '../lib/focusHold'
@@ -117,10 +118,10 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     if (!c) throw new Error('Fly request before the map controls mounted')
     flushMotion(c, camera)
     const reduced = prefersReducedMotion()
-    const known = l.interior?.stationId === station.id ? l.interior : null
+    const known = interiorCovers(l.interior, station.id) ? l.interior : null
     awaiting.current = known ? null : { stationId: station.id, reduced }
     const dest = known
-      ? interiorFlight(known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
+      ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
       : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
     flight.current = newFlight(dest, c, camera, reduced, known !== null || reduced)
   }, [flyRequest, network, camera])
@@ -138,14 +139,14 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     const az = c.getAzimuthalAngle()
     const e0 = flightProgress(f.elapsed, f.duration)
     let dest
-    if (interior?.stationId !== f.stationId) {
+    if (!interior || !interiorCovers(interior, f.stationId)) {
       dest = stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
     } else {
       const turn = retargetTurn(f.turnDecided, e0)
       // Later: too late to fold in without a lurch; the flight lands as it is and the reframe takes over.
       if (turn === 'later') return
       // Keep: frame for the azimuth already chosen (the landing turn, or the current one when there is none).
-      dest = interiorFlight(interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide')
+      dest = interiorFlight(f.stationId, interior, size, insets, panel, camera.fov, turn === 'keep' ? (f.azimuth ?? az) : az, turn === 'decide')
       if (turn === 'keep') dest.azimuth = f.azimuth
       f.turnDecided = true
       awaiting.current = null
@@ -180,7 +181,7 @@ export function CameraRig({ network, insets, interior, panel, anchor }: CameraRi
     controls,
     camera,
     focusPos,
-    interior: interior?.stationId === focusedId ? interior : null,
+    interior: interiorCovers(interior, focusedId) ? interior : null,
     viewport: size,
     free,
     flying,
