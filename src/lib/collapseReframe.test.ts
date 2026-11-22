@@ -49,7 +49,7 @@ describe('reframeGains', () => {
 })
 
 describe('collapseAction', () => {
-  const idle = { flying: false, following: false, focusedId: '635' }
+  const idle = { flying: false, following: false, focusedId: '635', tookOver: false, lateArrival: false }
   it('reframes, or snaps under reduced motion', () => {
     expect(collapseAction(pending(), idle)).toBe('reframe')
     expect(collapseAction(pending({ reduced: true }), idle)).toBe('snap')
@@ -60,5 +60,14 @@ describe('collapseAction', () => {
     expect(collapseAction(pending(), { ...idle, following: true })).toBe('drop')
     expect(collapseAction(pending(), { ...idle, focusedId: 'L08' })).toBe('drop')
     expect(collapseAction(pending(), { ...idle, focusedId: null })).toBe('drop')
+  })
+
+  it('leaves a view the user panned or turned since the landing where it is', () => {
+    expect(collapseAction(pending(), { ...idle, tookOver: true })).toBe('drop')
+    expect(collapseAction(pending({ reduced: true }), { ...idle, tookOver: true })).toBe('drop')
+  })
+
+  it('leaves a late interior or streets to their own reframe, so the landing moves once', () => {
+    expect(collapseAction(pending(), { ...idle, lateArrival: true })).toBe('drop')
   })
 })

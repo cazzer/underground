@@ -81,6 +81,8 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
   const awaiting = useRef<AwaitingInterior | null>(null)
   /** A user collapse or expand of the panel settling before it reframes (useCollapseReframe). */
   const collapse = useRef<CollapsePending | null>(null)
+  /** A gesture since the last landing: a panel toggle then leaves the view alone. */
+  const tookOver = useRef(false)
 
   // Fit the whole city once; resizing later keeps the user's view.
   useLayoutEffect(() => {
@@ -152,7 +154,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     focusedId,
     following: follow.active,
   })
-  useCollapseReframe({ controls, camera, flight, collapse, layout: latest, panel, focusedId, flyRequest, following: follow.active, recheck: landed })
+  useCollapseReframe({ controls, camera, flight, collapse, awaiting, tookOver, layout: latest, panel, focusedId, flyRequest, following: follow.active, recheck: landed })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((state, delta) => {
@@ -178,6 +180,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
       camera.position.copy(c.target).add(offset)
       if (e >= 1) {
         flight.current = null
+        tookOver.current = false
         flushMotion(c, camera)
         landed()
       }
@@ -227,6 +230,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     flight.current = null
     awaiting.current = null
     collapse.current = null
+    tookOver.current = true
     gesture.current = true
     onGestureStart()
     follow.onGestureStart()

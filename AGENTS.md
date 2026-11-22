@@ -171,14 +171,19 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `collapsed`, a panel size change, an /ene poll or arrival rows) arms it, unless a flight is under way (its retarget takes the new
     panel) or a train is followed; once the panel's rect holds still 150 ms (at most 600 ms after the toggle; `lib/collapseReframe.ts`,
     pure: `collapseDueIn`, `reframeGains`, `collapseAction`) a 0.6-1 s eased flight, no turn, onto the focused interior's priority frame
-    (`interiorFlight` with the frame: trip path, then machines out of service) or a bare station's point and entrance marks
-    (`stationFlight`) in the new free rect; reduced motion snaps. It moves only when the view doesn't already frame every priority
-    point there and the new framing shows no less (`reframeGains` over `framedCount` per tier; a tie moves, so an expand returns to
-    the open panel's landing); an interior with no priority frame, or one still loading, stays. A gesture, another flight or fly
-    request, a follow or a focus change cancels it. A desktop collapse frees no room (the free rect ends at the panel's left edge),
-    so the landed view already frames it and nothing moves. On a 390×844 phone the bar leaves the free rect's bottom at 690 px
-    (`collapseFixture.ts`): collapsed, Union Sq's Lexington and Canarsie ways out fit (635N reframes onto a 600 m frame; the others
-    already show) and Pelham Pkwy's station-house machines already show (`pathFrame.data.test.ts`, `outageFrame.data.test.ts`);
+    (`interiorFlight` with the frame: trip path, then machines out of service), an interior's usual landing when it has no priority
+    frame, or a bare station's point and entrance marks (`stationFlight`) in the new free rect; reduced motion snaps; nothing when
+    `reframeDuration` finds nothing to move. With a priority frame or a bare station it moves only when the view doesn't already
+    frame every priority point there and the new framing shows no less (`reframeGains` over `framedCount` per tier; a tie moves, so
+    an expand returns to the open panel's landing). It declines once the user took the view over (a gesture since the last landing:
+    CameraRig's `tookOver`, set in `onStart`, cleared when a flight lands) and while `useInteriorReframe` awaits a late interior or
+    streets (`kind: 'interior' | 'streets'`; that reframe moves once, with its landing turn). When it declines or has nothing to move
+    it asks `useInteriorReframe` again, so with the trip panel open the `'frame'` await (#113) may still frame the trip's path onto
+    the new panel. A gesture, another flight or fly request, a follow or a focus change cancels it. A desktop collapse frees no room
+    (the free rect ends at the panel's left edge), so the landed view already frames it and nothing moves. On a 390×844 phone the
+    bar leaves the free rect's bottom at 690 px (`collapseFixture.ts`): collapsed, Union Sq's Lexington and Canarsie ways out fit
+    (635N's reframes onto a path frame; the others already show) and Pelham Pkwy's station-house machines already show
+    (`pathFrame.data.test.ts`, `outageFrame.data.test.ts`);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded

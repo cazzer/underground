@@ -1,9 +1,11 @@
 /**
  * The collapse reframe: a user collapse or expand of the panel in front (panelCollapse.tsx's `seq`, never the panel's
  * size) reframes the focused station onto its priority frame (pathFrame.ts: the trip's path there, the machines out of
- * service; a bare station's point and entrance marks) in the free area the panel now leaves. It waits for the panel's
- * measurement to settle, so one toggle is one move, and moves only when the view doesn't already frame all of it and
- * the new framing shows no less than the view does. Pure; useCollapseReframe applies it.
+ * service; a bare station's point and entrance marks; an interior with neither, its usual landing) in the free area the
+ * panel now leaves. It waits for the panel's measurement to settle, so one toggle is one move, and moves only when the
+ * view doesn't already frame all of it and the new framing shows no less than the view does. It declines once the user
+ * has taken over the view (a gesture since the last landing) and while a late interior or streets reframe is pending
+ * (useInteriorReframe's own, which decides the landing turn). Pure; useCollapseReframe applies it.
  */
 import { showsMore } from './pathFrame'
 
@@ -44,12 +46,19 @@ export interface CollapseInput {
   flying: boolean
   following: boolean
   focusedId: string | null
+  /** A gesture since the last landing: the user took the view over, so a toggle leaves it where it is. */
+  tookOver: boolean
+  /** The landing awaits a late interior or a bare station's streets (AwaitingInterior kind 'interior' or 'streets'): that reframe moves once, with its turn. */
+  lateArrival: boolean
 }
 
-/** drop: forget it (another flight, a follow, or the focus moved on). reframe: an eased flight, no turn. snap: the same at once. */
+/**
+ * drop: forget it (another flight, a follow, the focus moved on, the user took over, or a late-arrival reframe is
+ * pending). reframe: an eased flight, no turn. snap: the same at once.
+ */
 export type CollapseAction = 'drop' | 'reframe' | 'snap'
 
 export function collapseAction(p: CollapsePending, s: CollapseInput): CollapseAction {
-  if (s.flying || s.following || s.focusedId !== p.stationId) return 'drop'
+  if (s.flying || s.following || s.tookOver || s.lateArrival || s.focusedId !== p.stationId) return 'drop'
   return p.reduced ? 'snap' : 'reframe'
 }
