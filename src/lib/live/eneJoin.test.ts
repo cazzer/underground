@@ -6,6 +6,8 @@ import { ENE_MAX_AGE_S, eneFresh, eneNowS, joinStationOutages, closedForRouting,
 
 const l08 = JSON.parse(readFileSync(new URL('../../../public/data/stations/L08.json', import.meta.url), 'utf8')) as StationInterior
 
+const unionSq = JSON.parse(readFileSync(new URL('../../../public/data/stations/635.json', import.meta.url), 'utf8')) as StationInterior
+
 const NOW = 2_000_000
 const outage = (code: string, returnAt: number | null = NOW + 3600): EneOutage => ({ code, reason: null, since: NOW - 100, returnAt })
 function feed(codes: EneOutage[], generatedAt = NOW, over: Partial<EneInput> = {}): EneInput {
@@ -26,6 +28,71 @@ describe('joinStationOutages', () => {
   it('reads the street to mezzanine elevator the same way round', () => {
     const j = joinStationOutages(l08, feed([outage('EL359')]), NOW)
     expect(j.panel).toMatchObject({ outages: [{ id: 'EL359', levels: 'Street to mezzanine' }] })
+  })
+
+  describe('escalator direction', () => {
+    // EL359 runs between the mezzanine (lower) and the street (upper).
+    const base = l08.connectors.find((c) => c.id === 'EL359')!
+    const withEscalators = (travels: Record<string, 'up' | 'down' | undefined>): StationInterior => ({
+      ...l08,
+      connectors: [
+        ...l08.connectors,
+        ...Object.entries(travels).map(([id, travel]) => ({ ...base, id, kind: 'escalator' as const, travel })),
+      ],
+    })
+    const levelsOf = (interior: StationInterior, id: string): string | undefined => {
+      const j = joinStationOutages(interior, feed([outage(id)]), NOW)
+      return j.panel.kind === 'out' ? j.panel.outages[0]?.levels : undefined
+    }
+
+    it('names an up escalator from its lower level', () => {
+      expect(levelsOf(withEscalators({ ES1: 'up' }), 'ES1')).toBe('Mezzanine up to street')
+    })
+
+    it('names a down escalator from its upper level', () => {
+      expect(levelsOf(withEscalators({ ES1: 'down' }), 'ES1')).toBe('Street down to mezzanine')
+    })
+
+    it('reads two opposite escalators between the same levels differently', () => {
+      const i = withEscalators({ ES257X: 'up', ES258X: 'down' })
+      expect(levelsOf(i, 'ES257X')).not.toBe(levelsOf(i, 'ES258X'))
+    })
+
+    it("reads Union Sq's ES257X and ES258X as opposite directions on the real data", () => {
+      const j = joinStationOutages(unionSq, feed([outage('ES257X'), outage('ES258X')]), NOW)
+      const texts = j.panel.kind === 'out' ? Object.fromEntries(j.panel.outages.map((o) => [o.id, o.levels])) : {}
+      expect(texts).toEqual({ ES257X: 'Mezzanine up to street', ES258X: 'Street down to mezzanine' })
+    })
+
+    it("keeps a proper level name's capital: Union Sq's ES219 runs up from the Canarsie platform", () => {
+      const j = joinStationOutages(unionSq, feed([outage('ES219')]), NOW)
+      expect(j.panel).toMatchObject({ outages: [{ id: 'ES219', levels: 'Canarsie platform up to mezzanine' }] })
+    })
+
+    // EL358 runs between the mezzanine (upper) and the platform (lower); name that platform like Union Sq's.
+    const named: StationInterior = {
+      ...l08,
+      levels: l08.levels.map((l) => (l.id === 'platform' ? { ...l, name: 'Canarsie platform' } : l)),
+      connectors: [
+        ...l08.connectors,
+        { ...l08.connectors.find((c) => c.id === 'EL358')!, id: 'ES1', kind: 'escalator', travel: 'down' },
+      ],
+    }
+
+    it('keeps a proper name on a down escalator and an elevator, and lowercases a generic one', () => {
+      expect(levelsOf(named, 'ES1')).toBe('Mezzanine down to Canarsie platform')
+      expect(levelsOf(named, 'EL358')).toBe('Mezzanine to Canarsie platform')
+      expect(levelsOf(l08, 'EL358')).toBe('Mezzanine to platform')
+    })
+
+    it('keeps the street-first wording for an escalator with no travel', () => {
+      expect(levelsOf(withEscalators({ ES1: undefined }), 'ES1')).toBe('Street to mezzanine')
+    })
+
+    it('keeps elevators as they were, whatever travel says', () => {
+      const i: StationInterior = { ...l08, connectors: l08.connectors.map((c) => (c.id === 'EL359' ? { ...c, travel: 'up' as const } : c)) }
+      expect(levelsOf(i, 'EL359')).toBe('Street to mezzanine')
+    })
   })
 
   it('lists several, sorted, and ignores codes the interior does not have', () => {

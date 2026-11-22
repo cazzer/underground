@@ -481,7 +481,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,
   one request at a time, a hidden tab aborts and stops, backoff via `lib/live/enePoll.ts`; `eneFetch.ts` validates one body
   (`realtimeFetch.ts`'s timeout, errors and `parseRetryAfter` are reused). Pure joins in `lib/live/`: `eneJoin.ts`
-  (`joinStationOutages`: outage codes to the focused interior's `Connector.id`; a snapshot over `ENE_MAX_AGE_S` 480 s old
+  (`joinStationOutages`: outage codes to the focused interior's `Connector.id`, each row's levels street-first ("Mezzanine to
+  platform"), or for an escalator with `travel` its direction ("Mezzanine up to street"); a snapshot over `ENE_MAX_AGE_S` 480 s old
   by the /rt live clock, else the device clock, is unknown, never "in service" (`useEne` republishes 20 s after it would go stale);
   `closedForRouting(join)` is the step-free routing's input: `chooseExit({ closed })`, or null when status is unknown (callers must
   then say step-free status is unknown; checked on L08 in `exitOutage.test.ts`; no UI routes with it yet), `eneText.ts` (panel text, New York return times). `App` passes `outages.outIds` to `Scene` > `StationInterior`, which
