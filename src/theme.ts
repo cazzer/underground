@@ -6,9 +6,6 @@ export interface Theme {
   name: string
   /** Canvas and page background. */
   background: string
-  /** Faint ground grid (cell lines, then every-10th section lines). */
-  gridCell: string
-  gridSection: string
   /** How a route's GTFS color is drawn: mixed toward a theme color (amount 1 = mono). */
   routeLineMix: RouteLineMix
   /** TEMPORARY (removed with ?lines=, see LineHighlight.tsx): single line color for the mono looks a and c. */
@@ -79,8 +76,8 @@ export interface Theme {
    * is faint by color and drawn opaque (a translucent LineSegments2 beads at its joints); it fades in with the
    * interior reveal through material.opacity, as the interior does, so it is briefly translucent mid-fade (accepted),
    * and its last 70 m mix to the background (streetBuffers.ts). A neutral gray, 2.5:1 to 4:1 on the
-   * background (fainter than the route lines), at least 60 in sRGB from every drawn route color and both grid
-   * colors (theme.test.ts). With the station's interior loaded under look A they draw above the veil instead,
+   * background (fainter than the route lines), at least 60 in sRGB from every drawn route color
+   * (theme.test.ts). With the station's interior loaded under look A they draw above the veil instead,
    * at a fainter stroke, 1.8 to 2:1 (veiledStreetHex in streetVeil.ts; the test keeps that range), built into
    * their vertex colors: the interior is the subject, and the DOM labels carry the street names. TEMPORARY `?streets=under`
    * (streetsLook.ts) keeps them under the veil, where look A leaves them at about 1.25:1, a floor the test keeps;
@@ -95,7 +92,7 @@ export interface Theme {
    * and every drawn route color, in steps: highway (bluer, about 2.5:1) over major (about 2:1) over minor (about
    * 1.45:1) over path (at least 1.3:1); highway also differs from major by tone. Water a teal and parks a green, each
    * 1.5:1 to 2.5:1. All
-   * stay 60 in sRGB from the route colors, the rim and `here`, and 0.05 in OKLab from the grid and from each other
+   * stay 60 in sRGB from the route colors, the rim and `here`, and 0.05 in OKLab from each other
    * across water, park and roads (themeBasemap.test.ts). Drawn opaque; a class fades by mixing toward the background.
    */
   basemap: Readonly<Record<BasemapClass, { stroke: string; width: number }>>
@@ -125,8 +122,6 @@ export const THEMES = {
   blueprint: {
     name: 'blueprint',
     background: '#0b2147',
-    gridCell: '#16376e',
-    gridSection: '#2a5aa8',
     routeLineMix: { toward: '#ffffff', amount: 0.3 },
     lineMono: '#5ce1ff',
     lineWidth: 1.5,

@@ -147,7 +147,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
-  - `Scene.tsx` canvas; `MapGrid.tsx` ground grid (fades out by 30 km); `CameraRig.tsx` MapControls,
+  - `Scene.tsx` canvas; `CameraRig.tsx` MapControls,
     HUD-aware fit-to-city framing, zoom-driven tilt, fly-to, auto focus, interrupted-fly-to focus hold;
     `cameraFlight.ts` its fly-to destinations (interior, bare station, point; `interiorFlight` takes the focused station id, which for a complex member is not the file's `stationId`, so the focus hold follows the member; `follows` marks a flight to the selected
     train; a bare station's `stationFlight` frames its entrance marks, `bareStationPoints`, through `bareStationFrame` in `lib/freeFrame.ts`; `interiorFlight` frames the interior's priority frame when there is one, `priorityLanding`, and under TEMPORARY `?landturn=half` may land half a turn round, `priorityTurn`), `newFlight`, `flushMotion` and the landing turn;
@@ -863,7 +863,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   back to north-up). Esc, ×, a station pick or search choice (they clear the train), the panel's Stop and the
   location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
-  an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, focused station's streets 0.35 (7.5 above the veil
+  an explicit `renderOrder` from `src/scene/renderOrder.ts`: focused station's streets 0.35 (7.5 above the veil
   while the interior is loaded under look A; TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
   0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5,
@@ -880,13 +880,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   The focused station (picked or auto-focused by zoom), and the other members of its complex once the interior that covers them is loaded, draw no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
-  tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth
-  (MapGrid turns off the drei grid's depthWrite, since cars on a station ramp run below the street), and everything after it (veil, interior) has depthTest false.
+  tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth and everything after it (veil, interior) has depthTest false.
   The above-veil platform car bodies (9.5) test and write depth too: they copy their street cars' matrices, so
   they pass where those drew and a nearer street car stays in front. The selected outline shells (street and platform)
   test depth but never write it, and so do the platform car footprints of every deck above the deepest (9.55, 9.58).
-  drei's Grid is transparent, and three.js draws all opaque objects before all transparent
-  ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
+  three.js draws all opaque objects before all transparent ones, so `renderOrder` only sorts within a list; depth precision is too coarse at map
   zoom for z-offsets to work.
 - All route shapes draw as one merged `LineSegments2` (one draw call, per-vertex colors in linear
   space via three's `Color`). Buffer order is the overlap rule: non-primary shapes, then

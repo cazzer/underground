@@ -82,13 +82,8 @@ describe('basemap tokens', () => {
     }
   })
 
-  it('stay apart from the grid, and water, parks and roads from each other', async () => {
+  it('keep water, parks and roads apart from each other', async () => {
     for (const t of Object.values(await themes())) {
-      for (const [cls, { stroke }] of Object.entries(t.basemap)) {
-        for (const [name, grid] of [['gridCell', t.gridCell], ['gridSection', t.gridSection]] as const) {
-          expect(oklabDistance(stroke, grid), `${cls} ${stroke} vs ${name} ${grid}`).toBeGreaterThanOrEqual(MIN_OKLAB)
-        }
-      }
       const groups = [['water', [t.basemap.water.stroke]], ['park', [t.basemap.park.stroke]], ['roads', ROADS.map((r) => t.basemap[r].stroke)]] as const
       for (const [a, as] of groups) {
         for (const [b, bs] of groups) {

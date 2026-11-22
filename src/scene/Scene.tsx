@@ -26,7 +26,6 @@ import { basemapLook } from './basemapLook'
 import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
-import { MapGrid } from './MapGrid'
 import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
 import { StationStreets } from './StationStreets'
@@ -116,7 +115,6 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       aria-label="Subway map"
     >
       <color attach="background" args={[theme.background]} />
-      <MapGrid />
       <SubwayLines network={network} paths={banded?.shapes ?? network.shapes} interiorSpans={interiorSpans} view={bandView} />
       <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
       <Stations stations={network.stations} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
