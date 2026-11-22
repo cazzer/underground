@@ -11,6 +11,7 @@ import { markSelected, newReselect, reselectDue, type ViewPose } from '../lib/ba
 import { drawnTiles } from '../lib/basemap/tileCover'
 import { createTileLru } from '../lib/basemap/tileLru'
 import { keyX, keyY, keyZ, MIN_Z, zoomFor } from '../lib/basemap/tileMath'
+import type { PackedTracks } from '../lib/routeTracks'
 import { tileUrl, type BasemapConfig } from './basemapConfig'
 import type { BasemapReply, BasemapRequest } from './basemapProtocol'
 import type { BasemapTile, BasemapTiles, BasemapWorkerLike } from './basemapTypes'
@@ -34,7 +35,12 @@ function realWorker(): BasemapWorkerLike | null {
 /** The four frustum corners in NDC, in the order groundFootprint expects. */
 const CORNERS = [-1, -1, 1, -1, 1, 1, -1, 1]
 
-export function createBasemapTiles(config: BasemapConfig, { createWorker = realWorker }: BasemapTilesOptions = {}): BasemapTiles {
+/** `tracks` are the drawn route lines the worker cuts the roads under (routeTracks.ts); posted, not transferred, on start. */
+export function createBasemapTiles(
+  config: BasemapConfig,
+  tracks: PackedTracks,
+  { createWorker = realWorker }: BasemapTilesOptions = {},
+): BasemapTiles {
   let worker: BasemapWorkerLike | null = null
   let disabled = false
   let capZ: number | null = null
@@ -220,7 +226,7 @@ export function createBasemapTiles(config: BasemapConfig, { createWorker = realW
       w.onerror = (e) => fail(`the tile worker failed (${e.message || 'worker error'})`)
       w.onmessageerror = () => fail('the tile worker sent an unreadable reply')
       w.onmessage = (e) => onReply(e.data)
-      post({ type: 'init', layers: config.layers })
+      post({ type: 'init', layers: config.layers, tracks })
     },
     update(pose, camera, nowMs) {
       if (worker === null) return

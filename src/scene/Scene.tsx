@@ -134,7 +134,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
-          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} />
+          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} />
         </ErrorBoundary>
       )}
     </Canvas>

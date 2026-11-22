@@ -8,6 +8,13 @@
 export const BASEMAP_CLASSES = ['highway', 'major', 'minor', 'path', 'water', 'park'] as const
 export type BasemapClass = (typeof BASEMAP_CLASSES)[number]
 
+const ROAD_CLASSES: ReadonlySet<BasemapClass> = new Set(['highway', 'major', 'minor', 'path'])
+
+/** The road classes: the station's streets redraw them (the mask) and the route lines cut them (routeClip.ts). */
+export function isRoadClass(cls: BasemapClass): boolean {
+  return ROAD_CLASSES.has(cls)
+}
+
 /** MVT geometry types: 0 unknown, 1 point, 2 line, 3 polygon. */
 export type GeomType = 0 | 1 | 2 | 3
 

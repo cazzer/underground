@@ -4,6 +4,7 @@ import { Color, type Group } from 'three'
 import { interiorCovers, interiorStationIds } from '../data/interiorLoad'
 import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
 import type { StreetMask } from '../lib/basemap/streetMask'
+import { clipLineBuffers } from '../lib/clipLineBuffers'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
 import { exitEntranceIndex, type ExitLabel } from '../lib/exitView'
@@ -15,6 +16,8 @@ import type { Rgb } from '../lib/lineBuffers'
 import { DESKTOP_LABEL_RADIUS_M, streetLabelOpacity } from '../lib/streetLabelReveal'
 import type { Network } from '../lib/network'
 import { routeBundles } from '../lib/routeBundles'
+import { buildRouteClip, CLIP_TRACK_REACH_M } from '../lib/routeClip'
+import { localTracks } from '../lib/routeTracks'
 import type { Ground } from '../lib/projection'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
@@ -109,9 +112,23 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     insetsRef.current = insets
     panelRef.current = panel
   }, [insets, panel])
+  // The street pieces that run under a route line are left out, so none reads as one more track in its bundle. Not
+  // at a station with an interior (loaded or loading): there the tracks sink under it, clear of the streets.
+  // While the station index is still loading, every station counts as pending (focusedMarkerShown), so a station
+  // with none draws its streets whole for that moment and the pieces under its lines pop out once the index lands.
+  // The index is fetched on mount, so only a focus in the page's first moments (a #station link) can show it.
+  const clipped = !interior && !interiorPending
+  const clip = useMemo(
+    () => (clipped ? buildRouteClip(localTracks(network.shapes, layer.anchor, layer.file.radiusM + CLIP_TRACK_REACH_M)) : null),
+    [clipped, network, layer],
+  )
   const mode = streetMode(interior)
+  const buffers = useMemo(() => {
+    const base = mode === 'veiled' ? layer.veiledBuffers : layer.buffers
+    return clip ? clipLineBuffers(base, clip) : base
+  }, [mode, layer, clip])
   const lines = useLineLayer(
-    mode === 'veiled' ? layer.veiledBuffers : layer.buffers,
+    buffers,
     mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,
     theme.streetWidth,
   )
