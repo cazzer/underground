@@ -11,9 +11,9 @@ import { CORNER_MIN_ANGLE_DEG, JOIN_RADIUS_M, MEDIAN_MAX_M, joinEntrance, street
 import { nearestOnPolyline, SIDE_MIN_M } from './streetGeometry.ts'
 import { RADIUS_M } from './streetsOsm.ts'
 
-/** An entrance whose opposite same-street carriageway lies this far beyond MEDIAN_MAX_M is logged as a near miss
- *  (to tune MEDIAN_MAX_M on Eastern and Ocean Pkwy): a median entrance needs the other carriageway within 25 m. */
-export const NEAR_MISS_SLACK_M = 15
+/** An entrance whose opposite same-street carriageway lies up to this far beyond MEDIAN_MAX_M (and within the join
+ *  radius) is logged as a near miss, to tune MEDIAN_MAX_M on Eastern and Ocean Pkwy. */
+export const NEAR_MISS_SLACK_M = JOIN_RADIUS_M - MEDIAN_MAX_M
 /** An entrance this close to the pin's radius edge may have streets cut off beyond it. */
 export const EDGE_MARGIN_M = 40
 
@@ -79,8 +79,10 @@ export function median(values: readonly number[]): number {
   return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
 }
 
+/** The ways an entrance may join: all of the file's, except building passages (`tunnel=building_passage`, a way
+ *  through a building, not a street). They stay in the file, drawn like any other way. */
 function toJoinWays(file: FileStreets): JoinWay[] {
-  return file.ways.map((w) => ({
+  return file.ways.filter((w) => file.tags.get(w.id)?.tunnel !== 'building_passage').map((w) => ({
     id: w.id,
     highway: w.highway,
     name: w.name,

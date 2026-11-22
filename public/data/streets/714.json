@@ -140,10 +140,10 @@
   ],
   "entrances": [
     {"x":-306,"z":14,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"Queens Boulevard","wayId":423680532,"cross":null,"crossWayId":null,"side":"median","plaza":null},
-    {"x":-288,"z":-131,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"Queens Boulevard","wayId":216928604,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-288,"z":-131,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"Queens Boulevard","wayId":216928604,"cross":null,"crossWayId":null,"side":"median","plaza":null},
     {"x":-173,"z":35,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"Queens Boulevard","wayId":423680532,"cross":null,"crossWayId":null,"side":"median","plaza":null},
-    {"x":-154,"z":-108,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"Queens Boulevard","wayId":216928604,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-154,"z":-108,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"Queens Boulevard","wayId":216928604,"cross":null,"crossWayId":null,"side":"median","plaza":null},
     {"x":476,"z":133,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"Queens Boulevard","wayId":423680532,"cross":"47th Street","crossWayId":216928613,"side":"median","plaza":null},
-    {"x":496,"z":-11,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"47th Street","wayId":216928613,"cross":"Queens Boulevard","crossWayId":216928604,"side":"SW","plaza":null}
+    {"x":496,"z":-11,"type":"Stair","entry":true,"exit":true,"stopIds":["714"],"street":"Queens Boulevard","wayId":216928604,"cross":"47th Street","crossWayId":216928613,"side":"median","plaza":null}
   ]
 }

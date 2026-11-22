@@ -88,6 +88,13 @@ describe('buildEntrances', () => {
     expect(no.log).toEqual([])
   })
 
+  it('never joins an entrance to a building passage, though the way stays in the file', () => {
+    const file = fileOf([horizontal(1, 'Fulton Street', 0, { tunnel: 'building_passage' }), horizontal(2, 'Other St', 30)])
+    const { entrances, log } = buildEntrances(STATION, [row([0, 5])], file)
+    expect(entrances[0]).toMatchObject({ street: 'Other St', wayId: 2 })
+    expect(log.map((l) => l.kind)).not.toContain('bridge-tunnel')
+  })
+
   it('logs an entrance near the edge of the pinned radius', () => {
     const file = fileOf([{ id: 1, name: 'Main St', points: [[-150, 0], [350, 0]] }])
     expect(buildEntrances(STATION, [row([100, 0])], file).log).toEqual([])

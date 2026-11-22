@@ -100,8 +100,8 @@
   ],
   "entrances": [
     {"x":-292,"z":23,"type":"Stair","entry":true,"exit":true,"stopIds":["715"],"street":"Queens Boulevard","wayId":25355654,"cross":null,"crossWayId":null,"side":"median","plaza":null},
-    {"x":-273,"z":-125,"type":"Stair","entry":true,"exit":true,"stopIds":["715"],"street":"Queens Boulevard","wayId":216928604,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-273,"z":-125,"type":"Stair","entry":true,"exit":true,"stopIds":["715"],"street":"Queens Boulevard","wayId":216928604,"cross":null,"crossWayId":null,"side":"median","plaza":null},
     {"x":-146,"z":42,"type":"Stair","entry":true,"exit":true,"stopIds":["715"],"street":"Queens Boulevard","wayId":25355654,"cross":null,"crossWayId":null,"side":"median","plaza":null},
-    {"x":-132,"z":-101,"type":"Stair","entry":true,"exit":true,"stopIds":["715"],"street":"Queens Boulevard","wayId":216928604,"cross":null,"crossWayId":null,"side":"south","plaza":null}
+    {"x":-132,"z":-101,"type":"Stair","entry":true,"exit":true,"stopIds":["715"],"street":"Queens Boulevard","wayId":216928604,"cross":null,"crossWayId":null,"side":"median","plaza":null}
   ]
 }

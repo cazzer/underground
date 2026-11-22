@@ -116,10 +116,10 @@
   ],
   "entrances": [
     {"x":-661,"z":-32,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"Queens Boulevard","wayId":1416710757,"cross":null,"crossWayId":null,"side":"median","plaza":null},
-    {"x":-643,"z":-187,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"Queens Boulevard","wayId":1137137611,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-643,"z":-187,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"Queens Boulevard","wayId":1137137611,"cross":null,"crossWayId":null,"side":"median","plaza":null},
     {"x":-523,"z":-14,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"Queens Boulevard","wayId":1416710757,"cross":null,"crossWayId":null,"side":"median","plaza":null},
-    {"x":-501,"z":-163,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"Queens Boulevard","wayId":1137137611,"cross":null,"crossWayId":null,"side":"south","plaza":null},
+    {"x":-501,"z":-163,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"Queens Boulevard","wayId":1137137611,"cross":null,"crossWayId":null,"side":"median","plaza":null},
     {"x":121,"z":85,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"Queens Boulevard","wayId":1416710757,"cross":"34th Street","crossWayId":1089742803,"side":"median","plaza":null},
-    {"x":138,"z":-58,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"34th Street","wayId":1089742803,"cross":"Queens Boulevard","crossWayId":1137137611,"side":"SW","plaza":null}
+    {"x":138,"z":-58,"type":"Stair","entry":true,"exit":true,"stopIds":["716"],"street":"Queens Boulevard","wayId":1137137611,"cross":"34th Street","crossWayId":1089742803,"side":"median","plaza":null}
   ]
 }

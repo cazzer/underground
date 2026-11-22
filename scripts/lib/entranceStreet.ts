@@ -24,7 +24,7 @@ export const CORNER_SLACK_M = 10
 /** A cross street must run at least this far off the primary's direction (parallel streets are not corners). */
 export const CORNER_MIN_ANGLE_DEG = 30
 /** Another carriageway of the same street within this far on the other side makes the entrance a median one. */
-export const MEDIAN_MAX_M = 25
+export const MEDIAN_MAX_M = 28
 
 const COS_CORNER = Math.cos((CORNER_MIN_ANGLE_DEG * Math.PI) / 180)
 const EPS = 1e-9
