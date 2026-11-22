@@ -8,6 +8,7 @@ import type { Insets } from '../lib/framing'
 import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
+import { createLabelBlockers } from '../lib/labelBlockers'
 import type { Network } from '../lib/network'
 import { memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
@@ -68,6 +69,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   )
   // The index says who shares the file; the model says who it draws. Their markers and ties go with the focused one's.
   const hiddenSiblings = useMemo(() => hiddenSiblingIds(siblings, interior), [siblings, interior])
+  /** Written by the level labels each frame, read by the street labels: their screen rects. */
+  const labelBlockers = useMemo(() => createLabelBlockers(), [])
   return (
     <Canvas
       // No tone mapping, so every theme token renders as the exact color it names.
@@ -90,8 +93,15 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
-      <StationStreets />
-      {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} />}
+      <StationStreets
+        interior={interior}
+        interiorPending={!interior && !focusedMarker}
+        insets={insets}
+        panel={panel}
+        labelBlockers={labelBlockers}
+        network={network}
+      />
+      {interior && <StationInterior key={interior.stationId} model={interior} network={network} outOfService={outOfService} labelBlockers={labelBlockers} />}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />
       {basemapProbe && <BasemapProbe config={basemapProbe} />}
     </Canvas>

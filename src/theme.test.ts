@@ -98,7 +98,7 @@ describe('street tokens', () => {
     }
   })
 
-  it('keep the veiled floor under look A at full 3D', async () => {
+  it('keep the veiled floor under look A at full 3D (?streets=under)', async () => {
     vi.stubGlobal('window', { location: { search: '' } })
     const { resolveInteriorLook } = await import('./scene/interiorLook')
     vi.unstubAllGlobals()
@@ -107,6 +107,16 @@ describe('street tokens', () => {
       // The veil is the background at veilOpacity × veilWeight, and veilWeight is 1 at full 3D.
       const veiled = mixHex(t.background, t.streetStroke, 1 - look.veilOpacity)
       expect(contrastRatio(veiled, t.background), `${t.name} veiled ${veiled}`).toBeGreaterThanOrEqual(STREET_VEILED_FLOOR)
+    }
+  })
+
+  it('rest at about 1.8 to 2:1 above the veil at full 3D (the auto draw order with an interior, look A)', async () => {
+    const { veiledStreetHex } = await import('./lib/streetVeil')
+    for (const t of Object.values(await themes())) {
+      const veiled = veiledStreetHex(t.streetStroke, t.background)
+      const c = contrastRatio(veiled, t.background)
+      expect(c, `${t.name} over-veil ${veiled}`).toBeGreaterThanOrEqual(1.8)
+      expect(c, `${t.name} over-veil ${veiled}`).toBeLessThanOrEqual(2)
     }
   })
 

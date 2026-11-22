@@ -79,9 +79,11 @@ export interface Theme {
    * interior reveal through material.opacity, as the interior does, so it is briefly translucent mid-fade (accepted),
    * and its last 70 m mix to the background (streetBuffers.ts). A neutral gray, 2.5:1 to 4:1 on the
    * background (fainter than the route lines), at least 60 in sRGB from every drawn route color and both grid
-   * colors (theme.test.ts). Under look A at full 3D the interior veil leaves it at about 1.25:1, a floor the test
-   * keeps: there the interior is the subject, and the DOM labels (ost.5) carry the street names. TEMPORARY
-   * `?streets=over` (streetsLook.ts), drawing it above the veil, is the alternative for the ost.7 look card.
+   * colors (theme.test.ts). With the station's interior loaded under look A they draw above the veil instead,
+   * at a fainter stroke, 1.8 to 2:1 (veiledStreetHex in streetVeil.ts; the test keeps that range), built into
+   * their vertex colors: the interior is the subject, and the DOM labels carry the street names. TEMPORARY `?streets=under`
+   * (streetsLook.ts) keeps them under the veil, where look A leaves them at about 1.25:1, a floor the test keeps;
+   * `?streets=over` draws them above it at full color; both for the ost.7 look card.
    */
   streetStroke: string
   /** Street line width in CSS px. */

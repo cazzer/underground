@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
 import { interiorStationIds } from '../data/interiorLoad'
+import type { LabelBlockers } from '../lib/labelBlockers'
 import type { Network } from '../lib/network'
 import { interiorOpacity, labelOpacity, veilWeight } from '../lib/interiorReveal'
 import { depthFactor, depthScaleY } from '../lib/tilt'
@@ -21,6 +22,8 @@ interface StationInteriorProps {
   network: Network
   /** Ids of the elevators and escalators out of service, sorted: only a change redraws the layers. */
   outOfService: readonly string[]
+  /** Where the level labels write their screen rects, for the street labels to keep clear of. */
+  labelBlockers: LabelBlockers
 }
 
 /**
@@ -29,7 +32,7 @@ interface StationInteriorProps {
  * veil and DOM level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
-export function StationInterior({ model, network, outOfService }: StationInteriorProps) {
+export function StationInterior({ model, network, outOfService, labelBlockers }: StationInteriorProps) {
   // Every station the interior covers must be on the map: its spans, markers and camera all look them up.
   for (const id of interiorStationIds(model)) {
     if (!network.stationById.has(id)) throw new Error(`Interior ${model.stationId} covers unknown station "${id}"`)
@@ -83,7 +86,7 @@ export function StationInterior({ model, network, outOfService }: StationInterio
     labelShown.current = labelOpacity(o, depth)
   })
 
-  useLevelLabels(model.labels, group, labelShown)
+  useLevelLabels(model.labels, group, labelShown, labelBlockers)
 
   return (
     <>

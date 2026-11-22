@@ -3,8 +3,7 @@
  *  build runs it on the same decimeter coordinates it stores. Which ways count is `isStreet` in src/lib/streetClass.ts. */
 import type { StreetJoin, StreetSide } from '../../src/data/streetSchema.ts'
 import type { LocalPoint } from '../../src/data/stationSchema.ts'
-import { searchTokens } from '../../src/lib/searchText.ts'
-import { isArea, isStreet } from '../../src/lib/streetClass.ts'
+import { isArea, isStreet, streetKey } from '../../src/lib/streetClass.ts'
 import { insidePolygon, nearestOnPolyline, SIDE_MIN_M, type Nearest } from './streetGeometry.ts'
 
 /** An OSM way as the join sees it: meters. `closed` is `isClosedRing(way.nodes)` on the street file's way; a closed
@@ -29,14 +28,8 @@ export const MEDIAN_MAX_M = 28
 const COS_CORNER = Math.cos((CORNER_MIN_ANGLE_DEG * Math.PI) / 180)
 const EPS = 1e-9
 
-/** The name reduced to what makes streets the same street: "N 7th St" and "North 7th Street" share a key.
- *  It reuses the station-search synonym table (src/lib/searchText.ts), so a change to search spellings changes join
- *  keys too: rerun the street build and read its diff after touching that table. */
-export function streetKey(name: string): string {
-  return searchTokens(name)
-    .map((t) => t.canon)
-    .join(' ')
-}
+// streetKey lives in src/lib/streetClass.ts (the client's street labels key by it too); re-exported for the build.
+export { streetKey }
 
 interface Hit extends Nearest {
   way: JoinWay

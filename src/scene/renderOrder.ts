@@ -42,8 +42,12 @@ export const RENDER_ORDER = {
   // The veil dims everything above (live trains included), then fine and strong interior strokes of the platform level
   // the lifted trains ride and the levels below it.
   interiorVeil: 7,
-  // TEMPORARY (?streets=over, streetsLook.ts): the streets above the interior veil, under the interior strokes.
+  // The streets above the interior veil, under the interior strokes, while the interior is loaded under look A (at the
+  // fainter veiled stroke, streetVeil.ts); forced either way by the TEMPORARY ?streets= (streetsLook.ts).
   streetsOver: 7.5,
+  // The street file's entrance marks the interior doesn't draw itself: above the veil like the interior's own
+  // entrance squares, under its strokes.
+  streetEntrance: 7.6,
   interiorFine: 8,
   interior: 9,
   // Trains on a revealed station's platforms, redrawn above the veil and those strokes: footprints, bodies
