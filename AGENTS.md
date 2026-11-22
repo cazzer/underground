@@ -142,8 +142,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   2q7.25 landing-turn card is decided (default off: the usual landing turn); the removal list is in `src/scene/landingLook.ts`
   Exit tokens `exitPath` (pink, 3:1, held apart from the interior, focus, location and route colors, also under simulated
   red-green color blindness; theme.test.ts), `exitPathWidth` (3 px), `exitPathDash` / `exitPathGap` (world m) draw the trip's
-  way out. TEMPORARY: `?exitPath=a|b` (centerline only, or restroked connectors and entrance too; default b) and
-  `?exitColor=pink|rim|focus` until the 2q7.12 cards are decided; the removal list is in `src/scene/exitPathLook.ts`
+  way out.
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -203,7 +202,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `ErrorBoundary` keyed by `stationPathKey`): `exitPathBuffers` in one LineMaterial layer per stroke band (`model.decks`), at
     `strokeOrders(band, count).exitPath`: over that band's strokes, under the next deck's lifted trains (9.3 band 0, 9.8
     the top band, 9.545 / 9.578 Union Sq's mid bands), `theme.exitPathWidth`, dashed (`exitPathDash`/`exitPathGap`)
-    when the layout is estimated or the walk outside is; opacity `interiorOpacity`; `exitPathLook.ts` TEMPORARY look flags.
+    when the layout is estimated or the walk outside is; opacity `interiorOpacity`.
     It hands its start and markers (`ExitPathLayers.keepOut`) to the level labels, which drop just below it on screen
     (`src/lib/labelKeepOut.ts`). The exit's entrance (`TripExit.mapLabel`: ground x/z and raw type) goes to
     `StationStreets` as `exitLabel`, which finds it in the street file it shows (`exitEntranceIndex`, within 1.5 m, same
@@ -211,7 +210,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     twin merged into it) is the exit label: `rankEntrances` (entranceLabelBoxes.ts) ranks it above every other entrance
     (an 8e9 tier over the elevators' 4e9), `exemptExitFromMarks` (streetLabelPlacement.ts) lets it cover other entrances'
     marks (only those; panel, header, footer, station markers, focus ring and level labels still block), and
-    `useStreetLabels` tints it `exitPathLook.color` (the path's)
+    `useStreetLabels` tints it `theme.exitPath`
   - `StationStreets.tsx` the focused station's streets (interior or not): one plain LineMaterial layer at y = 0 in a
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
     with the reveal and goes with the focus); keyed by station. Street pieces running under a route line are left out
