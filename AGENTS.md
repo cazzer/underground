@@ -817,9 +817,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `geosearch.ts` / `photon.ts` (the pure trims; Photon rows for transit, another state or country dropped) over
     `geocodeCandidate.ts`; `geocodeMerge.ts` (dedupe: PAD aliases, cross-source twins; rank); `geocodeOutcome.ts` (status,
     attribution, `incomplete`, the log line); `clientLimit.ts` (the per-client limit: Cloudflare's Workers Rate Limiting
-    binding `GEOCODE_CLIENT_LIMIT`, 30 per 60 s per `CF-Connecting-IP` per location, approximate; Cloudflare holds the counter and
-    the address is never logged, stored or echoed; fails open, logging one fixed code once per isolate, with no binding, no
-    header or a throwing binding, since the buckets below still protect Photon; `src/wrangler.test.ts` pins the `ratelimits`
+    binding `GEOCODE_CLIENT_LIMIT`, 30 per 60 s per client per location, approximate; the key is `CF-Connecting-IP` through `clientKey.ts` (IPv4 and
+    IPv4-mapped IPv6 on the full address, other IPv6 on its /64; clients sharing an address, CGNAT or Private Relay, share the
+    count); Cloudflare holds the counter and the address is never logged, stored or echoed; fails open, logging one fixed code
+    once per isolate, with no binding, a malformed address or a throwing binding (and silently with no header), since the buckets below still protect Photon; `src/wrangler.test.ts` pins the `ratelimits`
     entry to its constants); `rateLimit.ts` (per-isolate token buckets: 20 at 2/s overall, 5 at 0.5/s for
     Photon); `lru.ts` (`TtlLru`, 500 entries, 1 h); `geocodeUpstream.ts` (3 s timeout, 256 KB cap, descriptive User-Agent,
     fixed error codes only: a fetch error's text can hold the query)

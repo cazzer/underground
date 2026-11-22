@@ -81,6 +81,27 @@ describe('/geocode per-client limit', () => {
     expect(keys).toEqual([IP_A])
   })
 
+  it('counts the addresses of one IPv6 /64 together and another /64 apart', async () => {
+    const { binding, keys } = fakeBinding(1)
+    const deps = harness()
+    deps.clientLimit = binding
+    expect((await call(deps, '2001:db8:1:2::1')).status).toBe(200)
+    expect((await call(deps, '2001:db8:1:2:abcd:ef01:2345:6789', 'q=another+query')).status).toBe(429)
+    expect((await call(deps, '2001:db8:1:3::1')).status).toBe(200)
+    expect(keys).toEqual(['2001:db8:1:2::/64', '2001:db8:1:2::/64', '2001:db8:1:3::/64'])
+  })
+
+  it('skips the limit for a malformed address, logging one fixed code once and never the value', async () => {
+    const { binding, keys } = fakeBinding(0)
+    const deps = harness()
+    deps.clientLimit = binding
+    const bad = 'not-an-address-zz9'
+    for (let i = 0; i < 3; i++) expect((await call(deps, bad)).status).toBe(200)
+    expect(keys).toEqual([])
+    expect(errorLines('geocode-client-limit')).toEqual([['{"event":"geocode-client-limit-bad-address"}']])
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(bad)
+  })
+
   it('fails open and logs one fixed code once when there is no binding', async () => {
     const deps = harness()
     for (let i = 0; i < 3; i++) expect((await get(deps, QS)).status).toBe(200)

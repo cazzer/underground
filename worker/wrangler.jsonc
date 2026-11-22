@@ -6,15 +6,10 @@
   // on a custom domain/route (tracked in 8x4.5). Until then the per-isolate memo and the
   // upstream cf.cacheTtl are what limit upstream fetches.
   "workers_dev": true,
-  // /geocode's URL carries the user's query, so nothing the platform records may hold it: invocation
-  // logs ("Fetch GET <url>") are off, query strings are redacted anyway, and traces (which record
-  // subrequest URLs) are off. Our own console logs (rt-miss, ene-miss, geocode-miss: counts and fixed
-  // codes, never a query) stay on. `wrangler tail` and the dashboard's live logs may still show full
-  // URLs to whoever tails production. src/wrangler.test.ts pins these settings.
   // /geocode's per-client limit (src/clientLimit.ts: the numbers and why). The binding is Cloudflare's Workers
-  // Rate Limiting, keyed on CF-Connecting-IP; the counter is Cloudflare's, the address is never logged or stored.
-  // namespace_id is an account-unique positive integer as a string; period is 10 or 60. src/wrangler.test.ts
-  // pins this entry against the constants in clientLimit.ts, so change them together.
+  // Rate Limiting, keyed on CF-Connecting-IP (an IPv6 client on its /64); the counter is Cloudflare's, the
+  // address is never logged or stored. namespace_id is an account-unique positive integer as a string; period
+  // is 10 or 60. src/wrangler.test.ts pins this entry against the constants in clientLimit.ts, so change them together.
   "ratelimits": [
     {
       "name": "GEOCODE_CLIENT_LIMIT",
@@ -22,6 +17,11 @@
       "simple": { "limit": 30, "period": 60 }
     }
   ],
+  // /geocode's URL carries the user's query, so nothing the platform records may hold it: invocation
+  // logs ("Fetch GET <url>") are off, query strings are redacted anyway, and traces (which record
+  // subrequest URLs) are off. Our own console logs (rt-miss, ene-miss, geocode-miss: counts and fixed
+  // codes, never a query) stay on. `wrangler tail` and the dashboard's live logs may still show full
+  // URLs to whoever tails production. src/wrangler.test.ts pins these settings.
   "observability": {
     "enabled": true,
     "redact_query_string": true,
