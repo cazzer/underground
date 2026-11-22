@@ -172,9 +172,15 @@ describe('serveCached', () => {
     await expect(serveCached(route, req('/ene'), ctx, null, edge)).rejects.toThrow('down')
     const busy = await serveCached(route, req('/ene'), ctx, ALLOWED, edge)
     expect(busy.status).toBe(503)
-    expect(busy.headers.get('retry-after')).toBe('1')
+    expect(await busy.text()).toBe('{"error":"upstream"}')
+    expect(busy.headers.get('retry-after')).toBe(String(FAILURE_BACKOFF_MS / 1000))
     expect(busy.headers.get('access-control-allow-origin')).toBe(ALLOWED)
     expect(build).toHaveBeenCalledTimes(1)
+
+    // The hint counts down and rounds up, never below 1 s.
+    vi.setSystemTime(T0 + FAILURE_BACKOFF_MS - 1)
+    const last = await serveCached(route, req('/ene'), ctx, null, edge)
+    expect(last.headers.get('retry-after')).toBe('1')
 
     vi.setSystemTime(T0 + FAILURE_BACKOFF_MS)
     expect(await (await serveCached(route, req('/ene'), ctx, null, edge)).text()).toBe('fresh')

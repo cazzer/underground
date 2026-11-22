@@ -83,13 +83,18 @@ export async function serveCached(
   const now = Date.now()
   let decision = cacheDecision(now, state.memo, state.refreshingSince)
   // After a failed refresh, don't hit a struggling upstream on every request.
-  if (decision === 'refresh' && state.failedUntil !== null && now < state.failedUntil) {
-    decision = state.memo ? 'stale' : 'busy'
-  }
+  const backoffLeftMs = state.failedUntil === null ? 0 : state.failedUntil - now
+  const backedOff = decision === 'refresh' && backoffLeftMs > 0
+  if (backedOff) decision = state.memo ? 'stale' : 'busy'
   if (decision === 'busy') {
-    return new Response('{"error":"warming"}', {
+    // Warming resolves in about a second; a failed upstream says how long the backoff has left.
+    return new Response(backedOff ? '{"error":"upstream"}' : '{"error":"warming"}', {
       status: 503,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'retry-after': '1', ...corsHeaders(origin) },
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'retry-after': backedOff ? String(Math.max(1, Math.ceil(backoffLeftMs / 1000))) : '1',
+        ...corsHeaders(origin),
+      },
     })
   }
   if (decision !== 'refresh' && state.memo) return respond(state.memo.body, decision, origin)
@@ -100,10 +105,11 @@ export async function serveCached(
     const result = await refresh(route, request, ctx, edge)
     // Overlapping refreshes can finish out of order; never move the memo backwards.
     if (!state.memo || result.memo.expiresAt > state.memo.expiresAt) state.memo = result.memo
-    state.failedUntil = null
+    // Only the current claim records the outcome; a taken-over refresh must not undo it.
+    if (state.refreshingSince === now) state.failedUntil = null
     return respond(result.memo.body, result.state, origin)
   } catch (e) {
-    state.failedUntil = Date.now() + FAILURE_BACKOFF_MS
+    if (state.refreshingSince === now) state.failedUntil = Date.now() + FAILURE_BACKOFF_MS
     if (!state.memo) throw e
     console.error(e)
     return respond(state.memo.body, 'stale', origin)

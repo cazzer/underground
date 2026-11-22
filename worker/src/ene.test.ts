@@ -96,14 +96,16 @@ describe('transformEne', () => {
 
   it('cleans a reason: collapses whitespace, strips control and bidi characters, caps by code point', () => {
     const reasons = [
-      'Re‮pair\u0000  \n work​',
-      '‮\u0007',
+      'Re\u202Epair\u0000  \n work\u200B',
+      'a \u200B b',
+      '\u202E\u0007',
       `${'x'.repeat(99)}😀y`,
       `${'x'.repeat(98)}😀😀`,
     ].map((reason, i) => ({ ...row('EL738'), equipment: `EL10${i}`, reason }))
     const { snapshot } = transformEne(reasons, GENERATED_AT)
     expect(snapshot.outages.map((o) => o.reason)).toEqual([
       'Repair work',
+      'a b',
       null,
       `${'x'.repeat(99)}😀`,
       `${'x'.repeat(98)}😀😀`,

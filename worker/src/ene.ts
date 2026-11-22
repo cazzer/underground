@@ -71,10 +71,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Free text from upstream: whitespace collapsed, control and format characters (bidi overrides) removed, 100 code points. */
+/** Free text from upstream: whitespace collapsed (again after the strip), control and format characters (bidi overrides) removed, 100 code points. */
 function parseReason(value: unknown): string | null {
   if (typeof value !== 'string') return null
-  const clean = value.replace(/\s+/g, ' ').replace(/[\p{Cc}\p{Cf}]/gu, '').trim()
+  const clean = value.replace(/\s+/g, ' ').replace(/[\p{Cc}\p{Cf}]/gu, '').replace(/\s+/g, ' ').trim()
   // By code point, so the cap never splits a surrogate pair.
   const reason = Array.from(clean).slice(0, REASON_MAX_CHARS).join('').trim()
   return reason === '' ? null : reason

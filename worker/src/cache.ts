@@ -24,7 +24,8 @@ export type CacheDecision = 'memory' | 'stale' | 'busy' | 'refresh'
  * period is presumed dead and may be taken over).
  *
  * Freshness, worst case per route: /rt about 36 s = 15 s upstream cf cache + 15 s memo + 6 s grace;
- * /ene about 246 s = 120 s upstream cf cache + 120 s memo + 6 s grace.
+ * /ene about 246 s = 120 s upstream cf cache + 120 s memo + 6 s grace. After a failed refresh the
+ * stale body can be served up to FAILURE_BACKOFF_MS (15 s) longer per failed attempt.
  */
 export function cacheDecision(now: number, memo: Memo | null, refreshingSince: number | null): CacheDecision {
   if (memo && now < memo.expiresAt) return 'memory'
