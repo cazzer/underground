@@ -143,7 +143,7 @@ export function OutageStatus({ view, stationId, onFocusLost }: OutageStatusProps
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
-      <OutageList key={stationId} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
+      <OutageList key={`${stationId}|${view.body.kind}`} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
     </>
   )
 }

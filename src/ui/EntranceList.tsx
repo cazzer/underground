@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { EntranceText } from '../lib/entranceText'
 import { entranceRows } from '../lib/entranceList'
 
@@ -16,12 +16,11 @@ interface EntranceListProps {
  * nothing while the street file loads or when the station has no labelled entrance.
  */
 export function EntranceList({ entrances, listsStation }: EntranceListProps) {
-  const headingId = useId()
   const rows = useMemo(() => (entrances ? entranceRows(entrances, listsStation) : []), [entrances, listsStation])
   if (rows.length === 0) return null
   return (
-    <section className="sr-only" aria-labelledby={headingId}>
-      <h3 id={headingId}>Entrances</h3>
+    <section className="sr-only">
+      <h3>Entrances</h3>
       <ul>
         {rows.map((row) => (
           <li key={row.key}>{row.spoken}</li>
