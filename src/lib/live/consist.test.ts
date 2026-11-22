@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { tiltT } from '../tilt'
-import { carMix, carsReach, CARS_AT_M, consistCenter, consistFor, DEFAULT_CONSIST, DOTS_FROM_M, MAX_CARS } from './consist'
+import {
+  carMix,
+  carsReach,
+  CARS_AT_M,
+  consistCenter,
+  consistFor,
+  DEFAULT_CONSIST,
+  DOTS_FROM_M,
+  MAX_CARS,
+  SELECTED_CARS_AT_M,
+  SELECTED_DOTS_FROM_M,
+  selectedCarMix,
+} from './consist'
 
 describe('consistFor', () => {
   it('gives each division its car count and length', () => {
@@ -67,6 +79,25 @@ describe('carMix', () => {
   it('is continuous at both thresholds', () => {
     for (const d of [CARS_AT_M, DOTS_FROM_M]) {
       expect(Math.abs(carMix(d - 0.01) - carMix(d + 0.01))).toBeLessThan(1e-6)
+    }
+  })
+})
+
+describe('selectedCarMix', () => {
+  it('is cars to 12 km and a dot only past 20 km', () => {
+    expect(selectedCarMix(SELECTED_CARS_AT_M)).toBeCloseTo(1, 12)
+    expect(selectedCarMix(5000)).toBe(1)
+    expect(selectedCarMix(SELECTED_DOTS_FROM_M)).toBeCloseTo(0, 12)
+    expect(selectedCarMix(30_000)).toBe(0)
+  })
+
+  it('is never below carMix and rises monotonically as the camera comes in', () => {
+    let prev = -1
+    for (let d = 25_000; d >= 200; d -= 25) {
+      const m = selectedCarMix(d)
+      expect(m).toBeGreaterThanOrEqual(carMix(d))
+      expect(m).toBeGreaterThanOrEqual(prev)
+      prev = m
     }
   })
 })

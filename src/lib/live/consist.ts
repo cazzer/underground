@@ -66,11 +66,25 @@ export function consistCenter(lengthM: number, shown: number, trainM: number): n
 export const DOTS_FROM_M = 2400
 export const CARS_AT_M = 1600
 
-/** 0 draws dots, 1 draws cars; a smoothstep in log distance between, so zooming at a steady rate feels even. */
-export function carMix(distance: number): number {
-  const x = Math.log(DOTS_FROM_M / distance) / Math.log(DOTS_FROM_M / CARS_AT_M)
+/** The selected train stays cars much farther out: cars to 12 km, a dot only past 20 km. */
+export const SELECTED_DOTS_FROM_M = 20_000
+export const SELECTED_CARS_AT_M = 12_000
+
+/** 0 at `dotsFrom` and beyond, 1 at `carsAt` and closer; a smoothstep in log distance between. */
+function mixBetween(distance: number, dotsFrom: number, carsAt: number): number {
+  const x = Math.log(dotsFrom / distance) / Math.log(dotsFrom / carsAt)
   const t = Math.min(Math.max(x, 0), 1)
   return t * t * (3 - 2 * t)
+}
+
+/** 0 draws dots, 1 draws cars; a smoothstep in log distance between, so zooming at a steady rate feels even. */
+export function carMix(distance: number): number {
+  return mixBetween(distance, DOTS_FROM_M, CARS_AT_M)
+}
+
+/** carMix for the selected train (selectedMix.ts eases a slot onto and off it). Never below carMix. */
+export function selectedCarMix(distance: number): number {
+  return mixBetween(distance, SELECTED_DOTS_FROM_M, SELECTED_CARS_AT_M)
 }
 
 /**

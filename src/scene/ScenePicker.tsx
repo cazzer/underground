@@ -77,6 +77,7 @@ export function ScenePicker({ stations, trainPick }: ScenePickerProps) {
       input.consistOf = src.consistOf
       input.y = src.y
       input.carHeightM = src.carHeightM
+      input.mixOf = src.mixOf
       input.mix = carMix(d)
       input.localS = performance.now() / 1000
       return input

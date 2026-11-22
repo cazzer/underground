@@ -95,7 +95,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, `theme.train` if `routeLineMix.amount` is 1 (mono lines); stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
     `theme.trainSelectedRim` rim. Its dot is drawn on its own above every other dot; its cars get the top widen
-    level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
+    level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints, and it is cars at any zoom
+    to 12 km (`selectedCarMix`, laid out wherever it is; `useSelectedSlot.ts` maps the selected trip to its slot and
+    eases it on and off over 0.4 s, `src/lib/live/selectedMix.ts`; picks read the same per-slot mix through
+    `TrainPickSource.mixOf`); wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
     their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body (its dimension constants live in `src/lib/carDims.ts`));
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
@@ -243,7 +246,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     the arrival's clock minute minus the current one (not floor of seconds), so adjacent rows and both
     panels agree
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
-    (dots from 2400 m, cars by 1600 m, so a train is a flat footprint before the camera tips) and `carsReach`; `consistLayout.ts` `writeConsist`: cars end to end along the shape
+    (dots from 2400 m, cars by 1600 m, so a train is a flat footprint before the camera tips), `selectedCarMix` (the
+    selected train: dots from 20 km, cars by 12 km) and `carsReach`; `consistLayout.ts` `writeConsist`: cars end to end along the shape
     (`consistSpanInto`, shared with picking), each on its chord between two track points (pitched on the profile), unfolding from the dot point (spacing and length by mix, section by the slot fade);
     `dirtyRanges.ts` upload ranges for runs of changed slots. Only trains within `carsReach` of the view center
     ((1 + 2 × tilt) camera distances plus 300 m, so 1 top-down and 3 at full tilt) are laid out; the rest are zeroed once
