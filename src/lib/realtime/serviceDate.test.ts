@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { index } from './fixture'
-import { addDays, nyDate, servicesOn } from './serviceDate'
+import { addDays, nyDate, serviceDayStart, servicesOn } from './serviceDate'
+
+describe('serviceDayStart', () => {
+  it('is New York midnight on an ordinary EST day', () => {
+    expect(serviceDayStart('20261123')).toBe(Date.UTC(2026, 10, 23, 5) / 1000)
+  })
+  it('is New York midnight on an ordinary EDT day', () => {
+    expect(serviceDayStart('20260701')).toBe(Date.UTC(2026, 6, 1, 4) / 1000)
+  })
+  it('is an hour off midnight on the fall-back day', () => {
+    expect(serviceDayStart('20261101')).toBe(1793509200)
+  })
+  it('is an hour off midnight on the spring-forward day', () => {
+    expect(serviceDayStart('20260308')).toBe(1772942400)
+    expect(serviceDayStart('20270314')).toBe(Date.UTC(2027, 2, 14, 4) / 1000)
+  })
+})
 
 const on = (date: string) => servicesOn(date, index.calendar, index.calendarExceptions)
 

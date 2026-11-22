@@ -43,3 +43,33 @@ export function nyDate(epochSec: number): string {
     NY_DATE.formatToParts(new Date(epochSec * 1000)).find((p) => p.type === type)!.value
   return part('year') + part('month') + part('day')
 }
+
+const NY_CLOCK = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+  second: 'numeric',
+})
+
+/** New York's offset from UTC, in seconds (negative), at an epoch-seconds instant. */
+function nyOffsetS(epochSec: number): number {
+  const part = (type: Intl.DateTimeFormatPartTypes): number =>
+    Number(NY_CLOCK.formatToParts(new Date(epochSec * 1000)).find((p) => p.type === type)!.value)
+  const local = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second')) / 1000
+  return local - epochSec
+}
+
+/**
+ * Epoch seconds of a service day's time base (GTFS "noon minus 12 h"): New York noon on `date` (YYYYMMDD) minus
+ * 12 h. Timetable seconds count from it. It is midnight New York time, except an hour off on the two DST days.
+ */
+export function serviceDayStart(date: string): number {
+  const [y, m, d] = parts(date)
+  // 17:00 UTC is after the 02:00 switch on any NY date, so its offset is the day's noon offset.
+  const offset = nyOffsetS(Date.UTC(y, m - 1, d, 17) / 1000)
+  return Date.UTC(y, m - 1, d, 12) / 1000 - offset - 12 * 3600
+}

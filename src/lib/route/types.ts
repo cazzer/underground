@@ -31,7 +31,7 @@ export interface Pattern {
   tripIds: readonly string[]
   /** Per trip: patterns are keyed by stop sequence, so two routes can share one. */
   routeIds: readonly RouteId[]
-  /** Seconds since the query day's midnight (negative or past 86400 is fine), row per trip: [trip * n + i]. */
+  /** Seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days; negative or past 86400 is fine), row per trip: [trip * n + i]. */
   arr: Int32Array
   dep: Int32Array
 }
