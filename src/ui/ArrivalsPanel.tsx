@@ -63,7 +63,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
         <InteriorStatus info={interior} />
         <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
         <ArrivalsList key={`arrivals-${stationId}`} network={network} station={station} source={arrivals} status={live} onFocusLost={() => headingRef.current?.focus()} />
-        <EntranceList key={stationId} entrances={streets?.entrances ?? null} listsStation={listsStation} onFocusLost={() => headingRef.current?.focus()} />
+        <EntranceList entrances={streets?.entrances ?? null} listsStation={listsStation} />
       </div>
     </aside>
   )

@@ -1,154 +1,32 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useId, useMemo } from 'react'
 import type { EntranceText } from '../lib/entranceText'
-import { entranceRows, entranceTotal, type EntranceRow } from '../lib/entranceList'
-import { useListScroll } from './useListScroll'
-import { useStackedPanel } from './useStackedPanel'
-
-/** Rows shown before "Show all N entrances" (none while the panel is stacked over the map: the section starts as a closed disclosure). */
-const COLLAPSED_ROWS = 3
-
-interface RowProps {
-  row: EntranceRow
-}
-
-/** The visible wording is hidden from screen readers, which get the spoken form (full names, corners spelled out). */
-function Row({ row }: RowProps) {
-  return (
-    <li className="py-1.5 leading-tight">
-      <span aria-hidden="true">
-        {row.parts.map((part, i) => (
-          <span key={i}>
-            {part.sep}
-            <span className={part.keep ? 'whitespace-nowrap' : undefined}>{part.text}</span>
-          </span>
-        ))}
-        {row.count > 1 && (
-          <>
-            {' '}
-            <span className="whitespace-nowrap text-ink-dim">({row.count})</span>
-          </>
-        )}
-      </span>
-      <span className="sr-only">{row.spoken}</span>
-    </li>
-  )
-}
-
-interface ToggleProps {
-  expanded: boolean
-  controls: string | undefined
-  onToggle: () => void
-  /** Called when the button goes away while it has focus. */
-  onFocusLost: () => void
-  className: string
-  children: ReactNode
-}
-
-function Toggle({ expanded, controls, onToggle, onFocusLost, className, children }: ToggleProps) {
-  const button = useRef<HTMLButtonElement>(null)
-  const lost = useRef(onFocusLost)
-  useLayoutEffect(() => {
-    lost.current = onFocusLost
-  })
-  // The layout cleanup of an unmounting child runs before React removes its node, so focus can still be read.
-  // Empty deps: it must run only on unmount, however the parent's callback changes.
-  useLayoutEffect(
-    () => () => {
-      if (button.current !== null && button.current === document.activeElement) lost.current()
-    },
-    [],
-  )
-  return (
-    <button
-      ref={button}
-      type="button"
-      aria-expanded={expanded}
-      aria-controls={controls}
-      onClick={onToggle}
-      className={`cursor-pointer focus-visible:outline-2 focus-visible:outline-focus ${className}`}
-    >
-      {children}
-    </button>
-  )
-}
+import { entranceRows } from '../lib/entranceList'
 
 interface EntranceListProps {
   /** The focused station's labelled entrances (the street file's), null until they load or when it has none. */
   entrances: readonly EntranceText[] | null
   /** Whether a label's entrance lists the focused station; rows that do come first (a complex shares its entrances). */
   listsStation?: (text: EntranceText) => boolean
-  /** Takes focus when the button that has it goes away (a resize across the stacked-panel breakpoint, another station). */
-  onFocusLost: () => void
 }
 
 /**
- * Where the focused station's entrances open onto the street, in the map labels' words, for everyone and for screen
- * readers (the labels are aria-hidden; each row has a spoken form). Wider screens show three rows and "Show all N
- * entrances"; a panel stacked over the map (phones in portrait) shows a closed "Entrances (N)" disclosure, so the panel stays short over the map. Not a live
- * region, and nothing while the street file loads or when the station has no labelled entrance. Key it by station
- * so a new station starts collapsed.
+ * Where the focused station's entrances open onto the street, for screen readers only. Sighted users read the map's
+ * entrance labels, so the panel never shows the list (the user's call: keep the panel short). The map labels are
+ * aria-hidden, so this list is how a screen reader gets the same facts, in each row's spoken form. Not a live region;
+ * nothing while the street file loads or when the station has no labelled entrance.
  */
-export function EntranceList({ entrances, listsStation, onFocusLost }: EntranceListProps) {
-  const stacked = useStackedPanel()
-  const [expanded, setExpanded] = useState(false)
-  const listId = useId()
+export function EntranceList({ entrances, listsStation }: EntranceListProps) {
   const headingId = useId()
-  const all = useMemo(() => (entrances ? entranceRows(entrances, listsStation) : []), [entrances, listsStation])
-  const rows = expanded ? all : stacked ? [] : all.slice(0, COLLAPSED_ROWS)
-  const { scroller, list, capPx, overflows, atEnd, onScroll } = useListScroll<HTMLUListElement>(rows.length)
-  if (all.length === 0) return null
-  const total = entranceTotal(all)
-  const toggle = () => setExpanded((e) => !e)
+  const rows = useMemo(() => (entrances ? entranceRows(entrances, listsStation) : []), [entrances, listsStation])
+  if (rows.length === 0) return null
   return (
-    <section className="mt-3">
-      <h3 id={headingId} className="text-xs uppercase tracking-widest text-ink-dim">
-        {stacked ? (
-          <Toggle
-            expanded={expanded}
-            controls={rows.length > 0 ? listId : undefined}
-            onToggle={toggle}
-            onFocusLost={onFocusLost}
-            className="-mx-2 flex min-h-11 w-[calc(100%+1rem)] items-center justify-between px-2 uppercase tracking-widest hover:text-ink"
-          >
-            <span>Entrances ({total})</span>
-            <span aria-hidden="true">{expanded ? '−' : '+'}</span>
-          </Toggle>
-        ) : (
-          'Entrances'
-        )}
-      </h3>
-      {rows.length > 0 && (
-        <div className="relative mt-1">
-          {/* Capped at whole rows while stacked, like the train's stop list; a focusable region only while it scrolls. */}
-          <div
-            ref={scroller}
-            onScroll={onScroll}
-            style={capPx === null ? undefined : { maxHeight: capPx }}
-            {...(overflows ? ({ role: 'region', 'aria-labelledby': headingId, tabIndex: 0 } as const) : {})}
-            className="relative overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-focus"
-          >
-            <ul ref={list} id={listId} className="divide-y divide-edge/30 text-sm">
-              {rows.map((row) => (
-                <Row key={row.key} row={row} />
-              ))}
-            </ul>
-          </div>
-          {overflows && !atEnd && (
-            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-linear-to-t from-panel to-transparent" />
-          )}
-        </div>
-      )}
-      {!stacked && all.length > COLLAPSED_ROWS && (
-        <Toggle
-          expanded={expanded}
-          controls={listId}
-          onToggle={toggle}
-          onFocusLost={onFocusLost}
-          className="-mx-2 mt-1 flex min-h-11 items-center px-2 text-sm text-ink-dim hover:text-ink"
-        >
-          {expanded ? 'Show fewer' : `Show all ${total} entrances`}
-        </Toggle>
-      )}
+    <section className="sr-only" aria-labelledby={headingId}>
+      <h3 id={headingId}>Entrances</h3>
+      <ul>
+        {rows.map((row) => (
+          <li key={row.key}>{row.spoken}</li>
+        ))}
+      </ul>
     </section>
   )
 }
