@@ -46,8 +46,21 @@ interface FocusProviderProps {
   children: ReactNode
 }
 
+/** The focused station's entrance marks and point in viewport px, the camera's distance and target, the free rect. */
+export interface EntranceProbe {
+  stationId: string
+  distance: number
+  target: Ground
+  station: { ground: Ground; px: { x: number; y: number } } | null
+  marks: { x: number; y: number }[]
+  free: { left: number; top: number; right: number; bottom: number }
+  viewport: { width: number; height: number }
+}
+
 /** Dev-only console and Playwright hooks; each provider adds and removes only its own. */
 export interface UndergroundDevHooks {
+  /** The focused station's street layer probe (useEntranceProbe), while it has a streets file. */
+  entrancesAt?: () => EntranceProbe
   select?: (stationId: string) => void
   selectTrain?: (key: string) => void
   trainKeys?: () => string[]

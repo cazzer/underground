@@ -22,6 +22,7 @@ import { interiorLook } from './interiorLook'
 import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
 import { RENDER_ORDER } from './renderOrder'
 import { streetsLook } from './streetsLook'
+import { useEntranceProbe } from './useEntranceProbe'
 import { useLineLayer } from './useLineLayer'
 import { MARKER_MIN_METERS } from './markerShape'
 import { useStreetLabels, type LabelContext } from './useStreetLabels'
@@ -154,6 +155,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
   })
 
   useStreetLabels(layer, stations, bundles, labelShown, labelContext, insetsRef, panelRef, labelBlockers, ENTRANCE_SIZE_M / 2)
+  useEntranceProbe(layer, focused, insets, panel)
 
   return (
     <group ref={group} position={[layer.anchor.x, 0, layer.anchor.z]} visible={false}>

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { interiorReadyFor, reframeAction, reframeDuration, REFRAME_MAX_S, REFRAME_MIN_S, type ReframeInput } from './interiorReframe'
+import { interiorReadyFor, reframeAction, reframeDuration, streetsReadyFor, REFRAME_MAX_S, REFRAME_MIN_S, type ReframeInput } from './interiorReframe'
 
-const landed: ReframeInput = { flying: false, following: false, focusedId: 'L08', interiorReady: true }
-const awaiting = { stationId: 'L08', reduced: false }
+const landed: ReframeInput = { flying: false, following: false, focusedId: 'L08', ready: true }
+const awaiting = { stationId: 'L08', kind: 'interior' as const, reduced: false }
 
 describe('reframeAction', () => {
   it('reframes once the flight has landed and its interior is known', () => {
@@ -10,19 +10,19 @@ describe('reframeAction', () => {
   })
 
   it('snaps without a turn under reduced motion', () => {
-    expect(reframeAction({ stationId: 'L08', reduced: true }, landed)).toBe('snap')
+    expect(reframeAction({ stationId: 'L08', kind: 'interior' as const, reduced: true }, landed)).toBe('snap')
   })
 
   it('waits while the flight is under way or the interior has not arrived', () => {
     expect(reframeAction(awaiting, { ...landed, flying: true })).toBe('wait')
     // A stale interior of another station is not ready: interiorCovers decides that (interiorComplex.test.ts).
-    expect(reframeAction(awaiting, { ...landed, interiorReady: false })).toBe('wait')
+    expect(reframeAction(awaiting, { ...landed, ready: false })).toBe('wait')
   })
 
   it('reframes for a complex member the interior covers, whichever member awaited it', () => {
-    // The caller decides interiorReady with interiorCovers; the awaited station is the focused member, not the file id.
-    expect(reframeAction({ stationId: 'U01', reduced: false }, { ...landed, focusedId: 'U01' })).toBe('reframe')
-    expect(reframeAction({ stationId: 'U01', reduced: false }, { ...landed, focusedId: 'T01' })).toBe('drop')
+    // The caller decides ready with interiorCovers; the awaited station is the focused member, not the file id.
+    expect(reframeAction({ stationId: 'U01', kind: 'interior' as const, reduced: false }, { ...landed, focusedId: 'U01' })).toBe('reframe')
+    expect(reframeAction({ stationId: 'U01', kind: 'interior' as const, reduced: false }, { ...landed, focusedId: 'T01' })).toBe('drop')
   })
 
   it('drops the reframe when focus moves on or a train is followed, even mid-flight', () => {
@@ -56,13 +56,32 @@ describe('interiorReadyFor', () => {
   const complex = { stationId: 'T01', memberStationIds: ['T01', 'U01'] }
 
   it('is ready when the loaded interior covers the awaited station, whichever member it was', () => {
-    expect(interiorReadyFor({ stationId: 'U01', reduced: false }, complex)).toBe(true)
-    expect(interiorReadyFor({ stationId: 'L08', reduced: false }, { stationId: 'L08' })).toBe(true)
+    expect(interiorReadyFor({ stationId: 'U01', kind: 'interior' as const, reduced: false }, complex)).toBe(true)
+    expect(interiorReadyFor({ stationId: 'L08', kind: 'interior' as const, reduced: false }, { stationId: 'L08' })).toBe(true)
   })
 
   it('is not ready for no awaiting flight, no interior, or the interior of another station', () => {
     expect(interiorReadyFor(null, complex)).toBe(false)
-    expect(interiorReadyFor({ stationId: 'U01', reduced: false }, null)).toBe(false)
-    expect(interiorReadyFor({ stationId: 'L08', reduced: false }, complex)).toBe(false)
+    expect(interiorReadyFor({ stationId: 'U01', kind: 'interior' as const, reduced: false }, null)).toBe(false)
+    expect(interiorReadyFor({ stationId: 'L08', kind: 'interior' as const, reduced: false }, complex)).toBe(false)
+  })
+})
+
+describe('streetsReadyFor', () => {
+  const bare = { stationId: '127', kind: 'streets' as const, reduced: false }
+
+  it("is ready once the awaited bare station's streets have loaded", () => {
+    expect(streetsReadyFor(bare, { stationId: '127' })).toBe(true)
+  })
+
+  it('is not ready for no awaiting flight, no streets, another station, or a flight awaiting an interior', () => {
+    expect(streetsReadyFor(null, { stationId: '127' })).toBe(false)
+    expect(streetsReadyFor(bare, null)).toBe(false)
+    expect(streetsReadyFor(bare, { stationId: '725' })).toBe(false)
+    expect(streetsReadyFor({ ...bare, kind: 'interior' }, { stationId: '127' })).toBe(false)
+  })
+
+  it('leaves a flight awaiting streets unready for any interior', () => {
+    expect(interiorReadyFor(bare, { stationId: '127' })).toBe(false)
   })
 })

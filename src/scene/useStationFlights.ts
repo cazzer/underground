@@ -1,15 +1,25 @@
 import { useEffect, useLayoutEffect, type RefObject } from 'react'
 import type { PerspectiveCamera } from 'three'
-import { interiorCovers } from '../data/interiorLoad'
+import { interiorCovers, interiorIdOf } from '../data/interiorLoad'
+import type { StreetLayer } from '../data/useStationStreets'
 import type { FlyRequest } from '../lib/focus'
 import type { FocusHold } from '../lib/focusHold'
 import { flightProgress } from '../lib/flight'
 import type { Insets, Viewport } from '../lib/framing'
-import { retargetTurn, type ScreenRect } from '../lib/interiorCamera'
-import type { AwaitingInterior } from '../lib/interiorReframe'
+import { LATE_TURN_PROGRESS, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
+import { streetsReadyFor, type AwaitingInterior } from '../lib/interiorReframe'
 import type { Network } from '../lib/network'
 import { prefersReducedMotion } from '../lib/reducedMotion'
-import { flushMotion, interiorFlight, newFlight, pointFlight, stationFlight, type Flight, type MapControlsImpl } from './cameraFlight'
+import {
+  bareStationPoints,
+  flushMotion,
+  interiorFlight,
+  newFlight,
+  pointFlight,
+  stationFlight,
+  type Flight,
+  type MapControlsImpl,
+} from './cameraFlight'
 import type { InteriorModel } from './interiorModel'
 import type { ReframeLayout } from './useInteriorReframe'
 
@@ -31,11 +41,13 @@ interface StationFlightsOptions {
   panel: ScreenRect | null
   size: Viewport
   insets: Insets
+  /** The focused station's streets once loaded: a bare station's flight frames their entrances. */
+  streets: StreetLayer | null
 }
 
 /**
  * Starts the flight a fly request asks for (a station or a point), and retargets a station flight mid-way when its
- * interior or the panel's measurement arrives. Call it after CameraRig's `latest` layout effect, so a fly request
+ * interior, a bare station's streets or the panel's measurement arrives. Call it after CameraRig's `latest` layout effect, so a fly request
  * reads the current layout.
  */
 export function useStationFlights({
@@ -51,6 +63,7 @@ export function useStationFlights({
   panel,
   size,
   insets,
+  streets,
 }: StationFlightsOptions): void {
   // Layout effect, not a passive one: a frame between the select and a passive effect would see
   // the new focus with no flight and drop it again (the camera is still far out).
@@ -76,10 +89,15 @@ export function useStationFlights({
     flushMotion(c, camera)
     const reduced = prefersReducedMotion()
     const known = interiorCovers(l.interior, station.id) ? l.interior : null
-    awaiting.current = known ? null : { stationId: station.id, reduced }
+    // A bare station (the index lists no interior) awaits only its streets, and nothing once they are cached.
+    const bare = l.index.status === 'ready' && interiorIdOf(station.id, l.index) === null
+    const points = bareStationPoints(station.id, l.streets, l.index)
+    if (known) awaiting.current = null
+    else if (!bare) awaiting.current = { stationId: station.id, kind: 'interior', reduced }
+    else awaiting.current = l.streets?.stationId === station.id ? null : { stationId: station.id, kind: 'streets', reduced }
     const dest = known
       ? interiorFlight(station.id, known, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle(), !reduced)
-      : stationFlight(station.id, station.pos, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
+      : stationFlight(station.id, station.pos, points, l.size, l.insets, l.panel, camera.fov, c.getAzimuthalAngle())
     flight.current = newFlight(dest, c, camera, reduced, known !== null || reduced)
   }, [flyRequest, network, camera, controls, flight, hold, awaiting, layout])
 
@@ -97,7 +115,12 @@ export function useStationFlights({
     const e0 = flightProgress(f.elapsed, f.duration)
     let dest
     if (!interior || !interiorCovers(interior, f.stationId)) {
-      dest = stationFlight(station.id, station.pos, size, insets, panel, camera.fov, az)
+      // Streets that load late in the flight wait for the landing too: the reframe folds them in.
+      const a = awaiting.current
+      const late = a?.kind === 'streets' && e0 > LATE_TURN_PROGRESS
+      const points = late ? [] : bareStationPoints(station.id, streets, layout.current.index)
+      dest = stationFlight(station.id, station.pos, points, size, insets, panel, camera.fov, az)
+      if (!late && streetsReadyFor(a, streets)) awaiting.current = null
     } else {
       const turn = retargetTurn(f.turnDecided, e0)
       // Later: too late to fold in without a lurch; the flight lands as it is and the reframe takes over.
@@ -115,5 +138,5 @@ export function useStationFlights({
     f.target = dest.target
     f.distance = dest.distance
     f.azimuth = dest.azimuth
-  }, [interior, panel, size, insets, camera, network, controls, flight, awaiting])
+  }, [interior, panel, size, insets, streets, camera, network, controls, flight, awaiting, layout])
 }

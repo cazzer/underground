@@ -1,0 +1,107 @@
+[
+  {
+    "view": "phone",
+    "reduced": false,
+    "station": "127",
+    "distance": 400,
+    "offset": 70.8,
+    "inside": "9/11",
+    "minMarginPx": -71.4,
+    "stationPx": {
+      "x": 195,
+      "y": 303
+    },
+    "stationMarginPx": 195,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 510.5
+    },
+    "focusedAfter": "127"
+  },
+  {
+    "view": "phone",
+    "reduced": false,
+    "station": "120",
+    "distance": 400,
+    "offset": 70.8,
+    "inside": "4/6",
+    "minMarginPx": -58.8,
+    "stationPx": {
+      "x": 195,
+      "y": 303
+    },
+    "stationMarginPx": 195,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 510.5
+    },
+    "focusedAfter": "120"
+  },
+  {
+    "view": "phone",
+    "reduced": true,
+    "station": "127",
+    "distance": 400,
+    "offset": 56.3,
+    "inside": "9/11",
+    "minMarginPx": -78.1,
+    "stationPx": {
+      "x": 195,
+      "y": 324
+    },
+    "stationMarginPx": 186,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 390,
+      "bottom": 510.5
+    },
+    "focusedAfter": "127"
+  },
+  {
+    "view": "desktop",
+    "reduced": false,
+    "station": "127",
+    "distance": 400,
+    "offset": 44.9,
+    "inside": "11/11",
+    "minMarginPx": 192.1,
+    "stationPx": {
+      "x": 561,
+      "y": 447
+    },
+    "stationMarginPx": 386.5,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 1120,
+      "bottom": 833
+    },
+    "focusedAfter": "127"
+  },
+  {
+    "view": "desktop",
+    "reduced": false,
+    "station": "120",
+    "distance": 400,
+    "offset": 44.9,
+    "inside": "6/6",
+    "minMarginPx": 97.6,
+    "stationPx": {
+      "x": 561,
+      "y": 447
+    },
+    "stationMarginPx": 386.5,
+    "free": {
+      "left": 0,
+      "top": 60,
+      "right": 1120,
+      "bottom": 833
+    },
+    "focusedAfter": "120"
+  }
+]

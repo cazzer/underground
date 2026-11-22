@@ -2,22 +2,30 @@ import { interiorCovers } from '../data/interiorLoad'
 /**
  * The "landed, awaiting interior" rule: a station flight that set off before its interior was known, and couldn't
  * frame it in flight (it arrived after LATE_TURN_PROGRESS, or after landing), reframes onto it once it is known and
- * the flight has landed. Pure; useInteriorReframe applies it.
+ * the flight has landed. A bare station's flight awaits its streets the same way: their entrances join the framing
+ * (bareStationFrame.ts). Pure; useInteriorReframe applies it.
  */
 
-/** A station flight that set off before its interior was known. A gesture, a new flight or a follow clears it. */
+/** A station flight that set off before its interior (or a bare station's streets) was known. A gesture, a new flight or a follow clears it. */
 export interface AwaitingInterior {
   stationId: string
+  /** interior: the station has (or may have) an interior. streets: it has none, and its entrances are not loaded yet. */
+  kind: 'interior' | 'streets'
   /** Under reduced motion the reframe snaps, without a landing turn. */
   reduced: boolean
 }
 
-/** Whether the loaded interior (or none) covers the awaited station, a complex member included: `ReframeInput.interiorReady`. */
+/** Whether the loaded interior (or none) covers a station awaiting its interior, a complex member included: `ReframeInput.ready`. */
 export function interiorReadyFor(
   awaiting: AwaitingInterior | null,
   interior: { stationId: string; memberStationIds?: readonly string[] } | null,
 ): boolean {
-  return awaiting !== null && interiorCovers(interior, awaiting.stationId)
+  return awaiting?.kind === 'interior' && interiorCovers(interior, awaiting.stationId)
+}
+
+/** Whether the loaded streets are those of a station awaiting its streets: `ReframeInput.ready`. */
+export function streetsReadyFor(awaiting: AwaitingInterior | null, streets: { stationId: string } | null): boolean {
+  return awaiting?.kind === 'streets' && streets?.stationId === awaiting.stationId
 }
 
 export interface ReframeInput {
@@ -26,20 +34,21 @@ export interface ReframeInput {
   /** The camera follows a train. */
   following: boolean
   focusedId: string | null
-  /** The loaded interior covers the awaited station (it is its own, or the station is a member of its complex). */
-  interiorReady: boolean
+  /** What the flight awaits has loaded: interiorReadyFor or streetsReadyFor, by its kind. */
+  ready: boolean
 }
 
 /**
  * none: nothing awaited. wait: ask again later. drop: forget it (focus moved on, or a train is followed).
- * reframe: an eased flight onto the interior that decides the landing turn then. snap: the same at once, no turn.
+ * reframe: an eased flight onto the interior that decides the landing turn then (onto a bare station's entrances,
+ * no turn). snap: the same at once, no turn.
  */
 export type ReframeAction = 'none' | 'wait' | 'drop' | 'reframe' | 'snap'
 
 export function reframeAction(awaiting: AwaitingInterior | null, s: ReframeInput): ReframeAction {
   if (!awaiting) return 'none'
   if (s.following || s.focusedId !== awaiting.stationId) return 'drop'
-  if (s.flying || !s.interiorReady) return 'wait'
+  if (s.flying || !s.ready) return 'wait'
   return awaiting.reduced ? 'snap' : 'reframe'
 }
 

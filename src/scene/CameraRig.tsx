@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { interiorCovers, type IndexLoad } from '../data/interiorLoad'
+import { useStationStreets } from '../data/useStationStreets'
 import { useFocus } from '../lib/focus'
 import { newDwell, settled } from '../lib/focusDwell'
 import { groupPositions, shouldReleaseHold, type FocusHold } from '../lib/focusHold'
@@ -68,7 +69,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor }: C
   const gesture = useRef(false)
   /** A gesture ended since the last frame: that frame restarts the wait too, however long frames take. */
   const gestureEnded = useRef(false)
-  /** A station flight that set off before its interior was known: reframed onto it after landing (useInteriorReframe). */
+  /** A station flight that set off before its interior (or bare streets) was known: reframed after landing (useInteriorReframe). */
   const awaiting = useRef<AwaitingInterior | null>(null)
 
   // Fit the whole city once; resizing later keeps the user's view.
@@ -87,12 +88,13 @@ export function CameraRig({ network, insets, interior, index, panel, anchor }: C
 
   // Read by the fly effect through a ref: depending on these would re-fire a stale fly request.
   // onStart reads `network` here too, so it stays referentially stable (underground-by0).
-  const latest = useRef({ interior, panel, size, insets, maxDistance, network })
+  const streets = useStationStreets(focusedId)
+  const latest = useRef({ interior, panel, size, insets, maxDistance, network, streets, index })
   useLayoutEffect(() => {
-    latest.current = { interior, panel, size, insets, maxDistance, network }
-  }, [interior, panel, size, insets, maxDistance, network])
+    latest.current = { interior, panel, size, insets, maxDistance, network, streets, index }
+  }, [interior, panel, size, insets, maxDistance, network, streets, index])
 
-  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets })
+  useStationFlights({ controls, camera, flight, hold, awaiting, layout: latest, network, flyRequest, interior, panel, size, insets, streets })
 
   const focusPos = (focusedId && network.stationById.get(focusedId)?.pos) || null
   const free = useMemo(() => interiorFreeRect(size, insets, panel), [size, insets, panel])
@@ -123,7 +125,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor }: C
     following: follow.active,
     holdAzimuth: follow.holdAzimuth,
   })
-  const landed = useInteriorReframe({ controls, camera, flight, awaiting, layout: latest, interior, focusedId, following: follow.active })
+  const landed = useInteriorReframe({ controls, camera, flight, awaiting, layout: latest, interior, streets, focusedId, following: follow.active })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((state, delta) => {
