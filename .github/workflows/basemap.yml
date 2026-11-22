@@ -4,10 +4,11 @@ name: Build the NYC basemap
 # deploy.yml then unpacks into the Pages artifact (the daily builds expire after about a week, and Protomaps asks
 # not to hotlink them). Manual only: run it when the basemap should change, then pin the release in a normal PR.
 #
-# The site serves the tiles as static files, tiles/<z>/<x>/<y>.mvt, uncompressed on disk (GitHub Pages compresses each
-# one itself and the browser decodes it): a single .pmtiles read in Range requests fails when Pages gzips a range, with a
-# wrong content-range total (measured in deploy run 44989770200, docs/research/data-sources.md). The one release asset
-# is a tarball of that directory, nyc-tiles.tar.gz.
+# The site serves the tiles as static files, tiles/<z>/<x>/<y>.mvt, each gzip-compressed on disk (`gzip -n -9`, still
+# named .mvt): GitHub Pages adds no content-encoding to that type, so the tiles go over the wire exactly as stored and the
+# client's worker inflates them (src/lib/basemap/inflate.ts). A single .pmtiles read in Range requests fails when Pages
+# gzips a range, with a wrong content-range total (measured in deploy run 44989770200, docs/research/data-sources.md). The
+# one release asset is a tarball of that directory, nyc-tiles.tar.gz.
 #
 #   generate  read-only; extracts the bbox and zoom range with go-pmtiles, checks the source metadata against the
 #             reviewed licence terms (scripts/gate-basemap.ts), drops the layers the site doesn't use with
@@ -44,7 +45,7 @@ env:
   TIPPECANOE_TAG: 2.79.0
   TIPPECANOE_COMMIT: 68ab8dcc229f95b8b25877697d5e8d66783af503
   # The deployed tiles must stay far below the 1 GB Pages limit; the NYC subset measured about 33 MB as a .pmtiles and
-  # 45 MB as 3,820 uncompressed tile files at z15 (the tarball 31 MB).
+  # 45 MB as 3,820 uncompressed tile files at z15 (the tarball 31 MB); gzipped the tile files are about two thirds of that.
   BASEMAP_MAX_BYTES: 200000000
 
 jobs:
@@ -62,6 +63,7 @@ jobs:
       bytes: ${{ steps.pack.outputs.bytes }}
       files: ${{ steps.pack.outputs.files }}
       tile_bytes: ${{ steps.pack.outputs.tile_bytes }}
+      inflated_bytes: ${{ steps.pack.outputs.inflated_bytes }}
       layers: ${{ steps.build.outputs.layers }}
     steps:
       - uses: actions/checkout@v7
@@ -167,10 +169,14 @@ jobs:
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # tile-join -e writes one tile per file, -pC uncompressed (Pages gzips each file itself); it names them <z>/<x>/<y>.pbf
-      # and adds a metadata.json, which the gate already read and the client doesn't need, so neither ships: the
-      # tiles are renamed .mvt and the tree is checked before anything is packed (scripts/basemap-tiles.ts check: every
-      # file an MVT, named on its zoom's grid, zoom within the spec's maxzoom).
+      # tile-join -e writes one tile per file, -pC uncompressed so that the compression below is ours and fixed (Pages adds
+      # no content-encoding to a .mvt, so the stored bytes are the wire bytes); it names them <z>/<x>/<y>.pbf and adds a
+      # metadata.json, which the gate already read and the client doesn't need, so neither ships: the tiles are renamed
+      # .mvt, each is gzipped in place (`gzip -n -9`: no name, no time, so the bytes depend on the content alone; the file
+      # keeps its .mvt name, the client sniffs 1f 8b) and the tree is checked before anything is packed
+      # (scripts/basemap-tiles.ts check --gzip: every file gzip, an MVT once inflated, named on its zoom's grid, zoom within
+      # the spec's maxzoom). The tile bytes in the report and the pin are the stored, compressed sizes; the inflated total
+      # is reported next to them, and the probe tiles' two sizes are appended to the report.
       - name: Write the tile directory
         id: tiles
         run: |
@@ -181,9 +187,15 @@ jobs:
           mv raw stage/tiles
           rm stage/tiles/metadata.json
           find stage/tiles -name '*.pbf' | while IFS= read -r f; do mv "$f" "${f%.pbf}.mvt"; done
+          # sh -e so a failed gzip stops its batch (a loop's status is its last command's); xargs then exits non-zero.
+          # The list is written first (outside stage/) so gzip's temp files never join it and a failed find stops the step.
+          find stage/tiles -type f -name '*.mvt' -print0 > mvt-list.bin
+          test -s mvt-list.bin
+          # shellcheck disable=SC2016  # the single quotes are on purpose: the inner sh expands $f
+          xargs -0 -n 64 -P "$(nproc)" sh -ec 'for f; do gzip -n -9 -c "$f" > "$f.tmp"; mv "$f.tmp" "$f"; done' sh < mvt-list.bin
           maxzoom=$(jq -r '.spec.maxzoom' data/basemap/basemap.json)
-          node scripts/basemap-tiles.ts check stage/tiles --max-zoom "$maxzoom" | tee tiles-report.txt
-          node scripts/basemap-tiles.ts probe-sizes stage/tiles
+          node scripts/basemap-tiles.ts check stage/tiles --gzip --max-zoom "$maxzoom" | tee tiles-report.txt
+          node scripts/basemap-tiles.ts probe-sizes stage/tiles 2>&1 | tee -a tiles-report.txt
 
       # Deterministic, so the same tiles give the same sha256: sorted names, files only (no directory entries), mtime 0,
       # owner 0, fixed modes, ustar (what the deploy's reader accepts), gzip without a name or time. The round trip uses
@@ -194,10 +206,13 @@ jobs:
           # From `basemap-tiles.ts check`, which wrote them to this step's outputs.
           files: ${{ steps.tiles.outputs.files }}
           tile_bytes: ${{ steps.tiles.outputs.tile_bytes }}
+          inflated_bytes: ${{ steps.tiles.outputs.inflated_bytes }}
+          encoding: ${{ steps.tiles.outputs.encoding }}
         run: |
-          [[ "$files" =~ ^[0-9]+$ && "$tile_bytes" =~ ^[0-9]+$ ]] || { echo "::error::the tile check reported no counts (files '$files', bytes '$tile_bytes')"; exit 1; }
-          if [ "$tile_bytes" -gt "$BASEMAP_MAX_BYTES" ]; then
-            echo "::error::the tiles are $tile_bytes bytes, over the $BASEMAP_MAX_BYTES cap"
+          [[ "$files" =~ ^[0-9]+$ && "$tile_bytes" =~ ^[0-9]+$ && "$inflated_bytes" =~ ^[0-9]+$ ]] || { echo "::error::the tile check reported no counts (files '$files', bytes '$tile_bytes', inflated '$inflated_bytes')"; exit 1; }
+          test "$encoding" = gzip || { echo "::error::the tile check says the tiles are '$encoding', not gzip"; exit 1; }
+          if [ "$inflated_bytes" -gt "$BASEMAP_MAX_BYTES" ]; then
+            echo "::error::the tiles inflate to $inflated_bytes bytes, over the $BASEMAP_MAX_BYTES cap"
             exit 1
           fi
           (cd stage && find tiles -type f | LC_ALL=C sort) > "$PWD/files.txt"
@@ -210,13 +225,13 @@ jobs:
           fi
           rm -rf unpacked
           start=$(date +%s.%N)
-          node scripts/basemap-tiles.ts unpack nyc-tiles.tar.gz unpacked --files "$files" --tile-bytes "$tile_bytes" --max-zoom "$(jq -r '.spec.maxzoom' data/basemap/basemap.json)"
+          node scripts/basemap-tiles.ts unpack nyc-tiles.tar.gz unpacked --files "$files" --tile-bytes "$tile_bytes" --gzip --max-zoom "$(jq -r '.spec.maxzoom' data/basemap/basemap.json)"
           secs=$(awk -v a="$start" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
           diff -r stage/tiles unpacked/tiles
           sha256=$(sha256sum nyc-tiles.tar.gz | cut -d' ' -f1)
           {
             echo "### Tile tarball"
-            echo "${files} tile files, ${tile_bytes} bytes unpacked; nyc-tiles.tar.gz ${bytes} bytes, sha256 \`${sha256}\`. The deploy's extractor unpacked it in ${secs} s and it matches the directory."
+            echo "${files} gzip-compressed tile files, ${tile_bytes} bytes stored (${inflated_bytes} inflated); nyc-tiles.tar.gz ${bytes} bytes, sha256 \`${sha256}\`. The deploy's extractor unpacked it in ${secs} s and it matches the directory."
             echo
             echo '```'
             cat tiles-report.txt
@@ -227,6 +242,7 @@ jobs:
             echo "bytes=$bytes"
             echo "files=$files"
             echo "tile_bytes=$tile_bytes"
+            echo "inflated_bytes=$inflated_bytes"
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
@@ -250,6 +266,7 @@ jobs:
       BYTES: ${{ needs.generate.outputs.bytes }}
       FILES: ${{ needs.generate.outputs.files }}
       TILE_BYTES: ${{ needs.generate.outputs.tile_bytes }}
+      INFLATED_BYTES: ${{ needs.generate.outputs.inflated_bytes }}
       LAYERS: ${{ needs.generate.outputs.layers }}
     steps:
       - uses: actions/download-artifact@v8
@@ -271,9 +288,10 @@ jobs:
           NYC basemap tiles for the underground map: the Protomaps basemap build ${BUILD} (basemap ${BASEMAP_VERSION}),
           cut to the five boroughs, zoom 0 to 15, with only the ${LAYERS} layers.
 
-          - Asset: \`nyc-tiles.tar.gz\`, a tarball of ${FILES} uncompressed Mapbox Vector Tiles at \`tiles/<z>/<x>/<y>.mvt\`
-            (${TILE_BYTES} bytes unpacked), cut from a PMTiles extract by tippecanoe's tile-join (\`-e -pC\`); the site serves
-            them as static files
+          - Asset: \`nyc-tiles.tar.gz\`, a tarball of ${FILES} gzip-compressed Mapbox Vector Tiles at \`tiles/<z>/<x>/<y>.mvt\`
+            (each gzipped with \`gzip -n -9\`, still named .mvt; ${TILE_BYTES} bytes unpacked, ${INFLATED_BYTES} bytes inflated),
+            cut from a PMTiles extract by tippecanoe's tile-join (\`-e -pC\`); the site serves them as static files, and the
+            client inflates them
           - Source: https://build.protomaps.com/${BUILD}.pmtiles (https://docs.protomaps.com/basemaps/downloads)
           - sha256: \`${SHA256}\`, ${BYTES} bytes (the tarball)
           - Pin: \`data/basemap/basemap.json\`; built by the \`basemap\` workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}

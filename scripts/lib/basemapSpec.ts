@@ -1,6 +1,6 @@
 /** data/basemap/basemap.json: what the basemap workflow extracts (`spec`) and the published build the site serves (`pin`).
  *  The pin is null until the first publish; a normal PR then sets it, so CI runs on it. The release asset is a tarball of
- *  uncompressed MVT tiles, `tiles/<z>/<x>/<y>.mvt`, which deploy.yml extracts into the Pages artifact (the site reads no
+ *  MVT tiles (plain, or gzip-compressed and still named .mvt), `tiles/<z>/<x>/<y>.mvt`, which deploy.yml extracts into the Pages artifact (the site reads no
  *  Range). A pin from before that (the single `nyc.pmtiles` asset, no `asset` key) parses as `LegacyPin` and is not deployed. */
 import { finite, list, oneOf, onlyKeys, record, text } from './check.ts'
 

@@ -2,16 +2,20 @@
  *
  *  Everything is checked before the first byte is written: the gzip stream is bounded by the pin's sizes, every tar entry
  *  must be a regular tile file by name (scripts/lib/tarTiles.ts, an allowlist), the file count and total size must be
- *  the pin's, and every body must be an MVT. A name that still resolved outside `destRoot` is refused again at write time. */
+ *  the pin's, and every body must be an MVT, plain or gzip-compressed and inflated for the check (a tarball mixing the two
+ *  is refused; the files are written as they are, still gzip). A name that still resolved outside `destRoot` is refused again at write time. */
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { listTarFiles } from './tarTiles.ts'
-import { mvtProblems } from './tileProbe.ts'
+import { readTile } from './tileProbe.ts'
 
 export interface UnpackExpect {
   files: number
+  /** The sum of the tile files' sizes as stored (gzip sizes when the tiles are gzipped). */
   tileBytes: number
+  /** Refuse a tile that is not gzip-compressed (what basemap.yml packs); otherwise plain and gzip tiles are both accepted. */
+  gzip?: boolean
   /** The deepest zoom a tile may have (the spec's maxzoom). */
   maxZoom: number
 }
@@ -35,10 +39,13 @@ export async function unpackTarGz(tarGz: string, destRoot: string, expect: Unpac
   const bytes = files.reduce((n, f) => n + f.size, 0)
   if (files.length !== expect.files) throw new Error(`the tarball has ${files.length} tile files, the pin says ${expect.files}`)
   if (bytes !== expect.tileBytes) throw new Error(`the tarball's tiles total ${bytes} bytes, the pin says ${expect.tileBytes}`)
+  let gzipFiles = 0
   for (const f of files) {
-    const problems = mvtProblems(tar.subarray(f.offset, f.offset + f.size))
-    if (problems.length > 0) throw new Error(`${f.name} is not an MVT tile: ${problems[0]}`)
+    const tile = readTile(tar.subarray(f.offset, f.offset + f.size), { requireGzip: expect.gzip === true })
+    if (tile.problems.length > 0) throw new Error(`${f.name} is not an MVT tile: ${tile.problems[0]}`)
+    if (tile.gzip) gzipFiles++
   }
+  if (gzipFiles > 0 && gzipFiles < files.length) throw new Error(`the tarball has ${gzipFiles} gzip tiles of ${files.length} and the rest plain: it is all one or the other`)
   const root = resolve(destRoot)
   const existing = await lstat(resolve(root, 'tiles')).catch((err: NodeJS.ErrnoException) => (err.code === 'ENOENT' ? null : Promise.reject(err)))
   if (existing !== null) throw new Error(`${resolve(root, 'tiles')} already exists (a staging dir must be empty; a symlink there would be followed)`)

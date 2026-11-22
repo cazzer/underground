@@ -1,5 +1,10 @@
 /** What a static host must answer for one basemap tile, and what a tile must be. Pure: scripts/verify-basemap.ts makes
- *  the requests, scripts/lib/tileTree.ts reads the files, and both call this on the bytes. */
+ *  the requests, scripts/lib/tileTree.ts reads the files, and both call this on the bytes.
+ *
+ *  A stored tile is a Mapbox Vector Tile, plain or gzip-compressed (the file is still named `.mvt`; the host sends it with
+ *  no content-encoding, so the client inflates it, src/lib/basemap/inflate.ts). A body starting `1f 8b` is inflated and the
+ *  result checked; anything else must be an MVT as it stands, unless the caller requires gzip. */
+import { gunzipSync } from 'node:zlib'
 
 export interface TileCoord {
   z: number
@@ -64,6 +69,40 @@ export function mvtProblems(body: Uint8Array): string[] {
   return layers > 0 ? [] : ['no layers']
 }
 
+/** The most a tile may inflate to (the client's inflate.ts caps at the same number). The largest real tile inflates to
+ *  about 90 KB, so this is generous; the cap only stops a decompression bomb from filling memory. */
+export const MAX_INFLATED_TILE_BYTES = 2 * 1024 * 1024
+
+export function isGzipBody(body: Uint8Array): boolean {
+  return body.length >= 2 && body[0] === 0x1f && body[1] === 0x8b
+}
+
+export interface TileRead {
+  /** The body started `1f 8b`. */
+  gzip: boolean
+  /** The MVT bytes: the body, or its inflated bytes. Null when the gzip stream is bad. */
+  mvt: Uint8Array | null
+  /** Every way the body is not a tile (a bad gzip stream, a non-MVT payload, plain where `requireGzip`). Empty when it is one. */
+  problems: string[]
+}
+
+/** Reads a stored or served tile body: inflates it if it is gzip, then checks the MVT. `requireGzip` refuses a plain body. */
+export function readTile(body: Uint8Array, { requireGzip = false }: { requireGzip?: boolean } = {}): TileRead {
+  if (!isGzipBody(body)) {
+    const problems = mvtProblems(body)
+    if (requireGzip) problems.unshift('not gzip-compressed (the body does not start 1f 8b)')
+    return { gzip: false, mvt: body, problems }
+  }
+  let mvt: Uint8Array
+  try {
+    mvt = gunzipSync(body, { maxOutputLength: MAX_INFLATED_TILE_BYTES })
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') return { gzip: true, mvt: null, problems: [`inflates past ${MAX_INFLATED_TILE_BYTES} bytes`] }
+    return { gzip: true, mvt: null, problems: [`bad gzip stream: ${err instanceof Error ? err.message : String(err)}`] }
+  }
+  return { gzip: true, mvt, problems: mvtProblems(mvt).map((p) => `inflated body: ${p}`) }
+}
+
 export interface ProbeResponse {
   status: number
   /** Header names lowercased. */
@@ -73,11 +112,13 @@ export interface ProbeResponse {
 }
 
 export interface TileExpect {
-  /** The tile file's size in the deployed tree; the decoded body must have it. */
+  /** The tile file's size in the deployed tree (its gzip size when the tiles are stored gzipped); the decoded body must have it. */
   size: number
+  /** The tree's tiles are gzip: the served bytes must be too, and (inflated) an MVT. */
+  gzip?: boolean
   /** When `identity`, the response must not be content-encoded; otherwise any encoding is fine (the browser decodes it). */
   encoding: 'identity' | 'any'
-  /** The identity body: a decoded body must equal it byte for byte. */
+  /** The identity body (as stored: gzip bytes stay gzip): a decoded body must equal it byte for byte. */
   reference?: Uint8Array
 }
 
@@ -95,7 +136,7 @@ export function tileProblems(expect: TileExpect, res: ProbeResponse): string[] {
   if (body === undefined) return [...problems, 'no body read']
   if (res.status === 200) {
     if (body.length !== expect.size) problems.push(`body is ${body.length} bytes, the file is ${expect.size}`)
-    const mvt = mvtProblems(body)
+    const mvt = readTile(body, { requireGzip: expect.gzip === true }).problems
     if (mvt.length > 0) problems.push(...mvt)
     else if (expect.reference !== undefined && !sameBytes(body, expect.reference)) problems.push('the decoded body differs from the identity body')
   }

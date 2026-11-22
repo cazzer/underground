@@ -94,6 +94,8 @@ jobs:
     outputs:
       # The probe tiles' sizes in the artifact, as JSON; empty while data/basemap/basemap.json has no (current) pin.
       basemap_probe: ${{ steps.basemap.outputs.probe }}
+      # `gzip` or `plain`: how the tiles are stored, from the tree check; verify-basemap requires gzip on the wire for `gzip`.
+      basemap_encoding: ${{ steps.basemap.outputs.encoding }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -110,7 +112,8 @@ jobs:
       # The NYC basemap is never in git: basemap.yml publishes a tarball of tiles as a release asset, and the pin in
       # data/basemap/basemap.json names it. fetch-basemap.ts downloads it after the build (vite empties dist), checks its
       # size and sha256, and unpacks it into dist/basemap/tiles/<z>/<x>/<y>.mvt, refusing any entry that is not a tile
-      # file; the unpacked tree is then checked again against the pin's file count and byte total. The browser fetches
+      # file; the unpacked tree is then checked again against the pin's file count and byte total (the tiles may be
+      # stored gzip-compressed, still named .mvt, which the check inflates; tileBytes counts the stored sizes). The browser fetches
       # tiles only on demand. A pin from before the tile format (no `asset`) is skipped, so main stays deployable
       # until the new release is pinned.
       - name: Add the basemap
@@ -133,7 +136,7 @@ jobs:
               --max-zoom "$(jq '.spec.maxzoom' data/basemap/basemap.json)" | tee tiles-report.txt
             {
               echo "### Basemap tiles"
-              echo "Download, check and unpack took ${secs} s: $(jq -r '.pin.files' data/basemap/basemap.json) tile files, $(jq -r '.pin.tileBytes' data/basemap/basemap.json) bytes, from the $(jq -r '.pin.bytes' data/basemap/basemap.json)-byte tarball of release $(jq -r '.pin.release' data/basemap/basemap.json)."
+              echo "Download, check and unpack took ${secs} s: $(jq -r '.pin.files' data/basemap/basemap.json) tile files, $(jq -r '.pin.tileBytes' data/basemap/basemap.json) bytes as stored, from the $(jq -r '.pin.bytes' data/basemap/basemap.json)-byte tarball of release $(jq -r '.pin.release' data/basemap/basemap.json)."
               echo
               echo '```'
               cat fetch.log tiles-report.txt
@@ -178,8 +181,10 @@ jobs:
         uses: actions/deploy-pages@v5
 
   # Fetches a few tiles from the live site once the basemap is deployed (skipped while there is no current pin), with and
-  # without the Accept-Encoding a browser sends: each must answer 200 with the tile's exact bytes, decoded. Pages may
-  # compress a tile; the browser decodes it, so the headers are only recorded. There is no Range read anywhere.
+  # without the Accept-Encoding a browser sends: each must answer 200 with the tile's exact bytes, decoded, and an MVT once
+  # inflated. When the tiles are stored gzipped (Pages adds no content-encoding, so the body is the gzip file and the
+  # client inflates it) the served body must be gzip. Pages may compress a tile; the browser decodes it, so the headers
+  # are only recorded. There is no Range read anywhere.
   verify-basemap:
     needs: [build, deploy]
     if: needs.build.outputs.basemap_probe != ''
@@ -197,4 +202,8 @@ jobs:
       - env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
           PROBE: ${{ needs.build.outputs.basemap_probe }}
-        run: node scripts/verify-basemap.ts "${PAGE_URL%/}/basemap/tiles" "$PROBE"
+          ENCODING: ${{ needs.build.outputs.basemap_encoding }}
+        run: |
+          flags=()
+          if [ "$ENCODING" = gzip ]; then flags+=(--gzip); fi
+          node scripts/verify-basemap.ts "${PAGE_URL%/}/basemap/tiles" "$PROBE" "${flags[@]}"
