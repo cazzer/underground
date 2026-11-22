@@ -167,7 +167,10 @@ function legViews(j: TripJourney, names: TripNames): LegView[] {
     }
     const toStationId = stationOfStop(leg.toStop)
     const between = j.legs[i - 1]?.kind === 'ride' && j.legs[i + 1]?.kind === 'ride'
-    if (leg.sameStation && between) {
+    // Platforms of one complex (same name, different station ids) are a change too: "Walk to 14 St-Union Sq" after
+    // getting off at 14 St-Union Sq would read as a mistake.
+    const sameName = names.station(stationOfStop(leg.fromStop)) === names.station(toStationId)
+    if ((leg.sameStation || sameName) && between) {
       return { kind: 'change', stationId: toStationId, name: names.station(toStationId), minutes: leg.durationS > 0 ? walkMinutes(leg.durationS) : null }
     }
     return { kind: 'walk', toStationId, to: names.station(toStationId), minutes: walkMinutes(leg.durationS) }

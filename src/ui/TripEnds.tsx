@@ -36,7 +36,7 @@ function EndRow({ label, name, onPress }: EndRowProps) {
         {label}
       </span>
       {name ? (
-        <span aria-hidden="true" className="min-w-0 truncate">
+        <span aria-hidden="true" className="min-w-0 py-1">
           {name}
         </span>
       ) : (

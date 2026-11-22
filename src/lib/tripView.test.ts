@@ -108,6 +108,12 @@ describe('journeyView', () => {
     expect(v.transfersText).toBe('2 transfers')
   })
 
+  it('calls a walk between two stations of one name a change', () => {
+    const named: TripNames = { ...names, station: (id) => (id === 'L03' ? 'Union Sq' : id === '635' ? 'Union Sq' : names.station(id)) }
+    const legs = [ride('L', 'L08', 'L03', T, T + 600), walk('L03N', '635N', T + 600, 180, false), ride('4', '635', '630', T + 840, T + 1200)]
+    expect(journeyView(journey(legs, 1), NOW, named).legs[1]).toEqual({ kind: 'change', stationId: '635', name: 'Union Sq', minutes: 3 })
+  })
+
   it('rounds a short walk up to one minute', () => {
     const legs = [ride('L', 'L08', '635', T, T + 600), walk('635N', '630N', T + 600, 20, false)]
     expect(journeyView(journey(legs, 1), NOW, names).legs[1]).toMatchObject({ kind: 'walk', minutes: 1 })
