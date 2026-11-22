@@ -114,11 +114,11 @@ describe('street tokens', () => {
     }
   })
 
-  it('stay apart from every drawn route color, the grid and the selected-train rim', async () => {
+  it('stay apart from every drawn route color and the selected-train rim', async () => {
     const routes = (JSON.parse(readFileSync('public/data/routes.json', 'utf8')) as RoutesFile).routes
     for (const t of Object.values(await themes())) {
       const drawn = routes.map((r) => [`route ${r.id}`, routeLineColor(`#${r.color}`, t.routeLineMix, t.background)] as const)
-      const others = [...drawn, ['gridSection', t.gridSection], ['gridCell', t.gridCell], ['rim', t.trainSelectedRim]] as const
+      const others = [...drawn, ['rim', t.trainSelectedRim]] as const
       for (const [name, color] of others) {
         expect(colorDistance(t.streetStroke, color), `${t.name} street ${t.streetStroke} vs ${name} ${color}`).toBeGreaterThanOrEqual(MIN_STREET_DISTANCE)
       }
