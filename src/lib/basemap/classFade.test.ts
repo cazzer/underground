@@ -4,14 +4,9 @@ import { BASEMAP_CLASSES } from './featureClass'
 import { CLASS_FADE, classVisibility } from './classFade'
 
 describe('classVisibility', () => {
-  it('draws water at full strength at every distance', () => {
-    for (const d of [10, 1_000, 100_000, 1e7]) expect(classVisibility('water', d)).toBe(1)
-  })
-
   it('is full inside `full` and at its floor beyond `gone`', () => {
     for (const cls of BASEMAP_CLASSES) {
       const { full, gone, floor } = CLASS_FADE[cls]
-      if (!Number.isFinite(full)) continue
       expect(classVisibility(cls, full * 0.5), cls).toBe(1)
       expect(classVisibility(cls, full), cls).toBe(1)
       expect(classVisibility(cls, gone), cls).toBe(floor)
@@ -22,7 +17,6 @@ describe('classVisibility', () => {
   it('falls monotonically between, halfway at the log-distance midpoint', () => {
     for (const cls of BASEMAP_CLASSES) {
       const { full, gone, floor } = CLASS_FADE[cls]
-      if (!Number.isFinite(full)) continue
       let prev = 1
       for (let i = 0; i <= 40; i++) {
         const v = classVisibility(cls, full * (gone / full) ** (i / 40))
@@ -33,9 +27,9 @@ describe('classVisibility', () => {
     }
   })
 
-  it('keeps water, half the parks and half the highways at the city view, and no street grid', () => {
+  it('keeps water at 0.6, half the parks and half the highways at the city view, and no street grid', () => {
     const city = 80_000
-    expect(classVisibility('water', city)).toBe(1)
+    expect(classVisibility('water', city)).toBe(0.6)
     expect(classVisibility('park', city)).toBe(0.5)
     expect(classVisibility('highway', city)).toBe(0.5)
     expect(classVisibility('major', city)).toBe(0)

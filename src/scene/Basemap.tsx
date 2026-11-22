@@ -2,7 +2,8 @@
  * The citywide basemap: faint roads, water and parks from the tile store (useBasemapTiles.ts), one LineSegments2 per
  * class (basemapLayer.ts), under the route lines. Each frame (priority 0, after the store's update) it rewrites the
  * pooled buffers when the drawn tile set changed, re-mixes each class's stroke when the camera distance changed
- * (classFade.ts), and moves the road mask to the focused station's street layer, if one is drawn (streetMask.ts).
+ * (classFade.ts), moves the road mask to the focused station's street layer, if one is drawn (streetMask.ts), and
+ * lets a pool that has stayed mostly empty shrink. Every class fades out toward the spec bbox's edge (edgeFade.ts).
  * A steady frame allocates nothing.
  */
 import { useFrame } from '@react-three/fiber'
@@ -10,12 +11,13 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Color } from 'three'
 import type { BasemapConfig } from '../data/basemapConfig'
 import { classVisibility } from '../lib/basemap/classFade'
+import { EDGE_FADE_M, sceneBox } from '../lib/basemap/edgeFade'
 import { BASEMAP_CLASSES, type BasemapClass } from '../lib/basemap/featureClass'
 import { maskInner, type StreetMask } from '../lib/basemap/streetMask'
 import { planPool } from '../lib/basemap/tilePool'
 import { interiorOpacity } from '../lib/interiorReveal'
 import { theme } from '../theme'
-import { createMaskUniforms } from './basemapLineMaterial'
+import { createEdgeUniforms, createMaskUniforms } from './basemapLineMaterial'
 import { createClassLayer, type ClassLayer } from './basemapLayer'
 import { cameraDistance } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
@@ -50,15 +52,21 @@ export function Basemap({ config, mask }: BasemapProps) {
   const store = useBasemapTiles(config)
   const maskUniforms = useMemo(createMaskUniforms, [])
   const background = useMemo(() => new Color(theme.background), [])
-  const entries = useMemo<ClassEntry[]>(
-    () =>
-      BASEMAP_CLASSES.map((cls) => ({
-        cls,
-        layer: createClassLayer({ width: theme.basemap[cls].width, renderOrder: LAYER_ORDER[cls], mask: MASKED.has(cls) ? maskUniforms : null }),
-        stroke: new Color(theme.basemap[cls].stroke),
-      })),
-    [maskUniforms],
-  )
+  const entries = useMemo<ClassEntry[]>(() => {
+    const edge = createEdgeUniforms(sceneBox(config.bbox), EDGE_FADE_M)
+    // Water and parks share a mask that is never written: strength 0, so they are never masked.
+    const unmasked = createMaskUniforms()
+    return BASEMAP_CLASSES.map((cls) => ({
+      cls,
+      layer: createClassLayer({
+        width: theme.basemap[cls].width,
+        renderOrder: LAYER_ORDER[cls],
+        mask: MASKED.has(cls) ? maskUniforms : unmasked,
+        edge,
+      }),
+      stroke: new Color(theme.basemap[cls].stroke),
+    }))
+  }, [maskUniforms, config])
   const drawn = useRef({ version: -1, order: [] as number[], distance: -1 })
 
   useEffect(() => () => entries.forEach((e) => e.layer.dispose()), [entries])
@@ -88,6 +96,8 @@ export function Basemap({ config, mask }: BasemapProps) {
       for (const e of entries) e.layer.apply(plan.order, plan.keep, (key) => tiles.get(key)?.classes[e.cls])
       if (import.meta.env.DEV) performance.measure('basemap:apply', { start: t0, end: performance.now() })
     }
+    const now = state.clock.elapsedTime
+    for (const e of entries) e.layer.tick(now)
     const d = cameraDistance(state)
     if (d !== s.distance) {
       s.distance = d

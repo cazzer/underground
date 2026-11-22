@@ -1,7 +1,8 @@
 /**
  * How strongly each basemap class draws at a camera distance: 1 at `full` and closer, `floor` at `gone` and beyond,
- * smoothstep in log distance between (as the interior reveal eases, interiorReveal.ts). The city view keeps water,
- * parks at half and highways at half; the street grid comes in as the camera nears a neighbourhood, and footpaths
+ * smoothstep in log distance between (as the interior reveal eases, interiorReveal.ts). The city view keeps water at
+ * 0.6 (so the marsh and shore outlines of New Jersey and Long Island don't outweigh the subway), parks and highways at
+ * half; the street grid comes in as the camera nears a neighbourhood, and footpaths
  * only once the view is about to tip (the tilt's top-down distance). A class at 0 is not drawn.
  */
 import { DOTS_FROM_M } from '../live/consist'
@@ -18,7 +19,7 @@ export interface ClassFade {
 }
 
 export const CLASS_FADE: Readonly<Record<BasemapClass, ClassFade>> = {
-  water: { full: Infinity, gone: Infinity, floor: 1 },
+  water: { full: 10_000, gone: 20_000, floor: 0.6 },
   park: { full: 20_000, gone: 60_000, floor: 0.5 },
   highway: { full: 20_000, gone: 60_000, floor: 0.5 },
   major: { full: 10_000, gone: 25_000, floor: 0 },

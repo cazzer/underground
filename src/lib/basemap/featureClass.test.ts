@@ -9,6 +9,16 @@ describe('classOf', () => {
     expect(classOf('roads', 2, { kind: 'path' })).toBe('path')
   })
 
+  it('drops sidewalks and crossings, keeping footways, steps, cycleways and pedestrian ways', () => {
+    expect(classOf('roads', 2, { kind: 'path', kind_detail: 'sidewalk' })).toBeNull()
+    expect(classOf('roads', 2, { kind: 'path', kind_detail: 'crossing' })).toBeNull()
+    for (const detail of ['footway', 'steps', 'cycleway', 'pedestrian', 'path', 'pier']) {
+      expect(classOf('roads', 2, { kind: 'path', kind_detail: detail }), detail).toBe('path')
+    }
+    // Only paths: a road's kind_detail never drops it.
+    expect(classOf('roads', 2, { kind: 'minor_road', kind_detail: 'sidewalk' })).toBe('minor')
+  })
+
   it('drops tunnels, rail, ferries, aerialways and aeroways', () => {
     expect(classOf('roads', 2, { kind: 'major_road', is_tunnel: true })).toBeNull()
     for (const kind of ['rail', 'ferry', 'aerialway', 'aeroway', 'other']) expect(classOf('roads', 2, { kind })).toBeNull()

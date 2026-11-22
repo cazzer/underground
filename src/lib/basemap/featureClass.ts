@@ -1,7 +1,8 @@
 /**
  * Which drawn class a Protomaps basemap (v4) feature falls in, or null to drop it. Roads split by kind, minus
- * tunnels (they run under the street) and rail, ferry, aerialway and aeroway lines; water areas and rivers;
- * park-like landuse. Earth and every point are dropped.
+ * tunnels (they run under the street), sidewalks and crossings (OSM footway=sidewalk|crossing, which v4 carries as
+ * the path's `kind_detail`: they double every street they run beside), and rail, ferry, aerialway and aeroway
+ * lines; water areas and rivers; park-like landuse. Earth and every point are dropped.
  */
 
 export const BASEMAP_CLASSES = ['highway', 'major', 'minor', 'path', 'water', 'park'] as const
@@ -18,6 +19,9 @@ const ROAD_CLASS: Readonly<Record<string, BasemapClass>> = {
   minor_road: 'minor',
   path: 'path',
 }
+
+/** Paths that only shadow a street: a sidewalk beside it, a crossing over it. Park paths, footways and steps stay. */
+const STREET_PATH_DETAILS: ReadonlySet<string> = new Set(['sidewalk', 'crossing'])
 
 /** Water areas drawn as outlines; pools, fountains and reefs are left out. */
 const WATER_AREA_KINDS: ReadonlySet<string> = new Set(['water', 'ocean', 'lake', 'river', 'basin', 'dock', 'reservoir'])
@@ -43,6 +47,7 @@ export function classOf(layer: string, type: GeomType, props: FeatureProps): Bas
   if (typeof kind !== 'string') return null
   if (layer === 'roads') {
     if (type !== 2 || props.is_tunnel === true) return null
+    if (kind === 'path' && typeof props.kind_detail === 'string' && STREET_PATH_DETAILS.has(props.kind_detail)) return null
     return ROAD_CLASS[kind] ?? null
   }
   if (layer === 'water') {

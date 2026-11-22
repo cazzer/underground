@@ -202,14 +202,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     after `document.fonts.ready` and when a resize flips phone and desktop sizes; opacity `streetLabelOpacity` (the level labels' depth gate)
     While mounted it writes Scene's `StreetMask` (anchor and file radius), which the basemap's roads give way to
   - `Basemap.tsx` the citywide basemap: `useBasemapTiles` plus six class layers (`basemapLayer.ts`: one LineSegments2
-    over a grow-only pooled buffer per class, tiles in `lib/basemap/tilePool.ts` order so a new tile set rewrites and
-    uploads only from the first moved tile; DynamicDrawUsage, frustumCulled off, hidden at strength 0 or with no
-    segments). Each class fades by mixing its stroke toward the background with camera distance
-    (`lib/basemap/classFade.ts`: water always, parks and highways down to half by 60 km, major roads out by 25 km,
-    minor by 8 km, paths by 2400 m); never by opacity. Roads use `basemapLineMaterial.ts` (LineMaterial with the street
-    mask on its fragment alpha, `MASK_GLSL`, twin of `lib/basemap/streetMask.ts` `maskAlpha`; anchors throw if three
-    moves them; not in `BAND_UNIFORMS`): inside the focused station's street radius they fade out as its streets fade
-    in, the exact complement of that layer's 70 m edge fade, at the station layer's `interiorOpacity`. Dev only:
+    over a pooled buffer per class, tiles in `lib/basemap/tilePool.ts` order so a new tile set rewrites and uploads
+    only from the first moved tile; it grows on demand and shrinks after `SHRINK_AFTER_S` (2 s) under a quarter full,
+    never below 1024 segments; DynamicDrawUsage, frustumCulled off, hidden at strength 0 or with no segments). Each
+    class fades by mixing its stroke toward the background with camera distance (`lib/basemap/classFade.ts`: water to
+    0.6 by 20 km, parks and highways down to half by 60 km, major roads out by 25 km, minor by 8 km, paths by 2400 m);
+    never by opacity. Every class draws with `basemapLineMaterial.ts` (LineMaterial with two factors on its fragment
+    alpha, a fragment at 0 discarded; anchors throw if three moves them; not in `BAND_UNIFORMS`): the bbox edge fade
+    (`EDGE_GLSL`, twin of `lib/basemap/edgeFade.ts` `edgeAlpha`: smoothstep over the last 3 km inside the spec bbox, so
+    no tile edge shows), and for roads the street mask (`MASK_GLSL`, twin of `lib/basemap/streetMask.ts` `maskAlpha`):
+    inside the focused station's street radius they fade out as its streets fade in, the exact complement of that
+    layer's 70 m edge fade, at the station layer's `interiorOpacity`. Dev only:
     `__underground.basemapSegments()` (camera distance, per-class used/capacity/visible) and a `basemap:apply`
     performance measure per tile-set change
 - `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
@@ -493,7 +496,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   zoom down; `footprintInside`), `reselect.ts`, `tileCover.ts` (`drawnTiles`: ready, else previous children that
   cover it, else nearest ready ancestor, else partial previous children), `tileLru.ts`, `locationCap.ts` (the
   location zoom cap's state machine), `clip.ts` (Liang–Barsky; a ring's cut along a tile edge dropped), `featureClass.ts`
-  (`classOf`: highway, major, minor, path, water, park; tunnels, rail, ferry, earth and points dropped),
+  (`classOf`: highway, major, minor, path, water, park; tunnels, sidewalks and crossings (a path's `kind_detail`), rail,
+  ferry, earth and points dropped),
   `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip),
   `mvtFixture.ts` (tests' MVT writer). `projection.ts` exports `groundX`/`groundZ` for per-vertex use
 - `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,
