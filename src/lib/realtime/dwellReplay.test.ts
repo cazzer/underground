@@ -13,6 +13,7 @@ import { segmentKey } from '../../data/codec'
 import type { SegmentsFile, ShapesFile, StationsFile, TripIndexFile } from '../../data/schema'
 import { createSlotTable, reconcileSlots, stepSlot } from '../live/slots'
 import { DWELL_MAX_SHARE, dwellFor, hopDistance, planHop } from './position'
+import { rampShareFor } from './runEase'
 import type { LiveTrip } from './prepareTrips'
 import { buildShapeGeometries } from './shapeGeometry'
 import { TRACK_OFFSET_M } from '../trackOffset'
@@ -26,6 +27,7 @@ const geometries = [...buildShapeGeometries(shapes, index, stations, TRACK_OFFSE
 const BASE = 1_795_228_554
 const POLL_S = 20
 const FRAME_S = 0.5
+/** About a subway car's top speed (55 mph), which the eased run's cruise (its peak) must not exceed. */
 const MAX_SPEED_MPS = 25
 const MAX_STEP_M = 50
 // The per-frame ease (tau 1.5 s) trails the target, so "at the stop" means within a dot's radius.
@@ -40,12 +42,17 @@ const runOf = (stops: readonly string[], k: number): number => {
 }
 
 describe('dwell on every real pattern hop', () => {
-  it('needs at most 25 m/s to cover each hop in its run time minus the dwell', () => {
+  it('needs at most 25 m/s at the eased run\'s cruise to cover each hop in its run time minus the dwell', () => {
+    // The run cruises at 1 / (1 - rampShare) its average speed, so the peak, not the average, is what is bounded. The
+    // fastest real hop averages about 19.7 m/s after its dwell; rampShareFor shortens the ramps of any hop whose full
+    // ramps would cruise over 25 m/s, so only a hop averaging over 25 m/s fails here.
     let hops = 0
     for (const g of geometries) {
       for (let k = 0; k + 1 < g.stops.length; k++) {
         const runS = runOf(g.stops, k)
-        const v = (g.stopDistances[k + 1]! - g.stopDistances[k]!) / (runS - dwellFor(runS))
+        const d = g.stopDistances[k + 1]! - g.stopDistances[k]!
+        const moveS = runS - dwellFor(runS)
+        const v = d / moveS / (1 - rampShareFor(d, moveS))
         hops++
         expect(v, `${g.shapeId} hop ${k}`).toBeLessThanOrEqual(MAX_SPEED_MPS)
       }
