@@ -82,11 +82,6 @@ export function flushMotion(c: MapControlsImpl, camera: PerspectiveCamera): void
   c.enableDamping = damping
 }
 
-/** prefers-reduced-motion: flights snap to their destination, with no landing turn. */
-export function prefersReducedMotion(): boolean {
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
 /**
  * Fly-to that centers the interior in the screen area the HUD leaves free, at full reveal, framed for
  * `azimuth`. With `turn`, a portrait free area first picks a landing azimuth that runs the platforms

@@ -189,7 +189,9 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">
-      <header ref={header} className="flex items-start justify-between gap-3">
+      <header ref={header} className="relative isolate flex items-start justify-between gap-3">
+        {/* Backs the header text so map strokes panned beneath it stay out of the way; no pointer events. */}
+        <div aria-hidden className="pointer-events-none absolute -top-4 -right-4 -bottom-6 -left-4 -z-10 bg-linear-to-b from-canvas/85 via-canvas/60 to-transparent" />
         <div className="min-w-0">
           <h1 className="text-xl tracking-[0.2em] uppercase sm:tracking-[0.3em]">underground</h1>
           <p className="flex flex-wrap items-center gap-x-2 text-xs text-ink-dim">

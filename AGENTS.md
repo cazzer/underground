@@ -112,10 +112,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
     veil blends, so a copy at weight 0 renders exactly like its veiled street car. Along those platforms the map
     track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
-  - `StationInterior.tsx` the focused station's interior (two line layers on each side of the lifted-train split; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, drei Html
-    level labels); `interiorModel.ts` interior JSON to a
+  - `StationInterior.tsx` the focused station's interior (two line layers on each side of the lifted-train split; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, level
+    labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
-- `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
+- `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
   a dim aria-hidden `PartialAccessNote` line, then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only), nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
@@ -210,7 +210,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     on a portrait free area (`landingAzimuth`, ground height ≥ 1.5× width: phones) turned just enough that the
     platforms (`stationAxis`, `InteriorModel.axis`) run within 25° of screen-vertical, decided once per flight;
     `orbitLimits.ts` azimuth cap by tilt, short-way spring to north-up, soft pan radius, focus-point pivot;
-    `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`)
+    `orbitTurned.ts` the session's first-turn flag (set by `useStationOrbit`, read by `OrbitHint`); `turnMeter.ts` the
+    hint's max net turn (signed, wrapped steps); `reducedMotion.ts` `prefersReducedMotion()`, one live query shared by
+    the camera, live and line code
   - `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
     `stationSearch.ts` ranks stations for a query (exact, prefix, typo-tolerant; a number only prefix-matches as the
     last word and never with an explicit ordinal, so "14 st" and "14th" skip 145 St; half-typed long forms and ordinals
@@ -537,7 +539,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   the flight adds no turn). Under prefers-reduced-motion station and point flights snap, with no turn; a snapped station whose interior
   loads afterwards is reframed once onto it (snapped, no turn) unless a gesture started since. The
   location button frames its fix at ENTER_DISTANCE × 1.1 (about 1210 m) or farther.
-  drei `Html` labels need `zIndexRange={[0, 0]}`, or they paint over the HUD panel.
+  The level labels sit at z-index 0 in the canvas container, so they stay under the HUD panel.
 
 ## Station interior format
 `public/data/stations/<id>.json`, type `StationInterior` in `src/data/stationSchema.ts`. Built by

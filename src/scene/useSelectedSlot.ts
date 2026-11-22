@@ -9,7 +9,6 @@ export interface SelectedSlot {
   slot: RefObject<number>
   /** The selected train's own car mix (selectedMix.ts), so it is cars at zooms where the rest are dots. */
   mix: SelectedMix
-  reducedMotion: MediaQueryList
   /**
    * Re-finds the selected trip's slot. Call it after every slot reconcile, so a slot reused by another trip since
    * the last poll loses the highlight and doesn't inherit the cars. Stable.
@@ -25,7 +24,6 @@ export function useSelectedSlot(table: SlotTable, cars: TrainCarsLayer): Selecte
   /** The trip the selected slot held, to tell whether the old slot still holds it. */
   const slotKey = useRef<string | null>(null)
   const mix = useMemo(createSelectedMix, [])
-  const reducedMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)'), [])
 
   const sync = useCallback(() => {
     const next = key.current === null ? -1 : (table.byKey.get(key.current) ?? -1)
@@ -42,5 +40,5 @@ export function useSelectedSlot(table: SlotTable, cars: TrainCarsLayer): Selecte
     sync()
   }, [selectedKey, sync])
 
-  return useMemo(() => ({ slot, mix, reducedMotion, sync }), [mix, reducedMotion, sync])
+  return useMemo(() => ({ slot, mix, sync }), [mix, sync])
 }

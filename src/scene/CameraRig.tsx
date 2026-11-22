@@ -11,13 +11,13 @@ import { frameBounds, type Insets } from '../lib/framing'
 import { interiorFreeRect, retargetTurn, type ScreenRect } from '../lib/interiorCamera'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
+import { prefersReducedMotion } from '../lib/reducedMotion'
 import { tiltForDistance } from '../lib/tilt'
 import {
   flushMotion,
   interiorFlight,
   newFlight,
   pointFlight,
-  prefersReducedMotion,
   stationFlight,
   turnOffset,
   type Destination,

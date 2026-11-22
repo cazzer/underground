@@ -16,6 +16,7 @@ import { trainRouteId } from '../lib/live/trainRoute'
 import { interiorOpacity, veilWeight } from '../lib/interiorReveal'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
+import { prefersReducedMotion } from '../lib/reducedMotion'
 import { routeLineColor } from '../lib/routeColor'
 import { tiltT } from '../lib/tilt'
 import { theme } from '../theme'
@@ -141,7 +142,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     const perfMs = performance.now()
     const { needsColor, overflow } = reconcileSlots(table, trips, perfMs / 1000, {
       dataNow: clockNow(offsetS, perfMs),
-      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      reducedMotion: prefersReducedMotion(),
       view,
     })
     for (const i of needsColor) colorSlot(d, i)
@@ -170,7 +171,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, inter
     const localS = clock.localS
     const camera = cameraDistance(state)
     const mix = carMix(camera)
-    stepSelectedMix(sm, camera, dt, selection.reducedMotion.matches)
+    stepSelectedMix(sm, camera, dt, prefersReducedMotion())
     const dotScale0 = screenScale(camera, trainRadiusPx(camera), DOT_MIN_METERS)
     const carsOn = mix > 0 || selectedMixActive(sm)
     if (carsOn) cars.beginFrame(camera, view.depth)
