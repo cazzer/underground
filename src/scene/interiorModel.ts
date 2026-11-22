@@ -70,6 +70,8 @@ const ROLE_TOKEN: Record<InteriorRole, string> = {
 }
 
 const HULL_PAD = 6
+/** Real rise per drawn stair step, meters. */
+export const STEP_RISE_M = 0.18
 /** Side of the square drawn at each street entrance, meters; the street layer's own entrance marks match it. */
 export const ENTRANCE_SIZE_M = 2.5
 
@@ -127,7 +129,7 @@ function buildLayers(interior: StationInterior, hull: LocalPoint[] | null, outOf
   const decks = decksOf(interior)
   const built = buildInteriorBuffers(interior, {
     yScale: interiorLook.yScale,
-    stepRise: 0.18,
+    stepRise: STEP_RISE_M,
     railDrop: RAIL_DROP_M,
     entranceSize: ENTRANCE_SIZE_M,
     guides: interiorLook.guides,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildInteriorModel } from '../scene/interiorModel'
+import { buildInteriorModel, type InteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
 import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, NO_SIBLINGS, siblingIdsOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
 import { loadStationIndex } from './loadStationIndex'
@@ -100,4 +100,28 @@ export function useStationInterior(
   const siblings = streetMarker ? NO_SIBLINGS : indexed
   // Whether the focused station keeps its street marker and tie (the no-interior fallback; see focusedMarkerShown).
   return { load, retry, streetMarker, siblings, index: indexLoad }
+}
+
+/**
+ * A station interior's model by file id (`interiorIdOf`), from the same cache as the focused interior, so it is the
+ * same object once that station is focused. Null while loading, with no id, or after a failure (logged). Fetches only
+ * an id the visitor chose (a trip's To station), like the focused one.
+ */
+export function useInteriorModel(id: string | null): InteriorModel | null {
+  // The last id whose load settled: set only to re-render once the cache holds it.
+  const [, setLoadedId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!id || cache.peek(id)) return
+    let cancelled = false
+    cache.get(id).then(
+      () => {
+        if (!cancelled) setLoadedId(id)
+      },
+      (err: unknown) => console.error(`Failed to load the interior of station ${id}`, err),
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+  return (id && cache.peek(id)) || null
 }

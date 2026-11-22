@@ -88,7 +88,8 @@ export interface SpanCarOrders {
   gap: number
 }
 
-/** Band 0 and the top band (the levels above the shallowest deck). Their exit paths are 2q7.12's exitPath and exitPathOver. */
+/** Band 0 and the top band (the levels above the shallowest deck). The exit path (ExitPath.tsx) draws over each band's
+ *  strokes and under the next deck's lifted trains: 9.3 under deck 0's, 9.8 over the top band. */
 const BASE_BAND: StrokeOrders = { fine: RENDER_ORDER.interiorFine, strong: RENDER_ORDER.interior, exitPath: 9.3 }
 const TOP_BAND: StrokeOrders = { fine: RENDER_ORDER.interiorOverFine, strong: RENDER_ORDER.interiorOver, exitPath: 9.8 }
 /** Bands between decks at a multi-deck interior (Union Sq): band 1, then band 2. */

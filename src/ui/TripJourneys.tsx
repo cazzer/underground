@@ -1,7 +1,9 @@
 import { useId, useRef, useState } from 'react'
+import type { ExitLineView } from '../lib/exitView'
 import type { Network } from '../lib/network'
 import type { JourneyView, LegView, RideLegView } from '../lib/tripView'
 import { RouteChip } from './RouteChip'
+import { TripExitLine } from './TripExitLine'
 
 interface TripJourneysProps {
   network: Network
@@ -12,6 +14,8 @@ interface TripJourneysProps {
   drawnKeys: ReadonlySet<string> | null
   /** "Show train" was pressed on a live ride leg: selects that train (its panel then covers the trip). */
   onShowTrain: (tripId: string) => void
+  /** The way out at the To station, by the trip id of a journey's last ride. */
+  exits: ReadonlyMap<string, ExitLineView> | null
 }
 
 interface LegProps {
@@ -118,10 +122,13 @@ interface JourneyProps {
   onStation: (stationId: string) => void
   drawnKeys: ReadonlySet<string> | null
   onShowTrain: (tripId: string) => void
+  exits: ReadonlyMap<string, ExitLineView> | null
 }
 
-function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTrain }: JourneyProps) {
+function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTrain, exits }: JourneyProps) {
   const legsId = useId()
+  const last = view.legs.at(-1)
+  const exit = last?.kind === 'ride' ? exits?.get(last.tripId) : undefined
   return (
     <li className="border-t border-edge first:border-t-0">
       <button
@@ -153,13 +160,14 @@ function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTr
         {view.legs.map((leg, i) => (
           <Leg key={i} network={network} leg={leg} mixed={view.source === 'mixed'} drawnKeys={drawnKeys} onStation={onStation} onShowTrain={onShowTrain} />
         ))}
+        {exit && <TripExitLine view={exit} />}
       </ol>
     </li>
   )
 }
 
 /** The journeys as disclosures, soonest arrival first; the first starts open, the rest collapsed. */
-export function TripJourneys({ network, views, onStation, drawnKeys, onShowTrain }: TripJourneysProps) {
+export function TripJourneys({ network, views, onStation, drawnKeys, onShowTrain, exits }: TripJourneysProps) {
   // Only the ones the visitor toggled are kept; the rest follow the default (the first is open).
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(new Map())
   if (views.length === 0) return null
@@ -175,6 +183,7 @@ export function TripJourneys({ network, views, onStation, drawnKeys, onShowTrain
           onStation={onStation}
           drawnKeys={drawnKeys}
           onShowTrain={onShowTrain}
+          exits={exits}
         />
       ))}
     </ol>

@@ -3,6 +3,7 @@ import type { LocateControls } from '../data/useLocate'
 import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import { markedPlacement } from '../lib/locate'
+import type { ExitLineView } from '../lib/exitView'
 import type { Network } from '../lib/network'
 import { useTrainSelection } from '../lib/trainSelection'
 import { useTrip } from '../lib/trip'
@@ -24,6 +25,8 @@ interface TripPanelProps {
   covered: boolean
   /** Takes focus when the panel opens, and when a train panel or notice over it is closed on purpose. */
   headingRef: RefObject<HTMLHeadingElement | null>
+  /** The exit line of each journey ending on a train, by its last ride's trip id. */
+  exits: ReadonlyMap<string, ExitLineView> | null
   ref: Ref<HTMLElement>
 }
 
@@ -32,7 +35,7 @@ interface TripPanelProps {
  * station panel does, in front of it and behind a train panel or notice. What a screen reader hears is the HUD's
  * `TripAnnouncer`; the visible message under the ends is hidden from assistive tech to match.
  */
-export function TripPanel({ network, arrivals, locate, onClose, covered, headingRef, ref }: TripPanelProps) {
+export function TripPanel({ network, arrivals, locate, onClose, covered, headingRef, exits, ref }: TripPanelProps) {
   const { ends, plan, showLoading, setEnd, swap, retry } = useTrip()
   const { focusedId, select } = useFocus()
   const { selectTrain } = useTrainSelection()
@@ -119,7 +122,7 @@ export function TripPanel({ network, arrivals, locate, onClose, covered, heading
             Retry
           </button>
         )}
-        <TripJourneys network={network} views={views} onStation={select} drawnKeys={arrivals?.drawnKeys ?? null} onShowTrain={selectTrain} />
+        <TripJourneys network={network} views={views} onStation={select} drawnKeys={arrivals?.drawnKeys ?? null} onShowTrain={selectTrain} exits={exits} />
       </div>
       {more && <div aria-hidden="true" className="pointer-events-none sticky bottom-0 -mx-4 -mb-8 h-8 bg-linear-to-t from-panel to-transparent" />}
       <StationSearch ref={fromSearch} network={network} label="Trip from: search stations" placeholder="From station" onChoose={(id) => setEnd('from', id)} />

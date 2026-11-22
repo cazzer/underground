@@ -99,6 +99,19 @@ export interface Theme {
    * across water, park and roads (themeBasemap.test.ts). Drawn opaque; a class fades by mixing toward the background.
    */
   basemap: Readonly<Record<BasemapClass, { stroke: string; width: number }>>
+  /**
+   * The trip's way out at its To station (ExitPath.tsx): centerline, restroked connectors, the exit's entrance and the
+   * board marker. 3:1 on the background, apart from every interior token, the focus and location colors and every
+   * drawn route color, and under simulated deuteranopia and protanopia from the interior's structural and machine
+   * tokens (theme.test.ts). Not held apart from trainSelectedRim: both mark the trip's own things. TEMPORARY
+   * `?exitColor=rim|focus` (exitPathLook.ts) swaps in those tokens for the look card.
+   */
+  exitPath: string
+  /** Exit path line width in CSS px. */
+  exitPathWidth: number
+  /** Dash and gap of the exit path on an estimated layout (and of an estimated walk outside), world meters. */
+  exitPathDash: number
+  exitPathGap: number
 }
 
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
@@ -160,6 +173,10 @@ export const THEMES = {
       water: { stroke: '#16606e', width: 1 },
       park: { stroke: '#385446', width: 1 },
     },
+    exitPath: '#ff5cb8',
+    exitPathWidth: 3,
+    exitPathDash: 3,
+    exitPathGap: 2,
   },
 } as const satisfies Record<string, Theme>
 

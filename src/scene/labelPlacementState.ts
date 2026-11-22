@@ -149,6 +149,9 @@ export interface PlacementView {
   /** The loaded interior, whose outlines the street names keep clear of, and its group's y scale. */
   interior: InteriorModel | null
   depthScale: number
+  /** The street-file entrance index of the trip's exit; the label that has it among its `members` ranks before every
+   *  other entrance while its path is drawn; -1 for none. */
+  priorityEntrance: number
   /** Ignore last placement's picks this time (the view has settled): every label takes its best spot again. */
   fresh: boolean
   /** Scratch, written by placeLabels: the free area's middle and the station's point, canvas px. */
@@ -180,6 +183,7 @@ export function newView(camera: PlacementView['camera'], markHalfM: number): Pla
     focusRing: null,
     interior: null,
     depthScale: 1,
+    priorityEntrance: -1,
     fresh: false,
     focusX: 0,
     focusY: 0,

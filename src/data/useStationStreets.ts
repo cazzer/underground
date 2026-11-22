@@ -79,6 +79,15 @@ const cache = createInteriorCache((id) =>
     }),
 )
 
+/** Called after any load settles (once the cache holds it, or after a failure): `useStationStreetsLoad` waits on it. */
+const settleListeners = new Set<() => void>()
+/** `cache.get`, telling the listeners once it settles (a retry by another hook included). */
+function getLayer(id: string): Promise<StreetLayer | null> {
+  return cache.get(id).finally(() => {
+    for (const listen of settleListeners) listen()
+  })
+}
+
 /**
  * The focused station's streets, once loaded; null while loading, with no focus, with no street file, or after a
  * failure (logged). Nothing is fetched until a station is focused.
@@ -91,7 +100,7 @@ export function useStationStreets(stationId: string | null): StreetLayer | null 
     if (!stationId || cache.peek(stationId) !== undefined) return
     let cancelled = false
     // Not aborted on refocus: a small file may as well finish and land in the cache.
-    cache.get(stationId).then(
+    getLayer(stationId).then(
       () => {
         if (!cancelled) setLoadedId(stationId)
       },
@@ -105,4 +114,41 @@ export function useStationStreets(stationId: string | null): StreetLayer | null 
   }, [stationId])
 
   return (stationId && cache.peek(stationId)) || null
+}
+
+/**
+ * A station's street layer and whether its load has settled (loaded, no file, or failed), for a caller that must tell
+ * loading apart from missing. Fetches as `useStationStreets` does, from the same cache (the loader logs a failure, once),
+ * and re-renders when any load settles, so a retry that `useStationStreets` makes after a failure lands here too.
+ */
+export function useStationStreetsLoad(stationId: string | null): { layer: StreetLayer | null; settled: boolean } {
+  // The last failed id (a failure leaves the cache empty), and a counter bumped on every settle to re-render.
+  const [failed, setFailed] = useState<string | null>(null)
+  const [, setSettles] = useState(0)
+  useEffect(() => {
+    const listen = () => setSettles((n) => n + 1)
+    settleListeners.add(listen)
+    return () => {
+      settleListeners.delete(listen)
+    }
+  }, [])
+  useEffect(() => {
+    if (!stationId || cache.peek(stationId) !== undefined) return
+    let cancelled = false
+    getLayer(stationId).then(
+      () => {
+        if (!cancelled) setFailed(null)
+      },
+      () => {
+        // The loader logged it.
+        if (!cancelled) setFailed(stationId)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [stationId])
+  if (!stationId) return { layer: null, settled: true }
+  const layer = cache.peek(stationId)
+  return { layer: layer ?? null, settled: layer !== undefined || failed === stationId }
 }
