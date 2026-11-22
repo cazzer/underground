@@ -80,6 +80,7 @@ describe('entranceTexts', () => {
       [3, false, false],
     ])
     expect(texts.map((t) => t.headHouse)).toEqual([0, 0, 1])
+    expect(texts.map((t) => t.count)).toEqual([2, 1, 1])
   })
 
   it('names both cross streets around a median entrance', () => {

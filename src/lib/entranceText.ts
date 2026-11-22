@@ -29,6 +29,8 @@ export interface EntranceText {
   keys: string[]
   /** Its head house: entrances chained within HEAD_HOUSE_M share one index. */
   headHouse: number
+  /** How many entrances this label stands for: itself and the same-text ones within MERGE_M it absorbed. */
+  count: number
 }
 
 interface NamedLine {
@@ -164,7 +166,10 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
     if (!parts) continue
     const text = joinParts(parts)
     const twin = out.find((u) => u.text === text && Math.hypot(u.x - d.p[0], u.z - d.p[1]) <= MERGE_M)
-    if (twin) continue
+    if (twin) {
+      twin.count++
+      continue
+    }
     out.push({
       index: d.index,
       x: d.p[0],
@@ -176,6 +181,7 @@ export function entranceTexts(file: StationStreets): EntranceText[] {
       unique: true,
       keys: d.keys,
       headHouse: 0,
+      count: 1,
     })
   }
   for (const t of out) t.unique = out.filter((u) => u.text === t.text).length === 1

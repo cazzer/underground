@@ -8,9 +8,9 @@ const MIN_ROWS = 3
 /** Tailwind's `sm` breakpoint is 640 px; below it the panel sits over the map and must leave the train in view. */
 const NARROW = '(max-width: 639px)'
 
-export interface StopListScroll {
+export interface StopListScroll<L extends HTMLElement = HTMLOListElement> {
   scroller: RefObject<HTMLDivElement | null>
-  list: RefObject<HTMLOListElement | null>
+  list: RefObject<L | null>
   /** Height to cap the scroller at, ending exactly at a row's bottom edge so no row is clipped; null for no cap. */
   capPx: number | null
   /** The list is taller than its scroller, so it scrolls: it takes keyboard focus and shows a "more below" fade. */
@@ -26,9 +26,9 @@ export interface StopListScroll {
  * map. Wider screens get no cap. `rowCount` re-measures when rows come and go; resizes and wrapping are
  * observed.
  */
-export function useStopListScroll(rowCount: number): StopListScroll {
+export function useStopListScroll<L extends HTMLElement = HTMLOListElement>(rowCount: number): StopListScroll<L> {
   const scroller = useRef<HTMLDivElement>(null)
-  const list = useRef<HTMLOListElement>(null)
+  const list = useRef<L>(null)
   const [capPx, setCapPx] = useState<number | null>(null)
   const [overflows, setOverflows] = useState(false)
   const [atEnd, setAtEnd] = useState(true)
