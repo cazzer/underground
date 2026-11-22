@@ -22,11 +22,18 @@ export interface Nearest {
  *  so it does not depend on which way the way is drawn. */
 export function nearestOnPolyline(p: LocalPoint, points: readonly LocalPoint[]): Nearest | null {
   let best: Nearest | null = null
-  const last = points.length - 2
-  for (let i = 0; i <= last; i++) {
+  const lengths: number[] = []
+  for (let i = 0; i + 1 < points.length; i++) {
+    lengths.push(Math.hypot(points[i + 1]![0] - points[i]![0], points[i + 1]![1] - points[i]![1]))
+  }
+  // The way's true ends are its first and last segments with length; repeated end vertices do not move them.
+  const first = lengths.findIndex((len) => len > 0)
+  const last = lengths.findLastIndex((len) => len > 0)
+  if (first === -1) return null
+  for (let i = first; i <= last; i++) {
     const a = points[i]!
     const b = points[i + 1]!
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+    const len = lengths[i]!
     if (len === 0) continue
     const tx = (b[0] - a[0]) / len
     const tz = (b[1] - a[1]) / len
@@ -36,9 +43,9 @@ export function nearestOnPolyline(p: LocalPoint, points: readonly LocalPoint[]):
     const rz = p[1] - (a[1] + tz * along)
     const dist = Math.hypot(rx, rz)
     if (best !== null && dist >= best.dist) continue
-    const pastStart = i === 0 ? Math.max(0, -raw) : 0
+    const pastStart = i === first ? Math.max(0, -raw) : 0
     const pastEnd = i === last ? Math.max(0, raw - len) : 0
-    const atBend = (raw <= 0 && i > 0) || (raw >= len && i < last)
+    const atBend = (raw <= 0 && i > first) || (raw >= len && i < last)
     if (atBend && dist > 0) {
       const side = dist < SIDE_MIN_M ? null : ([rx / dist, rz / dist] as const)
       best = { dist, tx: -rz / dist, tz: rx / dist, side, pastEnd: 0 }

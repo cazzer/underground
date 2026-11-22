@@ -70,16 +70,32 @@ function quadrantSide(sx: number, sz: number): StreetSide {
   return east ? 'SE' : 'SW'
 }
 
-/** True when another carriageway of the same street, near and roughly parallel, lies on the opposite side. */
-function betweenCarriageways(primary: Hit, side: readonly [number, number], same: readonly Hit[]): boolean {
-  return same.some(
-    (other) =>
-      other !== primary &&
-      other.dist <= MEDIAN_MAX_M &&
-      other.side !== null &&
-      parallelism(primary, other) >= COS_CORNER &&
-      side[0] * other.side[0] + side[1] * other.side[1] < 0,
-  )
+/** The street whose carriageways the entrance sits between, if any: some key with two roughly parallel ways on
+ *  opposite sides, each within MEDIAN_MAX_M and each running alongside the entrance (not ending short of it, which
+ *  would be a jog). Only keys with a hit within `maxDist` are considered, nearest key first; returns that key's
+ *  nearest way. `hits` is sorted by distance. */
+function medianStreet(hits: readonly Hit[], maxDist: number): Hit | undefined {
+  const keys = new Set<string>()
+  for (const h of hits) {
+    if (h.dist > maxDist) break
+    keys.add(h.key)
+  }
+  for (const key of keys) {
+    const alongside = hits.flatMap((h) =>
+      h.key === key && h.dist <= MEDIAN_MAX_M && h.side !== null && h.pastEnd <= SIDE_MIN_M
+        ? [{ hit: h, side: h.side }]
+        : [],
+    )
+    const opposed = alongside.some((a, i) =>
+      alongside
+        .slice(i + 1)
+        .some(
+          (b) => parallelism(a.hit, b.hit) >= COS_CORNER && a.side[0] * b.side[0] + a.side[1] * b.side[1] < 0,
+        ),
+    )
+    if (opposed) return hits.find((h) => h.key === key)
+  }
+  return undefined
 }
 
 const NONE: StreetJoin = { street: null, wayId: null, cross: null, crossWayId: null, side: null, plaza: null }
@@ -99,26 +115,31 @@ export function joinEntrance(p: LocalPoint, ways: readonly JoinWay[]): StreetJoi
   const primary = hits[0]
   if (primary === undefined) return { ...NONE, plaza }
 
-  // A cross street must reach the entrance: a T-junction's stem or a dead end short of the primary is not a corner.
+  // At an intersection of a dual carriageway the nearest street can be the cross street, so the median is found on
+  // any near key, and that street is then the one the entrance is named on.
+  const median = medianStreet(hits, primary.dist + CORNER_SLACK_M)
+  const street = median ?? primary
+
+  // A cross street must reach the entrance: a T-junction's stem or a dead end short of the street is not a corner.
   const cross = hits.find(
     (h) =>
-      h.key !== primary.key &&
+      h.key !== street.key &&
       h.dist <= primary.dist + CORNER_SLACK_M &&
       h.pastEnd <= SIDE_MIN_M &&
-      parallelism(primary, h) <= COS_CORNER,
+      parallelism(street, h) <= COS_CORNER,
   )
 
-  const primarySide = primary.side
+  const streetSide = street.side
   let side: StreetSide | null = null
-  if (primarySide !== null) {
-    if (betweenCarriageways(primary, primarySide, hits.filter((h) => h.key === primary.key))) side = 'median'
-    else if (cross?.side) side = quadrantSide(primarySide[0] + cross.side[0], primarySide[1] + cross.side[1])
-    // Mid-block, or on the cross street's centerline where only the primary's side is known.
-    else side = axisSide(primarySide)
+  if (median !== undefined) side = 'median'
+  else if (streetSide !== null) {
+    if (cross?.side) side = quadrantSide(streetSide[0] + cross.side[0], streetSide[1] + cross.side[1])
+    // Mid-block, or on the cross street's centerline where only the street's side is known.
+    else side = axisSide(streetSide)
   }
   return {
-    street: primary.way.name,
-    wayId: primary.way.id,
+    street: street.way.name,
+    wayId: street.way.id,
     cross: cross?.way.name ?? null,
     crossWayId: cross?.way.id ?? null,
     side,

@@ -87,14 +87,28 @@ describe('joinEntrance', () => {
 
   it('keeps the cross street of a median entrance at an intersection', () => {
     const ways = [vertical(1, 'Broadway', -10), vertical(2, 'Broadway', 10, 100, -100), horizontal(3, 'W 72nd St', 0)]
-    for (const x of [2, -2]) {
-      expect(joinEntrance([x, -8], ways)).toMatchObject({
+    // Near points where the cross street, or either carriageway, is the nearest way: none relies on a tie.
+    for (const at of [[1, -3], [-1, -3], [0, -9], [2, -6]] as const) {
+      expect(joinEntrance([...at], ways), String(at)).toMatchObject({
         street: 'Broadway',
         cross: 'W 72nd St',
         crossWayId: 3,
         side: 'median',
       })
     }
+  })
+
+  it('does not take a jog in a street for a median', () => {
+    const ways = [horizontal(1, 'Main St', 0, -100, 0), horizontal(2, 'Main St', 10, 0, 100)]
+    expect(joinEntrance([3, 5], ways).side).toBe('north')
+  })
+
+  it('ends a way at its last distinct vertex, however often the end is repeated', () => {
+    const plain = way(2, 'Cross St', [[-100, 0], [0, 0]])
+    const repeated = way(2, 'Cross St', [[-100, 0], [0, 0], [0, 0]])
+    const joinOf = (cross: JoinWay) => joinEntrance([6, -5], [vertical(1, 'Main St', 0), cross])
+    expect(joinOf(plain).cross).toBeNull()
+    expect(joinOf(repeated)).toEqual(joinOf(plain))
   })
 
   it('does not take the stem of a T-junction or a dead end short of the street as a corner', () => {
