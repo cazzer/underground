@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { StaticRealtimeData } from '../lib/realtime/prepareTrips'
 import type { NetworkFiles } from './loadNetwork'
 import { loadRealtimeStatic, type DrawnShapes } from './loadRealtimeStatic'
+import { runsLook } from './runsLook'
 
 export type RealtimeStaticLoad =
   | { status: 'idle' | 'loading' }
@@ -25,7 +26,7 @@ export function useRealtimeStatic(
     setLoad({ status: 'loading' })
     loadRealtimeStatic(import.meta.env.BASE_URL, files, trackOffsetM, drawn, controller.signal).then(
       (data) => {
-        if (!controller.signal.aborted) setLoad({ status: 'ready', data })
+        if (!controller.signal.aborted) setLoad({ status: 'ready', data: { ...data, easedRuns: runsLook === 'eased' } })
       },
       (err: unknown) => {
         if (controller.signal.aborted) return
