@@ -14,6 +14,8 @@ function file(entrances: StreetEntrance[]): StationStreets {
     license: 'ODbL-1.0',
     attribution: ['© OpenStreetMap contributors'],
     osmTimestamp: '2026-11-01T00:00:00Z',
+    radiusM: 300,
+    walkRadiusM: 150,
     nodeId: [],
     x: [],
     z: [],

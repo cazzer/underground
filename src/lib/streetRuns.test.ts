@@ -15,6 +15,8 @@ function fixture(points: [number, number][], ways: StreetWay[]): StationStreets 
     license: 'ODbL-1.0',
     attribution: ['© OpenStreetMap contributors'],
     osmTimestamp: '2026-11-01T00:00:00Z',
+    radiusM: 300,
+    walkRadiusM: 150,
     nodeId: points.map((_, i) => (i === 0 ? 100 : 1)),
     x: points.map((p) => p[0] * 10),
     z: points.map((p) => p[1] * 10),
