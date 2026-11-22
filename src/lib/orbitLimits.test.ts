@@ -44,13 +44,14 @@ describe('panRadius', () => {
     expect(panRadius(1000)).toBe(PAN_RADIUS_MAX)
     // The target sits off the focus point by the free-area shift plus the depth term (drawn at the
     // depth factor, as useStationOrbit sizes it), on a phone with a stacked panel, at every distance the
-    // clamp applies at: out to where the tilt reaches PAN_CLAMP_TILT (about 750 m once the tilt's near
-    // distance is 400 m), where the shift is largest. A 30 m mid-depth (scaled) covers a deep station like
-    // 191 St at yScale 1, and is three times the starter stations'.
+    // clamp applies at: out to where the tilt reaches PAN_CLAMP_TILT (about 970 m on the 1450 to 400 m tilt).
+    // The depth term makes the 400 m landing the worst case, so the margin doesn't depend on that outer end.
+    // A 30 m mid-depth (scaled) covers a deep station like 191 St at yScale 1, and is three times the starter
+    // stations'.
     const phone = { width: 390, height: 844 }
     const free = interiorFreeRect(phone, { top: 80, bottom: 70 }, { left: 16, top: 470, right: 374, bottom: 770 })
     const outer = distanceAtTilt(PAN_CLAMP_TILT)
-    expect(outer).toBeCloseTo(Math.sqrt(DEFAULT_TILT.farDistance * DEFAULT_TILT.nearDistance), 1)
+    expect(outer).toBeGreaterThan(900)
     let worst = 0
     for (let d = DEFAULT_TILT.nearDistance; d <= outer; d += 5) {
       const polar = tiltForDistance(d)

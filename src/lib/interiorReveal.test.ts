@@ -1,25 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_TILT, depthFactor } from './tilt'
+import { ENTER_DISTANCE } from './focusMachine'
+import { DEFAULT_TILT, depthFactor, tiltForDistance } from './tilt'
 import { interiorOpacity, labelOpacity, LABELS_FROM_DEPTH, LABELS_FULL_DEPTH, REVEAL_FAR, REVEAL_NEAR, veilWeight } from './interiorReveal'
 
 describe('interiorOpacity', () => {
   it('is hidden at and beyond the far distance', () => {
-    expect(REVEAL_FAR).toBe(1100)
-    expect(interiorOpacity(1100)).toBe(0)
+    expect(REVEAL_FAR).toBe(1250)
+    expect(interiorOpacity(1250)).toBe(0)
     expect(interiorOpacity(3000)).toBe(0)
   })
 
-  it('is fully shown from the full-tilt distance in', () => {
-    expect(REVEAL_NEAR).toBe(800)
-    for (const d of [800, 400, 40, 0]) expect(interiorOpacity(d)).toBe(1)
+  it('is fully shown from the near distance in', () => {
+    expect(REVEAL_NEAR).toBe(1000)
+    for (const d of [1000, 800, 400, 40, 0]) expect(interiorOpacity(d)).toBe(1)
   })
 
   it('is half at the log midpoint', () => {
-    expect(interiorOpacity(Math.sqrt(800 * 1100))).toBeCloseTo(0.5)
+    expect(interiorOpacity(Math.sqrt(1000 * 1250))).toBeCloseTo(0.5)
   })
 
   it('decreases strictly across the fade', () => {
-    const values = [820, 880, 940, 1000, 1080].map(interiorOpacity)
+    const values = [1010, 1060, 1120, 1180, 1240].map(interiorOpacity)
     for (let i = 1; i < values.length; i++) expect(values[i]!).toBeLessThan(values[i - 1]!)
   })
 
@@ -49,10 +50,22 @@ describe('labelOpacity', () => {
 })
 
 describe('stage invariants', () => {
-  it('the plan is fully in while the camera is still nearly top-down, so the levels separate afterwards', () => {
+  /** On-screen gap (px on an 844 px tall phone, fov 35) between two levels 10 m apart (drawn x2) at distance d. */
+  const levelGapPx = (d: number) => {
+    const viewHeightM = 2 * d * Math.tan((17.5 * Math.PI) / 180)
+    return ((20 * depthFactor(d) * Math.sin(tiltForDistance(d))) / viewHeightM) * 844
+  }
+
+  it('the plan fades in from where the tilt first shows and is fully in while its levels are still a few px apart', () => {
+    expect(REVEAL_FAR).toBe(ENTER_DISTANCE)
+    expect(levelGapPx(REVEAL_FAR)).toBeLessThan(1)
     expect(interiorOpacity(REVEAL_NEAR)).toBe(1)
-    expect(depthFactor(REVEAL_NEAR)).toBeLessThan(0.45)
-    expect(depthFactor(REVEAL_FAR)).toBeLessThan(0.06)
+    expect(levelGapPx(REVEAL_NEAR)).toBeLessThan(6)
+    expect(levelGapPx(DEFAULT_TILT.nearDistance)).toBeGreaterThan(30)
+  })
+
+  it('names the levels only once they have begun to separate', () => {
+    expect(depthFactor(REVEAL_FAR)).toBeLessThan(LABELS_FROM_DEPTH)
   })
 
   it('depth and the reveal are both full at the landing distance', () => {

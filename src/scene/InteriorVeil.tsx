@@ -4,7 +4,7 @@ import type { LocalPoint } from '../data/stationSchema'
 import { theme } from '../theme'
 import { RENDER_ORDER } from './renderOrder'
 
-/** Meters per side: the view at the reveal's far end (REVEAL_FAR, 1100 m, nearly top-down) spans under 1.5 km on a wide screen. */
+/** Meters per side: the view at the reveal's far end (REVEAL_FAR, 1250 m, nearly top-down) spans under 2 km on a wide screen. */
 const SCREEN_VEIL_SIZE = 4000
 
 interface InteriorVeilProps {

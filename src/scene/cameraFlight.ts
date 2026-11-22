@@ -4,7 +4,7 @@ import type { ComponentRef } from 'react'
 import { Vector3, type PerspectiveCamera } from 'three'
 import { flightDuration } from '../lib/flight'
 import type { FlyRequest } from '../lib/focus'
-import { ENTER_DISTANCE } from '../lib/focusMachine'
+import { EXIT_DISTANCE } from '../lib/focusMachine'
 import { framePoint, type Insets, type Viewport } from '../lib/framing'
 import { frameInterior, interiorFreeRect, LANDING_DISTANCE, landingAzimuth, type ScreenRect } from '../lib/interiorCamera'
 import { wrapAngle } from '../lib/orbitLimits'
@@ -123,9 +123,12 @@ export function stationFlight(
   return { stationId, target: new Vector3(target.x, 0, target.z), distance: LANDING_DISTANCE, azimuth: null, follows: false }
 }
 
-/** Fly-to for a ground point (a location fix): `radiusM` in view, landing a little outside the focus range. */
+/**
+ * Fly-to for a ground point (a location fix): `radiusM` in view, landing outside the focus range at no less than
+ * EXIT_DISTANCE, where the view is still top-down (the tilt's far end).
+ */
 export function pointFlight(req: PointRequest, viewport: Viewport, insets: Insets, fovDeg: number, maxDistance: number): Destination {
-  const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, ENTER_DISTANCE * 1.1, maxDistance)
+  const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, EXIT_DISTANCE, maxDistance)
   return { stationId: null, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false }
 }
 

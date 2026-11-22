@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { shouldReleaseHold, type FocusHold } from './focusHold'
 import { EXIT_DISTANCE, EXIT_RADIUS } from './focusMachine'
 
-// Cancelled beyond EXIT_DISTANCE (1400 m), where a hold matters: inside it the focus rules take over anyway.
+// Cancelled beyond EXIT_DISTANCE (1450 m), where a hold matters: inside it the focus rules take over anyway.
 const HOLD: FocusHold = { stationId: 'L08', station: { x: 100, z: 100 }, distance: 3000, target: { x: 100, z: 100 } }
 
 describe('shouldReleaseHold', () => {
