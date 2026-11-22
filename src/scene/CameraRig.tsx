@@ -154,7 +154,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     focusedId,
     following: follow.active,
   })
-  useCollapseReframe({ controls, camera, flight, collapse, awaiting, tookOver, layout: latest, panel, focusedId, flyRequest, following: follow.active, recheck: landed })
+  const resized = useCollapseReframe({ controls, camera, flight, collapse, awaiting, tookOver, layout: latest, panel, focusedId, flyRequest, following: follow.active, tripOpen, recheck: landed })
 
   // Runs before drei's controls.update() (priority -1) so the polar clamp applies the same frame.
   useFrame((state, delta) => {
@@ -183,6 +183,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
         tookOver.current = false
         flushMotion(c, camera)
         landed()
+        resized(f)
       }
     } else if (hold.current && focusedId !== hold.current.stationId) {
       hold.current = null

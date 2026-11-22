@@ -29,6 +29,8 @@ export interface Destination {
   azimuth: number | null
   /** A flight to the selected train: the follow retargets it every frame to where the train has moved. */
   follows: boolean
+  /** A bare station's flight: the free rect's bottom (px) it framed in, so its landing can tell the panel moved since. */
+  freeBottom?: number
 }
 
 /** A destination plus where the flight started; progress is eased by expoInOut (src/lib/flight.ts). */
@@ -141,7 +143,7 @@ export function stationFlight(
   if (!station) throw new Error(`Station flight to unknown station "${stationId}"`)
   const free = interiorFreeRect(viewport, insets, panel)
   const { distance, target } = bareStationFrame({ station: station.pos, points, azimuth, viewport, free, fovDeg })
-  return { stationId, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false }
+  return { stationId, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false, freeBottom: free.bottom }
 }
 
 /**

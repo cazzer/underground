@@ -171,7 +171,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     snaps, no turn); a gesture, another flight, a follow or a focus change cancels it (`interiorReframe.ts`, pure; its `ready` is `interiorReadyFor`, `interiorCovers(interior, awaited station)`, so a complex's other member reframes too, or for a bare station awaiting its streets (`kind: 'streets'`) `streetsReadyFor`: the same reframe onto its entrances, no turn; with the trip panel open a framed interior goes on
     awaiting its priority frame (`kind: 'frame'`, `nextAwaiting`, `frameReadyFor`; the trip's path, then the machines out of service): its arrival, a change to it or a panel move reframes onto it, no turn, until a gesture, a focus change, a follow or the panel closing; with the trip panel closed the landing (which frames the machines out, as known by then, the late-interior reframe included) is final, so a later /ene poll, an outage list expanded or the trip panel opened never moves the camera (on a phone the expanded list leaves about 32 px above the panel, too little to frame anyway); a reframe with nothing to move is skipped; while a panel toggle settles, `CameraRig`'s `collapse` ref, every check waits and `useCollapseReframe` asks again after);
     `useCollapseReframe.ts` the collapse reframe: only a user collapse or expand of the panel in front (`usePanelCollapse().seq`; never
-    `collapsed`, a panel size change, an /ene poll or arrival rows; a landed bare station's resize below aside) arms it, unless a flight is under way (its retarget takes the new
+    `collapsed`, a panel size change, an /ene poll or arrival rows; the one exception is a bare station's resize within 2 s of its
+    landing, once per landing, below) arms it, unless a flight is under way (its retarget takes the new
     panel) or a train is followed; once the panel's rect holds still 150 ms (at most 600 ms after the toggle; `lib/collapseReframe.ts`,
     pure: `collapseDueIn`, `reframeGains`, `collapseAction`) a 0.6-1 s eased flight, no turn, onto the focused interior's priority frame
     (`interiorFlight` with the frame: trip path, then machines out of service), an interior's usual landing when it has no priority
@@ -186,16 +187,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (the free rect ends at the panel's left edge), so the landed view already frames it and nothing moves. On a 390×844 phone the
     bar leaves the free rect's bottom at 690 px (`collapseFixture.ts`): collapsed, Union Sq's Lexington and Canarsie ways out fit
     (635N's reframes onto a path frame; the others already show) and Pelham Pkwy's station-house machines already show
-    (`pathFrame.data.test.ts`, `outageFrame.data.test.ts`). A bare station's resize (ost.18): with nothing pending, a measured move of
-    the panel that changes the free rect's bottom (the Entrances row arriving with the streets file, a "Show all" or the Entrances
-    disclosure opened, or closed) arms the same settle (`CollapsePending.kind: 'resize'`; `panelMoveArms`: the index lists no
-    interior, the station panel has been in front since that station's own fly request (`flown`; a train panel, notice or trip
-    panel in front clears it), no gesture since the landing (`tookOver`), no flight, follow or late interior/streets await, same
-    viewport; a desktop side panel never moves the bottom, so never arms), then reframes onto `stationFlight` in the final free rect
-    only when that frames strictly more (`moveGains`: `showsMore`, the station first, then marks; no tie move), no turn, reduced
-    motion snaps. An interior's panel size alone still never moves the camera. On a 390×844 phone (free bottom 393.5 px before the
-    Entrances row, 337.5 px after) 127 goes from 8 to 10 of its 16 marks and 120 stays at 2 of 6, since nothing within the target
-    radius shows more (`panelGrow.data.test.ts`);
+    (`pathFrame.data.test.ts`, `outageFrame.data.test.ts`). A bare station's resize (ost.18, `lib/resizeReframe.ts`): a bare
+    station's own landing (its fly request made with the station panel in front, so a pick from a train panel gets none; the
+    late streets reframe's landing counts, the collapse or resize reframe's own never does) opens a `RESIZE_WINDOW_MS` (2 s) window
+    (`opensResizeWindow`). Inside it, with nothing pending, one measured panel move that changes the free rect's bottom, or a panel
+    already moved past the bottom the landed flight framed in (`Destination.freeBottom`), arms the same settle
+    (`CollapsePending.kind: 'resize'`; `panelMoveArms`: same station, the viewport recorded at the landing, no gesture, flight,
+    follow or late interior/streets await; a desktop side panel never moves the bottom). It reframes onto `stationFlight` in the
+    final free rect only when that frames strictly more (`moveGains`: `showsMore`, the station first, then marks; no tie move), no
+    turn, reduced motion snaps. The window closes on that reframe, on any `pointerdown` or `keydown` (so "Show all N destinations",
+    "Show fewer" or the outage disclosure never move the camera, even tapped within 2 s), a fly request, or its expiry; after it, of the panel's changes
+    only a user collapse or expand moves the camera. What can still grow a bare station's phone panel after landing: the "Out of
+    service (N)" disclosure once the equipment index or /ene joins, "status unavailable", the first arrivals and their "Show all N
+    destinations" button, arrivals notes. An interior's panel size alone still never moves the camera. On a 390×844 phone (free
+    bottom 393.5 px under the open panel, 690 px under the bar) 127 lands with 10 of its 16 marks and 120 with 2 of 6; collapsed, all
+    of both; the outage disclosure arriving (52 px) reframes 127 from 8 to 10 and leaves 120 at 2 (`panelGrow.data.test.ts`);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
@@ -1077,7 +1083,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   more toward the camera from what the free area shows, so at Union Sq the Lexington and Canarsie paths, and the station-house
   machines at Pelham Pkwy (211), can't be framed within 100 m looking north and land as usual, part of them under the panel
   (collapsing the panel to its bar frames them, `useCollapseReframe.ts`; `pathFrame.data.test.ts`, `outageFrame.data.test.ts`; a phone panel with the outage list expanded leaves too little free area
-  for any frame); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior; a phone panel that changes height after landing reframes onto the marks when that frames more, `useCollapseReframe.ts`). Both
+  for any frame); a bare station lands with its point and as many entrance marks as fit in the free area above the panel, at that distance or farther (to 600 m), its target within 100 m of the station (120 m when only the station fits; `bareStationFrame` in `freeFrame.ts`; streets loading late reframe after landing like an interior; a phone panel that changes height within 2 s of landing reframes once onto the marks when that frames more, `useCollapseReframe.ts`). Both
   retarget mid-flight when the interior, a bare station's streets (or the index, for a deep link) or the panel's final size arrives. An interior arriving after 90% of the
   flight, or after landing, is framed after landing by a 0.6-1 s eased flight that decides the landing turn then,
   unless a gesture, another flight, a follow or a focus change came first (`useInteriorReframe.ts`,

@@ -149,5 +149,6 @@ export function useStationFlights({
     f.target = dest.target
     f.distance = dest.distance
     f.azimuth = dest.azimuth
+    f.freeBottom = dest.freeBottom
   }, [interior, panel, size, insets, streets, index, frame, camera, network, controls, flight, awaiting, layout])
 }
