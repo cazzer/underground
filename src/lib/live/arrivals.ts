@@ -21,6 +21,8 @@ export interface ArrivalGroup {
   headsign: string
   /** Predicted epoch seconds at this station, ascending; at most MAX_TIMES_PER_GROUP. */
   times: number[]
+  /** `times[i]`'s trip as the map keys it (`${feed}:${tripId}`, the same as `LiveTrip.key`); same length and order. */
+  tripKeys: string[]
 }
 
 /** What the station panel reads arrivals from: the latest snapshot, the clock to evaluate it on, and the join data. */
@@ -30,6 +32,8 @@ export interface ArrivalsSource {
   lookup: TripLookup
   /** Consecutive failed polls. */
   failures: number
+  /** Keys of the trips the map draws as trains this poll: only those can be selected from a row. */
+  drawnKeys: ReadonlySet<string>
 }
 
 export interface ArrivalOptions {
@@ -90,14 +94,29 @@ export function arrivalsAt(
       const direction = directionOfStop(stop)
       const key = `${routeId}|${direction}|${headsign}`
       const group = groups.get(key)
-      if (group) group.times.push(time)
-      else groups.set(key, { routeId, direction, headsign, times: [time] })
+      const tripKey = `${feed}:${trip.tripId}`
+      if (group) {
+        group.times.push(time)
+        group.tripKeys.push(tripKey)
+      } else groups.set(key, { routeId, direction, headsign, times: [time], tripKeys: [tripKey] })
     }
   }
 
   return [...groups.values()]
-    .map((g) => ({ ...g, times: g.times.toSorted((a, b) => a - b).slice(0, MAX_TIMES_PER_GROUP) }))
+    .map(soonest)
     .sort((a, b) => a.direction.localeCompare(b.direction) || a.times[0]! - b.times[0]! || a.routeId.localeCompare(b.routeId) || a.headsign.localeCompare(b.headsign))
+}
+
+/** The group's soonest MAX_TIMES_PER_GROUP arrivals, times and trip keys kept in step. */
+function soonest(g: ArrivalGroup): ArrivalGroup {
+  const order = g.times.map((_, i) => i).sort((a, b) => g.times[a]! - g.times[b]!).slice(0, MAX_TIMES_PER_GROUP)
+  return { ...g, times: order.map((i) => g.times[i]!), tripKeys: order.map((i) => g.tripKeys[i]!) }
+}
+
+/** What a row's button selects: the group's soonest arrival whose train the map draws, or null if none is. */
+export function selectableArrival(group: ArrivalGroup, drawnKeys: ReadonlySet<string>): { tripKey: string; time: number } | null {
+  const i = group.tripKeys.findIndex((key) => drawnKeys.has(key))
+  return i < 0 ? null : { tripKey: group.tripKeys[i]!, time: group.times[i]! }
 }
 
 /**

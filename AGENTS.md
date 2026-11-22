@@ -74,6 +74,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
+  TEMPORARY: `?runs=linear|eased` (constant speed, or a trapezoid run after the dwell; default eased) until the 6mg.7
+  card is decided; the removal list is in `src/data/runsLook.ts`
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -124,7 +126,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/ui/Hud.tsx`: Tailwind overlay (the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
   plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
-  a dim aria-hidden `PartialAccessNote` line, then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only), nothing else; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
+  a dim aria-hidden `PartialAccessNote` line, then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only; `ArrivalsList.tsx`: a row whose train the map draws is a button that selects the soonest such train, `selectableArrival` over `ArrivalGroup.tripKeys` and `ArrivalsSource.drawnKeys`, so the keyboard reaches trains; the others are `aria-disabled` no-ops that look like text, so a poll never drops focus; every enabled row has an `aria-description` naming the arrival it picks), nothing else; closing the station panel (× or Esc) moves focus to the Search button; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
   each pick (one row under the heading: "Following" with a Stop button while the camera follows the train, else a "Follow
   train" button; the same button node, so toggling keeps focus and the panel's size; its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; on phones the expanded list is capped at whole rows by
   `useStopListScroll.ts`, about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first, then the
@@ -245,7 +247,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
     poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, a smoothstep-eased
     glide sized from the gap at 60 m/s catch-up within 3-10 s that a new poll continues on its curve rather than
-    restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change (`shapeCarry.ts`) the dot's
+    restarts, moved along the old glide to the poll's time first so that frame keeps its speed, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change (`shapeCarry.ts`) the dot's
     drawn point, in the last frame's `BandView`, is projected onto the new shape's drawn line (`nearestOnTrack`):
     within 25 m and 40 px on screen (`CARRY_MAX_PX`) it carries over and the gap left (a band pitch, or a
     junction's few meters) eases out as a world offset at about 30 px/s on screen (0.6-2 s; dot, cars and picks add
@@ -287,7 +289,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     allocation); `positionAlongShape` is their composition. A trip with no VehiclePosition doesn't advance
     to its next hop until the next poll. Segment run times are arrival-to-arrival and include dwell, so the
     first `dwellFor(runS)` (30 s, at most 35% of the hop) of every hop is held at its origin stop: the train
-    leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status. The predicted arrival is
+    leaves at `arriveAt - (runS - dwellS)` and still arrives on time, for every status. The run itself is eased
+    (`runEase.ts` `easeRun`: a trapezoid, 20% accelerating, cruise at 1.25x the average, 20% braking; monotone, at
+    rest at both ends; `rampShareFor` shortens the ramps so no run cruises above 25 m/s; an INCOMING_AT floor
+    eases over the rest of the hop). The predicted arrival is
     capped by the schedule from the trip's last stop (`capArrival` in `stopVisit.ts`): MTA final-approach
     predictions run about 40 s late
   - `stopVisit.ts` `nextVisit`: the last stop a train was seen at (STOPPED_AT time; `here` and `leftAfter` on the
