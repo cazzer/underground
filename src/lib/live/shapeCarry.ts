@@ -3,8 +3,10 @@
  * band, in the last frame's view) is projected onto the new shape's drawn line; the train continues from that
  * distance, and the gap left between the two drawn points (a band pitch or two where the shapes ride different
  * slots, up to CARRY_M at a junction) is kept as a world offset that eases to 0, at about CARRY_PX_PER_S on screen.
- * So the dot and cars slide onto their new band instead of jumping. Pure: the offsets live in plain arrays on the
- * slot table.
+ * So the dot and cars slide onto their new band instead of jumping. A gap over CARRY_MAX_PX on screen (a junction's
+ * 25 m zoomed in close) cross-fades instead, and under reduced motion any gap over 1 px does. The offset is in world
+ * meters while a band pitch is in screen pixels, so a zoom during the ease drifts the dot off its band by up to
+ * about 1 px until the offset is gone. Pure: the offsets live in plain arrays on the slot table.
  */
 import type { BandView } from '../bandOffset'
 import { createTrackPoint, nearestOnTrack, trackPointInto, type DrawnTrack, type TrackHit, type TrackPoint } from './trackPoint'
@@ -18,6 +20,10 @@ export const CARRY_M = 25
 export const CARRY_PX_PER_S = 30
 export const CARRY_MIN_S = 0.6
 export const CARRY_MAX_S = 2
+/** A larger gap on screen cross-fades: at the 30 px/s pace it would slide for longer than reads as one move. */
+export const CARRY_MAX_PX = 40
+/** Under reduced motion a gap up to this snaps (no offset); a larger one cross-fades. */
+export const REDUCED_SNAP_PX = 1
 
 /**
  * Per-slot offsets (world meters) from the shape's drawn point to where the dot is drawn, as of `at` (NaN: none),
@@ -92,18 +98,35 @@ export function carryDurationFor(gapPx: number): number {
 /**
  * Moves slot i, drawn at `shown` along `old` (plus any offset still easing out), onto `next` in `view`: returns the
  * distance along `next` nearest the drawn point, and records the remaining gap as the slot's offset from `nowS`.
- * Returns NaN, recording nothing, when the drawn point is more than CARRY_M from `next` (the caller cross-fades).
+ * Returns NaN, recording nothing, when the caller should cross-fade (the motion.ts convention): the drawn point is
+ * more than CARRY_M from `next`, the gap is over CARRY_MAX_PX on screen, or `reducedMotion` and over REDUCED_SNAP_PX
+ * (at or under it, the dot snaps with no offset). A view not written yet can't measure the gap: it carries over.
  */
-export function carryOnto(c: CarryTable, i: number, old: DrawnTrack, shown: number, next: DrawnTrack, view: BandView, nowS: number): number {
+export function carryOnto(
+  c: CarryTable,
+  i: number,
+  old: DrawnTrack,
+  shown: number,
+  next: DrawnTrack,
+  view: BandView,
+  nowS: number,
+  reducedMotion: boolean,
+): number {
   trackPointInto(old, shown, view, from)
   addCarry(c, i, nowS, from, left)
   nearestOnTrack(next, from, view, hit)
   if (!(hit.offsetM <= CARRY_M)) return NaN
   trackPointInto(next, hit.distance, view, to)
+  const gapPx = screenGapPx(view, from, to)
+  if (gapPx > (reducedMotion ? REDUCED_SNAP_PX : CARRY_MAX_PX)) return NaN
+  if (reducedMotion) {
+    clearCarry(c, i)
+    return hit.distance
+  }
   c.x[i] = from.x - to.x
   c.y[i] = from.y - to.y
   c.z[i] = from.z - to.z
   c.at[i] = nowS
-  c.dur[i] = carryDurationFor(screenGapPx(view, from, to))
+  c.dur[i] = carryDurationFor(gapPx)
   return hit.distance
 }

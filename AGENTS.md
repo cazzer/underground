@@ -220,11 +220,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     glide sized from the gap at 60 m/s catch-up within 3-10 s that a new poll continues on its curve rather than
     restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change (`shapeCarry.ts`) the dot's
     drawn point, in the last frame's `BandView`, is projected onto the new shape's drawn line (`nearestOnTrack`):
-    within 25 m it carries over and the gap left (a band pitch, or a junction's few meters) eases out as a world
-    offset at about 30 px/s on screen (0.6-2 s; dot, cars and picks add it), else it shrinks on the old shape
-    (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
+    within 25 m and 40 px on screen (`CARRY_MAX_PX`) it carries over and the gap left (a band pitch, or a
+    junction's few meters) eases out as a world offset at about 30 px/s on screen (0.6-2 s; dot, cars and picks add
+    it; under reduced motion only a gap under 1 px carries, snapped), else it shrinks on the old shape
+    (`drawGeometry`) and grows on the new one. `carryReplay.ts` is the shapeCarry tests' replay helper (app camera,
+    screen px); `shapeCarry.data.test.ts` replays every same-route shape pair at three junctions on the real bands;
+    `trainRoute.ts` dot color route
   - `trackPoint.ts` `trackPointInto`: a train's drawn point at a distance, on its route's band as the band line
-    shader draws it (vertices shifted by `bandShift`, straight between) at the profile's height. Dots, cars (and so
+    shader draws it (vertices shifted by `bandShift`, straight between) at the profile's height; `nearestOnTrack`
+    projects a point onto that drawn line (per poll, a shape change). Dots, cars (and so
     the platform copies), picks and `trainAt` all go through it, with the frame's `BandView` (SubwayLines writes it);
   - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends, track points);
     `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice; no live layer, an outage, keeps it);
@@ -412,7 +416,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and checks a port of it against `bandShift`; they agree only while the line object's world matrix is identity).
   Until the two direction tracks have room on screen for both bundles, the same shift pulls them onto the
   centerline. The buffers keep the unshifted points. Trains ride the bands: dots, cars and picks are placed only
-  through `trackPointInto` (`src/lib/live/trackPoint.ts`), never `pointAtDistance` on the raw line. Anything else
+  through `trackPointInto` (`src/lib/live/trackPoint.ts`) plus the slot's shape-change offset (`shapeCarry.ts`),
+  never `pointAtDistance` on the raw line. Anything else
   that must sit on a route line goes through the band line material (as the platform fade does) or trackPointInto.
   The corridor search runs after the first paint, in a Web Worker (`src/data/loadBands.ts`; on the main thread when
   idle if the worker fails, logged): useNetwork's ready state carries `bands`, a promise of the banded shapes. The

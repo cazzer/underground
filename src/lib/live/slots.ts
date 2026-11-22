@@ -108,7 +108,7 @@ function absorbPlan(t: SlotTable, slot: number, trip: LiveTrip, nowS: number, o:
     return
   }
   if (t.drawGeometry[slot] !== geometry && t.drawGeometry[slot]!.shapeId !== geometry.shapeId) {
-    const carried = carryOnto(t.carry, slot, t.drawGeometry[slot]!, shown, geometry, o.view ?? UNBANDED, nowS)
+    const carried = carryOnto(t.carry, slot, t.drawGeometry[slot]!, shown, geometry, o.view ?? UNBANDED, nowS, o.reducedMotion)
     if (Number.isNaN(carried)) {
       if (t.phase[slot] === SHRINK) return // already shrinking on the old shape; the move picks up the latest one
       // Start (or restart mid-grow) the shrink at the scale the dot has now.

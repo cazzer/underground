@@ -39,7 +39,7 @@ const next: ScreenPoint = { x: 0, y: 0 }
 function consistDistancePx(
   track: DrawnTrack,
   view: BandView,
-  shift: TrackPoint,
+  offset: TrackPoint,
   shown: number,
   consist: Consist,
   mixK: number,
@@ -52,7 +52,7 @@ function consistDistancePx(
   let havePrev = false
   for (let c = 0; c <= span.cars; c++) {
     trackPointInto(track, span.rear + c * span.step, view, point)
-    const ok = toScreen(point.x + shift.x, y + point.y + shift.y, point.z + shift.z, next)
+    const ok = toScreen(point.x + offset.x, y + point.y + offset.y, point.z + offset.z, next)
     if (ok && havePrev) best = Math.min(best, segmentDistancePx(click, prev, next))
     havePrev = ok
     prev.x = next.x

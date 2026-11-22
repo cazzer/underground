@@ -65,16 +65,19 @@ export function heldTrip(geometry: ShapeGeometry, distance: number): LiveTrip {
  * over. Returns the jump the poll makes on screen, the largest per-frame step until the offset has eased out, and
  * where it ends against `to`'s drawn line.
  */
-export function replay(from: ShapeGeometry, shown: number, to: ShapeGeometry, v: BandView) {
+export function replay(from: ShapeGeometry, shown: number, to: ShapeGeometry, v: BandView, reducedMotion = false) {
   const t = createSlotTable(1)
   reconcileSlots(t, [heldTrip(from, shown)], 0, { dataNow: 0, reducedMotion: false, view: v })
   t.displayed[0] = shown
   const before = drawnAt(t, v, 10)
   const hit = nearestOnTrack(to, before, v, { distance: 0, offsetM: 0 })
-  reconcileSlots(t, [heldTrip(to, hit.distance)], 10, { dataNow: 0, reducedMotion: false, view: v })
+  reconcileSlots(t, [heldTrip(to, hit.distance)], 10, { dataNow: 0, reducedMotion, view: v })
   const carried = t.phase[0] === 0 && t.drawGeometry[0] === to
+  const offset = !Number.isNaN(t.carry.at[0]!)
   let last = drawnAt(t, v, 10)
   const jumpPx = pxApart(v, before, last)
+  // A cross-fade shrinks in place on the old shape and moves unseen: no steps to measure.
+  if (!carried) return { jumpPx, stepPx: 0, endPx: 0, carried, offset }
   let stepPx = 0
   for (let s = 10 + DT; s < 10 + CARRY_MAX_S + 2 * DT; s += DT) {
     stepSlot(t, 0, hit.distance, 0, s, DT)
@@ -83,5 +86,5 @@ export function replay(from: ShapeGeometry, shown: number, to: ShapeGeometry, v:
     last = p
   }
   const end = trackPointInto(to, t.displayed[0]!, v, createTrackPoint())
-  return { jumpPx, stepPx, endPx: pxApart(v, last, end), carried }
+  return { jumpPx, stepPx, endPx: pxApart(v, last, end), carried, offset }
 }

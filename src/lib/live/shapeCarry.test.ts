@@ -59,7 +59,7 @@ describe('a shape change at a junction', () => {
   const east = geometry('E', [...trunk, { x: 50, z: -1100 }, { x: 300, z: -1600 }], -0.5, 0.5)
   const west = geometry('W', [...trunk, { x: -50, z: -1100 }, { x: -300, z: -1600 }], 0.5, 0.5)
 
-  it.each([980, 1000, 1010, 1030])('carries over within 1 px at %i m along, both ways', (d) => {
+  it.each([980, 1000, 1010, 1020])('carries over within 1 px at %i m along, both ways', (d) => {
     const v = viewAt({ x: 0, z: -1000 }, 600)
     for (const [a, b] of [[east, west], [west, east]] as const) {
       const r = replay(a, d, b, v)
@@ -74,6 +74,31 @@ describe('a shape change at a junction', () => {
     const v = viewAt({ x: 0, z: -1300 }, 600)
     const r = replay(east, 1250, west, v)
     expect(r.carried).toBe(false)
+  })
+
+  it('cross-fades a gap over CARRY_MAX_PX on screen, which the same gap farther out slides', () => {
+    // 1030 m along, the drawn branches are about 25 m apart: 186 px at 180 m, under 40 px at 1000 m.
+    expect(replay(east, 1030, west, viewAt({ x: 0, z: -1000 }, 180)).carried).toBe(false)
+    const far = replay(east, 1030, west, viewAt({ x: 0, z: -1000 }, 1000))
+    expect(far.carried && far.offset).toBe(true)
+  })
+})
+
+describe('a shape change under reduced motion', () => {
+  it('cross-fades a gap over 1 px instead of sliding', () => {
+    const v = viewAt({ x: 0, z: -800 }, 600)
+    const r = replay(straight('A', -0.5), 800, straight('B', 0.5), v, true)
+    expect(r.carried).toBe(false)
+    expect(r.offset).toBe(false)
+  })
+
+  it('snaps a gap under 1 px with no offset', () => {
+    const v = viewAt({ x: 0, z: -800 }, 600)
+    const r = replay(straight('A', 0.5), 800, straight('B', 0.5), v, true)
+    expect(r.carried).toBe(true)
+    expect(r.offset).toBe(false)
+    expect(r.jumpPx).toBeLessThan(1)
+    expect(r.endPx).toBeLessThan(1e-6)
   })
 })
 
