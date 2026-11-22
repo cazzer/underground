@@ -91,10 +91,10 @@ function Journey({ network, view, open, onToggle, onStation }: JourneyProps) {
       >
         <span aria-hidden="true" className="flex flex-wrap gap-x-2 text-base">
           <span className="whitespace-nowrap">
-            {view.departClock} → {view.arriveClock}
+            {view.departClock} → {view.arriveClock} ·
           </span>
-          <span className="whitespace-nowrap">· {view.minutes} min</span>
-          <span className="whitespace-nowrap">· {view.transfersText.toLowerCase()}</span>
+          <span className="whitespace-nowrap">{view.minutes} min ·</span>
+          <span className="whitespace-nowrap">{view.transfersText.toLowerCase()}</span>
         </span>
         <span aria-hidden="true" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-dim">
           {view.routes.map((id, i) => {
