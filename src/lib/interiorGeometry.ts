@@ -3,6 +3,7 @@
  * `.ts` import paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
  */
 import type { LocalPoint, StationInterior } from '../data/stationSchema.ts'
+import { CAR_FLOOR_M, CAR_HEIGHT_M } from './carDims.ts'
 import { spreadBanks } from './escalatorBanks.ts'
 import { stationAxis } from './interiorAxis.ts'
 import { interiorBounds } from './interiorFraming.ts'
@@ -13,7 +14,7 @@ import {
   drawRamp,
   type ConnectorContext,
 } from './interiorConnectors.ts'
-import { SegmentWriter, type Buffers, type InteriorRole, type Rgb } from './interiorSegments.ts'
+import { SegmentWriter, SplitAtY, type Buffers, type InteriorRole, type Rgb } from './interiorSegments.ts'
 
 export type { Buffers, InteriorRole, Rgb } from './interiorSegments.ts'
 
@@ -41,8 +42,10 @@ export interface InteriorBufferOptions {
   dashStructure?: boolean
   /**
    * Index into `interior.levels` of the level the lifted platform trains ride (`trainLevelIndex`). Levels above it
-   * (lower indices) and connectors reaching above it go to the `over` layers, drawn after the trains; this level and
-   * the ones below stay in the base layers. Undefined puts everything in the base layers.
+   * (lower indices) go to the `over` layers, drawn after the trains; this level and the ones below stay in the base
+   * layers. A stair, escalator or elevator shaft from this level or below up to a level above it is cut at the trains'
+   * roof (`trainRoofY`): the part below stays in the base layers, so a car in front of a stair foot hides it, and the
+   * rest goes over. Undefined puts everything in the base layers.
    */
   splitLevel?: number
   /** Linear RGB for a role on the level at `levelIndex`, an index into `interior.levels` (highest first, so the
@@ -56,6 +59,15 @@ export interface InteriorLayers {
   fine: Buffers
   overStrong: Buffers
   overFine: Buffers
+}
+
+/**
+ * Drawn y (group-local, before the depth factor) of a lifted train's roof on the platform at `level`: its rail
+ * (`yScale` exaggerated like the interior) plus the car's floor and body height (real meters: cars aren't
+ * exaggerated). At full tilt and crossScale 1, as at the interior's zoom.
+ */
+export function trainRoofY(level: { y: number }, railDrop: number, yScale: number): number {
+  return (level.y - railDrop) * yScale + CAR_FLOOR_M + CAR_HEIGHT_M
 }
 
 /**
@@ -86,9 +98,10 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
   const realY = (i: number) => interior.levels[i]!.y
   const streetIndex = interior.levels.findIndex((l) => l.kind === 'street')
   const base = { strong: new SegmentWriter(), fine: new SegmentWriter() }
-  const over = opts.splitLevel === undefined ? base : { strong: new SegmentWriter(), fine: new SegmentWriter() }
-  // A level, or a connector by its upper end, above the split draws over the trains.
-  const isOver = (i: number) => opts.splitLevel !== undefined && i < opts.splitLevel
+  const split = opts.splitLevel
+  const over = split === undefined ? base : { strong: new SegmentWriter(), fine: new SegmentWriter() }
+  // A level above the split draws over the trains.
+  const isOver = (i: number) => split !== undefined && i < split
   const dash = opts.dashStructure === true
 
   // Also throws for an interior with nothing to draw, so it becomes an error load.
@@ -106,7 +119,17 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
   }
   const baseCtx: ConnectorContext = { ...shared, ...base }
   const overCtx: ConnectorContext = { ...shared, ...over }
-  const ctxOf = (i: number) => (isOver(i) ? overCtx : baseCtx)
+  // Rising from the split level or below to above it: cut at the trains' roof.
+  const roofY = split === undefined ? 0 : trainRoofY(interior.levels[split]!, opts.railDrop, yScale)
+  const cutCtx: ConnectorContext = {
+    ...shared,
+    strong: new SplitAtY(base.strong, over.strong, roofY),
+    fine: new SplitAtY(base.fine, over.fine, roofY),
+  }
+  const connectorCtx = (lower: number, upper: number) => {
+    if (!isOver(upper)) return baseCtx
+    return isOver(lower) ? overCtx : cutCtx
+  }
 
   for (let li = interior.levels.length - 1; li >= 0; li--) {
     const level = interior.levels[li]!
@@ -129,13 +152,14 @@ export function buildInteriorBuffers(interior: StationInterior, opts: InteriorBu
       const upper = indexOf(c.upper.level, c.id)
       if (c.kind === 'elevator') {
         // The shaft spans every level in between; it stops only at its two ends, each written in
-        // that level's pass so the levels above still paint over it. A shaft reaching above the split draws over the
-        // trains whole, like a stair or escalator from the platform up.
-        if (lower === li) drawElevatorShaft(ctxOf(upper), c, lower, upper)
-        if (lower === li || upper === li) drawElevatorStop(ctxOf(li), c, li)
+        // that level's pass so the levels above still paint over it. A shaft through the split is cut at the trains'
+        // roof like a stair or escalator from the platform up.
+        if (lower === li) drawElevatorShaft(connectorCtx(lower, upper), c, lower, upper)
+        if (lower === li || upper === li) drawElevatorStop(isOver(li) ? overCtx : baseCtx, c, li)
       } else if (lower === li) {
-        if (c.kind === 'escalator') drawEscalator(ctxOf(upper), c, lower, upper)
-        else drawRamp(ctxOf(upper), c, lower, upper)
+        const ctx = connectorCtx(lower, upper)
+        if (c.kind === 'escalator') drawEscalator(ctx, c, lower, upper)
+        else drawRamp(ctx, c, lower, upper)
       }
     }
 

@@ -96,7 +96,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `theme.trainSelectedRim` rim. Its dot is drawn on its own above every other dot; its cars get the top widen
     level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
-    their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body and its dimension constants);
+    their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body (its dimension constants live in `src/lib/carDims.ts`));
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
@@ -456,8 +456,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.4 to 9.5; not in look C),
   and the levels above it draw over those trains at 9.6 (fine) and 9.7 (strong): `buildInteriorBuffers` splits at
   `splitLevel` (`trainLevelIndex`, the deepest level with a platform track). That level and below stay at 8/9; a
-  level above it, and a stair, escalator or elevator shaft whose upper end is above it, go over (an elevator's
-  stop stays with its level). At most four interior line layers; look C doesn't split. Every car within
+  level above it goes over; a stair, escalator or elevator shaft from it (or below) up to a level above it is cut
+  at the trains' roof (`trainRoofY`: rail ×yScale plus the car's floor and body height from `src/lib/carDims.ts`,
+  not exaggerated; `SplitAtY` in `interiorSegments.ts`), so a car in front of a stair foot hides it and the
+  stair above the roof draws over the car (an elevator's stop stays with its level). At most four interior line layers; look C doesn't split. Every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
   toward the background after shading by `veilTint` (veil opacity × veilWeight × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal

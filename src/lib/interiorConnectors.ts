@@ -3,11 +3,11 @@
  * `.ts` import paths: scripts/lib/stationOutputs.test.ts (nodenext) loads this file.
  */
 import type { Connector, LocalPoint } from '../data/stationSchema.ts'
-import { lerp, lerpRgb, type InteriorRole, type Rgb, type SegmentWriter, type Vec3 } from './interiorSegments.ts'
+import { lerp, lerpRgb, type InteriorRole, type Rgb, type SegmentSink, type Vec3 } from './interiorSegments.ts'
 
 export interface ConnectorContext {
-  strong: SegmentWriter
-  fine: SegmentWriter
+  strong: SegmentSink
+  fine: SegmentSink
   /** Real (unscaled) walking-surface y of the level at an index. */
   realY: (levelIndex: number) => number
   /** Index of the street level: 0 below ground, the last (lowest) level at an elevated station. */

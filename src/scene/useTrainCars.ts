@@ -8,10 +8,9 @@ import type { BandView } from '../lib/bandOffset'
 import type { DrawnTrack } from '../lib/live/trackPoint'
 import { theme } from '../theme'
 import { screenScale } from './cameraDistance'
-import { CAR_HEIGHT_M, CAR_WIDTH_M, createCarBodyGeometry, createCarHaloGeometry } from './carGeometry'
+import { CAR_FLOOR_M, CAR_HEIGHT_M, CAR_WIDTH_M, createCarBodyGeometry, createCarHaloGeometry } from './carGeometry'
 
 export const CAR_CAPACITY = TRAIN_CAPACITY * MAX_CARS
-const CAR_Y = 0.5
 /** Gap between car bodies and the halo rim around them: real meters zoomed in, a few pixels farther out. */
 const GAP = { px: 1.5, minM: 1.2 }
 const RIM = { px: 1, minM: 0.5 }
@@ -87,8 +86,8 @@ export function useTrainCars(): TrainCarsLayer {
 
   const layer = useMemo((): Omit<TrainCarsLayer, 'bodies' | 'halos' | 'rims' | 'geometry'> => {
     const consists = new Array<Consist>(TRAIN_CAPACITY).fill(DEFAULT_CONSIST)
-    const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: CAR_WIDTH_M, crossScale: 1, y: CAR_Y, extrude: 1 }
-    const gapFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM, y: CAR_Y + SELECTED_LIFT_M }
+    const frame: CarFrame = { gapM: GAP.minM, rimM: RIM.minM, widthM: CAR_WIDTH_M, crossScale: 1, y: CAR_FLOOR_M, extrude: 1 }
+    const gapFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM, y: CAR_FLOOR_M + SELECTED_LIFT_M }
     const rimFrame: CarFrame = { ...frame, rimM: SELECTED_GAP.minM + SELECTED_RIM.minM }
     /** writeConsist writes bodies with the footprints; the rim's bodies land here and are never drawn. */
     const rimBodies = new Float32Array(MAX_CARS * 16)
