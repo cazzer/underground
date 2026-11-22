@@ -7,6 +7,7 @@ import { nyClockTime, stopEta, stopEtaSpoken } from './live/trainStops'
 import type { Placement } from './locate'
 import type { OverlayCounts } from './route/overlay'
 import type { TripJourney, TripRideLeg } from './route/plan'
+import { isChangeWalk, transferLegKey } from './transferView'
 
 export interface TripEnds {
   from: StationId | null
@@ -119,6 +120,8 @@ export interface ChangeLegView {
   stationId: StationId
   name: string
   minutes: number | null
+  /** `transferLegKey` of the change: the transfer line's key. */
+  transferKey: string
 }
 export interface WalkLegView {
   kind: 'walk'
@@ -189,12 +192,12 @@ function legViews(j: TripJourney, names: TripNames): LegView[] {
       }
     }
     const toStationId = stationOfStop(leg.toStop)
-    const between = j.legs[i - 1]?.kind === 'ride' && j.legs[i + 1]?.kind === 'ride'
-    // Platforms of one complex (same name, different station ids) are a change too: "Walk to 14 St-Union Sq" after
-    // getting off at 14 St-Union Sq would read as a mistake.
-    const sameName = names.station(stationOfStop(leg.fromStop)) === names.station(toStationId)
-    if ((leg.sameStation || sameName) && between) {
-      return { kind: 'change', stationId: toStationId, name: names.station(toStationId), minutes: leg.durationS > 0 ? walkMinutes(leg.durationS) : null }
+    const next = j.legs[i + 1]
+    // Platforms of one complex (same name, different station ids) are a change too (`isChangeWalk`): "Walk to 14
+    // St-Union Sq" after getting off at 14 St-Union Sq would read as a mistake.
+    if (isChangeWalk(leg, names.station) && j.legs[i - 1]?.kind === 'ride' && next?.kind === 'ride') {
+      const minutes = leg.durationS > 0 ? walkMinutes(leg.durationS) : null
+      return { kind: 'change', stationId: toStationId, name: names.station(toStationId), minutes, transferKey: transferLegKey(leg, next) }
     }
     return { kind: 'walk', toStationId, to: names.station(toStationId), minutes: walkMinutes(leg.durationS) }
   })
@@ -272,30 +275,4 @@ export function planViews(plan: TripPlanState, nowS: number, names: TripNames): 
     seen.set(view.key, n + 1)
     return n === 0 ? view : { ...view, key: `${view.key}#${n}` }
   })
-}
-
-/** After a result settles, a station focused behind the panel stays unannounced this long, so it can't talk over it. */
-export const ON_MAP_QUIET_MS = 1500
-
-export interface OnMapInput {
-  /** The station the camera now focuses, and the one it focused when this was last checked. */
-  focusedId: string | null
-  previousId: string | null
-  /** The trip panel is open and nothing covers it. */
-  shown: boolean
-  /** The focused station is already From or To. */
-  isEnd: boolean
-  planLoading: boolean
-  /** Milliseconds since a plan settled; null if none has. */
-  sinceSettledMs: number | null
-}
-
-/**
- * Whether "On the map: X" is said: only when the focused station really changed while the panel is in front
- * (never on opening, a swap, an end pick or the cover going), it is not an end, and no result is loading or has
- * just settled.
- */
-export function shouldAnnounceOnMap(i: OnMapInput): boolean {
-  if (i.focusedId === null || i.focusedId === i.previousId || !i.shown || i.isEnd || i.planLoading) return false
-  return i.sinceSettledMs === null || i.sinceSettledMs >= ON_MAP_QUIET_MS
 }

@@ -108,6 +108,17 @@ mezzanines' positions are in no open source, so a full model needs a site visit 
 (card). Of the 35 complexes, the draft covers 32 (not Grand Central); only 12 have direct
 platform-to-platform stairs; Times Sq has 0, so every transfer there goes through passages.
 
+**Transfers (2q7.19).** Built over the same graph in transfer mode (`src/lib/interiorTransfer.ts`):
+- The router's change time stays transfers.json's (180 s at L03, R20 and 635). Plans run before interiors load and must
+  not reorder when one arrives; only two interiors are hand-authored; and the graph omits the platform walk to the car,
+  so its times understate (the direct L to N stair is about 50 s, the step-free way about 190 s). A possible follow-up:
+  graph-derived footpaths for authored complexes.
+- A transfer never touches the street or stands in a slab with `paid: false`: leaving fare control means a new fare, and no
+  fare line opens an unpaid area to it (`FareLine` stays geometry only). Exits are unchanged and may cross unpaid areas.
+  Platforms are paid; a slab with no `paid` (all of Union Sq's) is assumed inside, so the transfer is "probably".
+- Only changes whose two stops are in one hand-authored interior get a path (Union Sq; L08 has none). Generated or missing
+  interiors keep the bare "Change at" row; a change across one platform says "Across the platform" and draws nothing.
+
 **Accessibility and outages.** The MTA E&E outage feed (`nyct_ene.json`, 60 KB, 147 rows) and equipment
 list (`nyct_ene_equipments.json`, 644 KB: `serving`, ADA, a written `alternativeroute`) are MTA feeds,
 so they go through the Worker (already planned, `docs/research/data-sources.md:210`). `Connector.id`

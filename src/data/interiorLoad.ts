@@ -54,6 +54,23 @@ export function interiorIdOf(stationId: string | null, index: IndexLoad): string
   return index.index.stations[stationId]!.file ?? stationId
 }
 
+/** The distinct interior file ids of the hand-authored stations in the index, sorted; none until it is ready. */
+export function authoredInteriorIds(index: IndexLoad): string[] {
+  if (index.status !== 'ready') return []
+  const ids = new Set<string>()
+  for (const [id, entry] of Object.entries(index.index.stations)) if (entry.provenance === 'authored') ids.add(entry.file ?? id)
+  return [...ids].sort()
+}
+
+/**
+ * For a set of interiors loading at once: the ids not loaded yet (to fetch), and whether one loaded after `shownKey`
+ * (the comma-joined ids loaded at the last render) was taken, so the render that showed them is stale.
+ */
+export function modelsToLoad(ids: readonly string[], isLoaded: (id: string) => boolean, shownKey: string): { fetch: string[]; stale: boolean } {
+  const shown = new Set(shownKey === '' ? [] : shownKey.split(','))
+  return { fetch: ids.filter((id) => !isLoaded(id)), stale: ids.some((id) => isLoaded(id) && !shown.has(id)) }
+}
+
 /** Shared, so an unchanged "no siblings" keeps its identity. */
 export const NO_SIBLINGS: readonly string[] = Object.freeze([])
 

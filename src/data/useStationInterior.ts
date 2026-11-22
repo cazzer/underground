@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { buildInteriorModel, type InteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
-import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, NO_SIBLINGS, siblingIdsOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
+import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, modelsToLoad, NO_SIBLINGS, siblingIdsOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
 import { loadStationIndex } from './loadStationIndex'
 import { loadStationInterior } from './loadStationInterior'
 
@@ -124,4 +124,33 @@ export function useInteriorModel(id: string | null): InteriorModel | null {
     }
   }, [id])
   return (id && cache.peek(id)) || null
+}
+
+const NO_MODELS: ReadonlyMap<string, InteriorModel> = new Map()
+
+/**
+ * Several interiors' models by file id, from the same cache: those loaded so far (a failure is logged and left out).
+ * The map is built from the ids loaded at render (`loadedKey`) and keeps its identity until that changes. A load that
+ * settles between a render and its effect is caught by the effect (`modelsToLoad`'s `stale`), which re-renders.
+ */
+export function useInteriorModels(ids: readonly string[]): ReadonlyMap<string, InteriorModel> {
+  const key = ids.join(',')
+  const loadedKey = ids.filter((id) => cache.peek(id)).join(',')
+  const [, setSettled] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    const bump = (): void => {
+      if (!cancelled) setSettled((n) => n + 1)
+    }
+    const { fetch, stale } = modelsToLoad(key === '' ? [] : key.split(','), (id) => cache.peek(id) !== undefined, loadedKey)
+    if (stale) bump()
+    for (const id of fetch) cache.get(id).then(bump, (err: unknown) => console.error(`Failed to load the interior of station ${id}`, err))
+    return () => {
+      cancelled = true
+    }
+  }, [key, loadedKey])
+  return useMemo(() => {
+    if (loadedKey === '') return NO_MODELS
+    return new Map(loadedKey.split(',').map((id) => [id, cache.peek(id)!]))
+  }, [loadedKey])
 }

@@ -95,9 +95,9 @@ function labelOf(choice: ExitChoice, interior: StationInterior, sources: readonl
   return best
 }
 
-/** The machine kinds the route rides, in a fixed order. */
-function machinesUsed(choice: ExitChoice, interior: StationInterior): ('elevator' | 'escalator')[] {
-  const kinds = new Set(choice.connectorIds.map((id) => interior.connectors.find((c) => c.id === id)?.kind))
+/** The machine kinds a route rides (an exit or a transfer), in a fixed order. */
+export function machinesUsed(route: { connectorIds: readonly string[] }, interior: StationInterior): ('elevator' | 'escalator')[] {
+  const kinds = new Set(route.connectorIds.map((id) => interior.connectors.find((c) => c.id === id)?.kind))
   return (['elevator', 'escalator'] as const).filter((k) => kinds.has(k))
 }
 

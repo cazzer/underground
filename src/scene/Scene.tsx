@@ -10,8 +10,8 @@ import { createFollowAnchor } from '../lib/live/followAnchor'
 import type { TrainPickSource } from '../lib/live/trainPick'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { createLabelBlockers } from '../lib/labelBlockers'
-import type { ExitChoice } from '../lib/exitChoice'
 import type { ExitLabel } from '../lib/exitView'
+import type { StationPathDraw } from '../lib/interiorPath'
 import type { Network } from '../lib/network'
 import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
@@ -60,13 +60,14 @@ interface SceneProps {
   panel: ScreenRect | null
   /** The user's location, once found inside the covered area; null draws no marker. */
   here: { ground: Ground; accuracyM: number } | null
-  /** The trip's way out at its To station; drawn only while that station's interior is the focused one. */
-  exitPath: { interiorId: string; choice: ExitChoice } | null
-  /** The trip's exit label, which the street labels place first. */
+  /** The trip's way out at its To station and its transfers through complexes, by interior file id; each draws only
+   *  while its interior is the focused one (the first for an interior wins). */
+  stationPaths: readonly StationPathDraw[]
+  /** The trip's drawn exit's label, which the street labels place first; null for none. */
   exitLabel: ExitLabel | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, exitPath, exitLabel }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, stationPaths, exitLabel }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -118,7 +119,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         labelBlockers={labelBlockers}
         network={network}
         mask={streetMask}
-        exitLabel={exitPath ? exitLabel : null}
+        exitLabel={exitLabel}
       />
       {interior && (
         <StationInterior
@@ -127,7 +128,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
           network={network}
           outOfService={outOfService}
           labelBlockers={labelBlockers}
-          exit={exitPath?.interiorId === interior.stationId ? exitPath.choice : null}
+          path={stationPaths.find((p) => p.interiorId === interior.stationId)?.choice ?? null}
         />
       )}
       <CameraRig network={network} insets={insets} panel={panel} interior={interior} index={index} anchor={anchor} />

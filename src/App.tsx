@@ -9,6 +9,7 @@ import { useLocate } from './data/useLocate'
 import { useStationHash } from './data/useStationHash'
 import { useStationInterior } from './data/useStationInterior'
 import { useTripExit } from './data/useTripExit'
+import { useTripTransfers } from './data/useTripTransfers'
 import { FocusProvider, useFocus } from './lib/focus'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
 import { joinPanelOutages, stationEquipment } from './lib/live/eneIndexJoin'
@@ -17,10 +18,12 @@ import { noStepFreeNow } from './lib/live/stepFreeLoss'
 import { markedPlacement } from './lib/locate'
 import type { Insets } from './lib/framing'
 import type { ScreenRect } from './lib/interiorCamera'
+import type { StationPathDraw } from './lib/interiorPath'
 import type { Network } from './lib/network'
 import type { BandedShapes } from './lib/networkBands'
 import { TrainSelectionProvider } from './lib/trainSelection'
 import { TripProvider, useTrip } from './lib/trip'
+import { tripNamesOf } from './lib/tripView'
 import { Scene } from './scene/Scene'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { Hud } from './ui/Hud'
@@ -60,6 +63,16 @@ function MapView({ network, bands, live }: MapViewProps) {
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
   const tripExit = useTripExit({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS })
+  const names = useMemo(() => tripNamesOf(network), [network])
+  // The changes of trains inside hand-authored complexes: described in the trip panel, drawn in their interiors.
+  const tripTransfers = useTripTransfers({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, names })
+  const exitDraw = tripExit?.drawn ?? null
+  const exitInterior = tripExit?.interiorId ?? null
+  // The exit first: where an interior has both (a trip can't change at its To station), the exit wins.
+  const stationPaths = useMemo<StationPathDraw[]>(
+    () => [...(exitDraw && exitInterior ? [{ interiorId: exitInterior, choice: exitDraw }] : []), ...tripTransfers.drawn],
+    [exitDraw, exitInterior, tripTransfers.drawn],
+  )
   const accessible = focusedId !== null && (network.stationById.get(focusedId)?.access.status ?? 'none') !== 'none'
   const outKey = outages.outIds.join(',')
   const unknownStatus = outages.closed === null
@@ -86,8 +99,8 @@ function MapView({ network, bands, live }: MapViewProps) {
             siblings={interior.siblings}
             index={interior.index}
             here={here}
-            exitPath={tripExit?.drawn ? { interiorId: tripExit.interiorId, choice: tripExit.drawn } : null}
-            exitLabel={tripExit?.mapLabel ?? null}
+            stationPaths={stationPaths}
+            exitLabel={tripExit?.drawn ? tripExit.mapLabel : null}
           />
         )}
       </ErrorBoundary>
@@ -103,6 +116,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           interior={{ load: interior.load, onRetry: interior.retry }}
           outages={outagePanelView(outages, nowS, noStepFree)}
           tripExits={tripExit?.lines ?? null}
+          tripTransfers={tripTransfers.lines}
         />
       </ErrorBoundary>
       <LiveDebug debug={live.debug} technical={live.technical} />
