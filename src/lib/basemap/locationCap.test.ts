@@ -59,4 +59,13 @@ describe('capStep', () => {
     expect(capStep(s, down(2, 0, 0, true, true))).toBe(false)
     expect(s.capped).toBe(true)
   })
+
+  it('drops presses when the window loses focus', () => {
+    const s = capped()
+    capStep(s, down(1, 0, 0))
+    capStep(s, { type: 'blur' })
+    expect(capStep(s, { type: 'move', id: 1, x: 100, y: 0 })).toBe(false)
+    expect(capStep(s, down(2, 0, 0, false, false))).toBe(false)
+    expect(s.capped).toBe(true)
+  })
 })

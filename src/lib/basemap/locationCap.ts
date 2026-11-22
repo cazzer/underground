@@ -18,6 +18,8 @@ export type CapEvent =
   | { type: 'down'; id: number; x: number; y: number; touch: boolean; primary: boolean }
   | { type: 'move'; id: number; x: number; y: number }
   | { type: 'up'; id: number }
+  /** The window lost focus: presses in progress will never end here. */
+  | { type: 'blur' }
 
 interface Press {
   x: number
@@ -55,6 +57,9 @@ export function capStep(state: CapState, e: CapEvent): boolean {
     }
     case 'up':
       state.presses.delete(e.id)
+      return false
+    case 'blur':
+      state.presses.clear()
       return false
   }
 }

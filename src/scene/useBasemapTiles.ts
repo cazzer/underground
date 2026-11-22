@@ -4,18 +4,23 @@
  * camera: its frame runs at priority 0, after CameraRig, drei's update and the follow have moved it.
  *
  * Location cap (locationCap.ts): a location point flight caps tile zoom at CAP_Z until the user moves the view
- * past the click slop, wheels, pinches or picks a station. The pointer listeners are passive and on the canvas and
- * window, never MapControls props (a changed on* prop makes drei reconnect the controls, AGENTS.md).
+ * past the click slop, wheels, pinches or picks a station. Ordering: CameraRig starts the flight in a layout effect
+ * and moves the camera only in later frames; the cap is set in a layout effect of the same commit, so it is in
+ * force before any frame of the flight, even a reduced-motion one that lands in its first frame. The frame callback
+ * applies the latest request again (a no-op once handled) before it feeds the store, so no frame can select tiles
+ * for a point flight the store hasn't been capped for. The pointer listeners are passive, on the element MapControls
+ * listens on (r3f's connected element, as drei picks it) and the window, never MapControls props (a changed on*
+ * prop makes drei reconnect the controls, AGENTS.md). Not lifted by: following a train, keyboard input.
  */
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { PerspectiveCamera } from 'three'
 import type { BasemapConfig } from '../data/basemapConfig'
 import { createBasemapTiles } from '../data/basemapTiles'
 import type { BasemapTiles } from '../data/basemapTypes'
 import { CAP_Z, capStep, newCap, type CapEvent, type CapState } from '../lib/basemap/locationCap'
 import { newPose } from '../lib/basemap/reselect'
-import { useFocus } from '../lib/focus'
+import { useFocus, type FlyRequest } from '../lib/focus'
 import type { MapControlsImpl } from './cameraFlight'
 
 /** The idle callback's deadline: tiles start loading by then even if the main thread never idles. */
@@ -33,8 +38,11 @@ function stepCap(cap: CapState, store: BasemapTiles, e: CapEvent): void {
 
 export function useBasemapTiles(config: BasemapConfig): BasemapTiles {
   const store = useMemo(() => createBasemapTiles(config), [config])
-  const el = useThree((s) => s.gl.domElement)
+  // The element MapControls listens on (drei: `domElement || events.connected || gl.domElement`).
+  const el = useThree((s) => (s.events.connected as HTMLElement | undefined) || s.gl.domElement)
   const { flyRequest } = useFocus()
+  const latestFly = useRef<FlyRequest | null>(null)
+  const handledFly = useRef<FlyRequest | null>(null)
   const pose = useRef(newPose())
   const phase = useRef<Phase>('waiting')
   const cancelIdle = useRef<(() => void) | null>(null)
@@ -50,16 +58,34 @@ export function useBasemapTiles(config: BasemapConfig): BasemapTiles {
     [store],
   )
 
-  useEffect(() => {
-    if (flyRequest?.kind === 'point') stepCap(cap.current, store, { type: 'pointFlight' })
-    else if (flyRequest?.kind === 'station') stepCap(cap.current, store, { type: 'station' })
-  }, [flyRequest, store])
+  /** Applies the latest fly request to the cap once; cheap to call every frame. */
+  const applyFly = useCallback(() => {
+    const req = latestFly.current
+    if (req === handledFly.current) return
+    handledFly.current = req
+    if (req?.kind === 'point') stepCap(cap.current, store, { type: 'pointFlight' })
+    else if (req?.kind === 'station') stepCap(cap.current, store, { type: 'station' })
+  }, [store])
+
+  useLayoutEffect(() => {
+    if (cap.current.capped) store.capZoom(CAP_Z)
+  }, [store])
+
+  useLayoutEffect(() => {
+    latestFly.current = flyRequest
+    applyFly()
+  }, [flyRequest, applyFly])
 
   useEffect(() => {
     const touch = (e: PointerEvent) => e.pointerType === 'touch'
     const step = (e: CapEvent) => stepCap(cap.current, store, e)
     const onDown = (e: PointerEvent) => step({ type: 'down', id: e.pointerId, x: e.clientX, y: e.clientY, touch: touch(e), primary: e.isPrimary })
-    const onMove = (e: PointerEvent) => step({ type: 'move', id: e.pointerId, x: e.clientX, y: e.clientY })
+    const onMove = (e: PointerEvent) => {
+      // A mouse with no button held is hovering, not dragging.
+      if (e.pointerType === 'mouse' && e.buttons === 0) return
+      step({ type: 'move', id: e.pointerId, x: e.clientX, y: e.clientY })
+    }
+    const onBlur = () => step({ type: 'blur' })
     const onUp = (e: PointerEvent) => step({ type: 'up', id: e.pointerId })
     const onWheel = () => step({ type: 'wheel' })
     el.addEventListener('pointerdown', onDown, { passive: true })
@@ -68,7 +94,9 @@ export function useBasemapTiles(config: BasemapConfig): BasemapTiles {
     window.addEventListener('pointermove', onMove, { passive: true })
     window.addEventListener('pointerup', onUp, { passive: true })
     window.addEventListener('pointercancel', onUp, { passive: true })
+    window.addEventListener('blur', onBlur)
     return () => {
+      window.removeEventListener('blur', onBlur)
       el.removeEventListener('pointerdown', onDown)
       el.removeEventListener('wheel', onWheel)
       window.removeEventListener('pointermove', onMove)
@@ -103,6 +131,7 @@ export function useBasemapTiles(config: BasemapConfig): BasemapTiles {
       return
     }
     if (phase.current !== 'started') return
+    applyFly()
     const c = state.controls as MapControlsImpl | null
     if (!c) return
     const p = pose.current

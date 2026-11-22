@@ -815,7 +815,9 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   follow the camera, never the fix. After a location fly-to, tiles load no finer than z12 (several km a tile) until
   the user moves the view (a drag past the 6 px mouse / 10 px touch slop, a wheel step, a second finger) or picks a
   station (tap, panel, search); a tap that doesn't move, or the controls' `start` alone, keeps the cap
-  (`lib/basemap/locationCap.ts`, fed by `useBasemapTiles.ts`). Tiles already loaded still draw.
+  (`lib/basemap/locationCap.ts`, fed by `useBasemapTiles.ts`, which sets the cap in a layout effect, so it is in force
+  before any frame of the flight, even a reduced-motion one). Following a train or keyboard input doesn't lift it.
+  Tiles already loaded still draw.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip

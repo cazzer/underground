@@ -25,7 +25,9 @@ export interface FrustumRays {
 
 /** Writes the footprint's four ground (x, z) corners to `out` (8 numbers). */
 export function groundFootprint(rays: FrustumRays, out: Float64Array): void {
-  const [px, py, pz] = [rays.p[0]!, rays.p[1]!, rays.p[2]!]
+  const px = rays.p[0]!
+  const py = rays.p[1]!
+  const pz = rays.p[2]!
   const reach = MAX_REACH * rays.distance
   for (let i = 0; i < 4; i++) {
     const dx = rays.dirs[i * 3]!
