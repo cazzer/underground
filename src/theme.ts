@@ -70,8 +70,11 @@ export interface Theme {
   interiorApproxGap: number
   /**
    * The focused station's streets (StationStreets.tsx), a faint street-level layer under the route lines. Faint by
-   * color, not alpha (a translucent LineSegments2 beads at its joints); at least 2.5:1 on the background, since the
-   * interior veil dims it, and apart from the selected-train rim (theme.test.ts).
+   * color, not alpha (a translucent LineSegments2 beads at its joints): a neutral gray, 2.5:1 to 4:1 on the
+   * background (fainter than the route lines), at least 60 in sRGB from every drawn route color and both grid
+   * colors (theme.test.ts). Under look A at full 3D the interior veil leaves it at about 1.25:1, a floor the test
+   * keeps: there the interior is the subject, and the DOM labels (ost.5) carry the street names. TEMPORARY
+   * `?streets=over` (streetsLook.ts), drawing it above the veil, is the alternative for the ost.7 look card.
    */
   streetStroke: string
   /** Street line width in CSS px. */
@@ -124,7 +127,7 @@ export const THEMES = {
     interiorDepthFade: 0.5,
     interiorApproxDash: 1.5,
     interiorApproxGap: 0.75,
-    streetStroke: '#4a6aa0',
+    streetStroke: '#646468',
     streetWidth: 1,
   },
 } as const satisfies Record<string, Theme>

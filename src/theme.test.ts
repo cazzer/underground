@@ -83,12 +83,41 @@ describe('here token', () => {
 
 /** Smallest sRGB distance between the street stroke and a color it must not pass for. */
 const MIN_STREET_DISTANCE = 60
+/** The street stroke stays fainter than the route lines, yet reads on the background. */
+const STREET_CONTRAST_MIN = 2.5
+const STREET_CONTRAST_MAX = 4
+/** Under look A's veil at full 3D the streets nearly vanish (the interior is the subject), but not entirely. */
+const STREET_VEILED_FLOOR = 1.25
 
 describe('street tokens', () => {
-  it('read at 2.5:1 on the background and stay apart from the selected-train rim', async () => {
+  it('read faintly on the background, fainter than the route lines', async () => {
     for (const t of Object.values(await themes())) {
-      expect(contrastRatio(t.streetStroke, t.background), `${t.name} ${t.streetStroke}`).toBeGreaterThanOrEqual(2.5)
-      expect(colorDistance(t.streetStroke, t.trainSelectedRim), `${t.name} street vs rim`).toBeGreaterThanOrEqual(MIN_STREET_DISTANCE)
+      const c = contrastRatio(t.streetStroke, t.background)
+      expect(c, `${t.name} ${t.streetStroke}`).toBeGreaterThanOrEqual(STREET_CONTRAST_MIN)
+      expect(c, `${t.name} ${t.streetStroke}`).toBeLessThanOrEqual(STREET_CONTRAST_MAX)
+    }
+  })
+
+  it('keep the veiled floor under look A at full 3D', async () => {
+    vi.stubGlobal('window', { location: { search: '' } })
+    const { resolveInteriorLook } = await import('./scene/interiorLook')
+    vi.unstubAllGlobals()
+    const look = resolveInteriorLook('?interior=a')
+    for (const t of Object.values(await themes())) {
+      // The veil is the background at veilOpacity × veilWeight, and veilWeight is 1 at full 3D.
+      const veiled = mixHex(t.background, t.streetStroke, 1 - look.veilOpacity)
+      expect(contrastRatio(veiled, t.background), `${t.name} veiled ${veiled}`).toBeGreaterThanOrEqual(STREET_VEILED_FLOOR)
+    }
+  })
+
+  it('stay apart from every drawn route color, the grid and the selected-train rim', async () => {
+    const routes = (JSON.parse(readFileSync('public/data/routes.json', 'utf8')) as RoutesFile).routes
+    for (const t of Object.values(await themes())) {
+      const drawn = routes.map((r) => [`route ${r.id}`, routeLineColor(`#${r.color}`, t.routeLineMix, t.background)] as const)
+      const others = [...drawn, ['gridSection', t.gridSection], ['gridCell', t.gridCell], ['rim', t.trainSelectedRim]] as const
+      for (const [name, color] of others) {
+        expect(colorDistance(t.streetStroke, color), `${t.name} street ${t.streetStroke} vs ${name} ${color}`).toBeGreaterThanOrEqual(MIN_STREET_DISTANCE)
+      }
     }
   })
 })
