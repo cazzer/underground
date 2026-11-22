@@ -85,7 +85,12 @@ function piece(own: ShapeBands, primary: ShapeBands, run: SharedRun, length: num
   return { s, e, toV }
 }
 
-/** `own` outside the pieces, the primary's mapped knots inside them (pieces sorted, apart). */
+/**
+ * `own` outside the pieces, the primary's mapped knots inside them (pieces sorted, apart). A hand-over can repeat a
+ * knot (own and the primary's at one distance, same value), which profileAt reads as a zero span and lineBreaks drops
+ * as a repeat; a piece reaching the variant's start can map a knot below 0, which profileAt holds from and resampleAt
+ * ignores as a break.
+ */
 function splice(own: TrackProfile, primary: TrackProfile, pieces: readonly Piece[]): TrackProfile {
   const d: number[] = []
   const y: number[] = []

@@ -20,17 +20,22 @@ const MIN_BREAK_GAP_M = 5
 const MIN_TAPER_STEP = 0.25
 /**
  * A 0.5 slot ease is exactly MIN_TAPER_STEP from its start at its middle. A variant's knots mapped from its primary's
- * (corridorShare.ts) sit up to a millimetre off theirs, so float noise there must not decide whether the variant keeps
- * the break the primary keeps: a step this close to MIN_TAPER_STEP counts as reaching it.
+ * (corridorShare.ts) carry float noise, which must not decide whether the variant keeps the break the primary keeps:
+ * a step this close to MIN_TAPER_STEP counts as reaching it. Small enough that no primary's breaks change
+ * (trackBreaks.data.test.ts); 1e-3 added breaks to ten.
  */
-const STEP_EPS = 1e-3
+export const STEP_EPS = 1e-5
 
-/** Sorted break distances for `resampleAt`: ramps, tapers, and the fade ramps of each station span of shape `id`. */
+/**
+ * Sorted break distances for `resampleAt`: ramps, tapers, and the fade ramps of each station span of shape `id`.
+ * `stepEps` is STEP_EPS but for the data test that compares with none.
+ */
 export function lineBreaks(
   profile: TrackProfile,
   bands: ShapeBands,
   spans: ReadonlyMap<StationId, ReadonlyMap<ShapeId, PlatformSpan>>,
   id: ShapeId,
+  stepEps = STEP_EPS,
 ): number[] {
   const out = rampBreaks(profile)
   for (const byShape of spans.values()) {
@@ -47,7 +52,7 @@ export function lineBreaks(
     if (d - last < MIN_BREAK_GAP_M) continue
     const s = profileAt(bands.slot, d)
     const h = profileAt(bands.half, d)
-    if (!knots.has(d) && Math.abs(s - slot) < MIN_TAPER_STEP - STEP_EPS && Math.abs(h - half) < MIN_TAPER_STEP - STEP_EPS) continue
+    if (!knots.has(d) && Math.abs(s - slot) < MIN_TAPER_STEP - stepEps && Math.abs(h - half) < MIN_TAPER_STEP - stepEps) continue
     out.push(d)
     last = d
     slot = s

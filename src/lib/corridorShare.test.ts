@@ -94,6 +94,37 @@ describe('shareBands', () => {
     ])
   })
 
+  it('shares each run of a variant that leaves the primary and rejoins it, keeping its own taper between and after', () => {
+    // The variant's detour is 20 m shorter than the primary's, so the second run sits 520 m along the primary.
+    const own = bands([1290, 0], [1590, 0.5], [2400, 0.5], [2700, 0], [3290, 0], [3590, 0.5], [4500, 0.5], [4800, 0])
+    const primary = bands([1800, 0], [2100, 0.5], [2900, 0.5], [3200, 0], [3820, 0], [4120, 0.5], [4700, 0.5], [5000, 1])
+    const out = shareBands(own, primary, [run(1000, 2000, 500), run(3000, 4000, 520)], 6000)
+    // The primary's tapers off the runs (2900-3200 and 4700-5000 along it) stay out.
+    expect(knotsOf(out.slot)).toEqual([
+      [1300, 0],
+      [1600, 0.5],
+      [2400, 0.5],
+      [2700, 0],
+      [3300, 0],
+      [3600, 0.5],
+      [4500, 0.5],
+      [4800, 0],
+    ])
+  })
+
+  it('keeps its own ease that starts right at the end of a run', () => {
+    // The variant leaves at 2000 and tapers at once; the primary stays in the corridor.
+    const own = bands([1200, 0], [1500, 0.5], [2000, 0.5], [2300, 0])
+    const primary = bands([1210, 0], [1510, 0.5], [2600, 0.5], [2900, 0])
+    const out = shareBands(own, primary, [run(1000, 2000, 0)], 5000)
+    expect(knotsOf(out.slot)).toEqual([
+      [1210, 0],
+      [1510, 0.5],
+      [2000, 0.5],
+      [2300, 0],
+    ])
+  })
+
   it('keeps its own where it never agrees with the primary on a flat stretch', () => {
     const own = bands([0, 0.5])
     const primary = bands([0, -0.5])

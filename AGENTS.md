@@ -389,7 +389,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
     adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
     `lineBreaks`, every extra vertex a drawn line needs (ramps via `rampSampling.ts`, band tapers every 30 m but only once the slot
-    moved 0.25, less 1e-3 so a variant's mapped knots keep its primary's breaks, fade ramps);
+    moved 0.25, less 1e-5 so a variant's mapped knots keep its primary's breaks; `trackBreaks.data.test.ts` checks no primary's
+    breaks change with it; fade ramps);
     `corridors.ts` shared corridors at load (`corridorBands` gives each shape a `ShapeBands`: slot and corridor
     half-width as `TrackProfile`s. 30 m samples, other band keys within 18 m heading within 15 degrees, gaps under
     150 m filled, runs under 200 m dropped, slot = place minus the middle; band key = short name minus a trailing X),

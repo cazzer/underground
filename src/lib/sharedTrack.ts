@@ -154,6 +154,9 @@ export function sharedRuns(variant: Polyline, primary: TrackIndex): SharedRun[] 
       }
       close()
     }
+    // A run starts on the nearest point, the earlier pass on a tie: where a terminal loop crosses the same ground
+    // twice and the variant is on the later pass, the next vertex's offset breaks the run and it restarts there
+    // again. That loses the sharing on that stretch; it never pairs a variant point with a wrong primary one.
     const start = onTrack(primary, pt.x, pt.z, NaN)
     if (!Number.isNaN(start)) {
       v.push(dv)
