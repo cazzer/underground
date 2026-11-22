@@ -1,8 +1,9 @@
 import { BufferAttribute, type BufferGeometry, ExtrudeGeometry, PlaneGeometry, Shape } from 'three'
 
-/** Car body dimensions in meters: a chamfered prism (look card pah.5.2, option B). */
-export const CAR_WIDTH_M = 3
-export const CAR_HEIGHT_M = 3.6
+import { CAR_HEIGHT_M, CAR_WIDTH_M } from '../lib/carDims'
+
+/** Car body dimensions in meters (`lib/carDims.ts`): a chamfered prism (look card pah.5.2, option B). */
+export { CAR_FLOOR_M, CAR_HEIGHT_M, CAR_WIDTH_M } from '../lib/carDims'
 /** How far each roof edge is set in from the side walls. */
 export const CAR_ROOF_INSET_M = 0.6
 

@@ -97,7 +97,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `theme.trainSelectedRim` rim. Its dot is drawn on its own above every other dot; its cars get the top widen
     level, a 0.2 m lift (so its roof wins the depth test on shared corridors) and rim footprints; wrapped in an `ErrorBoundary` so a crash shows in the HUD, not a blank map). Zoomed in, the
     dots hand off to `TrainCars.tsx` (car bodies plus per-car background footprints; `useTrainCars.ts` owns
-    their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body and its dimension constants);
+    their instances, consists and per-frame writes; `carGeometry.ts` the shaded chamfered-prism body (its dimension constants live in `src/lib/carDims.ts`));
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `cameraDistance.ts` helpers; `renderOrder.ts`
@@ -106,7 +106,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
     veil blends, so a copy at weight 0 renders exactly like its veiled street car. Along those platforms the map
     track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
-  - `StationInterior.tsx` the focused station's interior (two line layers; for a generated interior both materials are dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, drei Html
+  - `StationInterior.tsx` the focused station's interior (two line layers on each side of the lifted-train split; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx`, drei Html
     level labels); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target); `interiorLook.ts` TEMPORARY look overrides
 - `src/ui/Hud.tsx`: Tailwind overlay (title, live status, a screen-reader-only announcer for the gone notice, arrivals
@@ -222,11 +222,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
     poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, a smoothstep-eased
     glide sized from the gap at 60 m/s catch-up within 3-10 s that a new poll continues on its curve rather than
-    restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change the dot's ground point is
-    projected onto the new shape: within 25 m it carries over, else it shrinks on the old shape
-    (`drawGeometry`) and grows on the new one; `trainRoute.ts` dot color route
+    restarts, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change (`shapeCarry.ts`) the dot's
+    drawn point, in the last frame's `BandView`, is projected onto the new shape's drawn line (`nearestOnTrack`):
+    within 25 m and 40 px on screen (`CARRY_MAX_PX`) it carries over and the gap left (a band pitch, or a
+    junction's few meters) eases out as a world offset at about 30 px/s on screen (0.6-2 s; dot, cars and picks add
+    it; under reduced motion only a gap under 1 px carries, snapped), else it shrinks on the old shape
+    (`drawGeometry`) and grows on the new one. `carryReplay.ts` is the shapeCarry tests' replay helper (app camera,
+    screen px); `shapeCarry.data.test.ts` replays every same-route shape pair at three junctions on the real bands;
+    `trainRoute.ts` dot color route
   - `trackPoint.ts` `trackPointInto`: a train's drawn point at a distance, on its route's band as the band line
-    shader draws it (vertices shifted by `bandShift`, straight between) at the profile's height. Dots, cars (and so
+    shader draws it (vertices shifted by `bandShift`, straight between) at the profile's height; `nearestOnTrack`
+    projects a point onto that drawn line (per poll, a shape change). Dots, cars (and so
     the platform copies), picks and `trainAt` all go through it, with the frame's `BandView` (SubwayLines writes it);
   - `trainPick.ts` the nearest drawn train to a click (dot, or the chord line through its car ends, track points);
     `trainSelection.ts` the selection reducer (two polls in a row without the trip clear it, with a notice; no live layer, an outage, keeps it);
@@ -405,7 +411,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: grid -1, lines 1, station tie 1.5, line focus 2,
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5, car rim 5.25,
   car halo 5.5, trains 6, selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
-  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
+  you-are-here reticle 6.55, above-veil platform cars 9.4 (selected rim), 9.45 (footprints) and 9.5 (bodies),
+  interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom) draws no marker and no
   station tie: its panel and interior mark it, and it stays pickable.
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
@@ -426,7 +433,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and checks a port of it against `bandShift`; they agree only while the line object's world matrix is identity).
   Until the two direction tracks have room on screen for both bundles, the same shift pulls them onto the
   centerline. The buffers keep the unshifted points. Trains ride the bands: dots, cars and picks are placed only
-  through `trackPointInto` (`src/lib/live/trackPoint.ts`), never `pointAtDistance` on the raw line. Anything else
+  through `trackPointInto` (`src/lib/live/trackPoint.ts`) plus the slot's shape-change offset (`shapeCarry.ts`),
+  never `pointAtDistance` on the raw line. Anything else
   that must sit on a route line goes through the band line material (as the platform fade does) or trackPointInto.
   The corridor search runs after the first paint, in a Web Worker (`src/data/loadBands.ts`; on the main thread when
   idle if the worker fails, logged): useNetwork's ready state carries `bands`, a promise of the banded shapes. The
@@ -460,7 +468,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   instance `slot * MAX_CARS + c`). Their per-frame
   path (`useFrame` in `LiveTrains.tsx`) must not allocate or throw: errors there bypass error boundaries.
 - The station interior is a group at `toGround(anchor)` with depths drawn ×2 × the depth factor (the group's
-  `scale.y`; x/z true and never rescaled, since dashes are object-space; labels give real depths). Two merged `LineSegments2` (fine, then strong strokes) are built from the deepest
+  `scale.y`; x/z true and never rescaled, since dashes are object-space; labels give real depths). Merged `LineSegments2` (fine, then strong strokes, a pair on each side of the split below) are built from the deepest
   level up, so upper levels paint over lower ones; levels farther from the street (in level count; deeper, or
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
@@ -468,7 +476,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   layer, live trains included, in one draw call, at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
   level labels show by `labelOpacity` (gated between depth 0.3 and 0.6); the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
-  are redrawn above the veil and strokes (`SpanCars.tsx`, 9.4 to 9.5; not in look C): every car within
+  are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.4 to 9.5; not in look C),
+  and the levels above it draw over those trains at 9.6 (fine) and 9.7 (strong): `buildInteriorBuffers` splits at
+  `splitLevel` (`trainLevelIndex`, the deepest level with a platform track). That level and below stay at 8/9; a
+  level above it goes over; a stair, escalator or elevator shaft from it (or below) up to a level above it is cut
+  at the trains' roof (`trainRoofY`: rail ×yScale plus the car's floor and body height from `src/lib/carDims.ts`,
+  not exaggerated; `SplitAtY` in `interiorSegments.ts`), so a car in front of a stair foot hides it and the
+  stair above the roof draws over the car (an elevator's stop stays with its level). The cut is by height alone, so a
+  foot behind a car is hidden too. One platform level is assumed: a two-deck interior logs a warning (none ships). At most four interior line layers; look C doesn't split. Every car within
   `TRAIN_RAMP_M` (40 m) of a platform span (`network.platformSpans`, the profile's kept runs) is copied, mixed
   toward the background after shading by `veilTint` (veil opacity × veilWeight × (1 − weight), look A only), so a car
   leaving the platform matches the veiled street cars. Along the platform the map track fades out with the reveal

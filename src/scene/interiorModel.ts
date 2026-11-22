@@ -3,7 +3,7 @@ import type { Level, LocalPoint, StationInterior } from '../data/stationSchema'
 import { stationAxis } from '../lib/interiorAxis'
 import { levelFadeShares } from '../lib/interiorFade'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
-import { buildInteriorBuffers, RAIL_DROP_M, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
+import { buildInteriorBuffers, RAIL_DROP_M, trainLevelIndex, type Buffers, type InteriorRole, type Rgb } from '../lib/interiorGeometry'
 import { toGround, type Ground } from '../lib/projection'
 import { mixHex } from '../lib/routeColor'
 import { ISO_POLAR } from '../lib/tilt'
@@ -17,7 +17,10 @@ export interface InteriorModel {
   origin: Ground
   strong: Buffers
   fine: Buffers
-  /** Draw both layers with a dashed material, cutting the segments `distances` marks (generated interiors). */
+  /** The levels above the platform the lifted trains ride, drawn over those trains (empty in look C). */
+  overStrong: Buffers
+  overFine: Buffers
+  /** Draw every layer with a dashed material, cutting the segments `distances` marks (generated interiors). */
   dashed: boolean
   /** Generated from an archetype template rather than surveyed: the panel says it is approximate. */
   approximate: boolean
@@ -93,6 +96,8 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const { yScale } = interiorLook
   const approximate = interior.generated !== undefined
   const colorOf = colorTable(interior.levels)
+  // Look C draws the interior under the street and lifts no trains, so nothing needs to go over them.
+  const splitLevel = interiorLook.under ? undefined : trainLevelIndex(interior)
   const built = buildInteriorBuffers(interior, {
     yScale,
     stepRise: 0.18,
@@ -100,8 +105,11 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     entranceSize: 2.5,
     guides: interiorLook.guides,
     dashStructure: approximate,
+    splitLevel,
     colorOf,
   })
+  // Look B's cut line is at the street, so it goes over the trains when the street does (below ground).
+  const cutInOver = splitLevel !== undefined && interior.levels.findIndex((l) => l.kind === 'street') < splitLevel
   const origin = toGround(interior.anchor)
   const hull =
     interiorLook.veil === 'footprint'
@@ -111,7 +119,9 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     stationId: interior.stationId,
     origin,
     strong: built.strong,
-    fine: hull ? withCutLine(built.fine, hull, colorOf('fare', 0)) : built.fine,
+    fine: hull && !cutInOver ? withCutLine(built.fine, hull, colorOf('fare', 0)) : built.fine,
+    overStrong: built.overStrong,
+    overFine: hull && cutInOver ? withCutLine(built.overFine, hull, colorOf('fare', 0)) : built.overFine,
     dashed: approximate,
     approximate,
     labels: levelLabels(interior, yScale),
