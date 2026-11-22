@@ -13,6 +13,8 @@ import { interiorLook } from './interiorLook'
 /** A station interior, ready to draw: group origin, merged line buffers, labels, camera target. */
 export interface InteriorModel {
   stationId: string
+  /** The interior this was built from, for `interiorLayers` (machines out of service redraw its layers only). */
+  interior: StationInterior
   /** A station complex: every station this interior covers (stationId first). Absent = stationId alone. */
   memberStationIds?: readonly string[]
   /** Scene position of the interior's local origin (its anchor). */
@@ -46,6 +48,7 @@ const ROLE_TOKEN: Record<InteriorRole, string> = {
   step: theme.interiorFine,
   guide: theme.interiorFine,
   fare: theme.interiorFine,
+  outage: theme.interiorOutage,
 }
 
 const HULL_PAD = 6
@@ -58,7 +61,7 @@ function colorTable(levels: readonly Level[]): (role: InteriorRole, levelIndex: 
   const table = new Map<string, Rgb>()
   const shares = levelFadeShares(levels)
   for (const [role, token] of Object.entries(ROLE_TOKEN)) {
-    const machine = role === 'elevator' || role === 'escalator'
+    const machine = role === 'elevator' || role === 'escalator' || role === 'outage'
     for (let i = 0; i < levels.length; i++) {
       const share = machine ? MACHINE_DEPTH_FADE_SHARE : 1
       const depthFade = theme.interiorDepthFade * share * shares[i]!
@@ -93,25 +96,53 @@ function withCutLine(fine: Buffers, hull: readonly LocalPoint[], rgb: Rgb): Buff
   return { positions, colors, distances }
 }
 
-/** Builds the drawable model; throws (naming the element) on inconsistent interior data or nothing to draw. */
-export function buildInteriorModel(interior: StationInterior): InteriorModel {
-  const { yScale } = interiorLook
-  const approximate = interior.generated !== undefined
+type Layers = Pick<InteriorModel, 'strong' | 'fine' | 'overStrong' | 'overFine'>
+
+/** The four line layers, with `outOfService` machines drawn as such (and Look B's cut line when there is a hull). */
+function buildLayers(interior: StationInterior, hull: LocalPoint[] | null, outOfService: ReadonlySet<string>): Layers {
   const colorOf = colorTable(interior.levels)
   // Look C draws the interior under the street and lifts no trains, so nothing needs to go over them.
   const splitLevel = interiorLook.under ? undefined : trainLevelIndex(interior)
   const built = buildInteriorBuffers(interior, {
-    yScale,
+    yScale: interiorLook.yScale,
     stepRise: 0.18,
     railDrop: RAIL_DROP_M,
     entranceSize: 2.5,
     guides: interiorLook.guides,
-    dashStructure: approximate,
+    dashStructure: interior.generated !== undefined,
     splitLevel,
+    outOfService: (id) => outOfService.has(id),
     colorOf,
   })
   // Look B's cut line is at the street, so it goes over the trains when the street does (below ground).
   const cutInOver = splitLevel !== undefined && interior.levels.findIndex((l) => l.kind === 'street') < splitLevel
+  return {
+    strong: built.strong,
+    fine: hull && !cutInOver ? withCutLine(built.fine, hull, colorOf('fare', 0)) : built.fine,
+    overStrong: built.overStrong,
+    overFine: hull && cutInOver ? withCutLine(built.overFine, hull, colorOf('fare', 0)) : built.overFine,
+  }
+}
+
+/**
+ * The model's line layers with the machines in `outKey` (their connector ids, comma-joined; empty for none) out of
+ * service. Empty is the model's own buffers, so a station with no outage costs nothing. A throw while rebuilding
+ * is logged and the model's own buffers stand: an outage is never worth losing the interior over.
+ */
+export function interiorLayers(model: InteriorModel, outKey: string): Layers {
+  if (outKey === '') return model
+  try {
+    return buildLayers(model.interior, model.hull, new Set(outKey.split(',')))
+  } catch (err) {
+    console.error(`Couldn't draw the outages at ${model.stationId}`, err)
+    return model
+  }
+}
+
+/** Builds the drawable model; throws (naming the element) on inconsistent interior data or nothing to draw. */
+export function buildInteriorModel(interior: StationInterior): InteriorModel {
+  const { yScale } = interiorLook
+  const approximate = interior.generated !== undefined
   const origin = toGround(interior.anchor)
   const hull =
     interiorLook.veil === 'footprint'
@@ -119,12 +150,10 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
       : null
   return {
     stationId: interior.stationId,
+    interior,
     ...(interior.memberStationIds ? { memberStationIds: interior.memberStationIds } : {}),
     origin,
-    strong: built.strong,
-    fine: hull && !cutInOver ? withCutLine(built.fine, hull, colorOf('fare', 0)) : built.fine,
-    overStrong: built.overStrong,
-    overFine: hull && cutInOver ? withCutLine(built.overFine, hull, colorOf('fare', 0)) : built.overFine,
+    ...buildLayers(interior, hull, new Set()),
     dashed: approximate,
     approximate,
     labels: levelLabels(interior, yScale),

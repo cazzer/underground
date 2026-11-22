@@ -209,14 +209,13 @@ describe('interior machine tokens', () => {
     }
   })
 
-  it('stand apart from the other interior tokens, statusError and each other', async () => {
+  it('stand apart from the other interior tokens and each other', async () => {
     for (const t of Object.values(await themes())) {
       const others = [
         ['stroke', t.interiorStroke],
         ['track', t.interiorTrack],
         ['entrance', t.interiorEntrance],
         ['fine', t.interiorFine],
-        ['statusError', t.statusError],
       ] as const
       for (const [name, token] of [['elevator', t.interiorElevator], ['escalator', t.interiorEscalator]] as const) {
         for (const [other, color] of others) {
@@ -237,6 +236,37 @@ describe('interior machine tokens', () => {
             const d = oklabDistance(simulateCvd(token, m), simulateCvd(color, m))
             expect(d, `${t.name} ${mode} ${name} ${token} vs ${other} ${color}`).toBeGreaterThanOrEqual(MIN_CVD_DISTANCE)
           }
+        }
+      }
+    }
+  })
+})
+
+describe('interiorOutage', () => {
+  it('reads at 3:1 on the background on the deepest level, after the machine depth fade', async () => {
+    const { MACHINE_DEPTH_FADE_SHARE } = await import('./theme')
+    for (const t of Object.values(await themes())) {
+      const deepest = mixHex(t.interiorOutage, t.background, t.interiorDepthFade * MACHINE_DEPTH_FADE_SHARE)
+      expect(contrastRatio(deepest, t.background), `${t.name} ${deepest}`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('stands apart from every other interior token, also under simulated deuteranopia and protanopia', async () => {
+    for (const t of Object.values(await themes())) {
+      const others = [
+        ['stroke', t.interiorStroke],
+        ['track', t.interiorTrack],
+        ['entrance', t.interiorEntrance],
+        ['fine', t.interiorFine],
+        ['elevator', t.interiorElevator],
+        ['escalator', t.interiorEscalator],
+        ['rim', t.trainSelectedRim],
+      ] as const
+      for (const [other, color] of others) {
+        expect(oklabDistance(t.interiorOutage, color), `${t.name} vs ${other} ${color}`).toBeGreaterThanOrEqual(0.1)
+        for (const [mode, m] of Object.entries(CVD)) {
+          const d = oklabDistance(simulateCvd(t.interiorOutage, m), simulateCvd(color, m))
+          expect(d, `${t.name} ${mode} vs ${other} ${color}`).toBeGreaterThanOrEqual(MIN_CVD_DISTANCE)
         }
       }
     }

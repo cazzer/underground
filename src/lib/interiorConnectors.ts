@@ -23,6 +23,8 @@ export interface ConnectorContext {
   center: LocalPoint
   /** Whether the interior's structural strokes are dashed (an estimated layout): a walkway's sides are, like its slabs' outlines. */
   dash: boolean
+  /** Whether the elevator or escalator with this id is out of service: drawn in the `outage` role, with an X. */
+  outOfService: (connectorId: string) => boolean
   /** Where a zero-run escalator's run sits (`spreadBanks`); undefined for every other connector. */
   anchorOf: (connectorId: string) => RunAnchor | undefined
 }
@@ -55,6 +57,8 @@ const CHEVRON_SPACING_M = 4.5
 const CHEVRON_DEPTH_M = 1.5
 const CHEVRON_MAX_DEPTH = 0.4
 const CHEVRON_SIDE = 1
+/** An out-of-service escalator's cross: at most this fraction of the run either side of mid-run. */
+const OUTAGE_CROSS_MAX_HALF = 0.4
 /** Elevator door gap and cab inset, as fractions of the shaft width. */
 const DOOR_GAP = 0.45
 const CAB_INSET = 0.25
@@ -156,15 +160,29 @@ function chevron(ctx: ConnectorContext, g: Incline, apex: number, depth: number)
   ctx.strong.segment(g.at(back, CHEVRON_SIDE), tip, cBack, cTip)
 }
 
-/** Escalators: the band, handrails and, when the travel direction is known, travel chevrons. */
+/** An out-of-service escalator's mark: two strong strokes corner to corner of a square across the band at mid-run. */
+function outageCross(ctx: ConnectorContext, c: Connector, g: Incline): void {
+  const half = Math.min(c.width / 2 / g.run, OUTAGE_CROSS_MAX_HALF)
+  const color = g.color('outage', 0.5)
+  ctx.strong.segment(g.at(0.5 - half, -1), g.at(0.5 + half, 1), color)
+  ctx.strong.segment(g.at(0.5 - half, 1), g.at(0.5 + half, -1), color)
+}
+
+/**
+ * Escalators: the band, handrails and, when the travel direction is known, travel chevrons. One that is out of
+ * service is drawn in the `outage` role with a cross over the band, and no chevrons (it isn't moving).
+ */
 export function drawEscalator(ctx: ConnectorContext, c: Connector, li: number, ui: number): void {
   const g = incline(ctx, c, li, ui)
-  band(ctx, g, 'escalator')
+  const out = ctx.outOfService(c.id)
+  const role: InteriorRole = out ? 'outage' : 'escalator'
+  band(ctx, g, role)
+  const [c0, c1] = [g.color(role, 0), g.color(role, 1)]
+  for (const side of [-RAIL_SIDE, RAIL_SIDE]) ctx.fine.segment(g.at(0, side, RAIL_HEIGHT_M), g.at(1, side, RAIL_HEIGHT_M), c0, c1)
+  if (out) return outageCross(ctx, c, g)
+  if (!c.travel) return
   // A fraction of the run, signed so that a chevron opens back from the travel direction.
   const depth = (c.travel === 'down' ? -1 : 1) * Math.min(CHEVRON_DEPTH_M / g.run, CHEVRON_MAX_DEPTH)
-  const [c0, c1] = [g.color('escalator', 0), g.color('escalator', 1)]
-  for (const side of [-RAIL_SIDE, RAIL_SIDE]) ctx.fine.segment(g.at(0, side, RAIL_HEIGHT_M), g.at(1, side, RAIL_HEIGHT_M), c0, c1)
-  if (!c.travel) return
   const n = Math.max(1, Math.floor(g.run / CHEVRON_SPACING_M))
   for (let k = 0; k < n; k++) chevron(ctx, g, (k + 0.5) / n + depth / 2, depth)
 }
@@ -179,12 +197,15 @@ function shaftCorners(c: Connector, axis: LocalPoint, inset = 0): LocalPoint[] {
   return [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)]
 }
 
+const elevatorRole = (ctx: ConnectorContext, c: Connector): InteriorRole => (ctx.outOfService(c.id) ? 'outage' : 'elevator')
+
 /** Elevator shaft from its lower to its upper level: four strong corner verticals. */
 export function drawElevatorShaft(ctx: ConnectorContext, c: Connector, li: number, ui: number): void {
   const yL = ctx.realY(li) * ctx.yScale
   const yU = ctx.realY(ui) * ctx.yScale
-  const cL = ctx.colorOf('elevator', li)
-  const cU = ctx.colorOf('elevator', ui)
+  const role = elevatorRole(ctx, c)
+  const cL = ctx.colorOf(role, li)
+  const cU = ctx.colorOf(role, ui)
   for (const [x, z] of shaftCorners(c, ctx.axis)) ctx.strong.segment([x, yL, z], [x, yU, z], cL, cU)
 }
 
@@ -211,7 +232,7 @@ export function doorSide(c: Connector, center: LocalPoint, axis: LocalPoint): nu
 /** One served level of an elevator: a doored square and its cab. */
 export function drawElevatorStop(ctx: ConnectorContext, c: Connector, levelIndex: number): void {
   const y = ctx.realY(levelIndex) * ctx.yScale
-  const color = ctx.colorOf('elevator', levelIndex)
+  const color = ctx.colorOf(elevatorRole(ctx, c), levelIndex)
   const corners = shaftCorners(c, ctx.axis)
   const door = doorSide(c, ctx.center, ctx.axis)
   const edge = (1 - DOOR_GAP) / 2
@@ -226,5 +247,9 @@ export function drawElevatorStop(ctx: ConnectorContext, c: Connector, levelIndex
     ctx.strong.segment(point(0), point(edge), color)
     ctx.strong.segment(point(1 - edge), point(1), color)
   }
-  ctx.fine.loop(shaftCorners(c, ctx.axis, CAB_INSET * c.width), y, color)
+  const cab = shaftCorners(c, ctx.axis, CAB_INSET * c.width)
+  ctx.fine.loop(cab, y, color)
+  // Out of service: the cab is crossed out.
+  if (!ctx.outOfService(c.id)) return
+  for (const [a, b] of [[0, 2], [1, 3]] as const) ctx.fine.segment([cab[a]![0], y, cab[a]![1]], [cab[b]![0], y, cab[b]![1]], color)
 }

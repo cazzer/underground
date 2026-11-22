@@ -1,11 +1,15 @@
 import { useCallback, useState } from 'react'
 import { useBands } from './data/useBands'
+import { useEne } from './data/useEne'
+import { ENE_URL } from './data/realtime'
 import { useLive } from './data/useLive'
 import { useNetwork } from './data/useNetwork'
 import { useLocate } from './data/useLocate'
 import { useStationHash } from './data/useStationHash'
 import { useStationInterior } from './data/useStationInterior'
 import { FocusProvider, useFocus } from './lib/focus'
+import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
+import { outagePanelView } from './lib/live/eneText'
 import { markedPlacement } from './lib/locate'
 import type { Insets } from './lib/framing'
 import type { ScreenRect } from './lib/interiorCamera'
@@ -40,6 +44,10 @@ function MapView({ network, bands, live }: MapViewProps) {
   const placement = markedPlacement(locate.state)
   const here = placement && { ground: placement.ground, accuracyM: placement.accuracyM }
   const model = interior.load.status === 'ready' ? interior.load.model : null
+  // Elevators and escalators out of service at the loaded interior; `outages.status` is the step-free routing's input.
+  const ene = useEne(ENE_URL)
+  const nowS = eneNowS(live.arrivals?.offsetS ?? null, performance.now(), Date.now())
+  const outages = joinStationOutages(model?.interior ?? null, ene, nowS)
   return (
     <>
       <ErrorBoundary fallback={(e) => <SceneCrash message={e.message} />}>
@@ -52,6 +60,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             onLiveError={live.onLayerError}
             panel={panel}
             interior={model}
+            outOfService={outages.outIds}
             focusedMarker={interior.streetMarker}
             siblings={interior.siblings}
             index={interior.index}
@@ -69,6 +78,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           locate={locate}
           linkNotice={{ show: stationHash.linkNotice, onDismiss: stationHash.dismissLinkNotice }}
           interior={{ load: interior.load, onRetry: interior.retry }}
+          outages={outagePanelView(outages, nowS)}
         />
       </ErrorBoundary>
       <LiveDebug debug={live.debug} technical={live.technical} />

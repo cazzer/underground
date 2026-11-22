@@ -11,7 +11,8 @@ Status: the real static network (every route shape and station from `public/data
 trains are live: the client polls the deployed realtime Worker (`worker/`) and draws dots from the
 pure realtime library. The station panel shows real arrivals. Bedford Av (L08) has a hand-authored interior, and
 about 250 more stations have generated ones (labelled "Estimated layout"), shown to everyone since 9wc.5.
-With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion.
+With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
+Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -102,7 +103,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   pushed to at least 3:1 against `theme.background`.
   TEMPORARY: `?lines=a|b|c` picks the lines look until the 8x4.3 options round is decided (default b)
   Interior tokens (`interiorStroke`, `interiorTrack`, `interiorEntrance`, `interiorFine`,
-  `interiorElevator`, `interiorEscalator`, the two widths, `interiorDepthFade`) color the station interior.
+  `interiorElevator`, `interiorEscalator`, `interiorOutage` (an out-of-service machine; the value of `statusError`), the two widths,
+  `interiorDepthFade`) color the station interior. Dev only: `?ene=EL358,EL359` fakes an outage snapshot for those codes (with or
+  without `VITE_RT_URL`; `eneDevFixture.ts`)
   TEMPORARY: `?interior=a|b|c` (veil, cutaway, ghost under; default a) and `?interiorY=1|2|3`
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
@@ -180,6 +183,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and `ReadyLine` for a loaded interior (null for authored ones; for a generated one the dim line "Estimated layout",
   shown whether or not the interior is in view so it is announced once, and keyed by station so a cached generated
   station after another one is announced too; the one place a ready-state line goes)
+  `OutageStatus.tsx` the panel's out-of-service machines under `InteriorStatus`: up to 2 rows as plain text (title, then "Mezzanine to
+  platform · EL358 · back about 6 AM"; no live region, so opening a panel never speaks them over "Showing <station>" or
+  "Estimated layout"), a "Show N more" toggle (focus goes to the station heading if it unmounts while focused), or a dim
+  "status unavailable" line; one always-mounted polite sr-only region speaks only a change to the machines out at the station
+  whose panel stays open (`outageAnnounce.ts`, pure; silent on open, station change or stale data)
   `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a combobox over a
   listbox of `SearchResult.tsx` rows (name and access icon, the borough on a dim line only for names whose stations span boroughs
   (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart); choosing a result
@@ -243,7 +251,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     station axis; on its listing entrance its street end sits there and the run heads toward the plan center,
     down below ground and up at an elevated station; else it is centered, descending toward the center) and elevators (shaft squared to the axis, a stop at each end in that level's pass; machines take
     half the depth fade). An escalator is a band with fine handrails and travel chevrons; an elevator is four
-    shaft verticals, a doored square at each stop and a fine cab inside it; `escalatorBanks.ts` `spreadBanks`: zero-run escalators whose bands would touch
+    shaft verticals, a doored square at each stop and a fine cab inside it. A machine in `ConnectorContext.outOfService` (from
+    `InteriorBufferOptions.outOfService`) takes the `outage` role, strong and fine, on both sides of the roof cut: an escalator loses its
+    chevrons and gets a cross over the band at mid-run, an elevator a cross over each stop's cab; tested in `interiorOutage.test.ts`; `escalatorBanks.ts` `spreadBanks`: zero-run escalators whose bands would touch
     sit side by side across the axis in id order (an authored one off its entrance stays put; one listed
     by two entrances throws);
     `interiorAxis.ts` `stationAxis`, the principal direction of the longest platform outline;
@@ -429,6 +439,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (`classOf`: highway, major, minor, path, water, park; tunnels, rail, ferry, earth and points dropped),
   `decodeTile.ts` (one MVT to per-class xyz segment pairs in scene meters at y 0; `isMvtBytes` rejects HTML and gzip),
   `mvtFixture.ts` (tests' MVT writer). `projection.ts` exports `groundX`/`groundZ` for per-vertex use
+- `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,
+  one request at a time, a hidden tab aborts and stops, backoff via `lib/live/enePoll.ts`; `eneFetch.ts` validates one body
+  (`realtimeFetch.ts`'s timeout, errors and `parseRetryAfter` are reused). Pure joins in `lib/live/`: `eneJoin.ts`
+  (`joinStationOutages`: outage codes to the focused interior's `Connector.id`; a snapshot over `ENE_MAX_AGE_S` 480 s old
+  by the /rt live clock, else the device clock, is unknown, never "in service"; also `MachineStatus`, the step-free routing's
+  input), `eneText.ts` (panel text, New York return times). `App` passes `outages.outIds` to `Scene` > `StationInterior`, which
+  rebuilds its four line layers only when that set changes (`interiorLayers`; `InteriorModel` itself never changes)
 - `src/data/useStationHash.ts` keeps `#station=<id>` and the focused station in step with `history.replaceState`
   (no history entries): reads on mount and `hashchange`, writes on every focus change; an unknown id clears the
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring

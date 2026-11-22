@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { scheduleLabel } from '../lib/labels'
 import type { ArrivalsSource } from '../lib/live/arrivals'
+import type { OutagePanelView } from '../lib/live/eneText'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { markedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
@@ -19,6 +20,7 @@ import { LinkNotice } from './LinkNotice'
 import { LocateButton } from './LocateButton'
 import { LocateStatus } from './LocateStatus'
 import { OrbitHint } from './OrbitHint'
+import { OutageStatus } from './OutageStatus'
 import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
@@ -30,12 +32,14 @@ interface ArrivalsPanelProps {
   arrivals: ArrivalsSource | null
   onClose: () => void
   interior: InteriorStatusInfo
+  /** Elevators and escalators out of service at the focused station. */
+  outages: OutagePanelView
   ref: Ref<HTMLElement>
   /** Takes focus when a panel that covered this one closes, or after the visitor picks this station from search. */
-  headingRef: Ref<HTMLHeadingElement>
+  headingRef: RefObject<HTMLHeadingElement | null>
 }
 
-function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, ref, headingRef }: ArrivalsPanelProps) {
+function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, outages, ref, headingRef }: ArrivalsPanelProps) {
   const station = network.stationById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   return (
@@ -59,6 +63,7 @@ function ArrivalsPanel({ network, stationId, live, arrivals, onClose, interior, 
       </div>
       <PartialAccessNote access={station.access} />
       <InteriorStatus info={interior} />
+      <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
       <ArrivalsList network={network} station={station} source={arrivals} status={live} />
     </aside>
   )
@@ -74,6 +79,8 @@ interface HudProps {
   onInsets: (insets: Insets) => void
   /** The focused station's interior load, shown in its panel. */
   interior: InteriorStatusInfo
+  /** The focused station's out-of-service machines, shown in its panel. */
+  outages: OutagePanelView
   /** Reports where the station panel sits (viewport px), or null when it closes. */
   onPanel: (rect: ScreenRect | null) => void
   /** The location button's state and actions. */
@@ -82,7 +89,7 @@ interface HudProps {
   linkNotice: { show: boolean; onDismiss: () => void }
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, onPanel, locate, linkNotice }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
   // One value gates the train panel and its Esc: a selection not seen in the feed yet shows no panel.
@@ -262,6 +269,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, onPanel, loca
             arrivals={arrivals}
             onClose={closeStation}
             interior={interior}
+            outages={outages}
             ref={panel}
             headingRef={stationHeading}
           />
