@@ -772,7 +772,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/loadStationStreets.ts` fetches `public/data/streets/<id>.json` (contract `src/data/streetSchema.ts`) and
   checks its outer shape; a 404 is null with one warning (cached for the session), other failures reject (evicted,
   retried on the next focus). `useStationStreets.ts` loads the focused station's file on focus only (never at
-  startup) into a cached `StreetLayer`: `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways
+  startup) into a cached `StreetLayer`; for a complex's lead (`membersOf`, lead first) it also loads each member's file
+  and merges them (`src/lib/streetMerge.ts`, `streetFileIds`, `mergeComplexStreets`): the lead's file plus every member
+  entrance no earlier file has (same type within 1.5 m on the ground), moved to the lead's frame, the lead's own first
+  then the added ones nearest the lead's point first, worded in one `entranceTexts` pass with the members' named streets
+  as extra lines (`NamedLine`, `namedLines`); lines, street labels, route clip and street mask stay the lead's, member
+  lines are not drawn, and the far marks sit on the basemap's roads. A member 404 is skipped; a member that fails
+  otherwise is warned about once (id and reason) and left out, the lead's layer showing without it, retried once that
+  layer is 5 s old when a hook asks for it (mount or key change; a lead's failure fails the layer, retried on the next focus). Raw files and layers
+  are cached separately (one fetch per file per page load). The merge adds Times Sq 10 entrances, WTC 9, 6 Av 7, Grand
+  Central 2, Borough Hall 1, Bryant Pk 1 (`streetMerge.data.test.ts`; WTC's 35 labels are over the 32 marker-exemption
+  cap, so its farthest lose that exemption). `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways
   (`src/lib/streetClass.ts`, which also holds `streetKey`, shared with the entrance join), decimeters to meters,
   mixing to the background over the last 70 m of `radiusM` (`edgeFade`; segments are split at the ramp's ends), plus
   the label sources: `src/lib/streetRuns.ts` (`streetLabelSources`: street ways grouped by `streetKey`, chained into
@@ -1254,6 +1264,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Walk shards are fetched only on a user action.** `data/walk/<id>.json` reveals its station id to the static host, so
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
   of a fix); no request carries the fix or the destination, and routing runs on the device.
+- **Member street files are fetched only for a focused complex lead** (and the trip's To complex, through `useTripExit`):
+  each member is part of the station the user opened; never for a fix's nearest station.
 - **Trip exit.** Once a plan for the trip panel's ends is ready, `src/data/useTripExit.ts` loads the To station's interior
   (`useInteriorModel`, the focused interior's cache) and street files (the interior file id's and, for a complex, the
   alighting member's; `useStationStreetsLoad` tells loading from missing, and the line waits for both). Both trip ends are

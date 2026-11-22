@@ -7,7 +7,7 @@ import { isClosedRing, isStreet, streetKey } from './streetClass'
 import { abbreviateStreet, entranceLabel, entranceParts, entranceSpoken, joinParts, type EntranceWording } from './streetName'
 
 /** The file's coordinates are integer decimeters. */
-const DM_PER_M = 10
+export const DM_PER_M = 10
 /** A nearby street names an entrance with no cross street only within this far of it, meters. */
 export const NEAR_STREET_M = 60
 
@@ -37,10 +37,19 @@ export interface EntranceText {
   members: number[]
 }
 
-interface NamedLine {
+/** A named street way as a polyline, meters from some origin. */
+export interface NamedLine {
   name: string
   key: string
   points: [number, number][]
+}
+
+/** The file's named streets as lines in meters from the file's anchor, moved by (dx, dz) meters. */
+export function namedLines(file: StationStreets, dx = 0, dz = 0): NamedLine[] {
+  const at = (n: number): [number, number] => [file.x[n]! / DM_PER_M + dx, file.z[n]! / DM_PER_M + dz]
+  return file.ways
+    .filter((w) => isStreet(w, isClosedRing(w.nodes)))
+    .map((w) => ({ name: w.name!, key: streetKey(w.name!), points: w.nodes.map(at) }))
 }
 
 /** The nearest point to p on the lines that `match` accepts, with its line and distance; null when none does. */
@@ -114,12 +123,11 @@ export const HEAD_HOUSE_M = 25
 /**
  * Every entrance of `file` that has a label (a street or a plaza), worded for the station as a whole. Same-text
  * entrances within MERGE_M share one label (the first's mark carries it); each label has its head house's index.
+ * `extraLines` (meters from the file's anchor) are streets the file lacks, such as a complex member's: they only help
+ * word an entrance (its nearest street, a compass side of it), they are not the file's own.
  */
-export function entranceTexts(file: StationStreets): EntranceText[] {
-  const at = (n: number): [number, number] => [file.x[n]! / DM_PER_M, file.z[n]! / DM_PER_M]
-  const lines: NamedLine[] = file.ways
-    .filter((w) => isStreet(w, isClosedRing(w.nodes)))
-    .map((w) => ({ name: w.name!, key: streetKey(w.name!), points: w.nodes.map(at) }))
+export function entranceTexts(file: StationStreets, extraLines: readonly NamedLine[] = []): EntranceText[] {
+  const lines: NamedLine[] = [...namedLines(file), ...extraLines]
   const pairFirst = new Map<string, string>()
   const drafts = file.entrances.map((e, index) => {
     const p: [number, number] = [e.x / DM_PER_M, e.z / DM_PER_M]

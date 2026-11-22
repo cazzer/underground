@@ -17,6 +17,7 @@ export const STICKY_PX = 48
 
 /** Lets entrance `i` ignore the station marker rects (from `first`, `count` of them) its own mark sits in. */
 function exemptOwnMarker(p: LabelPlacement, i: number, x: number, y: number, first: number, count: number): void {
+  // The exemption is one bit per label in a 32-bit mask (`labelDeclutter.ts`); two words per rect would lift it to 64.
   if (i >= 32) return
   const rects = p.bounds.rects
   const exempt = p.bounds.exempt!
