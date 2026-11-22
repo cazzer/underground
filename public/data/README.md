@@ -37,6 +37,7 @@ Route colors come from `routes.txt`. MTA's IP status for those colors is UNVERIF
 - `station-depths.json`
 - `streets/<id>.json`
 - `walk/<id>.json`
+- `search/streets/<bucket>.json`
 
 Per-station interior files (`stations/<id>.json`) merge hand-authored interiors with OSM
 platform polygons. The whole file is marked as a derivative database under the ODbL; each
@@ -61,6 +62,13 @@ sources and terms in `docs/research/data-sources.md` §5.3.
 pedestrian streets and roads), packed as OSM node ids, decimeter coordinates and edges (`npm run data:walk`). The whole file is a
 derivative database under the ODbL and carries the OSM credit only: the anchor is the station's `stations.json` point (MTA GTFS),
 everything else is OSM. It sits outside the startup budget.
+
+`search/streets/<bucket>.json` (64 files, `00.json` to `3f.json`) is the citywide street and intersection search index built from
+the same OSM ways (`npm run data:search:streets`): street names in short form, a point per nearby station, and the points where
+two named streets cross, filed by a hash of the first letters of the name. The whole file is a derivative database under the ODbL
+and carries the OSM credit only. Its borough labels (the nearest station's) come from `stations.json`, which takes the borough from the MTA Subway Stations
+dataset (39hk-dx4f, OPEN-NY Terms of Use; joined by `scripts/lib/stationAccess.ts`), and the station id on each point from MTA
+GTFS. The shards keep the OSM-only attribution line. It loads on demand, outside the startup budget.
 
 ## NY Open Data / MTA Elevator and Escalator feeds
 

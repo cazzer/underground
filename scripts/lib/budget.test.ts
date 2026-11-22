@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { checkFileCap, checkIndexCap, committedGzip, checkStreetsTotal, checkWalkTotal, INDEX_GZIP_CAP_BYTES, renderedFile } from './budget.ts'
+import { checkFileCap, checkIndexCap, committedGzip, checkStreetIndexTotal, checkStreetsTotal, checkWalkTotal, INDEX_GZIP_CAP_BYTES, renderedFile } from './budget.ts'
 
 describe('checkIndexCap', () => {
   it('returns the gzip size of an index under the cap', () => {
@@ -37,6 +37,13 @@ describe('street file caps', () => {
     const total = checkWalkTotal(files, 1_000_000)
     expect(total).toBe(files[0]!.gzip + files[1]!.gzip)
     expect(() => checkWalkTotal(files, total - 1)).toThrow(/2 walk files total/)
+  })
+
+  it('checkStreetIndexTotal sums the files and throws over the total cap', () => {
+    const files = [renderedFile('a.json', big), renderedFile('b.json', big)]
+    const total = checkStreetIndexTotal(files, 1_000_000)
+    expect(total).toBe(files[0]!.gzip + files[1]!.gzip)
+    expect(() => checkStreetIndexTotal(files, total - 1)).toThrow(/2 street search shards total/)
   })
 })
 
