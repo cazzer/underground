@@ -1,6 +1,6 @@
 import type { Vector3 } from 'three'
 import { MAX_OUTLINE_SAMPLES } from '../lib/interiorOutline'
-import { MAX_LEVEL_BLOCKERS, type LabelBlockers } from '../lib/labelBlockers'
+import { BLOCKER_SLOTS, MAX_LEVEL_BLOCKERS, type LabelBlockers } from '../lib/labelBlockers'
 import { declutter, LABEL_PAD_PX } from '../lib/labelDeclutter'
 import { RECT, writeRect } from '../lib/labelGeometry'
 import type { Ground } from '../lib/projection'
@@ -100,11 +100,14 @@ export function placeLabels(p: LabelPlacement, anchor: Ground, view: PlacementVi
   r++
   const markerCount = r - markerRect
   p.bounds.exempt!.fill(0)
-  const shown = Math.min(levels.count, MAX_LEVEL_BLOCKERS)
   const lr = levels.rects
-  for (let k = 0; k < shown; k++) {
-    const o = k * RECT
-    writeRect(rects, r++, lr[o]! - LABEL_PAD_PX, lr[o + 1]! - LABEL_PAD_PX, lr[o + 2]! + LABEL_PAD_PX, lr[o + 3]! + LABEL_PAD_PX)
+  // Every drawn interior's slot: the level labels of each.
+  for (let s = 0; s < BLOCKER_SLOTS; s++) {
+    const shown = Math.min(levels.counts[s]!, MAX_LEVEL_BLOCKERS)
+    for (let k = 0; k < shown; k++) {
+      const o = (s * MAX_LEVEL_BLOCKERS + k) * RECT
+      writeRect(rects, r++, lr[o]! - LABEL_PAD_PX, lr[o + 1]! - LABEL_PAD_PX, lr[o + 2]! + LABEL_PAD_PX, lr[o + 3]! + LABEL_PAD_PX)
+    }
   }
   p.bounds.count = r
   const e = p.entrances.length

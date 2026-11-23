@@ -2,7 +2,7 @@ import type { Camera, Vector3 } from 'three'
 import type { EntranceLabelSource } from '../data/useStationStreets'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { MAX_OUTLINE_SAMPLES } from '../lib/interiorOutline'
-import { MAX_LEVEL_BLOCKERS } from '../lib/labelBlockers'
+import { BLOCKER_SLOTS, MAX_LEVEL_BLOCKERS } from '../lib/labelBlockers'
 import type { LabelBounds, LabelCandidates } from '../lib/labelDeclutter'
 import { BOX, RECT, writeBox } from '../lib/labelGeometry'
 import type { Ground } from '../lib/projection'
@@ -76,8 +76,8 @@ export function createLabelPlacement(
     runs = Math.max(runs, s.runs.length)
   }
   const minus = (len: number) => new Int16Array(len).fill(-1)
-  // The marks, the nearby stations and the focus ring, the level labels, then the interior (street names only).
-  const rects = FIXED_RECTS + marks.length + stations.length + 1 + MAX_LEVEL_BLOCKERS + MAX_OUTLINE_SAMPLES
+  // The marks, the nearby stations and the focus ring, every drawn interior's level labels, then the interior (street names only).
+  const rects = FIXED_RECTS + marks.length + stations.length + 1 + MAX_LEVEL_BLOCKERS * BLOCKER_SLOTS + MAX_OUTLINE_SAMPLES
   return {
     entrances,
     streets,

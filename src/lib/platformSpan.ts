@@ -98,6 +98,51 @@ export function deckSpans(spans: StationSpans | null, deckOf: ReadonlyMap<StopId
 }
 
 /**
+ * Several drawn interiors' platform spans by shape (o3r.4): one entry per interior that has a span on the shape (a
+ * complex already unioned by `memberSpans`). Never unioned across interiors, so the track between two stations stays
+ * drawn and a train there stays under the veil.
+ */
+export type SpanSet = ReadonlyMap<ShapeId, readonly PlatformSpan[]>
+
+/** The drawn interiors' spans as one set, in order (nulls skipped; the span objects are shared, never changed); null when none has any. */
+export function spanSet(perInterior: readonly (StationSpans | null)[]): SpanSet | null {
+  let out: Map<ShapeId, PlatformSpan[]> | null = null
+  for (const spans of perInterior) {
+    if (!spans) continue
+    out ??= new Map()
+    for (const [shapeId, s] of spans) {
+      const list = out.get(shapeId)
+      if (list) list.push(s)
+      else out.set(shapeId, [s])
+    }
+  }
+  return out
+}
+
+/**
+ * The drawn interiors' spans by deck (each interior's `deckSpans`, deepest first): deck k holds deck k of every interior,
+ * so one lifted layer per deck serves them all. As long as the interior with the most decks, at least one; [null] for none.
+ */
+export function deckSpanSets(perInteriorDecks: readonly (readonly (StationSpans | null)[])[]): (SpanSet | null)[] {
+  const decks = Math.max(1, ...perInteriorDecks.map((d) => d.length))
+  return Array.from({ length: decks }, (_, k) => spanSet(perInteriorDecks.map((d) => d[k] ?? null)))
+}
+
+/** The highest of `maskSpanWeight` over the spans (0 for none). No allocation. */
+export function maskWeightIn(d: number, spans: readonly PlatformSpan[]): number {
+  let w = 0
+  for (let i = 0; i < spans.length; i++) w = Math.max(w, maskSpanWeight(d, spans[i]!))
+  return w
+}
+
+/** The highest of `trainSpanWeight` over the spans (0 for none). No allocation. */
+export function trainWeightIn(d: number, spans: readonly PlatformSpan[]): number {
+  let w = 0
+  for (let i = 0; i < spans.length; i++) w = Math.max(w, trainSpanWeight(d, spans[i]!))
+  return w
+}
+
+/**
  * 1 on [start, end], easing (smoothstep) to 0 at `rampM` outside it. With start > end (a span shorter than two
  * insets) the peak, midway, stays below 1. Continuous in d; rampM must be positive.
  */

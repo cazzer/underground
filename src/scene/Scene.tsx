@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { useMemo, useRef, useState } from 'react'
 import { BASEMAP } from '../data/basemapConfig'
-import { hiddenSiblingIds, interiorStationIds, type IndexLoad } from '../data/interiorLoad'
+import { interiorStationIds, type IndexLoad } from '../data/interiorLoad'
 import type { LiveLayer } from '../data/useLive'
 import { createBandView } from '../lib/bandOffset'
 import { createLocationCap } from '../lib/basemap/locationCapHandle'
@@ -17,7 +17,6 @@ import { RAIL_DROP_M, STEP_RISE_M } from '../lib/interiorGeometry'
 import type { ExitLabel } from '../lib/exitView'
 import { BOARD_HALF_M, type StationPathDraw } from '../lib/interiorPath'
 import type { Network } from '../lib/network'
-import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
 import { createLevels } from '../lib/tripEmphasis'
@@ -33,11 +32,13 @@ import { createViewStationSet } from '../lib/viewStationSet'
 import { LocationCapSource } from './LocationCapSource'
 import { ViewStationsSource } from './ViewStationsSource'
 import { ScenePicker } from './ScenePicker'
+import { ScreenVeil } from './ScreenVeil'
 import { StationInterior } from './StationInterior'
 import { StationStreets } from './StationStreets'
 import { StationTies } from './StationTies'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
+import { useSceneInteriors } from './useSceneInteriors'
 import { ViewCenterSource } from './ViewCenterSource'
 import { PlacePin } from './PlacePin'
 import { YouAreHere } from './YouAreHere'
@@ -45,7 +46,6 @@ import { YouAreHere } from './YouAreHere'
 /** TEMPORARY `?basemap=off` (basemapLook.ts) draws no basemap and loads no tiles. */
 const basemapConfig = basemapLook === 'off' ? null : BASEMAP
 
-const NO_DECKS: ReadonlyMap<string, number> = new Map()
 const NO_IDS: readonly string[] = []
 
 interface SceneProps {
@@ -65,7 +65,7 @@ interface SceneProps {
   focusedMarker: boolean
   /** The focused station's complex siblings from the index (empty for a lone station); hidden once the interior that covers them is loaded. */
   siblings: readonly string[]
-  /** The station index, from which the camera finds the focused and the closed station's complex. */
+  /** The station index, from which the camera finds the focused and the closed station's complex, and the view finds which stations in view have an interior. */
   index: IndexLoad
   /** The station panel's screen rect; interior fly-tos frame beside it. */
   panel: ScreenRect | null
@@ -99,22 +99,10 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const streetMask = useMemo(createStreetMask, [])
   /** Driven by LocationCapSource (always mounted), read by Basemap's tile store: the location zoom cap. */
   const locationCap = useState(createLocationCap)[0]
-  /** Written by ViewStationsSource: the station leads in view (empty under the cap); o3r.4 reads it. */
+  /** Written by ViewStationsSource: the station leads in view (empty under the cap), whose interiors draw. */
   const viewStations = useState(createViewStationSet)[0]
-  /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
-  const interiorSpans = useMemo(
-    () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),
-    [interior, network],
-  )
-  /** The same spans split by the deck each track rides, so each deck's trains draw between its strokes and the next band's. */
-  const spansByDeck = useMemo(
-    () => deckSpans(interiorSpans, interior?.trackDecks ?? NO_DECKS, interior?.decks.length ?? 0),
-    [interiorSpans, interior],
-  )
-  // The index says who shares the file; the model says who it draws. Their markers and ties go with the focused one's.
-  const hiddenSiblings = useMemo(() => hiddenSiblingIds(siblings, interior), [siblings, interior])
-  /** The trip's marks fade where the focused interior reveals: it marks its stations itself. */
-  const markHidden = useMemo(() => (interior ? interiorStationIds(interior) : NO_IDS), [interior])
+  /** The focused interior and those of the stations in view (o3r.4), with their spans and the stations they stand in for. */
+  const { drawn, spans, spansByDeck, hiddenStations, hiddenSiblings, markHidden, veiled } = useSceneInteriors(network, interior, viewStations, index, siblings)
   /** The trip's path the focused interior draws (the first listed for it): its way out or a change of trains. */
   const path = interior ? (stationPaths.find((p) => p.interiorId === interior.stationId)?.choice ?? null) : null
   // `outOfService` is a new array every render: its ids say when the machines out really change.
@@ -142,7 +130,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       <SubwayLines
         network={network}
         paths={banded?.shapes ?? network.shapes}
-        interiorSpans={interiorSpans}
+        interiorSpans={spans}
+        veiled={veiled}
         view={bandView}
         tripRoute={tripRoute}
         tripShown={tripShown}
@@ -150,11 +139,11 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         markHidden={markHidden}
         fix={here?.ground ?? null}
       />
-      <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} levels={tripLevels} />
+      <StationTies network={network} focusedMarker={focusedMarker} hiddenStations={hiddenStations} levels={tripLevels} />
       <Stations
         stations={network.stations}
         focusedMarker={focusedMarker}
-        hiddenSiblings={hiddenSiblings}
+        hiddenStations={hiddenStations}
         tripStations={tripRoute?.stations ?? null}
         tripMarks={tripRoute?.marks ?? null}
         levels={tripLevels}
@@ -171,6 +160,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       <StationStreets
         interior={interior}
         interiorPending={!interior && !focusedMarker}
+        veiled={veiled}
         insets={insets}
         panel={panel}
         labelBlockers={labelBlockers}
@@ -179,16 +169,19 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         pathLabels={pathLabels}
         tripLevels={tripLevels}
       />
-      {interior && (
-        <StationInterior
-          key={interior.stationId}
-          model={interior}
-          network={network}
-          outOfService={outOfService}
-          labelBlockers={labelBlockers}
-          path={path}
-        />
-      )}
+      {/* Each in its own boundary: a crash (logged) draws nothing for that interior instead of blanking the scene. */}
+      {drawn.map((m) => (
+        <ErrorBoundary key={m.stationId} fallback={null}>
+          <StationInterior
+            model={m}
+            network={network}
+            outOfService={m === interior ? outOfService : NO_IDS}
+            labelBlockers={labelBlockers}
+            path={m === interior ? path : null}
+          />
+        </ErrorBoundary>
+      ))}
+      {veiled && <ScreenVeil />}
       <CameraRig
         network={network}
         insets={insets}

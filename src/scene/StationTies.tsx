@@ -27,8 +27,9 @@ interface StationTiesProps {
   network: Network
   /** The focused station's street marker is drawn (no interior, or its load failed): it keeps a tether. */
   focusedMarker: boolean
-  /** The focused station's complex siblings whose interior is loaded: their ties drop with the focused one's. */
-  hiddenSiblings: readonly string[]
+  /** Stations a drawn interior stands in for beside the focused one (its covered complex siblings, every other drawn
+   *  interior's stations): their ties drop with the focused one's. */
+  hiddenStations: readonly string[]
   /** This frame's trip look (SubwayLines, -0.25): every tie dims with the network. */
   levels: EmphasisLevels
 }
@@ -40,12 +41,13 @@ interface StationTiesProps {
  * for island platforms, roughly right for side platforms. One merged LineSegments2 drawn at the depth factor
  * (tilt.ts): scale.y follows it as the lines' does, so each tie ends on its sunken track; the opacity ramps in
  * once the tie is long enough to read (tieOpacity).
- * A focused station with an interior draws no marker, so its tie is left out too, and so are its complex siblings'
+ * A focused station with an interior draws no marker, so its tie is left out too, and so are its complex siblings' and
+ * every other drawn interior's stations' (o3r.4)
  * (compactTies shifts the ties that remain to the front, in order, and the layer draws only those). With no interior
  * (focusedMarker) its marker stays and so does its tie; a station with no depth gets a short stub (stationTie.ts)
  * instead, written in the slot just after the drawn ties. Under a trip every tie dims with the network (DimLineMaterial).
  */
-export function StationTies({ network, focusedMarker, hiddenSiblings, levels }: StationTiesProps) {
+export function StationTies({ network, focusedMarker, hiddenStations, levels }: StationTiesProps) {
   const { focusedId } = useFocus()
   const ties = useMemo(() => {
     const positions: number[] = []
@@ -84,7 +86,7 @@ export function StationTies({ network, focusedMarker, hiddenSiblings, levels }: 
     const plan = station ? focusedTie(i !== undefined, focusedMarker) : 'keep'
     const dropped = new Set<number>()
     if (plan === 'drop' && i !== undefined) dropped.add(i)
-    for (const id of hiddenSiblings) {
+    for (const id of hiddenStations) {
       const j = ties.indexOf.get(id)
       if (j !== undefined) dropped.add(j)
     }
@@ -99,7 +101,7 @@ export function StationTies({ network, focusedMarker, hiddenSiblings, levels }: 
     }
     ties.lines.geometry.instanceCount = drawn
     attr.data.needsUpdate = true
-  }, [ties, network, focusedId, focusedMarker, hiddenSiblings])
+  }, [ties, network, focusedId, focusedMarker, hiddenStations])
 
   useEffect(
     () => () => {

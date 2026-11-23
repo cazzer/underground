@@ -21,8 +21,9 @@ interface StationsProps {
   stations: readonly Station[]
   /** Draw the focused station's marker too (it has no interior, or its load failed). */
   focusedMarker: boolean
-  /** The focused station's complex siblings whose interior is loaded: their markers hide with the focused one's. */
-  hiddenSiblings: readonly string[]
+  /** Stations a drawn interior stands in for beside the focused one (its covered complex siblings, every other drawn
+   *  interior's stations): their markers hide with the focused one's. */
+  hiddenStations: readonly string[]
   /** Every station the trip's drawn journey calls at (TripRouteDraw.stations); null with none. */
   tripStations: readonly string[] | null
   /** The trip's station marks (TripRouteDraw.marks); null with none: a focus ring on one draws outside it. */
@@ -35,13 +36,13 @@ interface StationsProps {
 
 /**
  * All station markers as two instanced meshes (fill, then ring). The focused station's marker is hidden
- * (its panel and interior mark it), and so are its complex siblings' (the one interior covers them); they stay
- * pickable, since ScenePicker picks in screen space. A station with no
+ * (its panel and interior mark it), and so are its complex siblings' (the one interior covers them) and every other
+ * drawn interior's stations (o3r.4); they stay pickable, since ScenePicker picks in screen space. A station with no
  * interior (`focusedMarker`) keeps its marker, plus a `theme.stationFocus` FocusRing above the trains. While a trip
  * shows, the rings of stations its journey doesn't call at mix toward the background by the network's dim (as the
  * lines do, lineDim.ts), rewritten only while that dim or the journey's stations change.
  */
-export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations, tripMarks, levels, fix }: StationsProps) {
+export function Stations({ stations, focusedMarker, hiddenStations, tripStations, tripMarks, levels, fix }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
   const { focusedId } = useFocus()
@@ -49,17 +50,17 @@ export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations
     () => (focusedId ? stations.findIndex((s) => s.id === focusedId) : -1),
     [stations, focusedId],
   )
-  /** Marker instances to collapse: the focused one unless it is drawn as the fallback, and every hidden sibling. */
+  /** Marker instances to collapse: the focused one unless it is drawn as the fallback, and every hidden station. */
   const hidden = useMemo(() => {
     const indexOf = new Map(stations.map((s, i) => [s.id, i]))
     const out: number[] = []
     if (focusedIndex >= 0 && !focusedMarker) out.push(focusedIndex)
-    for (const id of hiddenSiblings) {
+    for (const id of hiddenStations) {
       const i = indexOf.get(id)
       if (i !== undefined) out.push(i)
     }
     return out
-  }, [stations, focusedIndex, focusedMarker, hiddenSiblings])
+  }, [stations, focusedIndex, focusedMarker, hiddenStations])
   const positions = useMemo(() => stations.map((s) => s.pos), [stations])
   // Pre-rotated flat on the ground, so each instance matrix is only scale plus translate.
   const geometry = useMemo(

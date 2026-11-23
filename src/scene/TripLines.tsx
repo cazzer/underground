@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import type { RouteId } from '../data/schema'
 import type { Rgb } from '../lib/lineBuffers'
 import type { Network, ShapePath } from '../lib/network'
-import type { StationSpans } from '../lib/platformSpan'
+import type { SpanSet } from '../lib/platformSpan'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { tripLineBuffers, type TripRouteDraw } from '../lib/tripLineBuffers'
@@ -45,7 +45,7 @@ interface TripLinesProps {
   /** This frame's look, written by SubwayLines at -0.25. */
   levels: EmphasisLevels
   /** Its platform tracks fade out with the interior, as SubwayLines' do. */
-  interiorSpans: StationSpans | null
+  interiorSpans: SpanSet | null
 }
 
 /**

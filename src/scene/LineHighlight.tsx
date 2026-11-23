@@ -12,7 +12,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo } from 'react'
 import { useFocus } from '../lib/focus'
 import type { Network, ShapePath } from '../lib/network'
-import type { StationSpans } from '../lib/platformSpan'
+import type { SpanSet } from '../lib/platformSpan'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
@@ -27,7 +27,7 @@ interface LayerProps {
   /** The shapes SubwayLines draws (banded once the bands arrive). */
   paths: readonly ShapePath[]
   /** Its platform tracks fade out with the interior, as SubwayLines' do. */
-  interiorSpans: StationSpans | null
+  interiorSpans: SpanSet | null
   /** SubwayLines' trip emphasis: it dims with the network under the trip's route. */
   levels: EmphasisLevels
 }

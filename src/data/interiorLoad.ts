@@ -1,3 +1,4 @@
+import { MAX_VIEW_INTERIORS } from '../lib/viewStations'
 import type { InteriorModel } from '../scene/interiorModel'
 import type { StationIndex } from './stationSchema'
 
@@ -142,4 +143,68 @@ export function deriveInteriorLoad(
   }
   if (settled?.id !== id) return LOADING
   return settled.load
+}
+
+/** The fields of an interior the view helpers read (InteriorModel has them). */
+interface CoversStations {
+  stationId: string
+  memberStationIds?: readonly string[]
+}
+
+const NO_FILES: readonly string[] = Object.freeze([])
+
+/**
+ * The interior file ids to load for the stations in view (`view`: o3r.2's leads, focused first), other than the focused
+ * station's: in view order, each file once, stations the index doesn't list skipped, at most `max` files with the
+ * focused one's counted (its slot is kept while it loads or after it fails, so the set doesn't swap as it lands).
+ * Empty until the index is ready. Only ids in `view` ever appear, so the fetch follows the camera and nothing else.
+ */
+export function viewInteriorIds(view: readonly string[], focusedId: string | null, index: IndexLoad, max = MAX_VIEW_INTERIORS): readonly string[] {
+  if (index.status !== 'ready') return NO_FILES
+  const focusedFile = interiorIdOf(focusedId, index)
+  const room = max - (focusedFile ? 1 : 0)
+  const out: string[] = []
+  for (const id of view) {
+    if (out.length >= room) break
+    const file = interiorIdOf(id, index)
+    if (file === null || file === focusedFile || out.includes(file)) continue
+    out.push(file)
+  }
+  return out.length > 0 ? out : NO_FILES
+}
+
+const reportedUnknown = new Set<string>()
+
+/**
+ * The interiors the scene draws: the focused one first, then `others` in order, each file once, at most `max`. A model
+ * covering a station the map lacks (`known` rejects it, a stale or mixed deploy) is left out with one warning per file,
+ * since its spans, markers and camera all look its stations up.
+ */
+export function drawnInteriors<T extends CoversStations>(
+  focused: T | null,
+  others: readonly T[],
+  known: (id: string) => boolean,
+  max = MAX_VIEW_INTERIORS,
+): readonly T[] {
+  const out: T[] = []
+  for (const m of focused ? [focused, ...others] : others) {
+    if (out.length >= max) break
+    if (out.some((o) => o.stationId === m.stationId)) continue
+    const unknown = interiorStationIds(m).find((id) => !known(id))
+    if (unknown !== undefined) {
+      if (!reportedUnknown.has(m.stationId)) {
+        reportedUnknown.add(m.stationId)
+        console.warn(`Interior ${m.stationId} covers unknown station "${unknown}"; not drawn (the data files disagree)`)
+      }
+      continue
+    }
+    out.push(m)
+  }
+  return out
+}
+
+/** Every station the interiors cover, each once, in order. */
+export function coveredStationIds(models: readonly CoversStations[]): readonly string[] {
+  if (models.length === 0) return NO_SIBLINGS
+  return [...new Set(models.flatMap((m) => interiorStationIds(m)))]
 }

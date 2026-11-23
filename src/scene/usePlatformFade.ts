@@ -4,19 +4,19 @@ import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import type { LineBuffers } from '../lib/lineBuffers'
 import type { ShapePath } from '../lib/network'
 import { writePlatformFade } from '../lib/platformMask'
-import type { StationSpans } from '../lib/platformSpan'
+import type { SpanSet } from '../lib/platformSpan'
 import { FADE_ATTRIBUTE } from './bandLineMaterial'
 
 /**
  * Writes the per-vertex platform fade (platformMask.ts) of a band line layer built from `paths`, for the platform
- * spans of the interior that is loaded (every member of a complex, unioned; none: all zero). The band shader fades those segments by BAND_UNIFORMS.platformFade,
+ * spans of every drawn interior (each complex's members unioned, never across interiors; none: all zero). The band shader fades those segments by BAND_UNIFORMS.platformFade,
  * which SubwayLines sets per frame, so every band layer (the ?lines= overlays too) drops the same track.
  */
 export function usePlatformFade(
   lines: LineSegments2 | null,
   buffers: LineBuffers | null,
   paths: readonly ShapePath[],
-  interiorSpans: StationSpans | null,
+  interiorSpans: SpanSet | null,
 ): void {
   useEffect(() => {
     if (!lines || !buffers?.segments) return

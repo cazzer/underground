@@ -116,6 +116,8 @@ export interface UndergroundDevHooks {
   locationCapped?: () => boolean
   /** The station leads the scene last chose to show by the view (useViewStations); empty under the location cap. */
   viewStations?: () => readonly string[]
+  /** The interior file ids the scene draws now, the focused one first (useSceneInteriors). */
+  drawnInteriors?: () => string[]
   /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */
   basemapSegments?: () => { distance: number; classes: Record<string, { used: number; capacity: number; visible: boolean }> }
 }

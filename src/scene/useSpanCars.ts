@@ -3,14 +3,17 @@ import { BackSide, type BufferGeometry, Color, DynamicDrawUsage, type InstancedM
 import { type Consist, MAX_CARS } from '../lib/live/consist'
 import { consistSpanInto, type ConsistSpan } from '../lib/live/consistLayout'
 import { slotScale, TRAIN_CAPACITY, type SlotTable } from '../lib/live/slots'
-import { trainSpanWeight, veilTint, type StationSpans } from '../lib/platformSpan'
+import { trainWeightIn, veilTint, type PlatformSpan, type SpanSet } from '../lib/platformSpan'
 import { theme } from '../theme'
 import { interiorLook } from './interiorLook'
 import type { TrainCarsLayer } from './useTrainCars'
 import { VEIL_TINT_ATTRIBUTE, veilTintMaterial, withTintAttribute } from './veilTint'
 
-/** Trains drawn above the veil at once: a station's platforms hold a few, with room for ones pulling in and out. */
-export const SPAN_TRAINS = 12
+/**
+ * Trains drawn above the veil at once, per deck layer: a station's platforms hold a few, with room for ones pulling in
+ * and out, and up to MAX_VIEW_INTERIORS (3) drawn interiors share each layer (o3r.4).
+ */
+export const SPAN_TRAINS = 24
 export const SPAN_CARS = SPAN_TRAINS * MAX_CARS
 /**
  * Look A's screen-wide veil dims every street train, so a lifted car mixes toward it as it leaves the span. Look B's
@@ -48,15 +51,15 @@ export interface SpanCarsLayer {
   /** Before the first frame: dynamic usage, instance colors allocated, nothing drawn. */
   prepare(): void
   /**
-   * After this frame's cars are written: copies every car with a span weight above 0 (`spans` is the focused
-   * station's platform spans, null for none) into the above-veil meshes, with the selected train's rim, each mixed
+   * After this frame's cars are written: copies every car with a span weight above 0 (`spans` is the drawn
+   * interiors' platform spans on this deck, null for none) into the above-veil meshes, with the selected train's rim, each mixed
    * toward the veil by how far it is past the platform. `reveal` is the interior's opacity; at 0 nothing draws.
    * `veil` is the veil's weight (interiorReveal.ts veilWeight), which the tint follows as the veil does.
    * With more than SPAN_TRAINS candidates, the ones most on the platforms win. No allocation; never throws.
    */
   write(
     table: SlotTable,
-    spans: StationSpans | null,
+    spans: SpanSet | null,
     reveal: number,
     veil: number,
     mix: number,
@@ -124,7 +127,7 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
       const g = table.drawGeometry[i]!
       consistSpanInto(span, g.line.length, table.displayed[i]!, consistOf(i), mix * slotScale(table, i, localS))
     }
-    const carWeight = (c: number, s: { d0: number; d1: number }): number => trainSpanWeight(span.rear + (c + 0.5) * span.step, s)
+    const carWeight = (c: number, list: readonly PlatformSpan[]): number => trainWeightIn(span.rear + (c + 0.5) * span.step, list)
     return {
       prepare() {
         for (const m of [bodies.current, halos.current, rims.current, gaps.current, rimCaps.current, gapCaps.current]) {
@@ -162,13 +165,13 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
           for (let i = 0; i < table.high; i++) {
             const g = table.drawGeometry[i]
             if (!table.trips[i] || !g || !colors[i] || Number.isNaN(table.displayed[i]!)) continue
-            const s = spans.get(g.shapeId)
-            if (!s) continue
+            const list = spans.get(g.shapeId)
+            if (!list) continue
             layOut(table, i, mix, localS, consistOf)
             let peak = 0
-            for (let c = 0; c < span.cars; c++) peak = Math.max(peak, carWeight(c, s))
+            for (let c = 0; c < span.cars; c++) peak = Math.max(peak, carWeight(c, list))
             if (peak <= 0) continue
-            // Insertion by peak weight, highest first (a handful of candidates at most).
+            // Insertion by peak weight, highest first (a few dozen candidates at most).
             let at = found++
             while (at > 0 && peaks[at - 1]! < peak) {
               candidates[at] = candidates[at - 1]!
@@ -191,11 +194,11 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
           const bodyColors = b.instanceColor.array as Float32Array
           for (let t = 0; t < Math.min(found, SPAN_TRAINS); t++) {
             const i = candidates[t]!
-            const s = spans.get(table.drawGeometry[i]!.shapeId)!
+            const list = spans.get(table.drawGeometry[i]!.shapeId)!
             const color = colors[i]!
             layOut(table, i, mix, localS, consistOf)
             for (let c = 0; c < span.cars; c++) {
-              const w = carWeight(c, s)
+              const w = carWeight(c, list)
               if (w <= 0) continue
               const tint = veilTint(veil, w, VEIL_TINT)
               copyMatrix(srcB.instanceMatrix.array, i * MAX_CARS + c, outB, n)

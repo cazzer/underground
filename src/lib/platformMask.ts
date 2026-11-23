@@ -7,7 +7,7 @@
  */
 import type { ShapeId } from '../data/schema'
 import type { ShapePath } from './network'
-import { MASK_INSET_M, maskSpanWeight, type PlatformSpan, type StationSpans } from './platformSpan'
+import { MASK_INSET_M, maskWeightIn, type PlatformSpan, type SpanSet } from './platformSpan'
 
 /**
  * Vertex spacing along each end ramp of a span. The shader interpolates the fade linearly between vertices, so one
@@ -26,7 +26,8 @@ export function maskBreaks(span: PlatformSpan): number[] {
 export const FADE_INPUTS = 2
 
 /**
- * Writes the fade weights of `spans` (one station's, or null for none) into `fade`, laid out like the line buffers
+ * Writes the fade weights of `spans` (the drawn interiors', or null for none; each segment end takes its highest weight
+ * over the shape's spans) into `fade`, laid out like the line buffers
  * (`segments.get(id)[i - 1]` is the buffer segment joining points i - 1 and i of shape `id`, -1 when it isn't
  * drawn). Every other segment gets 0.
  */
@@ -34,20 +35,20 @@ export function writePlatformFade(
   fade: Float32Array,
   paths: readonly ShapePath[],
   segments: ReadonlyMap<ShapeId, Int32Array>,
-  spans: StationSpans | null,
+  spans: SpanSet | null,
 ): void {
   fade.fill(0)
   if (!spans) return
   for (const path of paths) {
-    const span = spans.get(path.id)
+    const list = spans.get(path.id)
     const of = segments.get(path.id)
-    if (!span || !of) continue
+    if (!list || !of) continue
     for (let i = 1; i < path.points.length; i++) {
       const seg = of[i - 1]!
       if (seg < 0) continue
       const o = seg * FADE_INPUTS
-      fade[o] = maskSpanWeight(path.cumulative[i - 1]!, span)
-      fade[o + 1] = maskSpanWeight(path.cumulative[i]!, span)
+      fade[o] = maskWeightIn(path.cumulative[i - 1]!, list)
+      fade[o + 1] = maskWeightIn(path.cumulative[i]!, list)
     }
   }
 }

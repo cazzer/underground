@@ -35,10 +35,11 @@ interface StationInteriorProps {
 const NO_KEEP_OUT = new Float32Array(0)
 
 /**
- * The focused station's interior as merged line layers in a group at its anchor: fine, then strong, for each stroke
- * band (interiorDecks.ts): the deepest deck and below, the bands between decks (Union Sq has one), and the levels above
- * the shallowest deck, each band drawn after the lifted trains of the deck below it. Plus the street
- * veil and DOM level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
+ * A drawn station's interior (the focused one, or one in view: Scene's useSceneInteriors) as merged line layers in a
+ * group at its anchor: fine, then strong, for each stroke band (interiorDecks.ts): the deepest deck and below, the
+ * bands between decks (Union Sq has one), and the levels above the shallowest deck, each band drawn after the lifted
+ * trains of the deck below it. Plus look B's footprint veil (look A's one screen veil is Scene's ScreenVeil) and DOM
+ * level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
 export function StationInterior({ model, network, outOfService, labelBlockers, path }: StationInteriorProps) {
@@ -116,7 +117,7 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
   return (
     <>
       <group ref={group} position={[model.origin.x, 0, model.origin.z]} visible={false}>
-      {interiorLook.veil !== 'none' && <InteriorVeil ref={veil} hull={model.hull} />}
+      {model.hull && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
       {strong && <primitive object={strong} />}
       {mid0Fine && <primitive object={mid0Fine} />}

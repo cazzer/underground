@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { buildInteriorModel, type InteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
-import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, modelsToLoad, NO_SIBLINGS, siblingIdsOf, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
+import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, modelsToLoad, NO_SIBLINGS, siblingIdsOf, viewInteriorIds, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
 import { loadStationIndex } from './loadStationIndex'
 import { loadStationInterior } from './loadStationInterior'
 
@@ -153,4 +153,21 @@ export function useInteriorModels(ids: readonly string[]): ReadonlyMap<string, I
     if (loadedKey === '') return NO_MODELS
     return new Map(loadedKey.split(',').map((id) => [id, cache.peek(id)!]))
   }, [loadedKey])
+}
+
+const NO_VIEW_MODELS: readonly InteriorModel[] = Object.freeze([])
+
+/**
+ * The loaded interiors of the stations in view other than the focused one (o3r.4), in view order, at most
+ * MAX_VIEW_INTERIORS with the focused one counted (`viewInteriorIds`), from the same cache. Fetches only for the ids in
+ * `view`, o3r.2's camera-driven set: empty from REVEAL_FAR out and while the location cap is in force, and never keyed
+ * by the location fix or its nearest station.
+ */
+export function useViewInteriors(view: readonly string[], focusedId: string | null, index: IndexLoad): readonly InteriorModel[] {
+  const ids = useMemo(() => viewInteriorIds(view, focusedId, index), [view, focusedId, index])
+  const models = useInteriorModels(ids)
+  return useMemo(() => {
+    const out = ids.flatMap((id) => models.get(id) ?? [])
+    return out.length > 0 ? out : NO_VIEW_MODELS
+  }, [ids, models])
 }

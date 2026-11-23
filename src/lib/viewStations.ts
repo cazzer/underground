@@ -23,6 +23,11 @@ import type { StationGroup } from './stationGroups'
 
 /** Most stations chosen at once, the focused one included. */
 export const MAX_VIEW_STATIONS = 4
+/**
+ * Most station interiors drawn at once (o3r.4), the focused one included: each costs four to eight line layers, a few
+ * level label divs and its share of the lifted trains, so three keeps a phone's frame rate (the look card's cap).
+ */
+export const MAX_VIEW_INTERIORS = 3
 /** Ground reach from the orbit target, as a share of the camera distance (a horizon guard; test 15 pins it). */
 export const REACH_SHARE = 1.5
 /** A previous pick stays inside the free rect with each side moved out by this share of its width / height. */

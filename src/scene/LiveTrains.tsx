@@ -15,7 +15,7 @@ import { trainRouteId } from '../lib/live/trainRoute'
 import { interiorOpacity, veilWeight } from '../lib/interiorReveal'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
-import type { StationSpans } from '../lib/platformSpan'
+import type { SpanSet } from '../lib/platformSpan'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { routeLineColor } from '../lib/routeColor'
 import { tiltT } from '../lib/tilt'
@@ -44,10 +44,10 @@ interface LiveTrainsProps extends LiveLayer {
   /** Filled while mounted, so a click can be tested against the trains as drawn. */
   trainPick: RefObject<TrainPickSource | null>
   /**
-   * The loaded interior's platform spans by deck (deckSpans: every member of a complex unioned, then split by the deck
-   * each track rides; [null] for none): trains on them draw above the veil as it reveals, each deck in its own layer.
+   * The drawn interiors' platform spans by deck (deckSpanSets: deck k holds deck k of every drawn interior, each complex's
+   * members unioned; [null] for none): trains on them draw above the veil as it reveals, each deck in its own layer.
    */
-  deckSpans: readonly (StationSpans | null)[]
+  deckSpans: readonly (SpanSet | null)[]
   /** This frame's band view, written by SubwayLines before this frame runs: dots, cars and picks sit on the drawn bands. */
   view: BandView
   /** Filled at priority -3 with the selected train's drawn point, for the camera follow. */

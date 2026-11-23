@@ -1,7 +1,7 @@
 /**
  * TEMPORARY override of the street layer's draw order for the ost.7 look card. The default, `auto` (the ost.4 UX
  * review's pick), draws the streets above the interior veil at a fainter stroke (about 1.9:1,
- * streetVeil.ts), whenever the focused station's interior is loaded under look A (the screen veil); otherwise (no
+ * streetVeil.ts), whenever any interior draws under look A (the screen veil: the focused station's or one in view); otherwise (no
  * interior, loading, failed, looks B and C) under the route lines at full color. `?streets=under` and
  * `?streets=over` force one order, at full color, whatever the interior. Once the card is decided, remove together:
  * - this file
