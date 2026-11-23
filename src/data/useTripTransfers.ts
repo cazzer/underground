@@ -4,7 +4,8 @@ import type { StationPathDraw } from '../lib/interiorPath'
 import { chooseTransfer, type TransferChoice } from '../lib/interiorTransfer'
 import { stationOfStop } from '../lib/live/arrivals'
 import { joinStationOutages, type EneInput } from '../lib/live/eneJoin'
-import { firstTransferDraws, transferLegs, transferLineView, type TransferLeg, type TransferLineView } from '../lib/transferView'
+import { journeyTransferDraws, transferLegs, transferLineView, type TransferLeg, type TransferLineView } from '../lib/transferView'
+import type { TripJourney } from '../lib/route/plan'
 import { plannable, tripKey, type TripEnds, type TripNames, type TripPlanState } from '../lib/tripView'
 import { authoredInteriorIds, interiorIdOf, type IndexLoad } from './interiorLoad'
 import { useInteriorModels } from './useStationInterior'
@@ -18,10 +19,12 @@ interface TripTransfersInput {
   ene: EneInput
   nowS: number
   names: TripNames
+  /** The journey the map draws a change for: the opened one, else the first. */
+  selected: TripJourney | null
 }
 
 export interface TripTransfers {
-  /** At most one transfer path per interior: the first journey's change there, none when it takes no connector. */
+  /** At most one transfer path per interior: the selected journey's change there, none when it takes no connector. */
   drawn: StationPathDraw[]
   /** The trip panel's transfer line, by `transferLegKey`. */
   lines: ReadonlyMap<string, TransferLineView>
@@ -46,8 +49,9 @@ const NONE: TripTransfers = { drawn: [], lines: new Map() }
  * changes at), and each change whose two stops are in one of them gets its transfer line. Generated interiors are left
  * out: their layouts can't carry a transfer. Out-of-service machines are avoided as for the exit; the choices are
  * rebuilt only when the stops, a model or the machines out change (string keys), so refreshes keep the drawn paths.
+ * Every journey's changes get a line; only the selected journey's change is drawn.
  */
-export function useTripTransfers({ open, ends, plan, index, ene, nowS, names }: TripTransfersInput): TripTransfers {
+export function useTripTransfers({ open, ends, plan, index, ene, nowS, names, selected }: TripTransfersInput): TripTransfers {
   const ready = open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
   const legs = ready && plan.status === 'ready' ? transferLegs(plan.journeys, names.station) : []
   const authoredKey = ready ? authoredInteriorIds(index).join(',') : ''
@@ -58,6 +62,9 @@ export function useTripTransfers({ open, ends, plan, index, ene, nowS, names }: 
     const file = fileOf(leg.fromStop)
     if (file !== null && file === fileOf(leg.toStop) && models.has(file)) kept.push({ ...leg, file })
   }
+  const drawKey = transferLegs(ready && selected ? [selected] : [], names.station)
+    .map((l) => l.key)
+    .join(',')
   const keptKey = kept.map((l) => `${l.file}:${l.key}`).join(',')
   // Per interior, the machines out and whether that is known, as the station panel would say it.
   const outages = [...new Set(kept.map((l) => l.file))].map((file) => {
@@ -98,8 +105,8 @@ export function useTripTransfers({ open, ends, plan, index, ene, nowS, names }: 
         console.error(`Couldn't describe the transfer from ${leg.fromStop} to ${leg.toStop}`, err)
       }
     }
-    const drawn = firstTransferDraws(kept, (leg) => choices.get(`${leg.fromStop}>${leg.toStop}`) ?? null)
+    const drawn = journeyTransferDraws(kept, new Set(drawKey === '' ? [] : drawKey.split(',')), (leg) => choices.get(`${leg.fromStop}>${leg.toStop}`) ?? null)
     return { drawn, lines }
     // `kept` is read through keptKey.
-  }, [keptKey, choices, models, knownKey, names])
+  }, [keptKey, choices, models, knownKey, names, drawKey])
 }

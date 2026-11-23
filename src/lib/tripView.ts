@@ -7,6 +7,7 @@ import { nyClockTime, stopEta, stopEtaSpoken } from './live/trainStops'
 import type { OverlayCounts } from './route/overlay'
 import type { TripJourney, TripRideLeg } from './route/plan'
 import { isChangeWalk, transferLegKey } from './transferView'
+import { journeyKey, journeyKeys } from './tripSelection'
 
 export interface TripEnds {
   from: StationId | null
@@ -122,15 +123,6 @@ export type LegView = RideLegView | ChangeLegView | WalkLegView
 export type JourneySource = 'live' | 'mixed' | 'scheduled'
 const SOURCE_TEXT: Record<JourneySource, string> = { live: 'Live', mixed: 'Live and scheduled', scheduled: 'Scheduled' }
 
-/**
- * What a journey is, not which trains it rides: each ride's route, board and alight stops, each walk's stops. A
- * poll that swaps a scheduled train for its live twin (a new trip id) keeps the key, so the disclosure the visitor
- * toggled, and focus inside it, stay put.
- */
-export function journeyKey(j: TripJourney): string {
-  return j.legs.map((l) => (l.kind === 'ride' ? `${l.routeId}:${l.boardStop}:${l.alightStop}` : `walk:${l.fromStop}:${l.toStop}`)).join('>')
-}
-
 /** A journey's source by its ride legs (a walk-only journey has no train to be live). */
 export function journeySource(j: TripJourney): JourneySource {
   const rides = j.legs.filter((l): l is TripRideLeg => l.kind === 'ride')
@@ -157,7 +149,7 @@ export interface JourneyView {
 }
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
-const transfersTextOf = (n: number): string => (n === 0 ? 'No transfers' : plural(n, 'transfer'))
+const transfersTextOf = (n: number): string => (n === 0 ? 'No changes' : plural(n, 'change'))
 const walkMinutes = (durationS: number): number => Math.max(1, Math.round(durationS / 60))
 
 function legViews(j: TripJourney, names: TripNames): LegView[] {
@@ -254,12 +246,6 @@ export function tripNamesOf(network: {
 /** The journeys of a ready plan as views; none otherwise. */
 export function planViews(plan: TripPlanState, nowS: number, names: TripNames): JourneyView[] {
   if (plan.status !== 'ready') return []
-  // Two journeys with the same legs on different trains would share a key: the later ones get a suffix.
-  const seen = new Map<string, number>()
-  return plan.journeys.map((j) => {
-    const view = journeyView(j, nowS, names)
-    const n = seen.get(view.key) ?? 0
-    seen.set(view.key, n + 1)
-    return n === 0 ? view : { ...view, key: `${view.key}#${n}` }
-  })
+  const keys = journeyKeys(plan.journeys)
+  return plan.journeys.map((j, i) => ({ ...journeyView(j, nowS, names), key: keys[i]! }))
 }

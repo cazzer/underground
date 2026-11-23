@@ -6,6 +6,7 @@ import type { Network } from '../lib/network'
 import { useTrip } from '../lib/trip'
 import { isTripEnd } from '../lib/tripEnds'
 import { shouldAnnounceOnMap } from '../lib/tripOnMap'
+import { droppedNote } from '../lib/tripSelection'
 import { planViews, shouldAnnounceTrip, tripAnnounceId, tripAnnouncement, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
 
 /** A gap between clearing the region and refilling it, so the same sentence twice is spoken twice. */
@@ -25,11 +26,11 @@ interface TripAnnouncerProps {
  * that appears with its text is not spoken) and lives in the HUD, so it outlasts the panel being covered and shown
  * again. It speaks a plan once it settles (new ends or a Retry, never the 30 s refresh), the message for ends that
  * can't be planned (a missing end, the same station twice), and "On the map: X" when the camera focuses a station
- * that is neither end. It is emptied whenever its text could be stale: the panel closing, a plan running, the ends
+ * that is neither end, and says so once when the opened journey is no longer offered. It is emptied whenever its text could be stale: the panel closing, a plan running, the ends
  * changing.
  */
 export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: TripAnnouncerProps) {
-  const { open, ends, plan } = useTrip()
+  const { open, ends, plan, dropped } = useTrip()
   const { focusedId } = useFocus()
   const [text, setText] = useState('')
   const lastId = useRef<string | null>(null)
@@ -75,6 +76,13 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
     } else if (endsChanged) say(null)
     // The plan answers the ends; it is what settles, so it is the trigger.
   }, [open, plan, ends.from, ends.to])
+
+  // The journey the visitor had open left a refreshed plan: said once, whatever view shows now (even a collapsed bar).
+  useEffect(() => {
+    if (dropped.seq === 0 || !open) return
+    say(droppedNote(dropped.remaining))
+    // The drop counter is what settles, so it is the trigger.
+  }, [dropped.seq])
 
   // A station that newly takes focus behind the panel is named once it has held. Only a change of focus counts:
   // opening, a swap, an end pick or the cover going leave `focusedId` as it was and say nothing.
