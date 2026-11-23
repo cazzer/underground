@@ -1,16 +1,38 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useState } from 'react'
+import type { RouteId } from '../data/schema'
+import type { Rgb } from '../lib/lineBuffers'
 import type { Network, ShapePath } from '../lib/network'
 import type { StationSpans } from '../lib/platformSpan'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { tripLineBuffers, type TripRouteDraw } from '../lib/tripLineBuffers'
+import type { RideShapeSpan } from '../lib/tripSpans'
 import { theme } from '../theme'
 import { writeLineDim } from './bandLineMaterial'
 import { cameraDistance } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
-import { routeColors, useLineLayer } from './useLineLayer'
+import { routeColorMap, useLineLayer } from './useLineLayer'
 import { usePlatformFade } from './usePlatformFade'
+
+/** Route ids a ride named that routes.json lacks, warned about once per session. */
+const unknownRoutes = new Set<RouteId>()
+
+/**
+ * A ride's color: its own route's, so a leg found on another route's track still reads as its line; for a route
+ * routes.json lacks (a feed-only reroute), warned once, the drawn shape's route's; else none, and the ride isn't drawn.
+ */
+function rideColor(colors: ReadonlyMap<RouteId, Rgb>): (ride: RideShapeSpan, path: ShapePath) => Rgb | null {
+  return (ride, path) => {
+    const own = colors.get(ride.routeId)
+    if (own) return own
+    if (!unknownRoutes.has(ride.routeId)) {
+      unknownRoutes.add(ride.routeId)
+      console.warn(`Trip route: no color for route "${ride.routeId}"; drawn in its shape's route color`)
+    }
+    return colors.get(path.routeId) ?? null
+  }
+}
 
 interface TripLinesProps {
   network: Network
@@ -34,7 +56,7 @@ export function TripLines({ network, paths, route, levels, interiorSpans }: Trip
   const [held, setHeld] = useState(route)
   if (route !== null && route !== held) setHeld(route)
   const buffers = useMemo(
-    () => (held ? tripLineBuffers(paths, held.rides, routeColors(network, theme.routeLineMix)) : null),
+    () => (held ? tripLineBuffers(paths, held.rides, rideColor(routeColorMap(network, theme.routeLineMix))) : null),
     [network, paths, held],
   )
   // The width is written per frame, never rebuilt: the base width here.

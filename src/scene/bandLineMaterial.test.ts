@@ -1,6 +1,17 @@
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { describe, expect, it } from 'vitest'
-import { BAND_END, BAND_START, BAND_UNIFORMS, BandLineMaterial, patchBandFragment, patchBandShader, WINDOW_ATTRIBUTE } from './bandLineMaterial'
+import {
+  BAND_END,
+  BAND_START,
+  BAND_UNIFORMS,
+  BandLineMaterial,
+  DimLineMaterial,
+  patchBandFragment,
+  patchBandShader,
+  patchDimFragment,
+  WINDOW_ATTRIBUTE,
+  writeLineDim,
+} from './bandLineMaterial'
 
 describe('patchBandShader', () => {
   const src = new LineMaterial().vertexShader
@@ -79,5 +90,28 @@ describe('BandLineMaterial', () => {
     expect(b.uniforms.lineDim!.value).toBe(0)
     expect(BAND_UNIFORMS).not.toHaveProperty('lineDim')
     expect(a.uniforms.lineDimColor!.value.toArray()).toEqual([11 / 255, 33 / 255, 71 / 255])
+  })
+})
+
+describe('DimLineMaterial', () => {
+  const src = new LineMaterial().fragmentShader
+
+  it('dims a plain line layer, leaving its vertex shader alone', () => {
+    expect(patchDimFragment(src)).toContain('gl_FragColor = vec4( dimLine( diffuseColor.rgb ), alpha );')
+    const m = new DimLineMaterial({ linewidth: 1 }, '#0b2147')
+    expect(m.vertexShader).toBe(new LineMaterial().vertexShader)
+    writeLineDim(m, 0.7)
+    expect(m.uniforms.lineDim!.value).toBe(0.7)
+  })
+
+  it.each(['uniform float opacity;', 'gl_FragColor = vec4( diffuseColor.rgb, alpha );'])('throws without, or with two of, %s', (anchor) => {
+    expect(() => patchDimFragment(src.replace(anchor, ''))).toThrow(/Dim shader/)
+    expect(() => patchDimFragment(src.replace(anchor, anchor + anchor))).toThrow(/exactly one/)
+  })
+
+  it('writeLineDim leaves a material without a dim alone', () => {
+    const plain = new LineMaterial()
+    writeLineDim(plain, 0.7)
+    expect(plain.uniforms.lineDim).toBeUndefined()
   })
 })

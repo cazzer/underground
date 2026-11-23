@@ -8,16 +8,22 @@ import { buildLineBuffers, type LineBuffers, type Rgb } from '../lib/lineBuffers
 import type { Network, ShapePath } from '../lib/network'
 import { routeLineColor, type RouteLineMix } from '../lib/routeColor'
 import { theme } from '../theme'
-import { BAND_END, BAND_START, BandLineMaterial, FADE_ATTRIBUTE, WINDOW_ATTRIBUTE } from './bandLineMaterial'
+import { BAND_END, BAND_START, BandLineMaterial, DimLineMaterial, FADE_ATTRIBUTE, WINDOW_ATTRIBUTE } from './bandLineMaterial'
 
-/** Each route's GTFS color under `mix` as drawn (3:1 on the background), in linear RGB for vertex colors. Throws for an unknown route. */
-export function routeColors(network: Network, mix: RouteLineMix): (routeId: RouteId) => Rgb {
+/** Each route's GTFS color under `mix` as drawn (3:1 on the background), in linear RGB for vertex colors. */
+export function routeColorMap(network: Network, mix: RouteLineMix): ReadonlyMap<RouteId, Rgb> {
   const colors = new Map<RouteId, Rgb>()
   for (const r of network.routes) {
     // Color(hex) converts sRGB to linear, which is what vertex colors must be.
     const c = new Color(routeLineColor(r.color, mix, theme.background))
     colors.set(r.id, [c.r, c.g, c.b])
   }
+  return colors
+}
+
+/** routeColorMap as a lookup that throws for an unknown route (the map's own shapes all have one). */
+function routeColors(network: Network, mix: RouteLineMix): (routeId: RouteId) => Rgb {
+  const colors = routeColorMap(network, mix)
   return (id) => {
     const c = colors.get(id)
     if (!c) throw new Error(`No color for route "${id}"`)
@@ -57,13 +63,15 @@ export interface DashableLineBuffers extends LineBuffers {
  * segment end by its band offset on the GPU (and fades it by its FADE_ATTRIBUTE weight, and with `windows` draws
  * only each segment's window); the band uniforms are written per frame in SubwayLines, each layer's `lineDim` by its owner. With `dash`, the material is dashed in world meters along `buffers.distances`
  * (written as-is, not by computeLineDistances); a dashed material drops every segment's round end caps. No layer
- * is both: a banded layer with a dash throws.
+ * is both: a banded layer with a dash throws. A banded layer always has a `lineDim` (writeLineDim); a plain one only with
+ * `dimmable` (DimLineMaterial).
  */
 export function useLineLayer(
   buffers: DashableLineBuffers | null,
   renderOrder: number,
   linewidth = theme.lineWidth,
   dash?: LineDash,
+  dimmable = false,
 ): LineSegments2 | null {
   const dashSize = dash?.size
   const gapSize = dash?.gap
@@ -89,7 +97,7 @@ export function useLineLayer(
       material = new BandLineMaterial(params, { windowed: windows !== undefined, dimToward: theme.background })
     } else {
       if (buffers.windows) throw new Error('Only a banded line layer can be windowed')
-      material = new LineMaterial(params)
+      material = dimmable ? new DimLineMaterial(params, theme.background) : new LineMaterial(params)
     }
     if (dashed) {
       if (buffers.distances?.length !== buffers.positions.length / 3) throw new Error('A dashed line layer needs two distances per segment')
@@ -103,7 +111,7 @@ export function useLineLayer(
     const l = new LineSegments2(geometry, material)
     l.renderOrder = renderOrder
     return l
-  }, [buffers, renderOrder, linewidth, dashSize, gapSize])
+  }, [buffers, renderOrder, linewidth, dashSize, gapSize, dimmable])
 
   useEffect(
     () => () => {

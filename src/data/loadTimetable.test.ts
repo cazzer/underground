@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { index } from '../lib/realtime/fixture'
-import { expectDatedIndex, expectTimetable, expectTripIndexForTrips } from './loadTimetable'
+import { expectDatedIndex, expectServiceCalendar, expectTimetable, expectTripPatterns } from './loadTimetable'
 import { EMPTY_DATED_INDEX } from './timetableSchema'
 
 const URL = 'x/Sunday.json'
@@ -76,26 +76,33 @@ describe('expectDatedIndex', () => {
   })
 })
 
-describe('expectTripIndexForTrips', () => {
-  it('keeps the calendar, its exceptions and the patterns, and nothing else', () => {
-    const kept = expectTripIndexForTrips(index, 'x/trip-index.json')
-    expect(kept).toEqual({ calendar: index.calendar, calendarExceptions: index.calendarExceptions, patterns: index.patterns })
-    expect(Object.keys(kept).sort()).toEqual(['calendar', 'calendarExceptions', 'patterns'])
+describe('expectServiceCalendar', () => {
+  it('keeps the calendar and its exceptions, whatever the patterns hold', () => {
+    const [id] = Object.keys(index.patterns)
+    expect(expectServiceCalendar({ ...index, patterns: { [id!]: null } }, 'x/trip-index.json')).toEqual({
+      calendar: index.calendar,
+      calendarExceptions: index.calendarExceptions,
+    })
   })
 
   it('rejects a file without calendarExceptions or calendar', () => {
-    expect(() => expectTripIndexForTrips({ ...index, calendarExceptions: undefined }, 'x')).toThrow('x: not a calendar file')
-    expect(() => expectTripIndexForTrips({ ...index, calendar: undefined }, 'x')).toThrow('x: not a calendar file')
+    expect(() => expectServiceCalendar({ ...index, calendarExceptions: undefined }, 'x')).toThrow('x: not a calendar file')
+    expect(() => expectServiceCalendar({ ...index, calendar: undefined }, 'x')).toThrow('x: not a calendar file')
+  })
+})
+
+describe('expectTripPatterns', () => {
+  it('keeps the patterns', () => {
+    expect(expectTripPatterns(index, 'x')).toBe(index.patterns)
   })
 
   it('rejects a file without patterns, or a pattern without a stop run', () => {
-    expect(() => expectTripIndexForTrips({ ...index, patterns: undefined }, 'x')).toThrow('x: not a patterns file')
-    expect(() => expectTripIndexForTrips({ ...index, patterns: [] }, 'x')).toThrow('x: not a patterns file')
+    expect(() => expectTripPatterns({ ...index, patterns: undefined }, 'x')).toThrow('x: not a patterns file')
+    expect(() => expectTripPatterns({ ...index, patterns: [] }, 'x')).toThrow('x: not a patterns file')
     const [id, first] = Object.entries(index.patterns)[0]!
-    expect(() => expectTripIndexForTrips({ ...index, patterns: { ...index.patterns, [id]: { ...first, stops: undefined } } }, 'x')).toThrow(
-      `x: pattern ${id} has no stops`,
-    )
-    expect(() => expectTripIndexForTrips({ ...index, patterns: { ...index.patterns, [id]: { ...first, stops: [1] } } }, 'x')).toThrow('has no stops')
-    expect(() => expectTripIndexForTrips({ ...index, patterns: { ...index.patterns, [id]: null } }, 'x')).toThrow('has no stops')
+    const withPattern = (p: unknown) => ({ ...index, patterns: { ...index.patterns, [id]: p } })
+    expect(() => expectTripPatterns(withPattern({ ...first, stops: undefined }), 'x')).toThrow(`x: pattern ${id} has no stops`)
+    expect(() => expectTripPatterns(withPattern({ ...first, stops: [1] }), 'x')).toThrow('has no stops')
+    expect(() => expectTripPatterns(withPattern(null), 'x')).toThrow('has no stops')
   })
 })

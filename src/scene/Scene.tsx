@@ -19,6 +19,7 @@ import type { Network } from '../lib/network'
 import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
+import { createLevels } from '../lib/tripEmphasis'
 import type { TripRouteDraw } from '../lib/tripLineBuffers'
 import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
@@ -86,6 +87,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const bandView = useMemo(createBandView, [])
   /** Written by LiveTrains at -3, read by CameraRig: the selected train the camera follows. */
   const anchor = useMemo(createFollowAnchor, [])
+  /** Written by SubwayLines at -0.25, read at 0: how far the network (lines, basemap, streets) dims under the trip's route. */
+  const tripLevels = useMemo(() => createLevels(theme), [])
   /** Written by StationStreets, read by Basemap: the basemap's roads give way to the focused station's streets. */
   const streetMask = useMemo(createStreetMask, [])
   /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
@@ -131,6 +134,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         view={bandView}
         tripRoute={tripRoute}
         tripShown={tripShown}
+        levels={tripLevels}
       />
       <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
       <Stations stations={network.stations} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
@@ -151,6 +155,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         network={network}
         mask={streetMask}
         exitLabel={exitLabel}
+        tripLevels={tripLevels}
       />
       {interior && (
         <StationInterior
@@ -176,7 +181,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
-          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} />
+          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} tripLevels={tripLevels} />
         </ErrorBoundary>
       )}
     </Canvas>

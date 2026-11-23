@@ -11,20 +11,37 @@ const BASE_URL = import.meta.env.BASE_URL
 /** What the service-day picker reads from trip-index.json. */
 export type ServiceCalendarFile = Pick<TripIndexFile, 'calendar' | 'calendarExceptions'>
 
-/** What the trip reads from trip-index.json: the calendar, and the patterns that tell the map which shape a ride leg is on. */
-export type TripIndexForTrips = ServiceCalendarFile & Pick<TripIndexFile, 'patterns'>
-
-/** Checks a fetched trip-index.json for the calendar, its exceptions and the patterns' stop runs, and keeps only those. */
-export function expectTripIndexForTrips(raw: unknown, url: string): TripIndexForTrips {
+/** Checks a fetched trip-index.json for the calendar and its exceptions, and keeps only those. */
+export function expectServiceCalendar(raw: unknown, url: string): ServiceCalendarFile {
   const file = expectDataRecord<TripIndexFile>(raw, 'calendar', url)
   if (!Array.isArray((file as Partial<TripIndexFile>).calendarExceptions)) throw new Error(`${url}: not a calendar file`)
-  const patterns: unknown = (file as Partial<TripIndexFile>).patterns
-  if (typeof patterns !== 'object' || patterns === null || Array.isArray(patterns)) throw new Error(`${url}: not a patterns file`)
+  return { calendar: file.calendar, calendarExceptions: file.calendarExceptions }
+}
+
+/** Checks a fetched trip-index.json's patterns for a stop run each (what the trip's map reads), and keeps only those. */
+export function expectTripPatterns(raw: unknown, url: string): TripIndexFile['patterns'] {
+  const { patterns } = expectDataRecord<TripIndexFile>(raw, 'patterns', url)
   for (const [shapeId, pattern] of Object.entries(patterns)) {
     const stops: unknown = (pattern as Partial<TripIndexFile['patterns'][string]> | null)?.stops
     if (!Array.isArray(stops) || !stops.every((s) => typeof s === 'string')) throw new Error(`${url}: pattern ${shapeId} has no stops`)
   }
-  return { calendar: file.calendar, calendarExceptions: file.calendarExceptions, patterns: file.patterns }
+  return patterns
+}
+
+/** A check's result, kept so one fetch serves both readers and either one's failure stays its own. */
+type Checked<T> = { ok: true; value: T } | { ok: false; error: Error }
+
+function check<T>(run: () => T): Checked<T> {
+  try {
+    return { ok: true, value: run() }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err : new Error(String(err)) }
+  }
+}
+
+function settled<T>(c: Checked<T>): T {
+  if (!c.ok) throw c.error
+  return c.value
 }
 
 // Lazy, one promise per file; a failure is evicted so the next call retries. Nothing here runs at import.
@@ -55,9 +72,14 @@ const datedIndexCache = createInteriorCache(() => {
     },
   )
 })
+// One fetch of the big file for both readers, each checked on its own: malformed patterns never fail a plan, and only
+// the two parts are kept, not the whole file.
 const tripIndexCache = createInteriorCache(() => {
   const url = `${BASE_URL}data/trip-index.json`
-  return fetchJson(url).then((raw) => expectTripIndexForTrips(raw, url))
+  return fetchJson(url).then((raw) => ({
+    calendar: check(() => expectServiceCalendar(raw, url)),
+    patterns: check(() => expectTripPatterns(raw, url)),
+  }))
 })
 
 /** `data/timetable/<serviceId>.json`, fetched once per page load. */
@@ -72,12 +94,12 @@ export function transfersFile(): Promise<TransfersFile> {
 
 /** The calendar from `data/trip-index.json` (a lazy fetch of the big file, only when a trip is planned). */
 export function serviceCalendar(): Promise<ServiceCalendarFile> {
-  return tripIndexCache.get(CONSTANT_KEY).then(({ calendar, calendarExceptions }) => ({ calendar, calendarExceptions }))
+  return tripIndexCache.get(CONSTANT_KEY).then((file) => settled(file.calendar))
 }
 
 /** The patterns from `data/trip-index.json`: the same one fetch as `serviceCalendar`, made when a trip is planned. */
 export function tripPatterns(): Promise<TripIndexFile['patterns']> {
-  return tripIndexCache.get(CONSTANT_KEY).then((file) => file.patterns)
+  return tripIndexCache.get(CONSTANT_KEY).then((file) => settled(file.patterns))
 }
 
 /** `data/timetable/dated/<date>.json` (YYYYMMDD; only a date the index lists), fetched once per page load. */

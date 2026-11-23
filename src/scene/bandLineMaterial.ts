@@ -26,7 +26,8 @@ export const FADE_ATTRIBUTE = 'instanceFade'
 export const WINDOW_ATTRIBUTE = 'instanceWindow'
 
 // A windowed layer's segment parameter: 0 at the start, 1 at the end, so it runs linearly along the segment in the
-// world (perspective-correct, as trackPointInto places trains). Each end cap keeps its end's value.
+// world (perspective-correct, as trackPointInto places trains). Each end cap keeps its end's value. LineMaterial's
+// near-plane trim moves a clipped segment's end, which biases t there (only with an end behind the camera; not at map zoom).
 const WINDOW_VERTEX_DECLARE = `#ifdef TRIP_WINDOW
 attribute vec2 ${WINDOW_ATTRIBUTE};
 varying vec2 vWindow;
@@ -147,7 +148,23 @@ export function patchBandFragment(src: string): string {
   )
 }
 
-/** Sets a band layer's dim (0..1); a plain LineMaterial has none and is left alone. Per frame: never allocates or throws. */
+/** A plain LineMaterial's fragment shader with the dim on its color (DimLineMaterial). Throws if three changed the anchors. */
+export function patchDimFragment(src: string): string {
+  const out = replaceOnce(src, FRAG_DECLARE_ANCHOR, `${FRAG_DECLARE_ANCHOR}\n${DIM_GLSL}`, DIM_PATCH)
+  return replaceOnce(out, FRAG_COLOR_ANCHOR, 'gl_FragColor = vec4( dimLine( diffuseColor.rgb ), alpha );', DIM_PATCH)
+}
+
+const DIM_PATCH: PatchOwner = { label: 'Dim shader', file: 'bandLineMaterial.ts' }
+
+/** The material's own `lineDim` (0 until written) and `lineDimColor` (`toward`, sRGB 0..1; black when left out). */
+function addLineDim(material: LineMaterial, toward: string | undefined): void {
+  const [r, g, b] = toward ? srgb01(toward) : [0, 0, 0]
+  // A Vector3, not a Color: a Color uniform would be taken as linear, and the mix runs in sRGB.
+  material.uniforms.lineDim = { value: 0 }
+  material.uniforms.lineDimColor = { value: new Vector3(r, g, b) }
+}
+
+/** Sets a layer's dim (0..1); a LineMaterial without one is left alone. Per frame: never allocates or throws. */
 export function writeLineDim(material: LineMaterial, dim: number): void {
   const u = material.uniforms.lineDim
   if (u) u.value = dim
@@ -171,9 +188,15 @@ export class BandLineMaterial extends LineMaterial {
     this.fragmentShader = patchBandFragment(this.fragmentShader)
     if (options.windowed) this.defines = { ...this.defines, TRIP_WINDOW: '' }
     Object.assign(this.uniforms, BAND_UNIFORMS)
-    const [r, g, b] = options.dimToward ? srgb01(options.dimToward) : [0, 0, 0]
-    // A Vector3, not a Color: a Color uniform would be taken as linear, and the mix runs in sRGB.
-    this.uniforms.lineDim = { value: 0 }
-    this.uniforms.lineDimColor = { value: new Vector3(r, g, b) }
+    addLineDim(this, options.dimToward)
+  }
+}
+
+/** A plain (unbanded) LineMaterial with the same dim: the focused station's streets dim with the network under a trip. */
+export class DimLineMaterial extends LineMaterial {
+  constructor(parameters: LineMaterialParameters | undefined, dimToward: string) {
+    super(parameters)
+    this.fragmentShader = patchDimFragment(this.fragmentShader)
+    addLineDim(this, dimToward)
   }
 }

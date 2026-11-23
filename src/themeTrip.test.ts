@@ -42,6 +42,22 @@ describe('trip route tokens', () => {
     }
   })
 
+  it('keep every dimmed route above the equally dimmed basemap and station streets', async () => {
+    for (const t of Object.values(await themes())) {
+      const on = (hex: string) => contrastRatio(hex, t.background)
+      const faintestDimmed = Math.min(
+        ...routes.map((r) => on(mixHex(routeLineColor(`#${r.color}`, t.routeLineMix, t.background), t.background, t.tripNetworkDim))),
+      )
+      // As drawn: the basemap (basemapLayer.ts setVisibility, a class at full strength) and the streets (DIM_GLSL) both mix in sRGB.
+      for (const [cls, { stroke }] of Object.entries(t.basemap)) {
+        const dimmed = mixHex(stroke, t.background, t.tripNetworkDim)
+        expect(on(dimmed), `${t.name} ${cls} ${dimmed}`).toBeLessThan(faintestDimmed)
+      }
+      const street = mixHex(t.streetStroke, t.background, t.tripNetworkDim)
+      expect(on(street), `${t.name} street ${street}`).toBeLessThan(faintestDimmed)
+    }
+  })
+
   it('draw the opened trip wider than the network, and dim the network more than the faint trip', async () => {
     for (const t of Object.values(await themes())) {
       expect(t.tripLineWidth).toBeGreaterThan(t.lineWidth)

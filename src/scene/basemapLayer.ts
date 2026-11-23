@@ -8,7 +8,7 @@
  * every overlay: the depth-tested car bodies rely on nothing before them writing depth (cars on a station ramp run
  * below the street).
  */
-import { DynamicDrawUsage, type Color, type InterleavedBuffer, type InterleavedBufferAttribute } from 'three'
+import { Color, DynamicDrawUsage, type InterleavedBuffer, type InterleavedBufferAttribute } from 'three'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { BasemapLineMaterial, type ExtentUniforms, type MaskUniforms } from './basemapLineMaterial'
@@ -42,8 +42,12 @@ export interface ClassLayer {
   apply(order: readonly number[], keep: number, segmentsOf: (key: number) => Float32Array | undefined): void
   /** Once per frame, `nowS` in seconds: shrinks a buffer that has stayed under a quarter full. Allocates only then. */
   tick(nowS: number): void
-  /** Mixes the stroke `v` (0..1) of the way from `background` to `stroke`; hidden at 0 or with nothing to draw. */
-  setVisibility(v: number, stroke: Color, background: Color): void
+  /**
+   * Mixes the stroke `v` (0..1) of the way from `background` to `stroke` (linear, both linear colors), then `dim` (0..1)
+   * of the way back to the background in sRGB, as the route lines dim under a trip (DIM_GLSL); hidden at v 0 or with
+   * nothing to draw.
+   */
+  setVisibility(v: number, stroke: Color, background: Color, dim?: number): void
   dispose(): void
 }
 
@@ -76,6 +80,8 @@ export function createClassLayer({ width, renderOrder, mask, extent }: ClassLaye
   let strength = 0
   /** When the buffer last fell under a quarter full, or -1 while it isn't. */
   let lowSince = -1
+  /** Scratch: the background in sRGB for the dim. */
+  const backgroundSrgb = new Color()
 
   const showIfDrawn = () => {
     line.visible = strength > 0 && used > 0
@@ -141,9 +147,10 @@ export function createClassLayer({ width, renderOrder, mask, extent }: ClassLaye
         resize(capacityFor(used), used)
       }
     },
-    setVisibility(v, stroke, background) {
+    setVisibility(v, stroke, background, dim = 0) {
       strength = v
       material.color.lerpColors(background, stroke, v)
+      if (dim > 0) material.color.convertLinearToSRGB().lerp(backgroundSrgb.copy(background).convertLinearToSRGB(), dim).convertSRGBToLinear()
       showIfDrawn()
     },
     dispose() {

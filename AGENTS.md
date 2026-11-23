@@ -238,14 +238,20 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     fragment's color toward `lineDimColor` (theme.background, sRGB) in sRGB, exactly as `mixHex` does, never by opacity
     (`src/lib/lineDim.ts` `dimLineRgb` is its JS twin; `lineDim.test.ts` pins the GLSL and checks both against mixHex); with
     `{ windowed: true }` (the `TRIP_WINDOW` define; buffers carrying `windows`) it discards each segment's fragments outside its
-    `WINDOW_ATTRIBUTE` (t0, t1), t being 0 at the segment's start and 1 at its end (caps keep their end's t). While the trip
+    `WINDOW_ATTRIBUTE` (t0, t1), t being 0 at the segment's start and 1 at its end (caps keep their end's t; an end the span
+    doesn't cut is -1 or 2, so no fragment sits on the cut). A plain layer gets the same dim as `DimLineMaterial`
+    (`useLineLayer`'s `dimmable`; the focused station's streets). While the trip
     panel is in front with a route (`usePanelCollapse().front === 'trip'`, collapsed or not; a train panel or notice in front
     ends it), SubwayLines eases one `TripEmphasis` at -0.25 (`src/lib/tripEmphasis.ts`, 0.25 s, reduced motion snaps) and
-    writes `lineDim` = `tripNetworkDim` on the main layer; the `?lines=` overlays write the same in their frames. `TripLines.tsx`
-    (render order 2.1, a child of SubwayLines in a null-fallback ErrorBoundary): the selected journey's ride legs (`useTripRoute`)
+    writes `lineDim` = `tripNetworkDim` on the main layer into Scene's `EmphasisLevels` (read at 0): the `?lines=` overlays and
+    StationStreets write the same `lineDim`, and Basemap mixes every class's stroke the same amount toward the background in
+    sRGB after its distance fade (`basemapLayer.ts` `setVisibility`'s `dim`), so no road, water or park outshines a dimmed line
+    (`themeTrip.test.ts`). `TripLines.tsx` (render order 2.1, a child of SubwayLines in a null-fallback ErrorBoundary keyed by
+    the last route's key, so a new route remounts it): the selected journey's ride legs (`useTripRoute`)
     as `tripLineBuffers` (`src/lib/tripLineBuffers.ts`, pure: each ride span's overlapping shape segments copied with the same
     positions, heights and band inputs as `buildLineBuffers`, cover ignored, plus `segmentWindow`'s (t0, t1); no new
-    vertices, `lineBreaks` untouched), in route colors under `theme.routeLineMix` whatever `?lines=` says, with
+    vertices, `lineBreaks` untouched), in route colors under `theme.routeLineMix` whatever `?lines=` says (a route routes.json
+    lacks warns once and takes its drawn shape's route's color, else the ride is left out), with
     `usePlatformFade` (a stretch two rides share fades on the first copy only); per frame at 0 its `scale.y`, width (base to
     `tripLineWidth` as a journey is opened) and own dim (`tripFaintDim` in the list view, 0 opened); it keeps the last route,
     so closing or covering the panel eases it out. Station markers, ties and trains don't dim. `straight` spans and walk legs
@@ -660,7 +666,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `faint` in the list view), while the trip panel is open with a ready plan and a journey selected; `journeySpans` on the drawn
   paths (banded once they arrive) with `tripPatterns()` as the hint, loaded through `import('./loadTimetable')` (the planner's
   chunk and its one fetch, so nothing at startup); nothing draws until the patterns settle; a failed load logs once and spans go
-  by geometry; a journey that can't be mapped logs and draws nothing. Memoised on each ride's route and stop run.
+  by geometry; a journey that can't be mapped, or has no ride span to draw, gives null (nothing drawn, nothing dimmed).
+  Memoised on each ride's route and stop run.
 - `src/lib/tripSpans.ts` (pure, 2q7.45.2): a trip's legs on the drawn map. `rideSpan` maps a ride leg to `{ shapeId, d0, d1, maxOffsetM, matched }` on a `network.shapes` or banded path of the stop suffix's direction (each stop's own station point, `projectForward`, offsets over `MAX_STOP_OFFSET_M` 150 m rejected, d1 > d0), by tier: a route shape whose trip-index pattern holds the leg's stops (`SpanContext.patterns`, optional hint), the route's shapes, any route's shape whose pattern holds them, any shape of the direction, else a `straight` line through the stop points; within a route primary first, then smallest offset (ties under `OFFSET_TIE_M` 0.01 m), then id (across routes offset first); `walkSpan` the two station points (none for `sameStation`; `sameComplex` marks a change inside a complex), `journeySpans` all legs, `spanPoints` a span's ground points; `stopStations` stop to station. `tripSpans.data.test.ts` plans L08 to 127 and checks banded and unbanded pick the same shapes (ends within a metre, so recompute on the banded paths)
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
@@ -765,8 +772,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/useStationHash.ts` keeps `#station=<id>` and the focused station in step with `history.replaceState`
   (no history entries): reads on mount and `hashchange`, writes on every focus change; an unknown id clears the
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
-- `src/data/loadTimetable.ts` (`expectTimetable`, `expectDatedIndex`, `expectTripIndexForTrips`: the calendar, its exceptions and
-  each pattern's stop run, from one `trip-index.json` fetch that `serviceCalendar()` and `tripPatterns()` share; one lazy cached promise per file via
+- `src/data/loadTimetable.ts` (`expectTimetable`, `expectDatedIndex`, `expectServiceCalendar`, `expectTripPatterns`: one
+  `trip-index.json` fetch keeps the calendar and the patterns (each pattern's stop run), each checked on its own, so
+  `serviceCalendar()` never fails on a malformed pattern and `tripPatterns()` rejects alone; one lazy cached promise per file via
   `interiorCache.ts`: `timetable/<service>.json`, `timetable/dated/<date>.json` and its `index.json` (built by each deploy, never in git; a 404 on the index is
   an empty one with one console warning, any other failure rejects), `route/transfers.json`, and the calendar from `trip-index.json`) and
   `planTrip.ts` (`planTripLive(stations, from, to, atS, live)`: reads the calendar and the dated index (fetched together; a failed

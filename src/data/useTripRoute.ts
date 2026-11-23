@@ -71,5 +71,6 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
     // `journey` is a new object on every replan; `legsKey` says when its legs really change.
   }, [legsKey, patterns, paths, stops])
   const faint = selection.view === 'list'
-  return useMemo(() => (rides && key !== null ? { key, rides, faint } : null), [rides, key, faint])
+  // No ride to draw (every leg `straight`, say): nothing shows, so the network isn't dimmed either.
+  return useMemo(() => (rides && rides.length > 0 && key !== null ? { key, rides, faint } : null), [rides, key, faint])
 }
