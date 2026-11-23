@@ -6,16 +6,16 @@ const levelsOf = (shown: number, full: number) => emphasisLevels({ shown, full }
 
 describe('emphasisLevels', () => {
   it('dims nothing and draws the trip at the base width when not shown', () => {
-    expect(levelsOf(0, 1)).toEqual({ networkDim: 0, tripDim: 0, tripWidthPx: 1.5, tripVisible: false })
-    expect(levelsOf(0, 0)).toEqual({ networkDim: 0, tripDim: 0, tripWidthPx: 1.5, tripVisible: false })
+    expect(levelsOf(0, 1)).toEqual({ networkDim: 0, tripDim: 0, tripWidthPx: 1.5, tripVisible: false, tripOpacity: 0 })
+    expect(levelsOf(0, 0)).toEqual({ networkDim: 0, tripDim: 0, tripWidthPx: 1.5, tripVisible: false, tripOpacity: 0 })
   })
 
   it('dims the network and draws an opened journey full and wide', () => {
-    expect(levelsOf(1, 1)).toEqual({ networkDim: 0.7, tripDim: 0, tripWidthPx: 2.5, tripVisible: true })
+    expect(levelsOf(1, 1)).toEqual({ networkDim: 0.7, tripDim: 0, tripWidthPx: 2.5, tripVisible: true, tripOpacity: 1 })
   })
 
   it('draws the list view faint at the base width', () => {
-    expect(levelsOf(1, 0)).toEqual({ networkDim: 0.7, tripDim: 0.35, tripWidthPx: 1.5, tripVisible: true })
+    expect(levelsOf(1, 0)).toEqual({ networkDim: 0.7, tripDim: 0.35, tripWidthPx: 1.5, tripVisible: true, tripOpacity: 1 })
   })
 
   it('moves monotonically as it eases in', () => {
@@ -24,6 +24,7 @@ describe('emphasisLevels', () => {
       const next = levelsOf(i / 20, 1)
       expect(next.networkDim).toBeGreaterThanOrEqual(last.networkDim)
       expect(next.tripWidthPx).toBeGreaterThanOrEqual(last.tripWidthPx)
+      expect(next.tripOpacity).toBeGreaterThanOrEqual(last.tripOpacity)
       last = next
     }
   })

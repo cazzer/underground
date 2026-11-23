@@ -2,13 +2,20 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { CircleGeometry, Color, DynamicDrawUsage, RingGeometry, type InstancedMesh } from 'three'
 import { useFocus } from '../lib/focus'
+import { dimLineRgbInto, srgb01 } from '../lib/lineDim'
 import { writeMarkerMatrices } from '../lib/markerMatrices'
 import type { Station } from '../lib/network'
+import type { Ground } from '../lib/projection'
+import type { EmphasisLevels } from '../lib/tripEmphasis'
+import type { TripMark } from '../lib/tripMarks'
 import { theme } from '../theme'
 import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
 import { FocusRing } from './FocusRing'
 import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
+import { useHeld } from './useHeld'
+
+const BACKGROUND = srgb01(theme.background)
 
 interface StationsProps {
   stations: readonly Station[]
@@ -16,15 +23,25 @@ interface StationsProps {
   focusedMarker: boolean
   /** The focused station's complex siblings whose interior is loaded: their markers hide with the focused one's. */
   hiddenSiblings: readonly string[]
+  /** Every station the trip's drawn journey calls at (TripRouteDraw.stations); null with none. */
+  tripStations: readonly string[] | null
+  /** The trip's station marks (TripRouteDraw.marks); null with none: a focus ring on one draws outside it. */
+  tripMarks: readonly TripMark[] | null
+  /** The location fix's ground point while its reticle shows (read only, sizes a focus ring round a grown start mark). */
+  fix: Ground | null
+  /** This frame's trip look (SubwayLines, -0.25): the other stations' rings dim with the network. */
+  levels: EmphasisLevels
 }
 
 /**
  * All station markers as two instanced meshes (fill, then ring). The focused station's marker is hidden
  * (its panel and interior mark it), and so are its complex siblings' (the one interior covers them); they stay
  * pickable, since ScenePicker picks in screen space. A station with no
- * interior (`focusedMarker`) keeps its marker, plus a `theme.stationFocus` FocusRing above the trains.
+ * interior (`focusedMarker`) keeps its marker, plus a `theme.stationFocus` FocusRing above the trains. While a trip
+ * shows, the rings of stations its journey doesn't call at mix toward the background by the network's dim (as the
+ * lines do, lineDim.ts), rewritten only while that dim or the journey's stations change.
  */
-export function Stations({ stations, focusedMarker, hiddenSiblings }: StationsProps) {
+export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations, tripMarks, levels, fix }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
   const { focusedId } = useFocus()
@@ -54,6 +71,16 @@ export function Stations({ stations, focusedMarker, hiddenSiblings }: StationsPr
   )
   const stroke = useMemo(() => new Color(theme.stationStroke), [])
   const drawn = useRef<{ scale: number; hidden: readonly number[] | null }>({ scale: NaN, hidden: null })
+  // The last journey's stations, so they stay full while its dim eases out.
+  const heldTrip = useHeld(tripStations)
+  const heldMarks = useHeld(tripMarks)
+  const focusedRole = (focusedId && heldMarks?.find((m) => m.stationId === focusedId)?.role) || null
+  const onTrip = useMemo(() => {
+    const ids = new Set(heldTrip)
+    return Uint8Array.from(stations, (s) => (ids.has(s.id) ? 1 : 0))
+  }, [stations, heldTrip])
+  const tint = useMemo(() => ({ full: new Float32Array([stroke.r, stroke.g, stroke.b]), dimmed: new Float32Array(3) }), [stroke])
+  const tinted = useRef<{ dim: number; onTrip: Uint8Array | null }>({ dim: NaN, onTrip: null })
 
   useEffect(
     () => () => {
@@ -73,12 +100,23 @@ export function Stations({ stations, focusedMarker, hiddenSiblings }: StationsPr
     for (let i = 0; i < stations.length; i++) r.setColorAt(i, stroke)
     r.instanceColor!.needsUpdate = true
     drawn.current.scale = NaN
+    tinted.current.dim = 0
+    tinted.current.onTrip = null
   }, [stations, stroke])
 
   useFrame((state) => {
     const f = fill.current
     const r = ring.current
     if (!f || !r) return
+    const t = tinted.current
+    if (levels.networkDim !== t.dim || (onTrip !== t.onTrip && levels.networkDim > 0)) {
+      t.dim = levels.networkDim
+      t.onTrip = onTrip
+      dimLineRgbInto(tint.dimmed, tint.full, BACKGROUND, t.dim)
+      const colors = r.instanceColor!.array as Float32Array
+      for (let i = 0; i < onTrip.length; i++) colors.set(onTrip[i] ? tint.full : tint.dimmed, i * 3)
+      r.instanceColor!.needsUpdate = true
+    }
     const d = cameraDistance(state)
     const scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
     const last = drawn.current
@@ -111,7 +149,7 @@ export function Stations({ stations, focusedMarker, hiddenSiblings }: StationsPr
         {/* Default white material: the per-instance colors are the ring colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
-      {focusedMarker && focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} />}
+      {focusedMarker && focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} tripRole={focusedRole} levels={levels} fix={fix} />}
     </>
   )
 }

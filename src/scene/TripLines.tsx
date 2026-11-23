@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { RouteId } from '../data/schema'
 import type { Rgb } from '../lib/lineBuffers'
 import type { Network, ShapePath } from '../lib/network'
@@ -40,7 +40,7 @@ interface TripLinesProps {
   network: Network
   /** The shapes SubwayLines draws (banded once the bands arrive); `route`'s spans are found on them. */
   paths: readonly ShapePath[]
-  /** The selected journey's ride legs; null with none (the last one stays drawn while it eases out). */
+  /** The selected journey's ride legs, held by SubwayLines while they ease out; null with none. */
   route: TripRouteDraw | null
   /** This frame's look, written by SubwayLines at -0.25. */
   levels: EmphasisLevels
@@ -54,12 +54,10 @@ interface TripLinesProps {
  * theme.routeLineMix whatever ?lines= draws, wider and full once a journey is opened, faint in the list view.
  */
 export function TripLines({ network, paths, route, levels, interiorSpans }: TripLinesProps) {
-  // The last route drawn, so closing the panel eases it out instead of dropping it.
-  const [held, setHeld] = useState(route)
-  if (route !== null && route !== held) setHeld(route)
+  const rides = route?.rides
   const buffers = useMemo(
-    () => (held ? tripLineBuffers(paths, held.rides, rideColor(routeColorMap(network, theme.routeLineMix))) : null),
-    [network, paths, held],
+    () => (rides ? tripLineBuffers(paths, rides, rideColor(routeColorMap(network, theme.routeLineMix))) : null),
+    [network, paths, rides],
   )
   // The width is written per frame, never rebuilt: the base width here.
   const lines = useLineLayer(buffers, RENDER_ORDER.tripLine)

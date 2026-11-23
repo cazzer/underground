@@ -4,7 +4,7 @@ import { CircleGeometry, RingGeometry, type Group } from 'three'
 import type { Ground } from '../lib/projection'
 import { theme } from '../theme'
 import { cameraDistance, screenScale } from './cameraDistance'
-import { accuracyEdgeBuffers, DOT_RADIUS, HALO_INNER, HALO_OUTER, reticleBuffers } from './hereShape'
+import { accuracyEdgeBuffers, DOT_RADIUS, HALO_INNER, HALO_OUTER, RETICLE_MIN_METERS, RETICLE_PX, reticleBuffers } from './hereShape'
 import { RENDER_ORDER } from './renderOrder'
 import { useLineLayer } from './useLineLayer'
 
@@ -14,9 +14,6 @@ interface YouAreHereProps {
   accuracyM: number
 }
 
-/** The reticle's radius on screen, and the smallest it gets in meters when zoomed right in. */
-const RETICLE_PX = 9
-const RETICLE_MIN_METERS = 8
 const SEGMENTS = 48
 const Y_ACCURACY = 0.1
 const Y_RETICLE = 0.3

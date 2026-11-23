@@ -1,14 +1,28 @@
 import { Color } from 'three'
 import type { LineBuffers } from '../lib/lineBuffers'
+import type { ReticleClearance } from '../lib/tripMarkSize'
+import { screenScale } from './cameraDistance'
 
 const EDGE_SEGMENTS = 96
 const RING_SEGMENTS = 32
+/** The reticle's radius on screen, and the smallest it gets in meters when zoomed right in (YouAreHere.tsx). */
+export const RETICLE_PX = 9
+export const RETICLE_MIN_METERS = 8
 /** Reticle proportions as multiples of the ring radius (1). */
 export const TICK_OUTER = 1.7
 /** The halo is a band just around the ring, not a disc: the station under the reticle stays visible. */
 export const HALO_INNER = 0.8
 export const HALO_OUTER = 1.25
 export const DOT_RADIUS = 0.3
+/** A trip's start mark grown round the reticle ends this far outside it, CSS px. */
+const RETICLE_GAP_PX = 2
+
+/** The reticle's outer radius (its ticks' ends) and RETICLE_GAP_PX at `distance`, in meters, written into `out`. No allocation. */
+export function reticleClearanceInto(out: ReticleClearance, distance: number): ReticleClearance {
+  out.outerM = TICK_OUTER * screenScale(distance, RETICLE_PX, RETICLE_MIN_METERS)
+  out.gapM = screenScale(distance, RETICLE_GAP_PX, 0)
+  return out
+}
 
 function push(out: number[], ax: number, az: number, bx: number, bz: number): void {
   out.push(ax, 0, az, bx, 0, bz)

@@ -23,6 +23,9 @@ const routes: { id: string; color: string }[] = JSON.parse(readFileSync(new URL(
 const MIN_DIMMED = 1.3
 const MIN_FAINT_OVER_DIMMED = 1.45
 const MIN_FULL_OVER_DIMMED = 1.4
+// The walks and marks (exitPath, 2q7.45.4): 2.66:1 over the dimmed N/Q/R/W, the closest; faint, 3.03:1 on the background.
+const MIN_WALK_OVER_DIMMED = 2.5
+const MIN_FAINT_WALK = 2.5
 
 describe('trip route tokens', () => {
   it('leave every dimmed route readable, the faint trip clearly above it and every full route above any dimmed one', async () => {
@@ -55,6 +58,18 @@ describe('trip route tokens', () => {
       }
       const street = mixHex(t.streetStroke, t.background, t.tripNetworkDim)
       expect(on(street), `${t.name} street ${street}`).toBeLessThan(faintestDimmed)
+    }
+  })
+
+  it("keep the trip's walks and marks readable over the dimmed network, and on the background when faint", async () => {
+    for (const t of Object.values(await themes())) {
+      const dimmed = routes.map((r) => ({
+        id: r.id,
+        color: mixHex(routeLineColor(`#${r.color}`, t.routeLineMix, t.background), t.background, t.tripNetworkDim),
+      }))
+      for (const r of dimmed) expect(contrastRatio(t.exitPath, r.color), `${t.name} walk over dimmed ${r.id}`).toBeGreaterThanOrEqual(MIN_WALK_OVER_DIMMED)
+      const faint = mixHex(t.exitPath, t.background, t.tripFaintDim)
+      expect(contrastRatio(faint, t.background), `${t.name} faint walk ${faint}`).toBeGreaterThanOrEqual(MIN_FAINT_WALK)
     }
   })
 

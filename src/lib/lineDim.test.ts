@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { DIM_GLSL } from '../scene/bandLineMaterial'
-import { dimLineRgb, linearToSrgb, srgb01, srgbToLinear } from './lineDim'
+import { dimLineRgb, dimLineRgbInto, linearToSrgb, srgb01, srgbToLinear } from './lineDim'
 import { mixHex, routeLineColor } from './routeColor'
 
 const PINNED = `
@@ -54,5 +54,17 @@ describe('dimLineRgb', () => {
       const want = srgb01(mixHex(drawn, BACKGROUND, t))
       out.forEach((v, i) => expect(Math.abs(v - want[i]!), `${drawn} at ${t}`).toBeLessThanOrEqual(1 / 255))
     }
+  })
+
+  it('matches dimLineRgbInto, written in place without allocating a result', () => {
+    const out = new Float32Array(3)
+    for (const t of [0, 0.35, 0.7]) {
+      const want = dimLineRgb([0.2, 0.5, 0.9], [0.1, 0.1, 0.3], t)
+      expect(dimLineRgbInto(out, [0.2, 0.5, 0.9], [0.1, 0.1, 0.3], t)).toBe(out)
+      out.forEach((v, i) => expect(v).toBeCloseTo(want[i]!, 6))
+    }
+    const same: [number, number, number] = [0.2, 0.5, 0.9]
+    dimLineRgbInto(same, same, [0.1, 0.1, 0.3], 0.7)
+    expect(same).toEqual(dimLineRgb([0.2, 0.5, 0.9], [0.1, 0.1, 0.3], 0.7))
   })
 })

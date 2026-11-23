@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
+import { focusScaleFactor, markerRadiusPx, screenScale, tripMarkRadiusPx } from './cameraDistance'
 
 describe('markerRadiusPx', () => {
   it('clamps at both ends', () => {
@@ -42,5 +42,16 @@ describe('focusScaleFactor', () => {
 
   it('never shrinks the marker below its neighbours when close in', () => {
     expect(focusScaleFactor(170, 6)).toBe(1)
+  })
+})
+
+describe('tripMarkRadiusPx', () => {
+  it('rings the station marker at every distance, held to 5..13 px', () => {
+    for (const d of [100, 1_000, 4_000, 20_000, 76_000, 150_000, 400_000]) {
+      const r = tripMarkRadiusPx(d)
+      expect(r).toBeGreaterThanOrEqual(5)
+      expect(r).toBeLessThanOrEqual(13)
+      expect(r).toBeGreaterThanOrEqual(markerRadiusPx(d) * 1.4)
+    }
   })
 })

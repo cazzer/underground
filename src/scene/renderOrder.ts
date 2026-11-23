@@ -21,8 +21,19 @@ export const RENDER_ORDER = {
   lineFocus: 2,
   // The trip's ride legs (TripLines.tsx) over every route line and the ties, under the station markers and trains.
   tripLine: 2.1,
+  // A ride leg found on no drawn shape, dashed straight through its stops (TripDashes.tsx), over the ride legs and
+  // under the station markers.
+  tripStraight: 2.2,
   stationFill: 3,
   stationRing: 4,
+  // The trip's board, change and alight marks (TripMarks.tsx) over the station markers, under the trains: a
+  // background halo, the ring, and the dot filling a start or an end.
+  tripMarkHalo: 4.4,
+  // The trip's walks between stations (TripDashes.tsx), dashed: over the marks' halo discs
+  // (so a short walk between two touching marks still shows) and under their rings.
+  tripWalk: 4.45,
+  tripMark: 4.5,
+  tripMarkDot: 4.55,
   trainHalo: 5,
   trains: 6,
   // The selected train's dot, drawn on its own above the other dots: its rim, a background gap, the dot.
@@ -59,6 +70,9 @@ export const RENDER_ORDER = {
   streetsOver: 7.5,
   // The street file's entrance marks the interior doesn't draw itself: above the veil like the interior's own
   // entrance squares, under its strokes.
+  // The trip's walks above the veil while the focused interior is loaded under look A and revealing (as the streets go to
+  // 7.5), so they read like the way out's walk outside.
+  tripWalkOver: 7.55,
   streetEntrance: 7.6,
   interiorFine: 8,
   interior: 9,

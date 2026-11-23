@@ -36,6 +36,20 @@ describe('interior band and deck render orders', () => {
     expect(RENDER_ORDER.placePin).toBeLessThan(RENDER_ORDER.interiorVeil)
   })
 
+  it("draw the trip's walks over the marks' halos and under their rings, or above the veil under the entrance marks", () => {
+    expect(RENDER_ORDER.tripMarkHalo).toBeLessThan(RENDER_ORDER.tripWalk)
+    expect(RENDER_ORDER.tripWalk).toBeLessThan(RENDER_ORDER.tripMark)
+    expect(RENDER_ORDER.tripMark).toBeLessThan(RENDER_ORDER.tripMarkDot)
+    expect(RENDER_ORDER.interiorVeil).toBeLessThan(RENDER_ORDER.streetsOver)
+    expect(RENDER_ORDER.streetsOver).toBeLessThan(RENDER_ORDER.tripWalkOver)
+    expect(RENDER_ORDER.tripWalkOver).toBeLessThan(RENDER_ORDER.streetEntrance)
+  })
+
+  it("draw a straight-drawn ride over the ride legs and under the station markers", () => {
+    expect(RENDER_ORDER.tripLine).toBeLessThan(RENDER_ORDER.tripStraight)
+    expect(RENDER_ORDER.tripStraight).toBeLessThan(RENDER_ORDER.stationFill)
+  })
+
   it('throw past the decks there are orders for', () => {
     expect(() => strokeOrders(3, 3)).toThrow()
     expect(() => spanCarOrders(MAX_DECKS)).toThrow()
