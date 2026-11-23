@@ -67,8 +67,9 @@ real departures). The Worker drops `trip_replacement_period` and schedule_relati
 (`worker/proto/subway-rt.proto:9-34`) and arrivals past 30 min (`worker/src/schema.ts:4-5`). A stale or
 erroring feed falls back to the schedule, so gaps aren't invented.
 
-**Planned service changes** (weekend work) are only in the supplemented feed (19.5 MB, hourly, 7 days). `npm run data`
-reads it for the dated timetable files (`public/data/timetable/dated/`, one per date planned work changes), and the planner
+**Planned service changes** (weekend work) are only in the supplemented feed (19.5 MB, hourly, 7 days). each Pages deploy
+reads it (`npm run data:dated`) into the dated timetable files (`timetable/dated/`, one per date planned work changes, never committed;
+a failed build ships an empty index), and the planner
 uses a date's file when the manifest lists it and the per-service files otherwise (2q7.7). The UI doesn't say yet
 that a trip follows planned work ("planned work through <date>" is a follow-up).
 

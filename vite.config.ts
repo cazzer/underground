@@ -8,19 +8,23 @@ import basemapJson from './data/basemap/basemap.json' with { type: 'json' }
 import { parseBasemapFile } from './scripts/lib/basemapSpec.ts'
 import type { BasemapConfig } from './src/data/basemapConfig'
 
-const TILES = '/underground/basemap/tiles/'
+const BASE = '/underground/'
+/** Folders of public/ that are gitignored and built or fetched on demand (basemap tiles, the deploy's dated timetables). */
+const BUILT_ON_DEMAND = ['basemap/tiles/', 'data/timetable/dated/']
 
-/** Dev server only: a tile that is not in public/basemap/tiles answers 404, as Pages does, instead of the SPA fallback's
- *  index.html with status 200. Runs before Vite's own middlewares, so it checks the file itself. */
-function missingTiles404(): Plugin {
+/** Dev server only: a file in one of those folders that is not in public/ answers 404, as Pages does, instead of the SPA
+ *  fallback's index.html with status 200. Runs before Vite's own middlewares, so it checks the file itself. */
+function missingFiles404(): Plugin {
   return {
-    name: 'missing-tiles-404',
+    name: 'missing-files-404',
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith(TILES)) return next()
-        const rel = decodeURIComponent(req.url.slice(TILES.length).split('?')[0] ?? '')
-        if (!rel.includes('..') && existsSync(join(server.config.publicDir, 'basemap/tiles', rel))) return next()
+        const url = req.url
+        const prefix = url?.startsWith(BASE) ? BUILT_ON_DEMAND.find((p) => url.startsWith(BASE + p)) : undefined
+        if (!url || !prefix) return next()
+        const rel = decodeURIComponent(url.slice(BASE.length).split('?')[0] ?? '')
+        if (!rel.includes('..') && existsSync(join(server.config.publicDir, rel))) return next()
         res.statusCode = 404
         res.end()
       })
@@ -44,7 +48,7 @@ function basemapConfig(devTiles: boolean): BasemapConfig | null {
 
 export default defineConfig(({ command, mode }) => ({
   base: '/underground/',
-  plugins: [react(), tailwindcss(), missingTiles404()],
+  plugins: [react(), tailwindcss(), missingFiles404()],
   define: { __BASEMAP__: JSON.stringify(basemapConfig(command === 'serve' && loadEnv(mode, process.cwd(), 'VITE_BASEMAP_DEV').VITE_BASEMAP_DEV === '1')) },
   build: { chunkSizeWarningLimit: 1500 }, // three.js alone is ~700 kB
   test: { environment: 'node', include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'] },

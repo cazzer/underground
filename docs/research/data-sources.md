@@ -69,8 +69,8 @@ If the Worker decodes and serves JSON (§6), the client ships **no protobuf libr
   chunks (Weekday, Weekday_C4/_C5/_C11; Saturday_C1-C3; Sunday_C6-C9) that partition the regular trips exactly; planned work is
   `calendar_dates`: type 2 removes chunks, type 1 adds date-only services (L0S1..9, L1S1..5, L2S1..3) absent from `calendar.txt`. The
   add-window was 20261121..20261129 (nine contiguous days; all nine run trips the regular feed doesn't, and no removal-only day lies outside it); outside it the feed is hash-identical to the regular one (the
-  following Monday, Saturday and Sunday equal Weekday, Saturday, Sunday). `npm run data` turns the window into
-  `public/data/timetable/dated/<date>.json`: 14.9 to 40.6 KB gzipped each (the heavy weekdays), about 238 KB for the nine days,
+  following Monday, Saturday and Sunday equal Weekday, Saturday, Sunday). Each Pages deploy turns the window (`npm run data:dated`) into
+  `dist/data/timetable/dated/<date>.json`, never committed: 14.9 to 40.6 KB gzipped each (the heavy weekdays), about 238 KB for the nine days,
   about 200 ms per date. Only the timetable comes from it; the static network stays on the regular zip. Loading both zips
   peaks near 2 GB of memory.
 - **Build-time only.** The S3 zips send **no ACAO**, so the browser can't fetch them.

@@ -36,7 +36,7 @@ export const SEARCH_STREETS_TOTAL_GZIP_CAP_BYTES = 660_000
 /** public/data/timetable/<serviceId>.json loads on demand, outside the budget above; each file has this cap:
  *  the committed Weekday file (39,662 B, node zlib level 9, fall 2026) plus about a fifth. */
 export const TIMETABLE_FILE_GZIP_CAP_BYTES = 48_000
-/** public/data/timetable/dated/<date>.json shares the per-file cap above (the largest, a heavy weekday, is 40,595 B, fall
+/** timetable/dated/<date>.json (built by each deploy, never committed) shares the per-file cap above (the largest, a heavy weekday, is 40,595 B, fall
  *  2026); the directory (at most 14 files) has this total: the measured nine-day window (237,956 B) plus about two thirds. */
 export const TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES = 400_000
 

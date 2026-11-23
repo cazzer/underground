@@ -19,8 +19,9 @@ const timetable = (service: string): TimetableFile => ({
 const datedTimetable = (date: string): TimetableFile => ({ ...timetable('Weekday_C1'), date, services: ['Weekday_C1', 'X1'] })
 
 /** Serves the fixture calendar, empty transfers, a dated index listing `datedDates` and a timetable per service and
- *  per dated date; the first `failures` timetable fetches 500, and the dated index 500s `indexFailures` times. */
-function stubFetch(failures = 0, datedDates: string[] = [], indexFailures = 0): { calls: string[] } {
+ *  per dated date; the first `failures` timetable fetches 500, and the dated index 500s `indexFailures` times, or
+ *  404s every time with `indexMissing` (a site that built no dated files). */
+function stubFetch(failures = 0, datedDates: string[] = [], indexFailures = 0, indexMissing = false): { calls: string[] } {
   const calls: string[] = []
   let failed = 0
   let indexFailed = 0
@@ -29,6 +30,7 @@ function stubFetch(failures = 0, datedDates: string[] = [], indexFailures = 0): 
     vi.fn(async (url: string) => {
       calls.push(url)
       if (url.endsWith('data/timetable/dated/index.json')) {
+        if (indexMissing) return new Response('missing', { status: 404 })
         if (indexFailed < indexFailures) {
           indexFailed += 1
           return new Response('nope', { status: 500 })
@@ -139,6 +141,20 @@ describe('planTrip', () => {
     await expect(loadRouterTimetable(stations, MON_8)).rejects.toThrow('HTTP 500')
     await expect(loadRouterTimetable(stations, MON_8)).resolves.toMatchObject({ window: { date: '20261123' } })
     expect(fetched(calls, 'dated/index.json')).toBe(2)
+  })
+
+  it('plans on the service files, warning once, when the site has no dated index', async () => {
+    const { calls } = stubFetch(0, ['20261123'], 0, true)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { loadRouterTimetable } = await load()
+    const first = await loadRouterTimetable(stations, MON_8)
+    expect(first.window.frames.map((f) => f.dated)).toEqual([false])
+    expect(calls.some((u) => u.includes('/dated/2'))).toBe(false)
+    expect(warn).toHaveBeenCalledTimes(1)
+    await loadRouterTimetable(stations, MON_2)
+    expect(fetched(calls, 'dated/index.json')).toBe(1)
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
   })
 
   it('throws NoServiceError when the calendar has no service that day', async () => {

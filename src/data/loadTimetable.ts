@@ -1,7 +1,7 @@
 import { createInteriorCache } from './interiorCache'
-import { expectDataFile, expectDataRecord, fetchJson } from './loadNetwork'
+import { expectDataFile, expectDataRecord, fetchJson, HttpError } from './loadNetwork'
 import type { TransfersFile, TripIndexFile } from './schema'
-import { TIMETABLE_FORMAT, type DatedTimetableIndex, type TimetableFile } from './timetableSchema'
+import { EMPTY_DATED_INDEX, TIMETABLE_FORMAT, type DatedTimetableIndex, type TimetableFile } from './timetableSchema'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -77,9 +77,18 @@ const transfersCache = createInteriorCache(() => {
   const url = `${BASE_URL}data/route/transfers.json`
   return fetchJson(url).then((raw) => expectDataFile<TransfersFile>(raw, 'transfers', url))
 })
+// The index is built by each deploy, never committed, so a 404 is a site with none (a local build, or an old deploy):
+// the plan uses the service files, with one warning. Any other failure rejects, so the next call retries.
 const datedIndexCache = createInteriorCache(() => {
   const url = `${BASE_URL}data/timetable/dated/index.json`
-  return fetchJson(url).then((raw) => expectDatedIndex(raw, url))
+  return fetchJson(url).then(
+    (raw) => expectDatedIndex(raw, url),
+    (err: unknown) => {
+      if (!(err instanceof HttpError && err.status === 404)) throw err
+      console.warn(`${url}: HTTP 404; planning trips on the regular schedule, with no planned work`)
+      return EMPTY_DATED_INDEX
+    },
+  )
 })
 const calendarCache = createInteriorCache(() => {
   const url = `${BASE_URL}data/trip-index.json`
@@ -106,7 +115,7 @@ export function datedTimetableFile(date: string): Promise<TimetableFile> {
   return datedFileCache.get(date)
 }
 
-/** `data/timetable/dated/index.json`: the dates with a dated file, fetched once per page load. */
+/** `data/timetable/dated/index.json`: the dates with a dated file, fetched once per page load; none (a 404) is an empty index. */
 export function datedTimetableIndex(): Promise<DatedTimetableIndex> {
   return datedIndexCache.get(CONSTANT_KEY)
 }

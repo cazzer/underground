@@ -22,6 +22,7 @@ let last: { key: string; promise: Promise<RouterTimetable> } | undefined
 
 async function build(stations: StationsFile, atS: number): Promise<RouterTimetable> {
   // A failed index fetch rejects the plan (and is retried by the next one): planned work must not vanish silently.
+  // datedTimetableIndex() is empty, with a warning, when the site has no dated index (404).
   const [{ calendar, calendarExceptions }, datedIndex] = await Promise.all([serviceCalendar(), datedTimetableIndex()])
   const window = serviceWindow(atS, calendar, calendarExceptions, new Set(datedIndex.dates))
   if (window.frames.length === 0) throw new NoServiceError(window.date)

@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "data": "node scripts/build-data.ts",
+    "data:dated": "node scripts/build-dated.ts",
     "data:access": "node scripts/build-access.ts",
     "data:stations": "node scripts/build-stations.ts",
     "data:stations:fetch": "node scripts/fetch-station-sources.ts",

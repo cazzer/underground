@@ -1,4 +1,4 @@
-/** Dated timetables (public/data/timetable/dated/<YYYYMMDD>.json) from the MTA's supplemented GTFS: the regular
+/** Dated timetables (timetable/dated/<YYYYMMDD>.json, built by each deploy by scripts/build-dated.ts) from the MTA's supplemented GTFS: the regular
  *  service plus the next days' planned work, as one file per date that planned work touches. The contract is
  *  src/data/timetableSchema.ts. Pure; never reads the clock. A date has a file when the supplemented feed runs a
  *  different set of trips on it than the regular feed does (work that only removes trains counts); every other date
