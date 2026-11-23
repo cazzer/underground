@@ -3,6 +3,7 @@ import type { ArrivalsSource } from '../lib/live/arrivals'
 import { clockNow } from '../lib/live/clock'
 import { deriveLiveStatus, type LiveStatus } from '../lib/live/liveStatus'
 import type { JoinStage } from '../lib/realtime/joinTrip'
+import type { TripLookup } from '../lib/realtime/tripLookup'
 import { carryMemory, prepareTrips, type CarriedMemory, type DropReason, type LiveTrip } from '../lib/realtime/prepareTrips'
 import type { DrawnShapes } from './loadRealtimeStatic'
 import type { NetworkFiles } from './loadNetwork'
@@ -42,6 +43,10 @@ export interface Live {
   debug: LiveDebugInfo | null
   /** For the station panel's arrivals; null until there is a snapshot and the join data. */
   arrivals: ArrivalsSource | null
+  /** The join data's trip lookup once the static load is ready (before any snapshot); null until then. */
+  lookup: TripLookup | null
+  /** The lookup will never come: live data is off, or its static load failed. */
+  lookupFailed: boolean
   /** The technical cause behind a failed or fatal state, for `?debug` (it is already in the console). */
   technical: string | null
   /** For the error boundary around the live layer: a render crash shows in the HUD instead of blanking the map. */
@@ -144,5 +149,5 @@ export function useLive(
     online,
   })
 
-  return { status, layer, debug, arrivals, technical: fatalError ?? feed.lastError, onLayerError }
+  return { status, layer, debug, arrivals, lookup: data?.lookup ?? null, lookupFailed: !configured || staticError !== null, technical: fatalError ?? feed.lastError, onLayerError }
 }

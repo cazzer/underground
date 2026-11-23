@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ServiceAlert } from '../../data/realtime'
 import type { Station } from '../network'
-import { alertKindOf, headerNamedStations, headerStretchEnds, skipClause, skipSetsOf, stretchEnds } from './alertStations'
+import { alertKindOf, headerEnds, headerNamedStations, headerStopNamed, headerStretchEnds, skipClause, skipSetsOf, stretchEnds } from './alertStations'
 
 const named = (header: string, names: string[]) => [...headerNamedStations(header, names.map((name, i) => ({ id: `s${i}`, name })))].map((id) => names[Number(id.slice(1))])
 
@@ -11,7 +11,9 @@ describe('alertKindOf', () => {
     expect(alertKindOf('Stop Skipped')).toBe('skip')
     expect(alertKindOf('Planned - Part Suspended')).toBe('part')
     expect(alertKindOf('Planned - Suspended')).toBe('suspended')
-    for (const other of ['Delays', 'Station Notice', 'Planned - Express to Local', 'Boarding Change', null]) expect(alertKindOf(other)).toBe('other')
+    expect(alertKindOf('Planned - Express to Local')).toBe('local')
+    expect(alertKindOf('Planned - Reroute')).toBe('reroute')
+    for (const other of ['Delays', 'Station Notice', 'Boarding Change', null]) expect(alertKindOf(other)).toBe('other')
   })
 })
 
@@ -81,6 +83,44 @@ describe('headerNamedStations', () => {
 
   it('names nothing from words before the skip (the direction, the line)', () => {
     expect(named('Flushing-bound [7] skips 52 St', ['Flushing-Main St', '52 St'])).toEqual(['52 St'])
+  })
+})
+
+describe('headerStopNamed', () => {
+  const cands = [
+    { id: 's0', name: '74 St-Broadway' },
+    { id: 's1', name: '61 St-Woodside' },
+    { id: 's2', name: 'Junction Blvd' },
+  ]
+  const stops = (header: string) => [...headerStopNamed(header, cands)].sort()
+
+  it('reads the stations after "stop(s) ... at", up to the clause\'s end', () => {
+    expect(stops('In Queens, all Manhattan-bound [7][7X] local/express trains stop at 74 St-Broadway')).toEqual(['s0'])
+    expect(stops('[7X] stops at 61 St-Woodside and Junction Blvd while work is done at 74 St-Broadway')).toEqual(['s1', 's2'])
+  })
+
+  it('names nothing in a "runs local from X to Y" header, or one with no "stop ... at"', () => {
+    expect(stops('[7X] runs local from 61 St-Woodside to Junction Blvd')).toEqual([])
+    expect(stops('[7X] stops running, at 74 St-Broadway')).toEqual([])
+  })
+})
+
+describe('headerEnds', () => {
+  const cands = [
+    { id: 'Q01', name: 'Canal St' },
+    { id: 'R23', name: 'Canal St' },
+    { id: 'R30', name: 'DeKalb Av' },
+    { id: 'D24', name: 'Atlantic Av-Barclays Ctr' },
+  ]
+
+  it('reads "between X and Y", every station of either name', () => {
+    expect(headerEnds('In Lower Manhattan and Brooklyn, [Q] runs via the [R] in both directions between Canal St and DeKalb Av', cands)).toEqual(['Q01', 'R23', 'R30'])
+  })
+
+  it('reads "from X to Y" first, and is null when an end names nothing or there is no stretch', () => {
+    expect(headerEnds('[Q] runs via the [R] from DeKalb Av to Atlantic Av-Barclays Ctr', cands)).toEqual(['R30', 'D24'])
+    expect(headerEnds('[Q] runs via the [R] between Canal St and Prospect Park', cands)).toBeNull()
+    expect(headerEnds('[Q] runs via the [R]', cands)).toBeNull()
   })
 })
 

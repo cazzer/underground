@@ -48,7 +48,7 @@ const feed = (alerts: ServiceAlert[], over: Partial<AlertsInput> = {}, generated
   schemaMismatch: false,
   ...over,
 })
-const join = (id: string, alerts: ServiceAlert[], nowS = NOW, members?: string[]) => joinStationChanges(group(id, members), stationById, feed(alerts), nowS, ORDER)
+const join = (id: string, alerts: ServiceAlert[], nowS = NOW, members?: string[]) => joinStationChanges(group(id, members), stationById, feed(alerts), nowS, ORDER, null)
 const changes = (id: string, alerts: ServiceAlert[], nowS = NOW, members?: string[]): StationChange[] => {
   const { panel } = join(id, alerts, nowS, members)
   return panel.kind === 'changes' ? panel.changes : []
@@ -117,7 +117,7 @@ describe('suspended and other alerts', () => {
     const station12 = [station('p', 'Pi St', 0, ['2', '1'])]
     const byId = new Map([...STATIONS, ...station12].map((s) => [s.id, s]))
     const g = { ...station12[0]!, memberIds: ['p'], otherNames: [] }
-    const { panel } = joinStationChanges(g, byId, feed([delays]), NOW, ORDER)
+    const { panel } = joinStationChanges(g, byId, feed([delays]), NOW, ORDER, null)
     expect(panel.kind === 'changes' && panel.changes.map(brief)).toEqual(['other:12'])
   })
 
@@ -146,7 +146,7 @@ describe('route-wide changes', () => {
     const byId = new Map([...STATIONS, ...six].map((s) => [s.id, s]))
     const g = { ...six[0]!, memberIds: ['s6'], otherNames: [] }
     const suspended = (route: string) => alert({ type: 'Planned - Suspended', header: 'No service', entities: [{ route, stop: null, direction: null }] })
-    const run = (a: ServiceAlert) => joinStationChanges(g, byId, feed([a]), NOW, ORDER).panel
+    const run = (a: ServiceAlert) => joinStationChanges(g, byId, feed([a]), NOW, ORDER, null).panel
     expect(run(suspended('6X'))).toEqual({ kind: 'none' })
     expect(run(suspended('6'))).toMatchObject({ kind: 'changes', changes: [{ kind: 'suspended' }] })
     // Delays on the 6X, by contrast, do reach the 6 (an express is folded into its line).
@@ -215,7 +215,7 @@ describe('order', () => {
 })
 
 describe('freshness', () => {
-  const run = (input: AlertsInput) => joinStationChanges(group('b'), stationById, input, NOW, ORDER)
+  const run = (input: AlertsInput) => joinStationChanges(group('b'), stationById, input, NOW, ORDER, null)
 
   it('says nothing without a Worker, and while still connecting', () => {
     expect(run({ configured: false, snapshot: null, failures: 0, schemaMismatch: false })).toEqual({ panel: { kind: 'none' }, known: false })

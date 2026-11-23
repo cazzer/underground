@@ -7,7 +7,7 @@ import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Ground } from '../lib/projection'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { tripMarkRadius, type ReticleClearance } from '../lib/tripMarkSize'
-import type { TripMark } from '../lib/tripMarks'
+import { markParts, type TripMark } from '../lib/tripMarks'
 import { theme } from '../theme'
 import { cameraDistance, screenScale, tripMarkRadiusPx } from './cameraDistance'
 import { reticleClearanceInto } from './hereShape'
@@ -17,10 +17,10 @@ import { RENDER_ORDER } from './renderOrder'
 const NO_MARKS: readonly TripMark[] = []
 const BACKGROUND = srgb01(theme.background)
 
-/** Whose marks these are: a trip's (theme.exitPath) or a picked service change's (theme.changeSkipMark). */
+/** Whose marks these are: a trip's (theme.exitPath) or a picked service change's (theme.changeMark). */
 export type MarkLook = 'trip' | 'change'
 
-const markColor = (look: MarkLook): string => (look === 'change' ? theme.changeSkipMark : theme.exitPath)
+const markColor = (look: MarkLook): string => (look === 'change' ? theme.changeMark : theme.exitPath)
 
 /** A trip's marks sit under the trains; a change's over them, so no train hides a skip's cross (renderOrder.ts). */
 const ORDERS: Record<MarkLook, { halo: number; ring: number; dot: number; cross: number }> = {
@@ -59,8 +59,9 @@ interface TripMarksProps {
  * the trains: a background halo disc under it, and a dot filling the start and the end (a change stays hollow and draws
  * at CHANGE_MARK_SHARE of their size). A start under the location reticle grows past it. The marks the focused interior
  * covers draw as a second set that fades by 1 − interiorOpacity, so they go as the interior comes in, not when it loads.
- * A service change's skipped station (role `skip`, look `change`) is a theme.changeSkipMark ring at full size with a
- * cross in it and no dot: the skip reads by shape, not colour alone. A change's marks draw over the trains and cars. No event handlers and not in ScenePicker, so a
+ * A service change's marks (look `change`) are theme.changeMark rings at full size: a skipped station's (role `skip`)
+ * with a cross in it, a stop an Express to Local change adds (`added`) with a dot, a station a reroute names (`named`)
+ * plain (markParts): each reads by shape, not colour alone. A change's marks draw over the trains and cars. No event handlers and not in ScenePicker, so a
  * mark never takes a pick.
  */
 export function TripMarks({ marks, hidden, fix, levels, look }: TripMarksProps) {
@@ -176,10 +177,10 @@ function MarkSet({ marks, covered, fix, levels, look }: MarkSetProps) {
     for (let i = 0; i < marks.length; i++) {
       const m = marks[i]!
       const radius = tripMarkRadius(m.role, base, m.pos, fix, reticle)
-      const skip = m.role === 'skip'
+      const parts = markParts(m.role)
       writeInstanceMatrix(hs, i, m.pos.x, MARKER_Y, m.pos.z, radius)
-      writeInstanceMatrix(ds, i, m.pos.x, MARKER_Y, m.pos.z, m.role === 'change' || skip ? 0 : radius)
-      writeInstanceMatrix(xs, i, m.pos.x, MARKER_Y, m.pos.z, skip ? radius : 0)
+      writeInstanceMatrix(ds, i, m.pos.x, MARKER_Y, m.pos.z, parts.dot ? radius : 0)
+      writeInstanceMatrix(xs, i, m.pos.x, MARKER_Y, m.pos.z, parts.cross ? radius : 0)
     }
     r.instanceMatrix.array.set(hs)
     h.instanceMatrix.needsUpdate = r.instanceMatrix.needsUpdate = d.instanceMatrix.needsUpdate = x.instanceMatrix.needsUpdate = true

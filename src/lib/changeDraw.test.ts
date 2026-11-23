@@ -21,7 +21,7 @@ const shape = (id: string, direction: 'N' | 'S', xs: number[], primary = true): 
   return { id, routeId: 'G', direction, primary, points, cumulative, length: cumulative.at(-1)! }
 }
 const shapes = [shape('G..N', 'N', [0, 500, 1000, 1500]), shape('G..S', 'S', [1500, 1000, 500, 0]), shape('G..N2', 'N', [500, 1000], false)]
-const ctx: ChangeDrawContext = { shapes, stationById: new Map(stations.map((s) => [s.id, s])), stopStations: stopStations(stations) }
+const ctx: ChangeDrawContext = { shapes, stationById: new Map(stations.map((s) => [s.id, s])), stopStations: stopStations(stations), serviceOf: null }
 
 const at = (stop: string | null, direction: 'N' | 'S' | null = null, route = 'G'): AlertEntity => ({ route, stop, direction })
 const alert = (type: string, header: string, entities: AlertEntity[]): ServiceAlert => ({ id: 'a', type, header, periods: [[0, null]], entities })
@@ -84,17 +84,17 @@ describe('serviceChangeDraw', () => {
 describe('changeDrawable', () => {
   const by = ctx.stationById
   it('takes skips with a skip set, suspensions with a stretch of two stations or a whole route', () => {
-    expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips Bravo St', [at('G2')]), by)).toBe(true)
-    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at('G2'), at('G3')]), by)).toBe(true)
-    expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at(null)]), by)).toBe(true)
+    expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips Bravo St', [at('G2')]), by, null)).toBe(true)
+    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at('G2'), at('G3')]), by, null)).toBe(true)
+    expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at(null)]), by, null)).toBe(true)
   })
   it('refuses other kinds, a part suspension with no stop, and stations the network lacks', () => {
-    expect(changeDrawable(alert('Delays', 'Delays', [at(null)]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at(null)]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips X', [at('X1')]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at('X1')]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G] at Alpha Av', [at('G1')]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Suspended', 'No [Z]', [at(null, null, 'Z')]), by)).toBe(false)
+    expect(changeDrawable(alert('Delays', 'Delays', [at(null)]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at(null)]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips X', [at('X1')]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at('X1')]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G] at Alpha Av', [at('G1')]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Suspended', 'No [Z]', [at(null, null, 'Z')]), by, null)).toBe(false)
   })
   it('agrees with what serviceChangeDraw draws on every synthetic case', () => {
     const cases = [
@@ -105,7 +105,7 @@ describe('changeDrawable', () => {
       alert('Planned - Suspended', 'No [G]', [at('G1'), at(null)]),
       alert('Delays', 'Delays', [at(null)]),
     ]
-    for (const a of cases) expect(changeDrawable(a, by), a.header).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
+    for (const a of cases) expect(changeDrawable(a, by, null), a.header).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
   })
 })
 
@@ -123,5 +123,20 @@ describe('changeDrawNote', () => {
       'Drawn from the MTA notice · skipped stops probably as shown',
       "Can't be drawn on the map",
     ])
+  })
+})
+
+describe('serviceChangeDraw for an Express to Local change', () => {
+  it('marks an added complex once, at its first added member, and draws the stretch round it', () => {
+    // G2b is G2's complex sibling; the G normally calls at G1, G3 and G4 only.
+    const sibling: Station = { ...station('G2b', 'Bravo St', 520), leadId: 'G2' }
+    const all = [...stations, sibling]
+    const service = { normal: new Set(['G1', 'G3', 'G4']), primary: ['G1', 'G3', 'G4'] }
+    const local: ChangeDrawContext = { ...ctx, stationById: new Map(all.map((s) => [s.id, s])), stopStations: stopStations(all), serviceOf: () => service }
+    const d = serviceChangeDraw(alert('Planned - Express to Local', '[G] runs local', [at('G2', 'N'), at('G2b', 'N')]), local, 'k')!
+    expect(d.route.marks.map((m) => `${m.stationId}:${m.role}`)).toEqual(['G2:added'])
+    expect([...d.route.stations].sort()).toEqual(['G1', 'G2', 'G2b', 'G3'])
+    expect(d.route.rides).toHaveLength(1)
+    expect(d.basis).toBe('timetable')
   })
 })

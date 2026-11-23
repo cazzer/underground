@@ -15,7 +15,7 @@ const routeOrder = new Map(routes.map((r, i) => [r.id, i]))
 const snapshot = transformAlerts(FEED, FEED_AT).snapshot
 const input = { configured: true, snapshot, failures: 0, schemaMismatch: false }
 const stationById = new Map(realStations.map((s) => [s.id, s]))
-const body = alertListView(input, routeOrder, FEED_AT, (a) => changeDrawable(a, stationById))
+const body = alertListView(input, routeOrder, FEED_AT, (a) => changeDrawable(a, stationById, null))
 if (body.kind !== 'list') throw new Error('expected a list')
 const short =(id: string) => id.replace('lmm:planned_work:', '')
 

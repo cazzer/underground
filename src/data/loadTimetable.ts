@@ -93,12 +93,15 @@ export function transfersFile(): Promise<TransfersFile> {
   return transfersCache.get(CONSTANT_KEY)
 }
 
-/** The calendar from `data/trip-index.json` (a lazy fetch of the big file, only when a trip is planned). */
+/** The calendar from `data/trip-index.json` (a lazy fetch of the big file, when a trip is planned or `tripPatterns()` is asked for). */
 export function serviceCalendar(): Promise<ServiceCalendarFile> {
   return tripIndexCache.get(CONSTANT_KEY).then((file) => settled(file.calendar))
 }
 
-/** The patterns from `data/trip-index.json`: the same one fetch as `serviceCalendar`, made when a trip is planned. */
+/**
+ * The patterns from `data/trip-index.json`: the same one fetch as `serviceCalendar`, made when a trip is planned, or for an
+ * Express to Local change's normal service when the live layer's own trip-index load failed (useNormalStops).
+ */
 export function tripPatterns(): Promise<TripIndexFile['patterns']> {
   return tripIndexCache.get(CONSTANT_KEY).then((file) => settled(file.patterns))
 }

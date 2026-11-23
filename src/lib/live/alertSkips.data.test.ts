@@ -77,7 +77,7 @@ describe('agreement with the station panel', () => {
       const input = { configured: true, snapshot, failures: 0, schemaMismatch: false }
       const wrong: string[] = []
       for (const group of realGroups) {
-        const panel = joinStationChanges(group, stationById, input, at, routeOrder).panel
+        const panel = joinStationChanges(group, stationById, input, at, routeOrder, null).panel
         const rows = panel.kind === 'changes' ? panel.changes.filter((c) => c.kind === 'skipped' && c.now) : []
         // An express (7X) is covered by its line's alert here and not in the panel's rows, so only own-line routes compare.
         for (const route of group.routeIds.filter((r) => lineKey(r) === r)) {

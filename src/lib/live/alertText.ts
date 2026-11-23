@@ -77,6 +77,7 @@ export function typeWord(type: string | null): string {
   if (/reduced/i.test(type)) return 'reduced service'
   if (/boarding/i.test(type)) return 'boarding change'
   if (/station notice/i.test(type)) return 'station notice'
+  if (/reroute/i.test(type)) return 'reroute'
   return 'service change'
 }
 
@@ -98,7 +99,16 @@ function directionPart(c: StationChange, ctx: Context): string | null {
 
 function rowParts(c: StationChange, ctx: Context): string[] {
   const many = c.routes.length > 1
-  const head = c.kind === 'skipped' ? `${c.probable ? 'probably ' : ''}${many ? 'skip' : 'skips'} this station` : c.kind === 'suspended' ? 'no service here' : typeWord(c.type)
+  const head =
+    c.kind === 'skipped'
+      ? `${c.probable ? 'probably ' : ''}${many ? 'skip' : 'skips'} this station`
+      : c.kind === 'suspended'
+        ? 'no service here'
+        : c.kind === 'added'
+          ? many
+            ? 'stop here (run local)'
+            : 'stops here (runs local)'
+          : typeWord(c.type)
   const parts = [head]
   const direction = directionPart(c, ctx)
   if (direction !== null) parts.push(direction)
@@ -112,13 +122,19 @@ function rowSpoken(c: StationChange, parts: readonly string[], ctx: Context): st
   const noun = nounOf(c.routes, ctx.routeById)
   const many = c.routes.length > 1
   const lead =
-    c.kind === 'skipped' ? `${noun} ${parts[0]}` : c.kind === 'suspended' ? `${noun} ${many ? 'have' : 'has'} no service here` : `${capital(parts[0]!)} for ${noun}`
+    c.kind === 'skipped'
+      ? `${noun} ${parts[0]}`
+      : c.kind === 'suspended'
+        ? `${noun} ${many ? 'have' : 'has'} no service here`
+        : c.kind === 'added'
+          ? `${noun} ${many ? 'run local and stop here' : 'runs local and stops here'}`
+          : `${capital(parts[0]!)} for ${noun}`
   return `${capital(lead)}${parts.length > 1 ? `, ${parts.slice(1).join(', ')}` : ''}.`
 }
 
-/** "The skip for the 1 train at this station has ended." ("suspension", or "service change" for any other kind: no plural to agree with). */
+/** "The skip for the 1 train at this station has ended." ("suspension", "local stop", or "service change" for any other kind: no plural to agree with). */
 function rowEnded(c: StationChange, ctx: Context): string {
-  const what = c.kind === 'skipped' ? 'skip' : c.kind === 'suspended' ? 'suspension' : 'service change'
+  const what = c.kind === 'skipped' ? 'skip' : c.kind === 'suspended' ? 'suspension' : c.kind === 'added' ? 'local stop' : 'service change'
   return `The ${what} for ${nounOf(c.routes, ctx.routeById)} at this station has ended.`
 }
 

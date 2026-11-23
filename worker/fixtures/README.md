@@ -7,11 +7,11 @@ Recorded feeds: MTA GTFS-RT protobuf for `src/transform.test.ts`, MTA E&E outage
 - Recorded 2026-11-20. Data: MTA.
 - `ene.json`: `https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fnyct_ene.json`, recorded 2026-11-22 05:10:06 GMT (epoch 1795324206, used as `generatedAt` in tests); 8 of 151 rows, values verbatim; upstream 61,897 B. Data: MTA.
 - `alerts.json`: `https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts.json`, recorded 2026-11-23 20:29:29 GMT
-  (feed header timestamp 1795465325 = 20:22:05 GMT, used as `generatedAt` in tests); 12 of 206 entities, each entity whole and
-  verbatim except `lmm:planned_work:31871`, whose `active_period` is cut to its first 12 of 231; upstream 1,004,539 B. The twelve:
+  (feed header timestamp 1795465325 = 20:22:05 GMT, used as `generatedAt` in tests); 14 of 206 entities, each entity whole and
+  verbatim except `lmm:planned_work:31871`, whose `active_period` is cut to its first 12 of 231; upstream 1,004,539 B. The fourteen:
   35124 (1 skips 125 St, direction 1, three informed stops), 35972 (R, direction 0), 35976 (4/6, 22 entities), 31498 (7, header
   with a second line), 35962 (Part Suspended), 35952 (Suspended), 31871 (Express to Local), 277657 (Delays, route only, open
-  ended), 33366 (Station Notice), 36685 (a skip more than 24 h out), 36275 (4/6 "run express from … to …", a Stops Skipped alert whose header has no "skip"; first period 2026-12-02 04:45 GMT), 35957 (2/5 "runs express from E 180 St to 3 Av-149 St", header and entities verbatim: its `direction_id` is 0 while its header says "Manhattan-bound", an MTA data error, shown as is; first period 2026-11-25 15:45 GMT). Data: MTA.
+  ended), 33366 (Station Notice), 36685 (a skip more than 24 h out), 36275 (4/6 "run express from … to …", a Stops Skipped alert whose header has no "skip"; first period 2026-12-02 04:45 GMT), 35957 (2/5 "runs express from E 180 St to 3 Av-149 St", header and entities verbatim: its `direction_id` is 0 while its header says "Manhattan-bound", an MTA data error, shown as is; first period 2026-11-25 15:45 GMT), 36538 (D "runs local from 59 St-Columbus Circle to 125 St", Express to Local, uptown, 15 informed stops; one period from 2026-12-19 05:01 GMT), 36553 (Q "runs via the [R] … between Canal St and DeKalb Av", Planned - Reroute, two informed stops, both Canal St; 7 periods, first 2026-12-15 05:01 GMT). Data: MTA.
 - `geocode.json`: trimmed upstream answers for `src/geosearch.test.ts`, `src/photon.test.ts`, `src/geocodeMerge.test.ts`,
   keyed by source then normalized query ("120 broadway", "katz's deli", "barclays center"). Recorded 2026-11-22 15:54 GMT
   with focus 40.73,-73.99 (the request text was mixed case; both APIs ignore case).
