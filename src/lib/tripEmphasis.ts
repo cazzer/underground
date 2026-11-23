@@ -36,6 +36,8 @@ export interface EmphasisLevels {
   tripWidthPx: number
   /** The trip line draws at all (shown above 0). */
   tripVisible: boolean
+  /** The trip's walks and station marks (TripDashes, TripMarks) fade in and out by opacity, 0..1, as the dim eases. */
+  tripOpacity: number
 }
 
 export function createEmphasis(): TripEmphasis {
@@ -65,9 +67,10 @@ export function emphasisLevels(e: TripEmphasis, look: EmphasisLook, out: Emphasi
   out.tripDim = s * look.tripFaintDim * (1 - f)
   out.tripWidthPx = look.lineWidth + s * f * (look.tripLineWidth - look.lineWidth)
   out.tripVisible = e.shown > 0
+  out.tripOpacity = s
   return out
 }
 
 export function createLevels(look: EmphasisLook): EmphasisLevels {
-  return { networkDim: 0, tripDim: 0, tripWidthPx: look.lineWidth, tripVisible: false }
+  return { networkDim: 0, tripDim: 0, tripWidthPx: look.lineWidth, tripVisible: false, tripOpacity: 0 }
 }

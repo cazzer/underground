@@ -50,3 +50,12 @@ export function focusScaleFactor(distance: number, baseScale: number): number {
   const capped = screenScale(distance, FOCUS_MAX_PX, 0) / baseScale
   return Math.max(1, Math.min(FOCUS_GROWTH, capped))
 }
+
+/** A trip mark (TripMarks.tsx) is this much larger than the station marker it rings, held to TRIP_MARK_PX. */
+const TRIP_MARK_GROWTH = 1.6
+const TRIP_MARK_PX = { min: 5, max: 13 }
+
+/** Trip mark radius in screen pixels for a camera distance: around the station marker, legible at the city fit. */
+export function tripMarkRadiusPx(distance: number): number {
+  return Math.min(Math.max(markerRadiusPx(distance) * TRIP_MARK_GROWTH, TRIP_MARK_PX.min), TRIP_MARK_PX.max)
+}

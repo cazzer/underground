@@ -42,6 +42,7 @@ import { YouAreHere } from './YouAreHere'
 const basemapConfig = basemapLook === 'off' ? null : BASEMAP
 
 const NO_DECKS: ReadonlyMap<string, number> = new Map()
+const NO_IDS: readonly string[] = []
 
 interface SceneProps {
   network: Network
@@ -104,6 +105,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   )
   // The index says who shares the file; the model says who it draws. Their markers and ties go with the focused one's.
   const hiddenSiblings = useMemo(() => hiddenSiblingIds(siblings, interior), [siblings, interior])
+  /** The trip's marks hide where the focused interior is shown: it marks its stations itself. */
+  const markHidden = useMemo(() => (interior ? interiorStationIds(interior) : NO_IDS), [interior])
   /** The trip's path the focused interior draws (the first listed for it): its way out or a change of trains. */
   const path = interior ? (stationPaths.find((p) => p.interiorId === interior.stationId)?.choice ?? null) : null
   // `outOfService` is a new array every render: its ids say when the machines out really change.
@@ -136,9 +139,16 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         tripRoute={tripRoute}
         tripShown={tripShown}
         levels={tripLevels}
+        markHidden={markHidden}
       />
-      <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
-      <Stations stations={network.stations} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
+      <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} levels={tripLevels} />
+      <Stations
+        stations={network.stations}
+        focusedMarker={focusedMarker}
+        hiddenSiblings={hiddenSiblings}
+        tripStations={tripRoute?.stations ?? null}
+        levels={tripLevels}
+      />
       <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>

@@ -177,6 +177,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   while the trip panel is in front, `tripLineWidth` (2.5 px) is an opened journey's ride legs, `tripFaintDim` (0.35) the list
   view's first journey at the base width; `themeTrip.test.ts` holds the floors (dimmed at least 1.3:1, faint at least 1.45x its
   route's dimmed contrast, every full route at least 1.4x the brightest dimmed one).
+  Trip walk tokens (TripDashes.tsx, 2q7.45.4): `tripWalkDashPx` (6) and `tripWalkGapPx` (4), CSS px at the view's target, dash the
+  trip's walks between stations and its straight-drawn rides; the walks and the trip marks are `exitPath`, at least 2.5:1 over every
+  route dimmed by `tripNetworkDim` (2.66:1 over N/Q/R/W) and, faint, on the background (3.03:1; themeTrip.test.ts).
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -257,8 +260,23 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     lacks warns once and takes its drawn shape's route's color, else the ride is left out), with
     `usePlatformFade` (a stretch two rides share fades on the first copy only); per frame at 0 its `scale.y`, width (base to
     `tripLineWidth` as a journey is opened) and own dim (`tripFaintDim` in the list view, 0 opened); it keeps the last route,
-    so closing or covering the panel eases it out. Station markers, ties and trains don't dim. `straight` spans and walk legs
-    draw nothing yet (2q7.45.4); `StationTies.tsx` a thin vertical tie
+    held by SubwayLines (`useHeld.ts`, the last non-null route), so closing or covering the panel eases it out. Beside it in the
+    same boundary (a crash un-dims the map), 2q7.45.4: `TripDashes.tsx` (2.2) one plain dashed `DimLineMaterial` layer at y 0
+    (`tripDashBuffers`, `src/lib/tripDashBuffers.ts`, pure: each walk between stations a segment in `exitPath`, each `straight`
+    ride its stop polyline in its route color, a route routes.json lacks warned once and left out; dash distances in meters
+    restarting at 0 per polyline), `dashScale` = 1 / `metersPerPx` (lib/follow.ts) per frame so `tripWalkDashPx`/`GapPx` hold on
+    screen at the target, width `tripWidthPx`, the faint dim, opacity `tripOpacity` (`EmphasisLevels`, the shown ease); and
+    `TripMarks.tsx`, three InstancedMeshes at MARKER_Y (a `theme.background` disc 4.4 at `TRIP_MARK_HALO` 1.2, the `exitPath`
+    ring 4.5 from `TRIP_MARK_INNER` 0.62 to 1, a dot 4.55 at `TRIP_MARK_DOT` 0.4 for the start and end only, so a change reads
+    hollow), radius `screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS 9)` (cameraDistance.ts: 1.6x the station marker,
+    5..13 px); matrices rewritten only on a scale or hidden-set change, the color (`dimLineRgbInto`, the faint dim) only when it
+    changes; a mark hides at a station the focused, loaded interior covers (Scene's `markHidden`, `interiorStationIds`). The marks
+    are `tripMarks` (`src/lib/tripMarks.ts`, pure: the first leg's start, the last leg's end, every other leg boundary a change,
+    one per station, start or end over change; a walk between complex members marks both). No handler and not in ScenePicker, so
+    neither takes a pick. While the trip shows, `Stations.tsx` mixes the rings of stations the journey doesn't call at
+    (`TripRouteDraw.stations`, `tripStationIds`, held) toward the background by `networkDim` (instance colors, rewritten only as it
+    or the set changes) and every `StationTies.tsx` tie dims by it (`DimLineMaterial`); the fills and the trains don't dim;
+    `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
     LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, and so are its complex siblings' (`hiddenSiblings`, `compactTies` in `lib/stationTie.ts`), kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
@@ -677,11 +695,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`live/feedHealth.ts`). `planLive.ts` runs it for the trip panel; `overlayFixture.ts` is the tests' scheduled evening and snapshots
   - Times are integer seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days; may be negative or past 86400, |t| < 2^29); a loader shifts other
     service days itself and keeps their patterns separate
-- `src/data/useTripRoute.ts` (2q7.45.3): the selected journey's ride spans for TripLines (`TripRouteDraw`: key, `ride` spans,
-  `faint` in the list view), while the trip panel is open with a ready plan and a journey selected; `journeySpans` on the drawn
+- `src/data/useTripRoute.ts` (2q7.45.3): the selected journey's draw (`TripRouteDraw`: key, `rides` for TripLines and the route
+  frame, `straights` and `walks` (a complex's members aside) for TripDashes, `marks` and `stations` (2q7.45.4), `faint` in the list view), while the trip panel is open with a ready plan and a journey selected; `journeySpans` on the drawn
   paths (banded once they arrive) with `tripPatterns()` as the hint, loaded through `import('./loadTimetable')` (the planner's
   chunk and its one fetch, so nothing at startup); nothing draws until the patterns settle; a failed load logs once and spans go
-  by geometry; a journey that can't be mapped, or has no ride span to draw, gives null (nothing drawn, nothing dimmed).
+  by geometry; a journey that can't be mapped, or has no ride, straight ride or walk between stations to draw, gives null (nothing
+  drawn, nothing dimmed).
   Memoised on each ride's route and stop run.
 - `src/lib/tripSpans.ts` (pure, 2q7.45.2): a trip's legs on the drawn map. `rideSpan` maps a ride leg to `{ shapeId, d0, d1, maxOffsetM, matched }` on a `network.shapes` or banded path of the stop suffix's direction (each stop's own station point, `projectForward`, offsets over `MAX_STOP_OFFSET_M` 150 m rejected, d1 > d0), by tier: a route shape whose trip-index pattern holds the leg's stops (`SpanContext.patterns`, optional hint), the route's shapes, any route's shape whose pattern holds them, any shape of the direction, else a `straight` line through the stop points; within a route primary first, then smallest offset (ties under `OFFSET_TIE_M` 0.01 m), then id (across routes offset first); `walkSpan` the two station points (none for `sameStation`; `sameComplex` marks a change inside a complex), `journeySpans` all legs, `spanPoints` a span's ground points; `stopStations` stop to station. `tripSpans.data.test.ts` plans L08 to 127 and checks banded and unbanded pick the same shapes (ends within a metre, so recompute on the banded paths)
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
@@ -1116,7 +1135,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - The trip route frame (`useRouteFlight.ts`, 2q7.45.5): with the trip panel in front, a settled plan (its ends and attempt, never a
   silent tick or poll) or a journey or list the visitor opens or leaves (the token is the view plus the journey key, so the first
   journey reframes too) flies the camera top-down and north-up to the whole selected journey, every point of its spans and stations
-  (`routeFramePoints` over `useTripRoute`'s ride spans, the same ones TripLines draws, which App passes down through Scene as CameraRig's `tripRoute`, plus the journey's stations; with no route to draw, its patterns still loading, its spans unmappable or every leg straight, nothing frames; `front` is `usePanelCollapse().front === 'trip'`) inside the free rect less 32 px (`frameTopDown`: the
+  (`routeFramePoints` over `useTripRoute`'s ride spans, the same ones TripLines draws, and its straight ones (TripDashes), which App passes down through Scene as CameraRig's `tripRoute`, plus the journey's stations; with no route to draw, its patterns still loading, its spans unmappable or only changes inside a station, nothing frames; `front` is `usePanelCollapse().front === 'trip'`) inside the free rect less 32 px (`frameTopDown`: the
   smallest distance at or above `ROUTE_MIN_DISTANCE`, EXIT_DISTANCE plus 0.1%, so the fit is exact and focus drops, the focus machine's
   test being strict; clamped to the zoom-out limit). It is not a `FlyRequest`: it starts through CameraRig's `startFlight` (clearing
   the hold and the pending reframes), never sets or lifts the basemap's location cap, and records its flight only if one started. It
@@ -1148,7 +1167,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: focused station's streets 0.35 (7.5 above the veil
   while the interior is loaded under look A; TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
   0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`),
-  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5,
+  trip walks 2.2 (`TripDashes.tsx`), you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo
+  4.4, ring 4.5 and dot 4.55 (`TripMarks.tsx`), train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,

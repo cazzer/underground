@@ -3,8 +3,9 @@ import type { TripIndexFile } from './schema'
 import type { Network, ShapePath } from '../lib/network'
 import type { TripJourney } from '../lib/route/plan'
 import type { TripRouteDraw } from '../lib/tripLineBuffers'
+import { tripMarks, tripStationIds } from '../lib/tripMarks'
 import { journeyKey, type TripSelection } from '../lib/tripSelection'
-import { journeySpans, stopStations, type RideShapeSpan } from '../lib/tripSpans'
+import { journeySpans, stopStations, type RideShapeSpan, type RideStraightSpan, type WalkSpan } from '../lib/tripSpans'
 import type { TripPlanState } from '../lib/tripView'
 
 interface TripRouteInput {
@@ -28,11 +29,11 @@ function legsKeyOf(journey: TripJourney): string {
 }
 
 /**
- * The selected journey's ride legs on the drawn shapes, for TripLines: while the trip panel is open with a ready plan
- * and a journey selected (faint in the list view). Reads trip-index.json's patterns through the trip planner's loader
- * (its chunk, its one fetch, already made by the plan); until they settle nothing draws. A failed load logs once and
- * draws by geometry. A journey that can't be mapped logs and draws nothing. Leaves out `straight` spans and walks
- * (2q7.45.4).
+ * The selected journey on the drawn shapes, while the trip panel is open with a ready plan and a journey selected
+ * (faint in the list view): its ride legs for TripLines, its `straight` rides and walks between stations for
+ * TripDashes, its board, change and alight marks for TripMarks and the stations it calls at. Reads trip-index.json's
+ * patterns through the trip planner's loader (its chunk, its one fetch, already made by the plan); until they settle
+ * nothing draws. A failed load logs once and draws by geometry. A journey that can't be mapped logs and draws nothing.
  */
 export function useTripRoute({ network, paths, open, plan, selection, journey }: TripRouteInput): TripRouteDraw | null {
   const enabled = open && plan.status === 'ready' && selection.view !== 'none' && journey !== null
@@ -59,11 +60,18 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
   const stops = useMemo(() => stopStations(network.stations), [network])
   const legsKey = enabled && journey ? legsKeyOf(journey) : null
   const key = enabled && journey ? journeyKey(journey) : null
-  const rides = useMemo((): readonly RideShapeSpan[] | null => {
+  const drawn = useMemo((): Omit<TripRouteDraw, 'key' | 'faint'> | null => {
     if (legsKey === null || journey === null || patterns === null) return null
     try {
       const spans = journeySpans(journey.legs, { shapes: paths, stopStations: stops, patterns: patterns === NO_PATTERNS ? undefined : patterns })
-      return spans.filter((s): s is RideShapeSpan => s.kind === 'ride')
+      return {
+        rides: spans.filter((s): s is RideShapeSpan => s.kind === 'ride'),
+        straights: spans.filter((s): s is RideStraightSpan => s.kind === 'straight'),
+        // A walk between a complex's members is a change inside one station as the UI shows it: its marks say so.
+        walks: spans.filter((s): s is WalkSpan => s.kind === 'walk' && !s.sameComplex),
+        marks: tripMarks(journey.legs, stops),
+        stations: tripStationIds(journey.legs, stops),
+      }
     } catch (err) {
       console.error(`Trip route: ${err instanceof Error ? err.message : String(err)}; not drawn`)
       return null
@@ -71,6 +79,7 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
     // `journey` is a new object on every replan; `legsKey` says when its legs really change.
   }, [legsKey, patterns, paths, stops])
   const faint = selection.view === 'list'
-  // No ride to draw (every leg `straight`, say): nothing shows, so the network isn't dimmed either.
-  return useMemo(() => (rides && rides.length > 0 && key !== null ? { key, rides, faint } : null), [rides, key, faint])
+  // Nothing to draw (no leg mapped and no walk between stations): nothing shows, so the network isn't dimmed either.
+  const any = drawn !== null && (drawn.rides.length > 0 || drawn.straights.length > 0 || drawn.walks.length > 0)
+  return useMemo(() => (any && drawn && key !== null ? { key, ...drawn, faint } : null), [any, drawn, key, faint])
 }

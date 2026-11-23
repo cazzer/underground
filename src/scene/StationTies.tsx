@@ -1,14 +1,15 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { InterleavedBufferAttribute } from 'three'
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { useFocus } from '../lib/focus'
 import type { Network } from '../lib/network'
+import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { compactTies, focusedTie, STUB_DEPTH_M } from '../lib/stationTie'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { theme } from '../theme'
+import { DimLineMaterial, writeLineDim } from './bandLineMaterial'
 import { cameraDistance } from './cameraDistance'
 import { MARKER_Y } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
@@ -28,6 +29,8 @@ interface StationTiesProps {
   focusedMarker: boolean
   /** The focused station's complex siblings whose interior is loaded: their ties drop with the focused one's. */
   hiddenSiblings: readonly string[]
+  /** This frame's trip look (SubwayLines, -0.25): every tie dims with the network. */
+  levels: EmphasisLevels
 }
 
 /**
@@ -40,9 +43,9 @@ interface StationTiesProps {
  * A focused station with an interior draws no marker, so its tie is left out too, and so are its complex siblings'
  * (compactTies shifts the ties that remain to the front, in order, and the layer draws only those). With no interior
  * (focusedMarker) its marker stays and so does its tie; a station with no depth gets a short stub (stationTie.ts)
- * instead, written in the slot just after the drawn ties.
+ * instead, written in the slot just after the drawn ties. Under a trip every tie dims with the network (DimLineMaterial).
  */
-export function StationTies({ network, focusedMarker, hiddenSiblings }: StationTiesProps) {
+export function StationTies({ network, focusedMarker, hiddenSiblings, levels }: StationTiesProps) {
   const { focusedId } = useFocus()
   const ties = useMemo(() => {
     const positions: number[] = []
@@ -56,13 +59,10 @@ export function StationTies({ network, focusedMarker, hiddenSiblings }: StationT
     const count = positions.length / 6
     // The spare slot after the real ties holds the focused stub, when there is one.
     positions.push(0, MARKER_Y, 0, 0, -STUB_DEPTH_M, 0)
-    const material = new LineMaterial({
-      color: theme.stationStroke,
-      linewidth: theme.stationTieWidth,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-    })
+    const material = new DimLineMaterial(
+      { color: theme.stationStroke, linewidth: theme.stationTieWidth, transparent: true, depthTest: false, depthWrite: false },
+      theme.background,
+    )
     const l = new LineSegments2(new LineSegmentsGeometry().setPositions(positions), material)
     l.renderOrder = RENDER_ORDER.stationTie
     l.frustumCulled = false
@@ -110,6 +110,7 @@ export function StationTies({ network, focusedMarker, hiddenSiblings }: StationT
   )
 
   useFrame((state) => {
+    writeLineDim(lines.material, levels.networkDim)
     const depth = depthFactor(cameraDistance(state))
     if (depth === lastDepth.current) return
     lastDepth.current = depth

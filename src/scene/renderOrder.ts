@@ -21,8 +21,15 @@ export const RENDER_ORDER = {
   lineFocus: 2,
   // The trip's ride legs (TripLines.tsx) over every route line and the ties, under the station markers and trains.
   tripLine: 2.1,
+  // The trip's walks between stations and its straight-drawn rides (TripDashes.tsx), dashed, over its ride legs.
+  tripWalk: 2.2,
   stationFill: 3,
   stationRing: 4,
+  // The trip's board, change and alight marks (TripMarks.tsx) over the station markers, under the trains: a
+  // background halo, the ring, and the dot filling a start or an end.
+  tripMarkHalo: 4.4,
+  tripMark: 4.5,
+  tripMarkDot: 4.55,
   trainHalo: 5,
   trains: 6,
   // The selected train's dot, drawn on its own above the other dots: its rim, a background gap, the dot.

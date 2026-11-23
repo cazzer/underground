@@ -4,16 +4,26 @@
  * layer (buildLineBuffers), so it lies exactly on its line and the trains ride it; a per-segment window (t0, t1) cuts
  * the first and last segment at the stops in the fragment shader. No line vertex is added (lineBreaks is untouched).
  */
-import type { ShapeId } from '../data/schema'
+import type { ShapeId, StationId } from '../data/schema'
 import { BAND_INPUTS, type LineBuffers, type Rgb } from './lineBuffers'
 import type { ShapePath } from './network'
-import type { RideShapeSpan } from './tripSpans'
+import type { TripMark } from './tripMarks'
+import type { RideShapeSpan, RideStraightSpan, WalkSpan } from './tripSpans'
 
-/** What the map draws of the trip: the selected journey's ride spans; `faint` in the list view (no journey opened). */
+/** What the map draws of the trip: the selected journey's spans and marks; `faint` in the list view (no journey opened). */
 export interface TripRouteDraw {
   /** The journey's `journeyKey`. */
   key: string
+  /** Its ride legs found on drawn shapes (TripLines, and the route frame). */
   rides: readonly RideShapeSpan[]
+  /** Its ride legs found on no drawn shape, drawn dashed straight through their stops (TripDashes). */
+  straights: readonly RideStraightSpan[]
+  /** Its walks between stations, a complex's members aside (TripDashes). */
+  walks: readonly WalkSpan[]
+  /** Where it boards, changes and alights (TripMarks). */
+  marks: readonly TripMark[]
+  /** Every station it calls at: their rings stay full while the network dims. */
+  stations: readonly StationId[]
   faint: boolean
 }
 

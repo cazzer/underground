@@ -42,14 +42,14 @@ interface RouteFlightOptions {
 
 /**
  * Frames the whole selected trip route (2q7.45.5) when the trip panel is in front: top-down, north-up, at the smallest
- * distance (just past EXIT_DISTANCE or more) that fits every ride the map draws (TripLines' spans, `tripRoute`) and the journey's stations in the free rect, once
+ * distance (just past EXIT_DISTANCE or more) that fits every ride the map draws (TripLines' spans and TripDashes' straight ones, `tripRoute`) and the journey's stations in the free rect, once
  * per settled plan and again when the visitor opens or leaves a journey or its list (routeFrameRule.ts). A silent
  * refresh, a train panel or notice in front, a follow, a gesture, another flight, or the visitor moving the view (a drag
  * past the click slop, a pinch, a wheel step, a station pick) while the plan loaded never move it. Not a fly request:
  * focus drops after landing by the usual rules, and the basemap's location cap is left as it is. A panel or viewport
  * change retargets its flight, and useRouteReframe reframes after its landing. Returns the landing call CameraRig makes
  * (stable): any other flight's landing forgets this one. With no route drawn (`tripRoute` null: its patterns still
- * loading, its spans unmappable or every leg straight) nothing frames.
+ * loading, its spans unmappable, or nothing but changes inside a station) nothing frames.
  */
 export function useRouteFlight({ controls, camera, flight, layout, network, flyRequest, startFlight, following, gesture, tookOver, tripRoute, panel, size, insets }: RouteFlightOptions): (landed: Flight) => void {
   const { open, ends, plan, selection, selectedJourney } = useTrip()
@@ -122,7 +122,7 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
     memo.current.framed = route
     if (decision === 'skip' || selectedJourney === null || tripRoute === null) return
     try {
-      const points = routeFramePoints(tripRoute.rides, network.shapeById, legStationPoints(selectedJourney.legs, stops))
+      const points = routeFramePoints([...tripRoute.rides, ...tripRoute.straights], network.shapeById, legStationPoints(selectedJourney.legs, stops))
       const l = layout.current
       const dest = routeDestination(points, l, camera.fov)
       startFlight(dest)

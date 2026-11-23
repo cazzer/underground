@@ -108,7 +108,9 @@ export interface Theme {
    * The trip's way out at its To station (ExitPath.tsx): centerline, restroked connectors, the exit's entrance and the
    * board marker. 3:1 on the background, apart from every interior token, the focus and location colors and every
    * drawn route color, and under simulated deuteranopia and protanopia from the interior's structural and machine
-   * tokens (theme.test.ts). Not held apart from trainSelectedRim: both mark the trip's own things.
+   * tokens (theme.test.ts). Not held apart from trainSelectedRim: both mark the trip's own things. Also the trip's walks
+   * between stations (TripDashes.tsx) and its board, change and alight rings (TripMarks.tsx) on the map, at least 2.5:1
+   * over every route dimmed by `tripNetworkDim` and on the background when faint (themeTrip.test.ts).
    */
   exitPath: string
   /** Exit path line width in CSS px. */
@@ -125,6 +127,12 @@ export interface Theme {
   tripNetworkDim: number
   tripFaintDim: number
   tripLineWidth: number
+  /**
+   * Dash and gap, CSS px at the view's target (world meters times the dash scale written per frame), of the trip's
+   * walks between stations and of a ride drawn straight through its stops (TripDashes.tsx).
+   */
+  tripWalkDashPx: number
+  tripWalkGapPx: number
 }
 
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
@@ -193,6 +201,8 @@ export const THEMES = {
     tripNetworkDim: 0.7,
     tripFaintDim: 0.35,
     tripLineWidth: 2.5,
+    tripWalkDashPx: 6,
+    tripWalkGapPx: 4,
   },
 } as const satisfies Record<string, Theme>
 

@@ -26,10 +26,18 @@ export function linearToSrgb(c: number): number {
 
 /** dimLine: a linear color mixed toward `towardSrgb` (sRGB 0..1) by `amount` in sRGB, back in linear. 0 is the identity. */
 export function dimLineRgb(linear: Rgb3, towardSrgb: Rgb3, amount: number): [number, number, number] {
-  if (amount <= 0) return [linear[0], linear[1], linear[2]]
-  const out: [number, number, number] = [0, 0, 0]
+  return dimLineRgbInto([0, 0, 0], linear, towardSrgb, amount)
+}
+
+/** dimLineRgb written into `out` (which may be `linear`), for per-frame use: no allocation. Returns `out`. */
+export function dimLineRgbInto<T extends [number, number, number] | Float32Array>(out: T, linear: Rgb3 | Float32Array, towardSrgb: Rgb3, amount: number): T {
   for (let i = 0; i < 3; i++) {
-    const s = linearToSrgb(linear[i]!)
+    const c = linear[i]!
+    if (amount <= 0) {
+      out[i] = c
+      continue
+    }
+    const s = linearToSrgb(c)
     out[i] = srgbToLinear(s + (towardSrgb[i]! - s) * amount)
   }
   return out

@@ -14,7 +14,10 @@ import { BAND_UNIFORMS, writeLineDim } from './bandLineMaterial'
 import { cameraDistance } from './cameraDistance'
 import { LineFade, LineHighlight } from './LineHighlight'
 import { RENDER_ORDER } from './renderOrder'
+import { TripDashes } from './TripDashes'
 import { TripLines } from './TripLines'
+import { TripMarks } from './TripMarks'
+import { useHeld } from './useHeld'
 import { routeLineBuffers, useLineLayer } from './useLineLayer'
 import { usePlatformFade } from './usePlatformFade'
 
@@ -35,15 +38,18 @@ interface SubwayLinesProps {
   tripShown: boolean
   /** The trip emphasis' look, written here each frame (Scene owns it): every line layer, the basemap and the streets read it. */
   levels: EmphasisLevels
+  /** Stations whose trip mark hides: the focused interior's (it marks them itself). */
+  markHidden: readonly string[]
 }
 
 /**
  * Every shape of every route, merged into one draw call, with shared corridors drawn as side-by-side bands. Along
  * the loaded interior's platforms the map track fades out as the interior reveals (platformMask.ts), since the
  * interior draws its own track there. While the trip panel is in front with a route, the network dims toward the
- * background by color (every layer's own `lineDim`) and TripLines draws the route over it, eased over EMPHASIS_S.
+ * background by color (every layer's own `lineDim`) and TripLines draws the route over it, eased over EMPHASIS_S, with
+ * TripDashes' walks and straight rides and TripMarks' station marks.
  */
-export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tripShown, levels }: SubwayLinesProps) {
+export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tripShown, levels, markHidden }: SubwayLinesProps) {
   const buffers = useMemo(() => routeLineBuffers(network, paths, baseLineMix(theme, linesMode), true), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lines)
   usePlatformFade(lines, buffers, paths, interiorSpans)
@@ -58,6 +64,8 @@ export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tr
   const [crashedKey, setCrashedKey] = useState<string | null>(null)
   const boundaryKey = tripKey ?? ''
   const tripCrashed = crashedKey === boundaryKey
+  // The last route drawn, so closing the panel eases it out instead of dropping it.
+  const held = useHeld(tripRoute)
 
   // Priority -0.25: after CameraRig and the orbit (-2), drei's controls.update() (-1) and the orbit pivot (-0.5),
   // so the view is this frame's camera; before LiveTrains (0), which places the trains on it.
@@ -90,9 +98,11 @@ export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tr
       {lines && <primitive object={lines} />}
       {linesMode === 'a' && <LineHighlight network={network} paths={paths} interiorSpans={interiorSpans} levels={levels} />}
       {linesMode === 'c' && <LineFade network={network} paths={paths} interiorSpans={interiorSpans} levels={levels} />}
-      {/* Decoration: a crash here (logged by the boundary) draws no trip route instead of blanking the scene. */}
+      {/* Decoration: a crash here (logged by the boundary) draws no trip route, walk or mark and un-dims the map instead of blanking the scene. */}
       <ErrorBoundary key={boundaryKey} fallback={null} onError={() => setCrashedKey(boundaryKey)}>
-        <TripLines network={network} paths={paths} route={tripRoute} levels={levels} interiorSpans={interiorSpans} />
+        <TripLines network={network} paths={paths} route={held} levels={levels} interiorSpans={interiorSpans} />
+        <TripDashes network={network} route={held} levels={levels} />
+        <TripMarks marks={held?.marks ?? null} hidden={markHidden} levels={levels} />
       </ErrorBoundary>
     </>
   )
