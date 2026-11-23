@@ -2,12 +2,18 @@ import { useThree } from '@react-three/fiber'
 import { type RefObject, useEffect, useMemo, useRef } from 'react'
 import { Vector3 } from 'three'
 import { useFocus } from '../lib/focus'
+import { footprintAt, footprintCounts } from '../lib/footprintPick'
+import type { Footprint } from '../lib/interiorFootprint'
+import { interiorOpacity } from '../lib/interiorReveal'
 import { carMix } from '../lib/live/consist'
 import { nearestTrain, trainScreenPoints, type TrainPickInput, type TrainPickSource } from '../lib/live/trainPick'
 import type { Station } from '../lib/network'
-import { choosePick, nearestStation, NO_STATIONS, trainHitPx, type ScenePick, type ScreenPoint, type ToScreen } from '../lib/pick'
+import { choosePick, nearestStation, NO_STATIONS, trainHitPx, withFootprint, type ScenePick, type ScreenPoint, type ToScreen } from '../lib/pick'
+import type { Presence } from '../lib/presence'
+import { depthFactor, depthScaleY } from '../lib/tilt'
 import { useTrainSelection } from '../lib/trainSelection'
 import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
+import type { InteriorModel } from './interiorModel'
 import { MARKER_MIN_METERS } from './markerShape'
 
 /** Pointer travel (px) above which a press is a pan, not a click. Fingertip taps drift more than a mouse. */
@@ -20,6 +26,20 @@ interface ScenePickerProps {
   /** Stations a drawn interior stands in for (the focused one's covered siblings, every other drawn interior's stations,
    *  o3r.4): like the open station, a train in reach beats them, and a direct tap with none still picks them. */
   hiddenSiblings: readonly string[]
+  /** Every interior mounted (useSceneInteriors' shown): a tap on a neighbour's footprint, with nothing else in reach, opens it. */
+  interiors: readonly InteriorModel[]
+  /** Their presences by file id (a stable map, read at pick time). */
+  presences: ReadonlyMap<string, Presence>
+  /** The focused station's interior: a tap inside its footprint opens nothing. */
+  focusedInterior: InteriorModel | null
+}
+
+/** The drawn interiors as the picker reads them: footprints, file ids, the focused one's index (-1 for none). */
+interface DrawnFootprints {
+  footprints: readonly Footprint[]
+  ids: readonly string[]
+  focused: number
+  presences: ReadonlyMap<string, Presence>
 }
 
 interface Press {
@@ -31,10 +51,11 @@ interface Press {
 /**
  * Click and tap picking for stations and trains, in screen space: on a still click (never per frame) every
  * station and live train is projected to pixels and the nearest within its hit radius wins (a station
- * unless a train is clearly closer, or the station is already open). Listens on the canvas alongside MapControls without ever stopping
+ * unless a train is clearly closer, or the station is already open). With neither in reach, a drawn neighbour interior's
+ * footprint opens that station (footprintPick.ts; never the focused one's). Listens on the canvas alongside MapControls without ever stopping
  * or preventing its events, and ignores multi-touch gestures. Hovering a target shows a pointer cursor.
  */
-export function ScenePicker({ stations, trainPick, hiddenSiblings }: ScenePickerProps) {
+export function ScenePicker({ stations, trainPick, hiddenSiblings, interiors, presences, focusedInterior }: ScenePickerProps) {
   const gl = useThree((s) => s.gl)
   const get = useThree((s) => s.get)
   const { focusedId, select } = useFocus()
@@ -53,11 +74,23 @@ export function ScenePicker({ stations, trainPick, hiddenSiblings }: ScenePicker
     open.current = indices
   }, [focusedId, hiddenSiblings, stations])
 
+  const drawn = useRef<DrawnFootprints>({ footprints: [], ids: [], focused: -1, presences })
+  useEffect(() => {
+    drawn.current = {
+      footprints: interiors.map((m) => m.footprint),
+      ids: interiors.map((m) => m.stationId),
+      focused: focusedInterior ? interiors.indexOf(focusedInterior) : -1,
+      presences,
+    }
+  }, [interiors, presences, focusedInterior])
+
   const picker = useMemo(() => {
     const v = new Vector3()
     const view = { width: 1, height: 1, left: 0, top: 0 }
     const click: ScreenPoint = { x: 0, y: 0 }
     const marker = { scale: 0 }
+    /** The interiors' reveal opacity and their group's scale.y at this moment's camera distance. */
+    const reveal = { opacity: 0, depthScale: 1 }
     /** One input object, refilled on each pick. */
     let input: TrainPickInput | null = null
     const toScreen: ToScreen = (x, y, z, out) => {
@@ -80,6 +113,8 @@ export function ScenePicker({ stations, trainPick, hiddenSiblings }: ScenePicker
       view.top = state.size.top
       const d = cameraDistance(state)
       marker.scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
+      reveal.opacity = interiorOpacity(d)
+      reveal.depthScale = depthScaleY(depthFactor(d))
       const src = trainPick.current
       if (!src) return null
       input ??= { ...src, mix: 0, localS: 0 }
@@ -92,13 +127,24 @@ export function ScenePicker({ stations, trainPick, hiddenSiblings }: ScenePicker
       input.localS = performance.now() / 1000
       return input
     }
+    const visible = (i: number): boolean => {
+      const { ids, focused, presences: p } = drawn.current
+      return footprintCounts(i, focused, reveal.opacity, p.get(ids[i]!)?.value ?? 0)
+    }
+    /** The neighbour interior under the click (begin() ran): its file id, or null (none, or inside the focused one). */
+    const footprintPick = (): string | null => {
+      const f = drawn.current
+      if (f.footprints.length === 0 || reveal.opacity === 0) return null
+      const i = footprintAt(f.footprints, visible, f.focused, reveal.depthScale, toScreen, click)
+      return i >= 0 && i !== f.focused ? f.ids[i]! : null
+    }
     const pickAt = (clientX: number, clientY: number, touch: boolean): ScenePick | null => {
       const trains = begin()
       click.x = clientX - view.left
       click.y = clientY - view.top
       const station = nearestStation(positions, toScreen, click, radiusM)
       const train = trains ? nearestTrain(trains, toScreen, click, trainHitPx(touch, station, open.current)) : null
-      return choosePick(station, train, open.current)
+      return withFootprint(choosePick(station, train, open.current), footprintPick)
     }
     const trainAt = (key: string) => {
       const trains = begin()
@@ -140,6 +186,7 @@ export function ScenePicker({ stations, trainPick, hiddenSiblings }: ScenePicker
       if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > CLICK_SLOP_PX[press.touch ? 'touch' : 'mouse']) return
       const pick = picker.pickAt(e.clientX, e.clientY, press.touch)
       if (pick?.kind === 'station') select(stations[pick.index]!.id)
+      else if (pick?.kind === 'interior') select(pick.stationId)
       else if (pick?.kind === 'train') {
         const key = trainPick.current?.table.keys[pick.index]
         if (key) selectTrain(key)

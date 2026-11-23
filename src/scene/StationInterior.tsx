@@ -13,7 +13,9 @@ import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { cameraDistance } from './cameraDistance'
 import { ExitPath } from './ExitPath'
+import { InteriorFocusFrame } from './InteriorFocusFrame'
 import { interiorLook } from './interiorLook'
+import type { PresenceStore } from './InteriorPresence'
 import { interiorLayers, type InteriorModel } from './interiorModel'
 import { InteriorVeil } from './InteriorVeil'
 import { RENDER_ORDER, strokeOrders } from './renderOrder'
@@ -36,6 +38,8 @@ interface StationInteriorProps {
   presence: Presence
   /** Draw its level labels (the focused interior only, until labels of several interiors are decluttered against each other). */
   labels: boolean
+  /** The focused interior: every shown interior's presences, so it frames its footprint while a neighbour shows. Null otherwise. */
+  frame: PresenceStore | null
 }
 
 const NO_LABELS: LevelLabel[] = []
@@ -46,11 +50,11 @@ const NO_KEEP_OUT = new Float32Array(0)
  * A drawn station's interior (the focused one, or one in view: Scene's useSceneInteriors) as merged line layers in a
  * group at its anchor: fine, then strong, for each stroke band (interiorDecks.ts): the deepest deck and below, the
  * bands between decks (Union Sq has one), and the levels above the shallowest deck, each band drawn after the lifted
- * trains of the deck below it. Plus look B's footprint veil (look A's one screen veil is Scene's ScreenVeil) and DOM
+ * trains of the deck below it. Plus the focused one's footprint frame beside a neighbour (InteriorFocusFrame), look B's footprint veil (look A's one screen veil is Scene's ScreenVeil) and DOM
  * level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
-export function StationInterior({ model, network, outOfService, labelBlockers, path, presence, labels }: StationInteriorProps) {
+export function StationInterior({ model, network, outOfService, labelBlockers, path, presence, labels, frame }: StationInteriorProps) {
   // Every station the interior covers must be on the map: its spans, markers and camera all look them up.
   for (const id of interiorStationIds(model)) {
     if (!network.stationById.has(id)) throw new Error(`Interior ${model.stationId} covers unknown station "${id}"`)
@@ -138,6 +142,7 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
       {mid1Strong && <primitive object={mid1Strong} />}
       {overFine && <primitive object={overFine} />}
       {overStrong && <primitive object={overStrong} />}
+      {frame && <InteriorFocusFrame model={model} presence={presence} store={frame} />}
       {path && (
         <ErrorBoundary key={stationPathKey(path)} fallback={null}>
           <ExitPath model={model} choice={path} keepOut={keepOut} />

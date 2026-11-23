@@ -156,7 +156,14 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         levels={tripLevels}
         fix={here?.ground ?? null}
       />
-      <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenStations} />
+      <ScenePicker
+        stations={network.stations}
+        trainPick={trainPick}
+        hiddenSiblings={hiddenStations}
+        interiors={shown}
+        presences={presences}
+        focusedInterior={interior}
+      />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
           <LiveTrains {...live} network={network} trainPick={trainPick} deckSpans={spansByDeck} presence={scene.store} view={bandView} anchor={anchor} />
@@ -193,6 +200,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
             path={m === interior ? path : null}
             presence={presences.get(m.stationId)!}
             labels={m === interior}
+            frame={m === interior ? scene.store : null}
           />
         </ErrorBoundary>
       ))}
