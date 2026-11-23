@@ -7,6 +7,7 @@ import { reframeDuration } from '../lib/interiorReframe'
 import { usePanelCollapse } from '../lib/panelCollapse'
 import { shouldResnapPoint } from '../lib/pointResnap'
 import { prefersReducedMotion } from '../lib/reducedMotion'
+import { routeIsFramed, type RouteToken } from '../lib/routeFrameRule'
 import { routeMoveArms, routePending, routeReframeAction } from '../lib/routeReframe'
 import type { Destination, Flight, MapControlsImpl } from './cameraFlight'
 import { freeBottom, landingOf, routeDestination, type RouteFlight } from './routeFlightState'
@@ -17,6 +18,8 @@ interface RouteReframeOptions {
   camera: PerspectiveCamera
   flight: RefObject<Flight | null>
   mine: RefObject<RouteFlight | null>
+  /** The route the map draws now. */
+  current: RefObject<RouteToken | null>
   layout: RefObject<FlightLayout>
   tookOver: RefObject<boolean>
   following: () => boolean
@@ -35,7 +38,7 @@ interface RouteReframeOptions {
  * drops a resize waiting; a gesture, another flight, a follow or the panel going cancel it. A reduced-motion landing
  * also re-snaps once just after, on a size or inset change, as a point flight does. Per event, never per frame.
  */
-export function useRouteReframe({ controls, camera, flight, mine, layout, tookOver, following, front, startFlight, panel, size, insets }: RouteReframeOptions): void {
+export function useRouteReframe({ controls, camera, flight, mine, current, layout, tookOver, following, front, startFlight, panel, size, insets }: RouteReframeOptions): void {
   const { seq } = usePanelCollapse()
   const seen = useRef(seq)
   const timer = useRef<number | null>(null)
@@ -50,7 +53,7 @@ export function useRouteReframe({ controls, camera, flight, mine, layout, tookOv
       const c = controls.current
       if (!c) return false
       const landed = m.landedAt !== null
-      if (routeReframeAction({ flying: flight.current !== null, following: following(), tookOver: tookOver.current, landed, front: frontRef.current, reduced }) === 'drop') return false
+      if (routeReframeAction({ flying: flight.current !== null, following: following(), tookOver: tookOver.current, landed, front: frontRef.current, sameRoute: routeIsFramed(m.token, current.current), reduced }) === 'drop') return false
       const l = layout.current
       const dest = routeDestination(m.points, l, camera.fov)
       const distance = camera.position.distanceTo(c.target)
@@ -64,7 +67,7 @@ export function useRouteReframe({ controls, camera, flight, mine, layout, tookOv
       Object.assign(m, { flight: f, landedAt: null, landing: landingOf(dest, performance.now()), width: l.size.width, height: l.size.height, bottom: freeBottom(l), windowOpen: false })
       return true
     },
-    [controls, camera, flight, layout, tookOver, following, startFlight],
+    [controls, camera, flight, current, layout, tookOver, following, startFlight],
   )
 
   const settle = useCallback(

@@ -1111,7 +1111,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   begun (`useRouteReframe`, `lib/routeReframe.ts`): a user collapse or expand of the panel (`usePanelCollapse().seq`), or one measured
   panel move that shifts the free rect's bottom within 2 s of the landing (a press or key closes that window), waits for the panel to
   hold still (`collapseDueIn`) and reframes once onto the route in the new free rect, 0.6-1 s eased, no turn, only when it moves
-  anything; a reduced-motion landing snaps and re-snaps once just after on a size or inset change (`shouldResnapPoint`).
+  anything; a reduced-motion landing snaps and re-snaps once just after on a panel, size or inset change (`shouldResnapPoint`). The reframes frame only the route still drawn: an ends change, a non-ready plan or a different route (skipped or none) forgets the landed flight (`routeIsFramed`); a retry's settling, new ends and the panel opening reset the visitor's move.
 - Selecting a train follows it (`useTrainFollow.ts`): a flight retargeted each frame to the moving train, at the
   distance where its consist spans 80% of the free width, held to 400..600 m (`followDistanceFor`; a desktop stays at
   400), never started over another flight. Then at -0.75 `stepFollow` moves target and camera by one step so its dot

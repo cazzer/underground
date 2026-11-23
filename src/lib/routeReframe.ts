@@ -39,11 +39,13 @@ export interface RouteReframeInput {
   landed: boolean
   /** The trip panel is in front. */
   front: boolean
+  /** The route the flight framed is still the one the map draws. */
+  sameRoute: boolean
   reduced: boolean
 }
 
 /** drop: leave the view alone. reframe: an eased flight, no turn. snap: the same at once. */
 export function routeReframeAction(s: RouteReframeInput): CollapseAction {
-  if (s.flying || s.following || s.tookOver || !s.landed || !s.front) return 'drop'
+  if (s.flying || s.following || s.tookOver || !s.landed || !s.front || !s.sameRoute) return 'drop'
   return s.reduced ? 'snap' : 'reframe'
 }

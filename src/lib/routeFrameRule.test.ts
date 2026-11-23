@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { routeFrameDecision, type RouteInput, type RouteMemo, type RouteToken } from './routeFrameRule'
+import { routeFrameDecision, routeIsFramed, type RouteInput, type RouteMemo, type RouteToken } from './routeFrameRule'
 
 const A: RouteToken = { plan: 'L08>127#1', journey: 'L:a>b' }
 const A2: RouteToken = { plan: 'L08>127#1', journey: 'L:c>d' }
@@ -65,5 +65,15 @@ describe('routeFrameDecision', () => {
   it('never fires later for a route that was skipped: once recorded as framed it is none', () => {
     const memo: RouteMemo = { framed: A, interrupted: false }
     expect(routeFrameDecision(memo, input({ front: true }))).toBe('none')
+  })
+})
+
+describe('routeIsFramed', () => {
+  it('is true only for the same plan and journey', () => {
+    expect(routeIsFramed(A, { ...A })).toBe(true)
+    expect(routeIsFramed(A, A2)).toBe(false)
+    expect(routeIsFramed(A, B)).toBe(false)
+    expect(routeIsFramed(A, null)).toBe(false)
+    expect(routeIsFramed(null, A)).toBe(false)
   })
 })

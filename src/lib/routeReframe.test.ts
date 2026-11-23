@@ -42,12 +42,12 @@ describe('routePending', () => {
 })
 
 describe('routeReframeAction', () => {
-  const ok: RouteReframeInput = { flying: false, following: false, tookOver: false, landed: true, front: true, reduced: false }
+  const ok: RouteReframeInput = { flying: false, following: false, tookOver: false, landed: true, front: true, sameRoute: true, reduced: false }
   it('reframes, or snaps under reduced motion', () => {
     expect(routeReframeAction(ok)).toBe('reframe')
     expect(routeReframeAction({ ...ok, reduced: true })).toBe('snap')
   })
-  it.each([{ flying: true }, { following: true }, { tookOver: true }, { landed: false }, { front: false }])('drops for %j', (over) => {
+  it.each([{ flying: true }, { following: true }, { tookOver: true }, { landed: false }, { front: false }, { sameRoute: false }])('drops for %j', (over) => {
     expect(routeReframeAction({ ...ok, ...over })).toBe('drop')
   })
 })

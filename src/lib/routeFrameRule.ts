@@ -36,10 +36,15 @@ export interface RouteInput {
 
 export type RouteDecision = 'fly' | 'skip' | 'none'
 
+/** Whether `framed` is the route `route` names. */
+export function routeIsFramed(framed: RouteToken | null, route: RouteToken | null): boolean {
+  return framed !== null && route !== null && framed.plan === route.plan && framed.journey === route.journey
+}
+
 export function routeFrameDecision(memo: RouteMemo, input: RouteInput): RouteDecision {
   const { route } = input
   const { framed } = memo
-  if (route === null || (framed !== null && framed.plan === route.plan && framed.journey === route.journey)) return 'none'
+  if (route === null || routeIsFramed(framed, route)) return 'none'
   const samePlan = framed !== null && framed.plan === route.plan
   if (samePlan && input.silent) return 'skip'
   const fresh = !samePlan

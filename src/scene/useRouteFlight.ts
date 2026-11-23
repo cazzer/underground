@@ -9,7 +9,7 @@ import type { Ground } from '../lib/projection'
 import type { TripJourney } from '../lib/route/plan'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { legStationPoints, routeFramePoints } from '../lib/routeFrame'
-import { routeFrameDecision, type RouteMemo, type RouteToken } from '../lib/routeFrameRule'
+import { routeFrameDecision, routeIsFramed, type RouteMemo, type RouteToken } from '../lib/routeFrameRule'
 import { useTrainSelection } from '../lib/trainSelection'
 import { useTrip } from '../lib/trip'
 import { journeyKey } from '../lib/tripSelection'
@@ -72,6 +72,8 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
   const memo = useRef<RouteMemo>({ framed: null, interrupted: false })
   const seenPlan = useRef(plan)
   const mine = useRef<RouteFlight | null>(null)
+  /** The route the map draws now (null while no plan is ready): the reframes only ever frame that one. */
+  const current = useRef<RouteToken | null>(null)
 
   // The visitor's own move while a plan loads keeps it from framing: a drag, pinch or wheel past the click slop, or a
   // station pick (a fly request after mount). A plain tap is not one.
@@ -86,13 +88,21 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
     memo.current.interrupted = true
     mine.current = null
   }, [flyRequest])
-  // A new run starts clean: a plan the cache answers in one commit may never be seen loading, so new ends or the panel
-  // opening reset it too.
+  // A new run starts clean: a plan the cache answers in one commit may never be seen loading, so new ends, the panel
+  // opening and a retry's settling reset it too, and the route the last run framed goes with its plan.
+  const seenAttempt = useRef<number | null>(null)
   useEffect(() => {
-    if (plan.status !== 'ready') memo.current.interrupted = false
+    if (plan.status !== 'ready') {
+      memo.current.interrupted = false
+      mine.current = null
+      return
+    }
+    if (plan.trigger === 'retry' && plan.attempt !== seenAttempt.current) memo.current.interrupted = false
+    seenAttempt.current = plan.attempt
   }, [plan])
   useEffect(() => {
     memo.current.interrupted = false
+    mine.current = null
   }, [open, ends.from, ends.to])
 
   // A panel or viewport change reframes the route's flight in the new free rect, at the same pace.
@@ -109,16 +119,19 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
     m.height = l.size.height
   }, [panel, size, insets, camera, controls, flight, layout])
 
-  useRouteReframe({ controls, camera, flight, mine, layout, tookOver, following, front, startFlight, panel, size, insets })
+  useRouteReframe({ controls, camera, flight, mine, current, layout, tookOver, following, front, startFlight, panel, size, insets })
 
   const journey = selectedJourney === null ? null : `${selection.view}:${journeyKey(selectedJourney)}`
   useEffect(() => {
     const silent = plan !== seenPlan.current && plan.status === 'ready' && (plan.trigger === 'tick' || plan.trigger === 'poll')
     seenPlan.current = plan
     const route: RouteToken | null = plan.status === 'ready' && selectedJourney !== null && journey !== null ? { plan: `${plan.key}#${plan.attempt}`, journey } : null
+    current.current = route
     const f = flight.current
     const flying = f === null ? null : f === mine.current?.flight ? 'mine' : 'other'
     const decision = routeFrameDecision(memo.current, { route, silent, front, flying, following: following(), gesture: gesture.current })
+    // A route other than the one the flight framed (skipped, or none) is not the one to reframe onto.
+    if (decision !== 'fly' && mine.current && !routeIsFramed(mine.current.token, route)) mine.current = null
     if (decision === 'none') return
     memo.current.framed = route
     if (decision === 'skip' || selectedJourney === null) return
@@ -131,7 +144,7 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
       // Only a flight this call started is ours: with no controls, startFlight starts none.
       mine.current =
         started && started !== f
-          ? { flight: started, points, reduced: prefersReducedMotion(), landing: landingOf(dest, performance.now()), landedAt: null, width: l.size.width, height: l.size.height, bottom: freeBottom(l), windowOpen: true, resnapped: false, pending: null }
+          ? { flight: started, token: route!, points, reduced: prefersReducedMotion(), landing: landingOf(dest, performance.now()), landedAt: null, width: l.size.width, height: l.size.height, bottom: freeBottom(l), windowOpen: true, resnapped: false, pending: null }
           : null
     } catch (e) {
       console.error('Trip route frame failed', e)

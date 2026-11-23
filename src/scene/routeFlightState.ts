@@ -4,6 +4,7 @@ import { interiorFreeRect } from '../lib/interiorCamera'
 import type { CollapsePending } from '../lib/collapseReframe'
 import type { PointLanding } from '../lib/pointResnap'
 import type { Ground } from '../lib/projection'
+import type { RouteToken } from '../lib/routeFrameRule'
 import { frameTopDown, ROUTE_MIN_DISTANCE } from '../lib/routeFrame'
 import type { Destination, Flight } from './cameraFlight'
 import type { FlightLayout } from './useStationFlights'
@@ -11,6 +12,8 @@ import type { FlightLayout } from './useStationFlights'
 /** The flight this feature started last, with what it framed; replaced by each reframe, dropped when another flight lands. */
 export interface RouteFlight {
   flight: Flight
+  /** The route it framed: a reframe only ever frames it again while it is still the route drawn. */
+  token: RouteToken
   points: readonly Ground[]
   reduced: boolean
   landing: PointLanding
