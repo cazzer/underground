@@ -47,7 +47,7 @@ function turn(a: number, b: number): number {
 }
 
 /** Whether `b` differs from `a` by more than the given pan share, zoom share and turn. */
-function differs(a: ViewPose, b: ViewPose, pan: number, zoom: number, rad: number): boolean {
+export function differs(a: ViewPose, b: ViewPose, pan: number, zoom: number, rad: number): boolean {
   return (
     a.width !== b.width ||
     a.height !== b.height ||
