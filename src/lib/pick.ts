@@ -23,7 +23,8 @@ export interface PickHit {
   distancePx: number
 }
 
-export type ScenePick = { kind: 'station'; index: number } | { kind: 'train'; index: number }
+/** A station by index, a train by slot, or a drawn interior picked by its footprint (o3r.7), by the station to open. */
+export type ScenePick = { kind: 'station'; index: number } | { kind: 'train'; index: number } | { kind: 'interior'; stationId: string }
 
 /** Distance from `p` to the segment a-b, in pixels. A zero-length segment is its point. */
 export function segmentDistancePx(p: ScreenPoint, a: ScreenPoint, b: ScreenPoint): number {
@@ -87,4 +88,14 @@ export function choosePick(station: PickHit | null, train: PickHit | null, open:
     return { kind: 'train', index: train.index }
   }
   return station ? { kind: 'station', index: station.index } : null
+}
+
+/**
+ * A marker or train pick, else the drawn interior whose footprint holds the click (`footprint`: its station, or null),
+ * asked only when nothing else was in reach, so a train or a marker inside a footprint still wins.
+ */
+export function withFootprint(pick: ScenePick | null, footprint: () => string | null): ScenePick | null {
+  if (pick) return pick
+  const stationId = footprint()
+  return stationId === null ? null : { kind: 'interior', stationId }
 }

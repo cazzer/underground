@@ -2,6 +2,7 @@ import { Color } from 'three'
 import type { Level, LocalPoint, StationInterior } from '../data/stationSchema'
 import { stationAxis } from '../lib/interiorAxis'
 import { levelFadeShares } from '../lib/interiorFade'
+import { footprintLoopBuffers, interiorFootprint, type Footprint } from '../lib/interiorFootprint'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { outlineSamples, type OutlineSamples } from '../lib/interiorOutline'
 import { interiorDecks, strokeBandOf, trackDecks } from '../lib/interiorDecks'
@@ -54,6 +55,10 @@ export interface InteriorModel {
   /** Points along its platform and slab outlines, group-local x, y (× yScale, before the depth factor), z triples, and
    *  their spacing (`outlineSamples`): the street names keep clear of them on screen. */
   outline: OutlineSamples
+  /** Its ground footprint (interiorFootprint): a neighbour's opens it on a tap (ScenePicker), the focused one's is framed. */
+  footprint: Footprint
+  /** The footprint's loop at street level in theme.stationFocus (InteriorFocusFrame), group-local. */
+  focusFrame: Buffers
 }
 
 const ROLE_TOKEN: Record<InteriorRole, string> = {
@@ -167,6 +172,8 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const approximate = generated || interior.approximate === true
   const origin = toGround(interior.anchor)
   const decks = decksOf(interior)
+  const footprint = interiorFootprint(interior, yScale, origin)
+  const focus = new Color(theme.stationFocus)
   const hull =
     interiorLook.veil === 'footprint'
       ? paddedHull([...interior.platforms.flatMap((p) => p.outline), ...interior.slabs.flatMap((s) => s.outline)], HULL_PAD)
@@ -188,5 +195,7 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     yScale,
     entrances: interior.entrances.map(({ x, z, type }) => ({ x, z, type })),
     outline: outlineSamples(interior, yScale),
+    footprint,
+    focusFrame: footprintLoopBuffers(footprint.hull, [focus.r, focus.g, focus.b]),
   }
 }

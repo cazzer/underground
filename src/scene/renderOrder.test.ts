@@ -45,6 +45,12 @@ describe('interior band and deck render orders', () => {
     expect(RENDER_ORDER.tripWalkOver).toBeLessThan(RENDER_ORDER.streetEntrance)
   })
 
+  it("draw the focused interior's frame over the veiled streets and under the trip's walks and the interior strokes", () => {
+    expect(RENDER_ORDER.interiorFocusFrame).toBeGreaterThan(RENDER_ORDER.streetsOver)
+    expect(RENDER_ORDER.interiorFocusFrame).toBeLessThan(RENDER_ORDER.tripWalkOver)
+    expect(RENDER_ORDER.interiorFocusFrame).toBeLessThan(RENDER_ORDER.interiorFine)
+  })
+
   it("draw a straight-drawn ride over the ride legs and under the station markers", () => {
     expect(RENDER_ORDER.tripLine).toBeLessThan(RENDER_ORDER.tripStraight)
     expect(RENDER_ORDER.tripStraight).toBeLessThan(RENDER_ORDER.stationFill)

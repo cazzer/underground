@@ -210,7 +210,7 @@ describe('interiorOutage', () => {
         ['fine', t.interiorFine],
         ['elevator', t.interiorElevator],
         ['escalator', t.interiorEscalator],
-        ['rim', t.trainSelectedRim],
+        ['rim', t.trainSelectedRim], ['focus', t.stationFocus],
       ] as const
       for (const [other, color] of others) {
         expect(oklabDistance(t.interiorOutage, color), `${t.name} vs ${other} ${color}`).toBeGreaterThanOrEqual(0.1)

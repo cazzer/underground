@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { choosePick, nearestStation, segmentDistancePx, STATION_HIT_PX, TRAIN_HIT_PX, TRAIN_TOUCH_HIT_PX, trainHitPx, type ToScreen } from './pick'
+import { choosePick, nearestStation, segmentDistancePx, STATION_HIT_PX, TRAIN_HIT_PX, TRAIN_TOUCH_HIT_PX, trainHitPx, withFootprint, type ToScreen } from './pick'
 
 /** Top-down, 1 px per meter; anything with y below -100 counts as behind the camera. */
 const ortho: ToScreen = (x, y, z, out) => {
@@ -98,5 +98,20 @@ describe('trainHitPx', () => {
     // A train within the touch target beside the hidden open station wins; with none, the station is picked.
     expect(choosePick({ index: 4, distancePx: 2 }, { index: 9, distancePx: TRAIN_TOUCH_HIT_PX - 1 }, new Set([4]))).toEqual({ kind: 'train', index: 9 })
     expect(choosePick({ index: 4, distancePx: 2 }, null, new Set([4]))).toEqual({ kind: 'station', index: 4 })
+  })
+})
+
+describe('withFootprint', () => {
+  it('keeps a station or train pick without asking for a footprint', () => {
+    const never = () => {
+      throw new Error('asked for a footprint')
+    }
+    expect(withFootprint({ kind: 'train', index: 2 }, never)).toEqual({ kind: 'train', index: 2 })
+    expect(withFootprint({ kind: 'station', index: 1 }, never)).toEqual({ kind: 'station', index: 1 })
+  })
+
+  it('falls back to the footprint under the click, or nothing', () => {
+    expect(withFootprint(null, () => 'L08')).toEqual({ kind: 'interior', stationId: 'L08' })
+    expect(withFootprint(null, () => null)).toBeNull()
   })
 })
