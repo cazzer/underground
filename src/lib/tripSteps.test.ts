@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { activeStepKey, journeyItinerary, stepStatus, type ItineraryRow, type StationLayout, type StepContext, type TripStep } from './tripSteps'
+import type { StationLayout } from '../data/interiorLoad'
+import { activeStepKey, journeyItinerary, stepStatus, type ItineraryRow, type StepContext, type TripStep } from './tripSteps'
 import type { ChangeLegView, RideLegView, WalkLegView } from './tripView'
 
 const ride = (routeId: string, from: [string, string, string], to: [string, string, string], tripId = `${routeId}-trip`): RideLegView => ({
@@ -19,6 +20,7 @@ const ctx = (over: Partial<StepContext> & { layouts?: Record<string, StationLayo
   const { layouts = {}, ...rest } = over
   return {
     layoutOf: (id) => (id in layouts ? layouts[id]! : 'generated'),
+    routeName: (id) => id,
     routeSpoken: (id) => id,
     hasBoardPath: false,
     hasExitPath: () => false,
@@ -41,17 +43,24 @@ describe('journeyItinerary', () => {
   it('steps Board, ride, Change, ride, Exit with "of 3" sentences', () => {
     const rows = journeyItinerary(withChange, ctx({ layouts: { L08: 'authored', '635': 'authored', '127': 'none' }, hasTransferPath: (k) => k === 'L>4' }))
     expect(shape(rows)).toEqual(['board:0', 'leg:0', 'change:1', 'leg:2', 'exit:2'])
-    expect(steps(rows).map((s) => s.text)).toEqual(['Board 8:04 at Bedford Av', 'Change at 14 St-Union Sq · 4 min', 'Exit 8:31 at Times Sq-42 St'])
+    expect(steps(rows).map((s) => s.text)).toEqual(['Board 8:04 at Bedford Av', 'Change at 14 St-Union Sq · 4 min walk · 4 at 8:16', 'Exit 8:31 at Times Sq-42 St'])
     expect(steps(rows).map((s) => s.spoken)).toEqual([
-      'Step 1 of 3: board the L at Bedford Av at 8:04.',
-      'Step 2 of 3: change at 14 St-Union Sq to the 4, 4 minutes.',
-      'Step 3 of 3: exit at Times Sq-42 St at 8:31. No station layout.',
+      'Step 1 of 3: board the L at Bedford Av, 8:04.',
+      'Step 2 of 3: change at 14 St-Union Sq to the 4 train at 8:16, a 4-minute walk.',
+      'Step 3 of 3: exit at Times Sq-42 St, 8:31. No station layout.',
     ])
   })
 
   it('says when a ride gets off, except before the Exit step, which has the time', () => {
     const rows = journeyItinerary(withChange, ctx())
     expect(rows.filter((r) => r.kind === 'leg').map((r) => r.kind === 'leg' && r.showOff)).toEqual([true, false])
+  })
+
+  it('names the station a ride gets off at only when a walk follows, since a step names it otherwise', () => {
+    const rows = journeyItinerary([ride('L', BEDFORD, UNION_OFF), walk('R20', '14 St'), ride('N', ['R20', '14 St', '8:20'], TIMES)], ctx())
+    const offs = rows.flatMap((r) => (r.kind === 'leg' && r.leg.kind === 'ride' ? [r.offPlace] : []))
+    expect(offs).toEqual(['14 St-Union Sq', null])
+    expect(journeyItinerary(withChange, ctx()).flatMap((r) => (r.kind === 'leg' ? [r.offPlace] : []))).toEqual([null, null])
   })
 
   it('has two steps for a journey with no change', () => {
@@ -69,7 +78,7 @@ describe('journeyItinerary', () => {
     const rows = journeyItinerary([ride('L', BEDFORD, UNION_OFF), walk('R20', '14 St'), ride('N', ['R20', '14 St', '8:20'], TIMES)], ctx())
     expect(shape(rows)).toEqual(['board:0', 'leg:0', 'leg:1', 'board:2', 'leg:2', 'exit:2'])
     expect(steps(rows).map((s) => s.stationId)).toEqual(['L08', 'R20', '127'])
-    expect(steps(rows)[1]!.spoken).toBe('Step 2 of 3: board the N at 14 St at 8:20.')
+    expect(steps(rows)[1]!.spoken).toBe('Step 2 of 3: board the N at 14 St, 8:20.')
   })
 
   it('has no steps for a walk-only journey', () => {
@@ -80,8 +89,8 @@ describe('journeyItinerary', () => {
   it('omits the minutes of a same-platform change', () => {
     const rows = journeyItinerary([ride('L', BEDFORD, UNION_OFF), change('635', '14 St-Union Sq', null), ride('4', UNION_ON, TIMES)], ctx())
     const step = steps(rows)[1]!
-    expect(step.text).toBe('Change at 14 St-Union Sq')
-    expect(step.spoken).toBe('Step 2 of 3: change at 14 St-Union Sq to the 4. No station layout for this change.')
+    expect(step.text).toBe('Change at 14 St-Union Sq · 4 at 8:16')
+    expect(step.spoken).toBe('Step 2 of 3: change at 14 St-Union Sq to the 4 train at 8:16. No path shown for this change.')
   })
 
   it('carries the keys the panel looks the lines up by', () => {
@@ -89,6 +98,16 @@ describe('journeyItinerary', () => {
     expect([board!.transferKey, board!.tripId]).toEqual([null, null])
     expect(chg!.transferKey).toBe('L>4')
     expect(exit!.tripId).toBe('4-trip')
+  })
+
+  it('keeps the exit line off a ride that a walk follows: the way out is at the walk\'s end, not its alight station', () => {
+    const rows = journeyItinerary([ride('L', BEDFORD, UNION_OFF), walk('X', 'Somewhere')], ctx({ layouts: { L03: 'authored' }, hasExitPath: () => true }))
+    const exit = steps(rows).at(-1)!
+    expect(exit.kind).toBe('exit')
+    expect(exit.tripId).toBeNull()
+    expect(exit.status).toBeNull()
+    const lone = steps(journeyItinerary([ride('L', BEDFORD, UNION_OFF)], ctx({ hasExitPath: () => true }))).at(-1)!
+    expect(lone.tripId).toBe('L-trip')
   })
 
   it('gives the first Board the board path only', () => {
@@ -108,7 +127,7 @@ describe('stepStatus', () => {
     expect(stepStatus('change', 'none', false)).toBe('No station layout')
   })
   it('says a change at a generated station has no drawable path, but stays quiet for Board and Exit there', () => {
-    expect(stepStatus('change', 'generated', false)).toBe('No station layout for this change')
+    expect(stepStatus('change', 'generated', false)).toBe('No path shown for this change')
     expect(stepStatus('board', 'generated', false)).toBeNull()
     expect(stepStatus('exit', 'generated', false)).toBeNull()
   })

@@ -33,7 +33,7 @@ export interface TripLines {
   /** Which stations have an interior: a step at one without says "No station layout". */
   index: IndexLoad
   /** The way to the first platform at the From station (2q7.45.7); absent or null: none. */
-  board?: { text: string } | null
+  board?: { text: string; spoken: string } | null
 }
 
 interface TripPanelProps {

@@ -20,9 +20,9 @@ export function TripStepButton({ step, active, onPress }: TripStepButtonProps) {
       aria-current={active ? 'step' : undefined}
       aria-description="Show on map"
       onClick={() => onPress(step.key, step.stationId)}
-      className={`-my-1 flex min-h-11 w-full cursor-pointer flex-col justify-center text-left hover:text-focus focus-visible:outline-2 focus-visible:outline-focus ${active ? 'text-focus' : ''}`}
+      className={`group -my-1 flex min-h-11 w-full cursor-pointer flex-col justify-center border-l-2 pl-2 text-left focus-visible:outline-2 focus-visible:outline-focus ${active ? 'border-focus text-focus' : 'border-transparent hover:text-ink'}`}
     >
-      <span aria-hidden="true" className="underline">
+      <span aria-hidden="true" className="underline decoration-1 underline-offset-2 group-hover:decoration-2">
         {step.text}
       </span>
       {step.status !== null && (

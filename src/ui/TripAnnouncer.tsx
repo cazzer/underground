@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ANNOUNCE_DELAY_MS } from '../lib/focusAnnounce'
+import { ANNOUNCE_DELAY_MS, focusAnnouncement } from '../lib/focusAnnounce'
 import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { Network } from '../lib/network'
@@ -30,7 +30,7 @@ interface TripAnnouncerProps {
  * changing.
  */
 export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: TripAnnouncerProps) {
-  const { open, ends, plan, dropped, activeStepLead } = useTrip()
+  const { open, ends, plan, dropped, activeStep, activeStepLead } = useTrip()
   const { focusedId } = useFocus()
   const [text, setText] = useState('')
   const lastId = useRef<string | null>(null)
@@ -112,6 +112,19 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
     }, ANNOUNCE_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [focusedId, shown])
+
+  // A step press says "Showing <station>" once (FocusAnnouncer's wording; it is covered while the trip panel is open, and the
+  // focus effect above skips the stepped station), after the same hold, and only if the step still holds.
+  useEffect(() => {
+    if (activeStep === null || activeStepLead === null) return
+    const name = network.groupById.get(activeStepLead)?.name
+    if (name === undefined) return
+    const timer = window.setTimeout(() => {
+      if (latest.current.activeStepLead === activeStepLead) say(focusAnnouncement(name))
+    }, ANNOUNCE_DELAY_MS)
+    return () => window.clearTimeout(timer)
+    // The pressed step is what triggers it; the station follows from it.
+  }, [activeStep])
 
   useEffect(() => () => window.clearTimeout(refill.current), [])
 

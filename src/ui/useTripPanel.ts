@@ -70,18 +70,13 @@ export function useTripPanel({ locate, panel, stationHeading, searchButton, sibl
     if (hadFocus) requestAnimationFrame(() => (stationHeading.current ?? searchButton.current)?.focus({ preventScroll: true }))
   }, [setOpen, panel, stationHeading, searchButton])
   // A collapsed panel is a bar with its body hidden: Esc closes it, not an unseen step or Back. Otherwise one level per
-  // press: the active step ends (its station is dismissed, the camera stays, focus goes to the step's button), then Back
-  // from the opened journey, then close.
+  // press: the active step ends (the station stays focused with its path, the camera and focus stay), then Back from the
+  // opened journey, then close.
   const escapeTrip = useCallback(() => {
     if (tripCollapsed) closeTrip()
-    else if (activeStep !== null) {
-      const hadFocus = panel.current?.contains(document.activeElement) ?? false
-      endStep()
-      if (hadFocus) {
-        requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>(`[data-step="${activeStep}"]`)?.focus({ preventScroll: true }))
-      }
-    } else if (selection.canGoBack) backToList()
+    else if (activeStep !== null) endStep()
+    else if (selection.canGoBack) backToList()
     else closeTrip()
-  }, [selection.canGoBack, tripCollapsed, activeStep, endStep, panel, backToList, closeTrip])
+  }, [selection.canGoBack, tripCollapsed, activeStep, endStep, backToList, closeTrip])
   return { tripOpen: open, openTrip, closeTrip, escapeTrip, focusRequest }
 }

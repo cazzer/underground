@@ -1,8 +1,6 @@
 /** The opened journey as an itinerary: Board, Change and Exit steps between its ride and walk rows, each with its status and one spoken sentence. Pure. */
+import type { StationLayout } from '../data/interiorLoad'
 import type { ChangeLegView, LegView, RideLegView } from './tripView'
-
-/** What a station's interior is: hand-authored, generated, none, or null while the station index isn't ready (nothing is known). */
-export type StationLayout = 'authored' | 'generated' | 'none' | null
 
 export type StepKind = 'board' | 'change' | 'exit'
 
@@ -29,12 +27,17 @@ export interface TripStep {
 
 export type ItineraryRow =
   | { kind: 'step'; step: TripStep }
-  /** `showOff`: the ride row says when it gets off (the next row is not the Exit step, which has the time). */
-  | { kind: 'leg'; leg: LegView; index: number; showOff: boolean }
+  /**
+   * `showOff`: the ride row says when it gets off (the next row is not the Exit step, which has the time). `offPlace`:
+   * and where, when a walk follows (the next row is a walk, not a Change or Board step that names the station).
+   */
+  | { kind: 'leg'; leg: LegView; index: number; showOff: boolean; offPlace: string | null }
 
 export interface StepContext {
   layoutOf: (stationId: string) => StationLayout
-  /** "L", "F express": how a screen reader says the route. */
+  /** "4", "FX": the route as the chip shows it. */
+  routeName: (routeId: string) => string
+  /** "4", "F express": how a screen reader says the route. */
   routeSpoken: (routeId: string) => string
   /** The first Board step has a path drawn at its station. */
   hasBoardPath: boolean
@@ -45,21 +48,19 @@ export interface StepContext {
 }
 
 const NO_LAYOUT = 'No station layout'
-const NO_CHANGE_LAYOUT = 'No station layout for this change'
+const NO_CHANGE_PATH = 'No path shown for this change'
 
 /**
  * What a step says it cannot show. Nothing while the layout is not known (null) or a path exists. A change at a
- * generated station has no path to draw (generated interiors never connect two tracks); a Board or Exit at one may
- * simply still be loading, so it says nothing.
+ * generated station has a layout but no path to draw (generated interiors never connect two tracks); a Board or Exit
+ * at one may simply still be loading, so it says nothing.
  */
 export function stepStatus(kind: StepKind, layout: StationLayout, hasPath: boolean): string | null {
   if (hasPath || layout === null) return null
   if (layout === 'none') return NO_LAYOUT
-  if (kind === 'change' && layout === 'generated') return NO_CHANGE_LAYOUT
+  if (kind === 'change' && layout === 'generated') return NO_CHANGE_PATH
   return null
 }
-
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 
 interface Draft {
   kind: StepKind
@@ -84,14 +85,15 @@ function boardDraft(ride: RideLegView, index: number, ctx: StepContext, first: b
     name,
     clock,
     text: `Board ${clock} at ${name}`,
-    sentence: `board the ${ctx.routeSpoken(ride.routeId)} at ${name} at ${clock}`,
+    sentence: `board the ${ctx.routeSpoken(ride.routeId)} at ${name}, ${clock}`,
     hasPath: first && ctx.hasBoardPath,
     transferKey: null,
     tripId: null,
   }
 }
 
-function exitDraft(ride: RideLegView, index: number, ctx: StepContext): Draft {
+/** `last`: the ride is the journey's last leg, so its alight station is where the exit line is; a trailing walk moves the way out elsewhere. */
+function exitDraft(ride: RideLegView, index: number, last: boolean, ctx: StepContext): Draft {
   const { stationId, name, clock } = ride.alight
   return {
     kind: 'exit',
@@ -100,23 +102,24 @@ function exitDraft(ride: RideLegView, index: number, ctx: StepContext): Draft {
     name,
     clock,
     text: `Exit ${clock} at ${name}`,
-    sentence: `exit at ${name} at ${clock}`,
-    hasPath: ctx.hasExitPath(ride.tripId),
+    sentence: `exit at ${name}, ${clock}`,
+    hasPath: last && ctx.hasExitPath(ride.tripId),
     transferKey: null,
-    tripId: ride.tripId,
+    tripId: last ? ride.tripId : null,
   }
 }
 
 function changeDraft(leg: ChangeLegView, index: number, next: RideLegView | undefined, ctx: StepContext): Draft {
   const { minutes } = leg
+  const to = next ? { visible: ` · ${ctx.routeName(next.routeId)} at ${next.board.clock}`, spoken: ` to the ${ctx.routeSpoken(next.routeId)} train at ${next.board.clock}` } : null
   return {
     kind: 'change',
     legIndex: index,
     stationId: leg.stationId,
     name: leg.name,
     clock: null,
-    text: `Change at ${leg.name}${minutes === null ? '' : ` · ${minutes} min`}`,
-    sentence: `change at ${leg.name}${next ? ` to the ${ctx.routeSpoken(next.routeId)}` : ''}${minutes === null ? '' : `, ${plural(minutes, 'minute')}`}`,
+    text: `Change at ${leg.name}${minutes === null ? '' : ` · ${minutes} min walk`}${to?.visible ?? ''}`,
+    sentence: `change at ${leg.name}${to?.spoken ?? ''}${minutes === null ? '' : `, a ${minutes}-minute walk`}`,
     hasPath: ctx.hasTransferPath(leg.transferKey),
     transferKey: leg.transferKey,
     tripId: null,
@@ -161,7 +164,7 @@ export function journeyItinerary(legs: readonly LegView[], ctx: StepContext): It
     if (leg.kind === 'ride') {
       if (!seenRide || legs[i - 1]?.kind === 'walk') drafts.push(boardDraft(leg, i, ctx, !seenRide))
       seenRide = true
-      if (i === lastRide) drafts.push(exitDraft(leg, i, ctx))
+      if (i === lastRide) drafts.push(exitDraft(leg, i, i === legs.length - 1, ctx))
     } else if (leg.kind === 'change') {
       drafts.push(changeDraft(leg, i, legs.slice(i + 1).find((l): l is RideLegView => l.kind === 'ride'), ctx))
     }
@@ -172,7 +175,10 @@ export function journeyItinerary(legs: readonly LegView[], ctx: StepContext): It
     const [board, change, exit] = [steps.get(`board:${i}`), steps.get(`change:${i}`), steps.get(`exit:${i}`)]
     if (board) rows.push({ kind: 'step', step: board })
     if (change) rows.push({ kind: 'step', step: change })
-    else rows.push({ kind: 'leg', leg, index: i, showOff: leg.kind === 'ride' && exit === undefined })
+    else {
+      const showOff = leg.kind === 'ride' && exit === undefined
+      rows.push({ kind: 'leg', leg, index: i, showOff, offPlace: leg.kind === 'ride' && showOff && legs[i + 1]?.kind === 'walk' ? leg.alight.name : null })
+    }
     if (exit) rows.push({ kind: 'step', step: exit })
   })
   return rows

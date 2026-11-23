@@ -164,7 +164,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     }
   }, [focusedId, trainOpen, noticeOpen, tripOpen, onPanel])
 
-  // Esc closes the front panel: the train panel, then the notice, then the trip panel (an opened journey goes back to the list first), then the station's.
+  // Esc closes the front panel: the train panel, then the notice, then the trip panel (an active step ends first, then an opened journey goes back to the list, then it closes), then the station's.
   useEffect(() => {
     // While search is open, Esc belongs to it: one press must not also dismiss a panel.
     if ((!focusedId && !trainOpen && !noticeOpen && !tripOpen) || searchOpen) return

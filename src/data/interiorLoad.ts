@@ -1,5 +1,4 @@
 import type { InteriorModel } from '../scene/interiorModel'
-import type { StationLayout } from '../lib/tripSteps'
 import type { StationIndex } from './stationSchema'
 
 export type InteriorLoad =
@@ -54,6 +53,9 @@ export function interiorIdOf(stationId: string | null, index: IndexLoad): string
   if (!Object.hasOwn(index.index.stations, stationId)) return null
   return index.index.stations[stationId]!.file ?? stationId
 }
+
+/** What a station's interior is: hand-authored, generated, none, or null while the station index isn't ready (nothing is known). */
+export type StationLayout = 'authored' | 'generated' | 'none' | null
 
 /**
  * What the station's interior is, for the trip steps: its file's provenance, `'none'` when the ready index doesn't list
