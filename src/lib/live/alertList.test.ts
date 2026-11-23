@@ -60,19 +60,19 @@ describe('alertListView status', () => {
 })
 
 describe('alertListView groups', () => {
-  it('puts an alert in effect under Now with "Now · until" and its end as the sort key', () => {
+  it('puts an alert in effect under Now with "Until" and its end as the sort key', () => {
     const { now, later } = list([alert()])
     expect(later).toEqual([])
-    expect(now).toEqual([{ id: 'lmm:planned_work:1', routeIds: ['1'], header: 'Some trains are delayed', when: 'Now · until 3:30 PM', atS: NOW + 3600 }])
+    expect(now).toEqual([{ id: 'lmm:planned_work:1', routeIds: ['1'], header: 'Some trains are delayed', when: 'Until 3:30 PM', atS: NOW + 3600 }])
   })
 
-  it('says only "Now" for an open-ended period, and for one with no start', () => {
-    expect(list([alert({ periods: [[0, null]] })]).now[0]).toMatchObject({ when: 'Now', atS: null })
-    expect(list([alert({ periods: [[NOW - 5, null]] })]).now[0]!.when).toBe('Now')
+  it('says nothing for an open-ended period, and for one with no start (the heading says Now)', () => {
+    expect(list([alert({ periods: [[0, null]] })]).now[0]).toMatchObject({ when: '', atS: null })
+    expect(list([alert({ periods: [[NOW - 5, null]] })]).now[0]!.when).toBe('')
   })
 
   it('words an end on another day', () => {
-    expect(list([alert({ periods: [[NOW - 5, est(24, 5)]] })]).now[0]!.when).toBe('Now · until tomorrow 5 AM')
+    expect(list([alert({ periods: [[NOW - 5, est(24, 5)]] })]).now[0]!.when).toBe('Until tomorrow 5 AM')
   })
 
   it('puts an alert starting within 24 h under Later, and drops one starting at +24 h exactly', () => {
@@ -163,7 +163,7 @@ describe('laterWhen', () => {
 })
 
 describe('alertChip', () => {
-  const row = (id: string) => ({ id, routeIds: [], header: id, when: 'Now', atS: null })
+  const row = (id: string) => ({ id, routeIds: [], header: id, when: '', atS: null })
   const chip = (body: AlertListBody, open = false) => alertChip(body, open)
 
   it('is null when off, and when connecting or empty with the panel closed', () => {

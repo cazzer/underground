@@ -33,7 +33,7 @@ export function ServiceChangeRow({ row, routeById }: ServiceChangeRowProps) {
               )
             })}
           </span>
-          <span className="min-w-0 pt-px text-ink-dim">{row.when}</span>
+          {row.when !== '' && <span className="min-w-0 pt-px text-ink-dim">{row.when}</span>}
         </span>
         <span className="mt-1 block text-sm break-words whitespace-pre-line text-ink">{row.header}</span>
       </div>

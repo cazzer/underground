@@ -11,7 +11,7 @@ export interface AlertListRow {
   routeIds: string[]
   /** The MTA's header, verbatim: a plain text node, never edited, truncated or re-cased. */
   header: string
-  /** "Now", "Now · until 11:45 PM", "Tonight 11:45 PM", "Tomorrow 4 AM": New York time. */
+  /** Under Now: "Until Fri 11:45 PM", or "" when there is no end (the heading says Now). Under Later: "Tonight 11:45 PM", "Tomorrow 4 AM". New York time. */
   when: string
   /** The sort key: the end of the period in effect (null: open-ended), or the start of the next. */
   atS: number | null
@@ -64,7 +64,7 @@ const byId = (a: AlertListRow, b: AlertListRow) => (a.id < b.id ? -1 : a.id > b.
 
 /**
  * The header's list as of `nowS`: every alert in effect (Now) or starting within the window (Later today), each once,
- * under the same freshness rule as the station panel (`alertsStatus`). An alert in effect stays "Now" however many
+ * under the same freshness rule as the station panel (`alertsStatus`). An alert in effect stays under Now however many
  * later periods it has; one that isn't takes its earliest start.
  */
 export function alertListView(alerts: AlertsInput, routeOrder: ReadonlyMap<RouteId, number>, nowS: number): AlertListBody {
@@ -80,7 +80,7 @@ export function alertListView(alerts: AlertsInput, routeOrder: ReadonlyMap<Route
     const routeIds = routesOf(alert.entities, routeOrder)
     const base = { id: alert.id, routeIds, header: alert.header }
     if (period.now) {
-      const when = period.end === null ? 'Now' : `Now · until ${nyWhen(period.end, nowS)}`
+      const when = period.end === null ? '' : `Until ${nyWhen(period.end, nowS)}`
       now.push({ ...base, when, atS: period.end })
     } else later.push({ ...base, when: laterWhen(period.start, nowS), atS: period.start })
   }

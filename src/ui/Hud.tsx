@@ -92,7 +92,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
   const searchButton = useRef<HTMLButtonElement>(null)
   const chipButton = useRef<HTMLButtonElement>(null)
   const { tripOpen, openTrip, closeTrip, escapeTrip, focusRequest } = useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf })
-  const { changesOpen, headingRef: changesHeading, toggleChanges, closeChanges } = useChangesPanel({ panel, chipRef: chipButton, tripHeading, stationHeading, searchButton })
+  const { changesOpen, headingRef: changesHeading, toggleChanges, closeChanges, chipFocusLost } = useChangesPanel({ panel, chipRef: chipButton, tripHeading, stationHeading, searchButton })
   // The one rule for which panel the bottom slot shows (panelCollapseState.ts); the changes and trip panels stay mounted under a train or notice.
   const { front } = usePanelCollapse()
   const chip = alertChip(changeList, changesOpen)
@@ -140,6 +140,8 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
   }
   const onSearchChoose = (stationId: string) => {
     focusOnClose.current = 'station'
+    // A search pick asks for that station, so the list doesn't hide its panel (a map tap keeps the list open).
+    if (changesOpen) closeChanges()
     select(stationId)
   }
   const onSearchChoosePlace = (pick: PlacePick) => {
@@ -175,7 +177,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
             <span>{scheduleLabel(network.feedVersion)}</span>
             <LiveStatus status={live} />
           </p>
-          <ServiceChangesChip ref={chipButton} chip={chip} expanded={front === 'changes'} controls={SERVICE_CHANGES_PANEL_ID} onToggle={toggleChanges} />
+          <ServiceChangesChip ref={chipButton} chip={chip} expanded={front === 'changes'} controls={SERVICE_CHANGES_PANEL_ID} onToggle={toggleChanges} onFocusLost={chipFocusLost} />
           <LocateStatus state={locate.state} onClear={onClearLocation} />
           <PlaceStatus
             ref={place.lineRef}

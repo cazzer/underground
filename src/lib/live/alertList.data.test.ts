@@ -21,7 +21,7 @@ describe('alertListView on the recorded feed', () => {
     const row = body.now.find((r) => short(r.id) === '35124')
     expect(row).toBeDefined()
     expect(row!.routeIds).toContain('1')
-    expect(row!.when).toMatch(/^Now/)
+    expect(row!.when).toBe('Until Fri 11:45 PM')
   })
 
   it('lists a change starting tonight as later, with its New York time', () => {

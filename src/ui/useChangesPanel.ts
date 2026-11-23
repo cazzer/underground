@@ -22,6 +22,8 @@ export interface ChangesPanelControls {
   toggleChanges: () => void
   /** "Close", or Esc: closes it and, when focus was inside, hands it to the chip, else the panel underneath. */
   closeChanges: () => void
+  /** For the chip's unmount while it has focus: focus goes to the next fallback, one frame later. */
+  chipFocusLost: () => void
 }
 
 /**
@@ -54,13 +56,19 @@ export function useChangesPanel({ panel, chipRef, tripHeading, stationHeading, s
     setFocusRequests((n) => n + 1)
   }, [front, close, selectedSummary, notice, clearTrain, dismissNotice, openChanges])
 
+  // One frame later, so a chip that stays is found (and a station panel that mounts as the list closes).
+  const focusFallback = useCallback(() => {
+    requestAnimationFrame(() => (chipRef.current ?? tripHeading.current ?? stationHeading.current ?? searchButton.current)?.focus({ preventScroll: true }))
+  }, [chipRef, tripHeading, stationHeading, searchButton])
+
   const closeChanges = useCallback(() => {
     const hadFocus = panel.current?.contains(document.activeElement) ?? false
     close()
-    if (hadFocus) {
-      requestAnimationFrame(() => (chipRef.current ?? tripHeading.current ?? stationHeading.current ?? searchButton.current)?.focus({ preventScroll: true }))
-    }
-  }, [panel, close, chipRef, tripHeading, stationHeading, searchButton])
+    if (hadFocus) focusFallback()
+  }, [panel, close, focusFallback])
 
-  return { changesOpen, headingRef, toggleChanges, closeChanges }
+  // The chip went away holding focus: a press that closed the list when it had nothing to list, or a poll that emptied it.
+  const chipFocusLost = focusFallback
+
+  return { changesOpen, headingRef, toggleChanges, closeChanges, chipFocusLost }
 }
