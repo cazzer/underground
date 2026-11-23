@@ -5,8 +5,10 @@
  *
  * "Moves the view" is the location cap's own detector (locationCap.ts: a drag past the 6 px mouse / 10 px touch
  * slop, a second finger, a wheel step), so the two never disagree; a tap that doesn't move keeps the hold. Any other
- * flight (a station pick, "Go to", a location fix, a followed train) ends it, and a new place re-arms it. The state is
- * the cap's, `capped` meaning "held". Allocation-free per pointer move.
+ * flight (a station pick, "Go to", a location fix) ends it, and so does a followed train (CameraRig releases it; App
+ * clears the place line and its pin at the same moment), and a new place re-arms it. The state is the cap's,
+ * `capped` meaning "held"; placeHold.test.ts pins the events that end it in numbers of its own. Allocation-free per
+ * pointer move.
  */
 import { capStep, newCap, type CapEvent, type CapState } from './basemap/locationCap'
 

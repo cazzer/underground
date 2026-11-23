@@ -2,11 +2,13 @@ import { Color } from 'three'
 import type { LineBuffers } from '../lib/lineBuffers'
 
 /**
- * The searched place's pin, in units of its radius (1): a diamond outline with a centre dot, on a background-colored
- * halo diamond a little larger. A diamond reads apart from the location reticle (a ring with ticks) and the focus
- * ring (a plain circle) without color alone.
+ * The searched place's pin, in units of its radius (1): a diamond outline with a centre dot, inside a thin
+ * background-colored halo band round the outline (not a disc: the station, lines and trains under the pin's middle stay
+ * visible). A diamond reads apart from the location reticle (a ring with ticks) and the focus ring (a plain circle)
+ * without color alone.
  */
-export const HALO_RADIUS = 1.5
+export const HALO_INNER = 0.7
+export const HALO_OUTER = 1.4
 export const DOT_RADIUS = 0.3
 
 /** The diamond's four corners on the ground plane, east, south, west, north of the center. */

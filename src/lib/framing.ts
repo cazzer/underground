@@ -54,7 +54,9 @@ export function frameBounds(
  * Framing of a circle of `radiusM` around `center` in the band between the HUD insets, with the distance clamped to
  * [minDistance, maxDistance]. The target is aimed (followTargetInto, exact under perspective) at the camera's real
  * tilt for the clamped distance, north-up, so `center` sits in the free band's middle even when the clamp bites and
- * when the view is tipped (a top-down distance gives the plain inset shift). Horizontally it stays centered.
+ * when the view is tipped (a top-down distance gives the plain inset shift). Horizontally it stays centered. It
+ * assumes a north-up view: a point flight drops focus, so the view springs back to north-up, and a spring not yet
+ * finished at the landing leaves the point slightly off-center.
  */
 export function framePoint(
   center: Ground,

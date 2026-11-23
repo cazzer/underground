@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useBands } from './data/useBands'
 import { useEne } from './data/useEne'
 import { useEquipmentIndex } from './data/useEquipmentIndex'
@@ -24,7 +24,7 @@ import type { StationPathDraw } from './lib/interiorPath'
 import type { Network } from './lib/network'
 import type { BandedShapes } from './lib/networkBands'
 import { PanelCollapseProvider } from './lib/panelCollapse'
-import { TrainSelectionProvider } from './lib/trainSelection'
+import { TrainSelectionProvider, useTrainSelection } from './lib/trainSelection'
 import { TripProvider, useTrip } from './lib/trip'
 import { tripNamesOf } from './lib/tripView'
 import { Scene } from './scene/Scene'
@@ -47,6 +47,12 @@ function MapView({ network, bands, live }: MapViewProps) {
   const locate = useLocate(network, flyToPoint)
   // The picked place: its line is the HUD's, its pin the scene's.
   const place = usePlaceLine()
+  // Following a train is a flight like any other: it ends the place line, and so its pin.
+  const { following } = useTrainSelection()
+  const { clear: clearPlace } = place
+  useEffect(() => {
+    if (following) clearPlace()
+  }, [following, clearPlace])
   const interior = useStationInterior(focusedId)
   const stationHash = useStationHash(network)
   // The scene waits for the HUD's measured insets so its opening view can frame around them.

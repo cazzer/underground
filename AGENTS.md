@@ -171,7 +171,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Exit tokens `exitPath` (pink, 3:1, held apart from the interior, focus, location and route colors, also under simulated
   red-green color blindness; theme.test.ts), `exitPathWidth` (3 px), `exitPathDash` / `exitPathGap` (world m) draw the trip's
   way out.
-  Place pin tokens `placePin` (orange, 3:1, held apart from the location, focus and exit colors, also under simulated red-green
+  Place pin tokens `placePin` (lemon, 3:1, held apart from the location, focus and exit colors, the selected-train rim and every route color, also under simulated red-green
   color blindness; theme.test.ts) and `placePinWidth` (2 px) draw the pin on a searched place.
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
@@ -249,7 +249,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     tilt or turn; the tubes are open so no end face crosses a joint, and two 2-instance cap meshes (`writeEndCaps`) close the train's two ends);
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
-    `PlacePin.tsx` the searched place's pin (a diamond outline and centre dot, `placePinShape.ts`, on a thin background halo, constant screen size, `theme.placePin`; no event handlers; Scene mounts it while the place line shows);
+    `PlacePin.tsx` the searched place's pin (a diamond outline and centre dot, `placePinShape.ts`, inside a thin background halo band, constant screen size, `theme.placePin`; no event handlers; Scene mounts it while the place line shows);
     `cameraDistance.ts` helpers; `renderOrder.ts` (also `strokeOrders` and `spanCarOrders`, the per-band and per-deck orders)
   - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms, one layer
     per platform deck (LiveTrains keeps three, splitting the spans with `deckSpans`; 12
@@ -382,7 +382,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   flight, not a station pick (`flyToPoint(…, 'place')`, which lands at `PLACE_LANDING_DISTANCE` (600 m, tilted: `pointFlight` by the request's source), the place in the free area's middle at the real tilt (`framePoint`, `followTargetInto`); it neither expands
   a collapsed station panel nor bumps the collapse seq, and like any point flight it ends a train follow) and shows `PlaceStatus.tsx`
   (`usePlaceLine.ts`): the place's label and "Go to <nearest station> · about 250 m", focus moved onto the sentence, gone with
-  the next flight of any kind or the ×, with a pin on the place for as long (`PlacePin.tsx`; `usePlaceLine` lives in App, so the scene gets its point). Auto-focus may not enter a station from the place's fly request until the user moves the view (the place hold, `lib/placeHold.ts`, `usePlaceHold.ts`: the location cap's detector, `useViewMoves.ts`, a drag past the slop, a pinch or a wheel step; a tap that doesn't move keeps it; any other flight or a followed train ends it; exits still apply); the landing at 600 m is inside the focus range. In a trip's From or To search a place sets that end to
+  the next flight of any kind (a followed train included) or the ×, with a pin on the place for as long (`PlacePin.tsx`; `usePlaceLine` lives in App, so the scene gets its point). Auto-focus may not enter a station from the place's fly request until the user moves the view (the place hold, `lib/placeHold.ts`, `usePlaceHold.ts`: the location cap's detector, `useViewMoves.ts`, a drag past the slop, a pinch or a wheel step; a tap that doesn't move keeps it; any other flight or a followed train ends it; exits still apply); the landing at 600 m is inside the focus range. In a trip's From or To search a place sets that end to
   its nearest station and keeps a "near <place>" note (`nearNote`: the name, or for a street its full label, "near Broadway, Brooklyn"; `TripProvider`'s `places`, shown under the end's name and in its spoken text;
   any station pick, swap aside, clears it); it flies nowhere, and the place is not an exit walking destination. The dialog's keydown stops Escape (the native cancel still closes it), so the HUD's window Esc
   handler never also closes a panel; the HUD's `searchOpen` guard stays. `useKeyboardInset.ts`
