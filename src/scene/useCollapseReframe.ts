@@ -10,7 +10,6 @@ import { usePanelCollapse } from '../lib/panelCollapse'
 import { priorityTiers } from '../lib/pathFrame'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { opensResizeWindow, panelMoveArms, RESIZE_WINDOW_MS, type ResizeWindow } from '../lib/resizeReframe'
-import { useTrainSelection } from '../lib/trainSelection'
 import { bareStationPoints, bareStationTiers, flushMotion, interiorFlight, newFlight, stationFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import type { ReframeLayout } from './useInteriorReframe'
 
@@ -30,8 +29,6 @@ interface CollapseReframeOptions {
   focusedId: string | null
   flyRequest: FlyRequest | null
   following: () => boolean
-  /** The trip panel is open: the station panel isn't in front. */
-  tripOpen: boolean
   /** useInteriorReframe's ask, which waits while a toggle settles: asked again when this one doesn't move the camera. */
   recheck: () => void
 }
@@ -84,10 +81,9 @@ export function useCollapseReframe({
   focusedId,
   flyRequest,
   following,
-  tripOpen,
   recheck,
 }: CollapseReframeOptions): (landed: Flight) => void {
-  const { seq } = usePanelCollapse()
+  const { seq, front: frontNow } = usePanelCollapse()
   const seen = useRef(seq)
   const timer = useRef<number | null>(null)
   const focused = useRef(focusedId)
@@ -102,8 +98,8 @@ export function useCollapseReframe({
   const mine = useRef<Flight | null>(null)
   /** The panel and the free rect's bottom at its last measure. */
   const measured = useRef<{ panel: ScreenRect | null; bottom: number | null } | null>(null)
-  const { selectedSummary, notice } = useTrainSelection()
-  const stationFront = selectedSummary === null && notice === null && !tripOpen
+  // No train, notice, changes list or trip panel over the station's: a station panel in front, or none yet (a pick is about to open it).
+  const stationFront = frontNow === 'station' || frontNow === null
   const front = useRef(stationFront)
   useLayoutEffect(() => {
     front.current = stationFront
@@ -195,12 +191,13 @@ export function useCollapseReframe({
     if (timer.current !== null) window.clearTimeout(timer.current)
     timer.current = null
     const id = focused.current
-    if (!id || flight.current !== null || following()) {
+    // The changes list is no panel of the station's: collapsing it frames nothing the visitor asked about.
+    if (!id || frontNow === 'changes' || flight.current !== null || following()) {
       collapse.current = null
       return
     }
     arm('toggle', id)
-  }, [seq, collapse, flight, following, arm])
+  }, [seq, frontNow, collapse, flight, following, arm])
 
   // Each measured move of the panel restarts the quiet wait (up to the cap); with none pending, one inside the resize
   // window arms a resize.

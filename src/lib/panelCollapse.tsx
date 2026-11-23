@@ -15,7 +15,7 @@ import { useTrip } from './trip'
 export interface PanelCollapse {
   collapsed: boolean
   seq: number
-  /** The panel in front (frontPanel): the trip's route draws while it is the trip panel, collapsed or not. */
+  /** The panel in front (frontPanel): the trip's route draws while it is the trip panel, collapsed or not; the changes list in front covers it like a train panel does. */
   front: FrontPanel
 }
 
@@ -23,18 +23,25 @@ export interface PanelCollapse {
 export interface PanelCollapseControls {
   stationCollapsed: boolean
   tripCollapsed: boolean
+  changesCollapsed: boolean
+  /** The header's service-changes list is open (it may be under a train panel or notice). */
+  changesOpen: boolean
   setCollapsed: (panel: CollapsiblePanel, collapsed: boolean) => void
   /** A directions pick: expands a collapsed trip panel without counting as a toggle (no `seq`: the pick's own focus move is the signal). */
   tripRequested: () => void
+  /** The header chip opens the list expanded, or closes it and forgets its collapse; neither counts as a toggle (no `seq`). */
+  openChanges: () => void
+  closeChanges: () => void
 }
 
 const ViewContext = createContext<PanelCollapse | null>(null)
 const ControlsContext = createContext<PanelCollapseControls | null>(null)
 
 /**
- * Whether the station and trip panels are collapsed to a bar. The station flag lasts the session (browsing passes
- * through no-focus states, and a reset there would reopen the panel on every station); the trip flag resets when the
- * trip panel closes. An explicit pick (a station flight request) expands a collapsed station panel without counting
+ * Whether the station, trip and service-changes panels are collapsed to a bar, and whether the changes list is open
+ * (the one panel opened by the header chip, so its open flag lives here with the rest of the front-panel rule). The
+ * station flag lasts the session (browsing passes through no-focus states, and a reset there would reopen the panel on
+ * every station); the trip and changes flags reset when their panel closes. An explicit pick (a station flight request) expands a collapsed station panel without counting
  * as a toggle: the pick's own flight frames it.
  */
 export function PanelCollapseProvider({ children }: { children: ReactNode }) {
@@ -42,7 +49,7 @@ export function PanelCollapseProvider({ children }: { children: ReactNode }) {
   const { open } = useTrip()
   const { selectedSummary, notice } = useTrainSelection()
   const [state, dispatch] = useReducer(collapseReducer, INITIAL_COLLAPSE)
-  const front = frontPanel({ trainShown: selectedSummary !== null, noticeShown: notice !== null, tripOpen: open, focusedId })
+  const front = frontPanel({ trainShown: selectedSummary !== null, noticeShown: notice !== null, changesOpen: state.changesOpen, tripOpen: open, focusedId })
 
   useEffect(() => {
     if (!open) dispatch({ type: 'tripClosed' })
@@ -57,9 +64,20 @@ export function PanelCollapseProvider({ children }: { children: ReactNode }) {
   const view = useMemo(() => ({ collapsed, seq: state.seq, front }), [collapsed, state.seq, front])
   const setCollapsed = useCallback((panel: CollapsiblePanel, next: boolean) => dispatch({ type: 'set', panel, collapsed: next, front }), [front])
   const tripRequested = useCallback(() => dispatch({ type: 'tripRequested' }), [])
+  const openChanges = useCallback(() => dispatch({ type: 'changesOpened' }), [])
+  const closeChanges = useCallback(() => dispatch({ type: 'changesClosed' }), [])
   const controls = useMemo(
-    () => ({ stationCollapsed: state.station, tripCollapsed: state.trip, setCollapsed, tripRequested }),
-    [state.station, state.trip, setCollapsed, tripRequested],
+    () => ({
+      stationCollapsed: state.station,
+      tripCollapsed: state.trip,
+      changesCollapsed: state.changes,
+      changesOpen: state.changesOpen,
+      setCollapsed,
+      tripRequested,
+      openChanges,
+      closeChanges,
+    }),
+    [state.station, state.trip, state.changes, state.changesOpen, setCollapsed, tripRequested, openChanges, closeChanges],
   )
   return (
     <ViewContext value={view}>

@@ -9,6 +9,7 @@ interface PanelReport {
   focusedId: string | null
   trainOpen: boolean
   noticeOpen: boolean
+  changesOpen: boolean
   tripOpen: boolean
 }
 
@@ -16,7 +17,7 @@ interface PanelReport {
  * Tracked while the panel is open, so a station fly-to can frame the view beside it. Resizes move a stacked
  * (phone) panel's top; window resizes move a desktop panel's left edge.
  */
-export function usePanelReport({ panel, onPanel, focusedId, trainOpen, noticeOpen, tripOpen }: PanelReport): void {
+export function usePanelReport({ panel, onPanel, focusedId, trainOpen, noticeOpen, changesOpen, tripOpen }: PanelReport): void {
   useLayoutEffect(() => {
     const el = panel.current
     if (!el) {
@@ -39,5 +40,5 @@ export function usePanelReport({ panel, onPanel, focusedId, trainOpen, noticeOpe
       observer.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [panel, focusedId, trainOpen, noticeOpen, tripOpen, onPanel])
+  }, [panel, focusedId, trainOpen, noticeOpen, changesOpen, tripOpen, onPanel])
 }
