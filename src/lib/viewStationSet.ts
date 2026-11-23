@@ -1,7 +1,8 @@
 /**
  * The stations in view as one shared object (o3r.2), the way `locationCapHandle.ts` shares the location cap: the scene
  * hook `useViewStations` writes it, and anything that draws or fetches by view (o3r.4) reads it through
- * `useSyncExternalStore`, so a change re-renders only its readers, never the whole app. Pure. `get` returns the last
+ * `useSyncExternalStore`, so a change re-renders only its readers, never the whole app. Scene keeps two, one for the
+ * stations in view and one for those to prefetch (o3r.8). Pure. `get` returns the last
  * set (station leads, the focused one first when there is one), the same array until it changes.
  */
 

@@ -126,6 +126,8 @@ export interface UndergroundDevHooks {
   locationCapped?: () => boolean
   /** The station leads the scene last chose to show by the view (useViewStations); empty under the location cap. */
   viewStations?: () => readonly string[]
+  /** The station leads the scene last chose to prefetch (o3r.8, useViewStations): wider than viewStations, empty under the location cap. */
+  prefetchStations?: () => readonly string[]
   /** The interior file ids the scene draws now, the focused one first (useSceneInteriors). */
   drawnInteriors?: () => string[]
   /** The station ids whose street layers draw now, the focused one first (StationStreets). */

@@ -23,6 +23,12 @@ import type { StationGroup } from './stationGroups'
 
 /** Most stations chosen at once, the focused one included. */
 export const MAX_VIEW_STATIONS = 4
+/** The prefetch choice (o3r.8) reaches out to this camera distance: twice REVEAL_FAR, so a quick zoom finds files already loaded. */
+export const PREFETCH_FAR = 2 * REVEAL_FAR
+/** Most stations the prefetch choice holds (the street files of all, the interior files of the first few: see PREFETCH_EXTRA_INTERIORS). */
+export const MAX_PREFETCH_STATIONS = MAX_VIEW_STATIONS + 2
+/** Interior files the prefetch warms beyond viewInteriorCap (the focused one counted in the cap, as for the view). */
+export const PREFETCH_EXTRA_INTERIORS = 2
 /**
  * Most station interiors drawn at once (o3r.4), the focused one included: each costs four to eight line layers, a few
  * level label divs and its share of the lifted trains, so three keeps a phone's frame rate (the look card's cap).
@@ -89,9 +95,14 @@ export function viewMovedEnough(chosenAt: ViewPose, now: ViewPose): boolean {
   return differs(chosenAt, now, MOVE_PAN_SHARE, MOVE_ZOOM_SHARE, MOVE_TURN_RAD)
 }
 
-/** The camera's distance zone: 0 inside REVEAL_FAR, 1 up to the keep distance, 2 beyond. */
-export function gateZone(distance: number): 0 | 1 | 2 {
-  return distance < REVEAL_FAR ? 0 : distance < REVEAL_FAR * GATE_KEEP_FACTOR ? 1 : 2
+/** The camera's distance zone for a gate at `far` (REVEAL_FAR, or PREFETCH_FAR): 0 inside it, 1 up to the keep distance, 2 beyond. */
+export function gateZone(distance: number, far = REVEAL_FAR): 0 | 1 | 2 {
+  return distance < far ? 0 : distance < far * GATE_KEEP_FACTOR ? 1 : 2
+}
+
+/** Both gates' zones in one number (0..8), so a change of either is one comparison: the choices run at once when it moves. */
+export function viewZones(distance: number): number {
+  return gateZone(distance) * 3 + gateZone(distance, PREFETCH_FAR)
 }
 
 /** The groups' member points in flat typed arrays: group i's members are x/z[start[i] .. start[i + 1]). */
@@ -136,6 +147,10 @@ export interface ViewQuery {
   /** The last choice's group indices; the first `previousCount` count. */
   previous: Int32Array
   previousCount: number
+  /** The gate's distance (default REVEAL_FAR; the prefetch choice, o3r.8, passes PREFETCH_FAR). */
+  far?: number
+  /** Most groups chosen, the focused one counted (default MAX_VIEW_STATIONS; the prefetch passes MAX_PREFETCH_STATIONS). */
+  max?: number
 }
 
 export interface ViewScratch {
@@ -146,8 +161,9 @@ export interface ViewScratch {
   pt: ScreenPoint
 }
 
-export function newViewScratch(space: ViewStationSpace): ViewScratch {
-  return { was: new Uint8Array(space.ids.length), score: new Float64Array(MAX_VIEW_STATIONS), pt: { x: 0, y: 0 } }
+/** A scratch for choices of at most `max` groups (the largest `max` any query using it passes). */
+export function newViewScratch(space: ViewStationSpace, max = MAX_VIEW_STATIONS): ViewScratch {
+  return { was: new Uint8Array(space.ids.length), score: new Float64Array(max), pt: { x: 0, y: 0 } }
 }
 
 /** The nearest qualifying member's distance to (mx, my) px, or Infinity when no member qualifies. */
@@ -180,12 +196,12 @@ function groupScore(
 }
 
 /**
- * Writes the chosen group indices to `out[0..n)` (at least MAX_VIEW_STATIONS long) in rank order, the focused one
- * first, and returns n; 0 from REVEAL_FAR out, except that a previous non-empty set stays (only its own members, nothing
- * new) out to REVEAL_FAR x GATE_KEEP_FACTOR. Allocates nothing; leaves `s` clean.
+ * Writes the chosen group indices to `out[0..n)` (at least `q.max` long, MAX_VIEW_STATIONS by default) in rank order,
+ * the focused one first, and returns n; 0 from `q.far` (REVEAL_FAR by default) out, except that a previous non-empty set
+ * stays (only its own members, nothing new) out to far x GATE_KEEP_FACTOR. Allocates nothing; leaves `s` clean.
  */
 export function chooseViewStations(space: ViewStationSpace, q: ViewQuery, s: ViewScratch, out: Int32Array): number {
-  const zone = gateZone(q.distance)
+  const zone = gateZone(q.distance, q.far ?? REVEAL_FAR)
   if (zone === 2 || (zone === 1 && q.previousCount === 0)) return 0
   const keepOnly = zone === 1
   const { free } = q
@@ -197,7 +213,7 @@ export function chooseViewStations(space: ViewStationSpace, q: ViewQuery, s: Vie
   for (let i = 0; i < q.previousCount; i++) s.was[q.previous[i]!] = 1
 
   const head = q.focused >= 0 && (!keepOnly || s.was[q.focused] === 1) ? 1 : 0
-  const slots = MAX_VIEW_STATIONS - head
+  const slots = (q.max ?? MAX_VIEW_STATIONS) - head
   let n = 0
   for (let g = 0; g < space.ids.length; g++) {
     if (g === q.focused) continue
@@ -226,7 +242,7 @@ export function chooseViewStations(space: ViewStationSpace, q: ViewQuery, s: Vie
 
 /**
  * Whether two choices hold the same groups: with `firstMatters` (a focused station leads the list) the first slot
- * must match too, the rest in any order. At most MAX_VIEW_STATIONS each, so the nested loop is cheap.
+ * must match too, the rest in any order. At most MAX_PREFETCH_STATIONS each, so the nested loop is cheap.
  */
 export function sameMembers(a: Int32Array, an: number, b: Int32Array, bn: number, firstMatters = true): boolean {
   if (an !== bn) return false
