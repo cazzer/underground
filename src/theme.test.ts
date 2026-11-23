@@ -270,3 +270,22 @@ describe('exitPath', () => {
     }
   })
 })
+
+describe('placePin', () => {
+  it('reads at 3:1 on the background', async () => {
+    for (const t of Object.values(await themes())) expect(contrastRatio(t.placePin, t.background), t.name).toBeGreaterThanOrEqual(3)
+  })
+
+  it('stands apart from the location, focus and exit colors, also as a dichromat sees them', async () => {
+    for (const t of Object.values(await themes())) {
+      const others = [['here', t.here], ['focus', t.stationFocus], ['exitPath', t.exitPath]] as const
+      for (const [name, color] of others) {
+        expect(oklabDistance(t.placePin, color), `${t.name} placePin ${t.placePin} vs ${name} ${color}`).toBeGreaterThanOrEqual(0.1)
+        for (const [mode, m] of Object.entries(CVD)) {
+          const d = oklabDistance(simulateCvd(t.placePin, m), simulateCvd(color, m))
+          expect(d, `${t.name} ${mode} placePin vs ${name} ${color}`).toBeGreaterThanOrEqual(MIN_CVD_DISTANCE)
+        }
+      }
+    }
+  })
+})

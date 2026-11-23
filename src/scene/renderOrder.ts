@@ -43,6 +43,9 @@ export const RENDER_ORDER = {
   hereAccuracyEdge: 0.6,
   hereHalo: 6.4,
   here: 6.55,
+  // The searched place's pin (PlacePin.tsx): a background halo, then the diamond and dot, over the reticle, under the veil.
+  placePinHalo: 6.57,
+  placePin: 6.58,
   // Station interior. Look C (?interior=c, temporary) draws it under the street layers.
   interiorUnderFine: -0.6,
   interiorUnder: -0.3,

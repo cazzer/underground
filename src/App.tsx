@@ -11,6 +11,7 @@ import { NO_SIBLINGS } from './data/interiorLoad'
 import { useStationInterior } from './data/useStationInterior'
 import { useTripExit } from './data/useTripExit'
 import { useTripTransfers } from './data/useTripTransfers'
+import { usePlaceLine } from './ui/usePlaceLine'
 import { FocusProvider, useFocus } from './lib/focus'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
 import { joinPanelOutages, stationEquipment } from './lib/live/eneIndexJoin'
@@ -44,6 +45,8 @@ function MapView({ network, bands, live }: MapViewProps) {
   const { focusedId, flyToPoint } = useFocus()
   const banded = useBands(bands)
   const locate = useLocate(network, flyToPoint)
+  // The picked place: its line is the HUD's, its pin the scene's.
+  const place = usePlaceLine()
   const interior = useStationInterior(focusedId)
   const stationHash = useStationHash(network)
   // The scene waits for the HUD's measured insets so its opening view can frame around them.
@@ -111,6 +114,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             siblings={interior.siblings}
             index={interior.index}
             here={here}
+            placePin={place.shown?.ground ?? null}
             stationPaths={stationPaths}
             exitLabel={tripExit?.drawn ? tripExit.mapLabel : null}
             tripOpen={trip.open}
@@ -125,6 +129,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           onInsets={setInsets}
           onPanel={setPanel}
           locate={locate}
+          place={place}
           linkNotice={{ show: stationHash.linkNotice, onDismiss: stationHash.dismissLinkNotice }}
           interior={{ load: interior.load, onRetry: interior.retry }}
           outages={outagePanelView(outages, nowS, noStepFree)}

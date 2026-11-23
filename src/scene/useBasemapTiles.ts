@@ -12,7 +12,7 @@
  * listens on (r3f's connected element, as drei picks it) and the window, never MapControls props (a changed on*
  * prop makes drei reconnect the controls, AGENTS.md). Not lifted by: following a train, keyboard input.
  */
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { PerspectiveCamera } from 'three'
 import type { BasemapConfig } from '../data/basemapConfig'
@@ -23,6 +23,7 @@ import { newPose } from '../lib/basemap/reselect'
 import { useFocus, type FlyRequest } from '../lib/focus'
 import type { PackedTracks } from '../lib/routeTracks'
 import type { MapControlsImpl } from './cameraFlight'
+import { useControlsElement, useViewMoves } from './useViewMoves'
 
 /** The idle callback's deadline: tiles start loading by then even if the main thread never idles. */
 const IDLE_TIMEOUT_MS = 2000
@@ -39,8 +40,7 @@ function stepCap(cap: CapState, store: BasemapTiles, e: CapEvent): void {
 
 export function useBasemapTiles(config: BasemapConfig, tracks: PackedTracks): BasemapTiles {
   const store = useMemo(() => createBasemapTiles(config, tracks), [config, tracks])
-  // The element MapControls listens on (drei: `domElement || events.connected || gl.domElement`).
-  const el = useThree((s) => (s.events.connected as HTMLElement | undefined) || s.gl.domElement)
+  const el = useControlsElement()
   const { flyRequest } = useFocus()
   const latestFly = useRef<FlyRequest | null>(null)
   const handledFly = useRef<FlyRequest | null>(null)
@@ -78,34 +78,8 @@ export function useBasemapTiles(config: BasemapConfig, tracks: PackedTracks): Ba
     applyFly()
   }, [flyRequest, applyFly])
 
-  useEffect(() => {
-    const touch = (e: PointerEvent) => e.pointerType === 'touch'
-    const step = (e: CapEvent) => stepCap(cap.current, store, e)
-    const onDown = (e: PointerEvent) => step({ type: 'down', id: e.pointerId, x: e.clientX, y: e.clientY, touch: touch(e), primary: e.isPrimary })
-    const onMove = (e: PointerEvent) => {
-      // A mouse or pen with no button held is hovering, not dragging.
-      if (e.pointerType !== 'touch' && e.buttons === 0) return
-      step({ type: 'move', id: e.pointerId, x: e.clientX, y: e.clientY })
-    }
-    const onBlur = () => step({ type: 'blur' })
-    const onUp = (e: PointerEvent) => step({ type: 'up', id: e.pointerId })
-    const onWheel = () => step({ type: 'wheel' })
-    el.addEventListener('pointerdown', onDown, { passive: true })
-    el.addEventListener('wheel', onWheel, { passive: true })
-    // On the window: a mouse drag isn't captured to the canvas (MapControls listens on the document).
-    window.addEventListener('pointermove', onMove, { passive: true })
-    window.addEventListener('pointerup', onUp, { passive: true })
-    window.addEventListener('pointercancel', onUp, { passive: true })
-    window.addEventListener('blur', onBlur)
-    return () => {
-      window.removeEventListener('blur', onBlur)
-      el.removeEventListener('pointerdown', onDown)
-      el.removeEventListener('wheel', onWheel)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-    }
-  }, [el, store])
+  const onViewMove = useCallback((e: CapEvent) => stepCap(cap.current, store, e), [store])
+  useViewMoves(el, onViewMove)
 
   useEffect(() => {
     if (!import.meta.env.DEV) return

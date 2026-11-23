@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { boundsCenter, fitDistance, frameBounds, framePoint } from './framing'
+import { tiltForDistance } from './tilt'
 
 const square = (half: number) => ({ minX: -half, maxX: half, minZ: -half, maxZ: half })
 const TAN = Math.tan((35 * Math.PI) / 360)
@@ -89,10 +90,26 @@ describe('framePoint', () => {
   })
 
   it('shifts the target south by the clamped meters-per-pixel for a top inset', () => {
-    const f = framePoint(center, 10, viewport, { top: 200, bottom: 0 }, 35, 504, 1e6)
-    const metersPerPx = (2 * 504 * TAN) / viewport.height
-    expect(f.distance).toBe(504)
+    const f = framePoint(center, 10, viewport, { top: 200, bottom: 0 }, 35, 1500, 1e6)
+    const metersPerPx = (2 * 1500 * TAN) / viewport.height
+    expect(f.distance).toBe(1500)
     expect(f.target.x).toBe(center.x)
     expect(f.target.z).toBeCloseTo(center.z - 100 * metersPerPx)
+  })
+
+  it('puts the point in the free band middle when the view is tipped', () => {
+    const insets = { top: 120, bottom: 360 }
+    const f = framePoint(center, 10, viewport, insets, 35, 600, 600)
+    const polar = tiltForDistance(600)
+    expect(polar).toBeGreaterThan(0.5)
+    // Project the point through the camera OrbitControls puts at f.target, 600 m out, north-up.
+    const cam = { x: f.target.x, y: 600 * Math.cos(polar), z: f.target.z + 600 * Math.sin(polar) }
+    const rel = { y: -cam.y, z: center.z - cam.z }
+    const forward = rel.y * -Math.cos(polar) + rel.z * -Math.sin(polar)
+    const up = rel.y * Math.sin(polar) + rel.z * -Math.cos(polar)
+    const ndcY = up / forward / TAN
+    expect(ndcY).toBeCloseTo((insets.bottom - insets.top) / viewport.height, 6)
+    // Horizontally the point stays on the middle.
+    expect(f.target.x).toBe(center.x)
   })
 })

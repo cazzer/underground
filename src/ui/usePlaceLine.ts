@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, type RefObject } from 'react'
 import { useFocus } from '../lib/focus'
 import type { PlacePick } from '../lib/placeLabel'
 
-/** What the point flight frames; `framePoint` floors the distance at EXIT_DISTANCE (1450 m, top-down). */
+/** The radius a place's point flight is asked to frame; its landing distance is PLACE_LANDING_DISTANCE (600 m, tilted), so only the request carries it. */
 export const PLACE_VIEW_RADIUS_M = 250
 
 export interface PlaceLine {

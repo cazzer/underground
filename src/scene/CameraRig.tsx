@@ -16,6 +16,7 @@ import type { CollapsePending } from '../lib/collapseReframe'
 import type { AwaitingInterior } from '../lib/interiorReframe'
 import type { FollowAnchor } from '../lib/live/followAnchor'
 import type { Network } from '../lib/network'
+import { holdsFocus, releaseHold } from '../lib/placeHold'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { tiltForDistance } from '../lib/tilt'
 import { complexMemberPoints, flushMotion, newFlight, turnOffset, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
@@ -24,6 +25,7 @@ import { useCollapseReframe } from './useCollapseReframe'
 import { usePathProbe } from './usePathProbe'
 import { useFocusGroups } from './useFocusGroups'
 import { useInteriorReframe } from './useInteriorReframe'
+import { usePlaceHold } from './usePlaceHold'
 import { useStationFlights } from './useStationFlights'
 import { useStationOrbit } from './useStationOrbit'
 import { useTrainFollow } from './useTrainFollow'
@@ -72,6 +74,8 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     dismissedGroup: NO_FOCUS_GROUP,
   })
   const focusGroup = useFocusGroups(input, interior, focusedId, dismissedId)
+  // A searched place lands inside the focus range: no auto-focus entering until the user moves the view (lib/placeHold.ts).
+  const placeHold = usePlaceHold(flyRequest)
   // Auto-focus enters only once the view has held still (focusDwell.ts); a gesture in progress never has.
   const dwell = useRef(newDwell())
   const gesture = useRef(false)
@@ -200,8 +204,9 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
       cur.distance = distance
       cur.target = c.target
       cur.stations = network.stations
-      // Following a train past stations never pops their panels; exits still apply.
-      cur.settled = still && !follow.active()
+      // Following a train past stations never pops their panels, and a followed train ends the place hold; exits still apply.
+      if (follow.active()) releaseHold(placeHold.current)
+      cur.settled = still && !follow.active() && !holdsFocus(placeHold.current)
       // Cheap pre-check on the reused input; only a real change pays for a copied target and
       // a functional update, which re-runs the rules against the latest state.
       if (nextFocus(cur) !== cur) {
