@@ -67,11 +67,18 @@ describe('reconcileOpened', () => {
   })
 
   it('opens the one left and notes the drop', () => {
-    expect(reconcileOpened(open, 'p', ['c'], 'poll')).toEqual({ opened: { planKey: 'p', key: 'c' }, dropped: true })
+    expect(reconcileOpened(open, 'p', ['c'], 'poll')).toEqual({ opened: { planKey: 'p', key: 'c', auto: true }, dropped: true })
   })
 
   it('notes the drop with none left', () => {
     expect(reconcileOpened(open, 'p', [], 'tick')).toEqual({ opened: null, dropped: true })
+  })
+
+  it("does not note the loss of a journey the panel opened itself", () => {
+    const auto = { planKey: 'p', key: 'a', auto: true }
+    expect(reconcileOpened(auto, 'p', ['b', 'c'], 'poll')).toEqual({ opened: null, dropped: false })
+    expect(reconcileOpened(auto, 'p', [], 'tick')).toEqual({ opened: null, dropped: false })
+    expect(reconcileOpened(auto, 'p', ['b'], 'poll')).toEqual({ opened: { planKey: 'p', key: 'b', auto: true }, dropped: false })
   })
 
   it('does not note a drop on a retry or new ends: the plan announcement covers them', () => {
@@ -81,11 +88,11 @@ describe('reconcileOpened', () => {
 
   it('resets for other ends without a drop, and opens a lone journey there', () => {
     expect(reconcileOpened(open, 'q', ['b', 'c'], 'poll')).toEqual({ opened: null, dropped: false })
-    expect(reconcileOpened(open, 'q', ['x'], 'poll')).toEqual({ opened: { planKey: 'q', key: 'x' }, dropped: false })
+    expect(reconcileOpened(open, 'q', ['x'], 'poll')).toEqual({ opened: { planKey: 'q', key: 'x', auto: true }, dropped: false })
   })
 
   it('opens the only journey of a plan when none is opened, and leaves a list alone', () => {
-    expect(reconcileOpened(null, 'p', ['a'], 'ends')).toEqual({ opened: { planKey: 'p', key: 'a' }, dropped: false })
+    expect(reconcileOpened(null, 'p', ['a'], 'ends')).toEqual({ opened: { planKey: 'p', key: 'a', auto: true }, dropped: false })
     expect(reconcileOpened(null, 'p', ['a', 'b'], 'ends')).toEqual({ opened: null, dropped: false })
   })
 
@@ -99,9 +106,9 @@ describe('reconcileOpened', () => {
 
 describe('droppedNote', () => {
   it('says how many trips are left', () => {
-    expect(droppedNote(0)).toBe('That trip is no longer offered. No other trip found.')
-    expect(droppedNote(1)).toBe('That trip is no longer offered. Showing the other trip.')
-    expect(droppedNote(3)).toBe('That trip is no longer offered. Showing all 3 trips.')
+    expect(droppedNote(0)).toBe('The trip you opened is no longer offered. No other trip found.')
+    expect(droppedNote(1)).toBe('The trip you opened is no longer offered. Showing the other trip.')
+    expect(droppedNote(3)).toBe('The trip you opened is no longer offered. Showing all 3 trips.')
   })
 })
 

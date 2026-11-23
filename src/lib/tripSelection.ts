@@ -26,6 +26,8 @@ export function journeyKeys(journeys: readonly TripJourney[]): string[] {
 export interface OpenedJourney {
   planKey: string
   key: string
+  /** The panel opened it (the plan's only journey), not the visitor: losing it is no drop to tell about. */
+  auto?: boolean
 }
 
 export type TripViewKind = 'none' | 'list' | 'detail'
@@ -51,8 +53,8 @@ export function tripSelection(keys: readonly string[], planKey: string | null, o
 
 /**
  * The opened journey after a plan settles: kept while the plan still offers it, auto-opened when it is the only
- * one, else cleared. `dropped` is set when the opened journey vanished from a refresh of the same ends (a `tick`
- * or `poll`); a retry is announced as a plan, and other ends are a new plan.
+ * one, else cleared. `dropped` is set when a journey the visitor opened vanished from a refresh of the same ends (a
+ * `tick` or `poll`); a retry is announced as a plan, and other ends are a new plan.
  */
 export function reconcileOpened(
   opened: OpenedJourney | null,
@@ -62,14 +64,14 @@ export function reconcileOpened(
 ): { opened: OpenedJourney | null; dropped: boolean } {
   const same = opened !== null && opened.planKey === planKey
   if (same && keys.includes(opened.key)) return { opened, dropped: false }
-  const next = keys.length === 1 ? { planKey, key: keys[0]! } : null
+  const next = keys.length === 1 ? { planKey, key: keys[0]!, auto: true } : null
   if (next === null && opened === null) return { opened, dropped: false }
-  return { opened: next, dropped: same && (trigger === 'tick' || trigger === 'poll') }
+  return { opened: next, dropped: same && opened.auto !== true && (trigger === 'tick' || trigger === 'poll') }
 }
 
 /** What a screen reader hears when the opened journey left the plan; `remaining` is how many trips are offered now. */
 export function droppedNote(remaining: number): string {
-  const lead = 'That trip is no longer offered.'
+  const lead = 'The trip you opened is no longer offered.'
   if (remaining === 0) return `${lead} No other trip found.`
   if (remaining === 1) return `${lead} Showing the other trip.`
   return `${lead} Showing all ${remaining} trips.`

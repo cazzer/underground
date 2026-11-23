@@ -164,7 +164,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
           )}
           {dropNoteShown && (
             <p aria-hidden="true" className="mt-2 text-sm text-ink-dim">
-              That trip is no longer offered.
+              The trip you opened is no longer offered.
             </p>
           )}
           <TripJourneys

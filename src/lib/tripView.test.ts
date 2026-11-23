@@ -57,7 +57,7 @@ describe('journeyView', () => {
       departAway: '4 min',
       arriveClock: '8:20',
       minutes: 8,
-      transfersText: 'No transfers',
+      transfersText: 'No changes',
       routes: ['L'],
       source: 'scheduled',
       sourceText: 'Scheduled',
@@ -74,7 +74,7 @@ describe('journeyView', () => {
         stopsText: '4 stops',
       },
     ])
-    expect(v.spoken).toBe('Leaves 8:12, in 4 minutes. Arrives 8:20. 8 minutes, no transfers: L. Scheduled.')
+    expect(v.spoken).toBe('Leaves 8:12, in 4 minutes. Arrives 8:20. 8 minutes, no changes: L. Scheduled.')
   })
 
   it('counts the duration on the clock face across a minute boundary', () => {
@@ -91,9 +91,9 @@ describe('journeyView', () => {
     const legs = [ride('L', 'L08', '635', T, T + 600), walk('635N', '635N', T + 600, 0, true), ride('4', '635', '630', T + 660, T + 900)]
     const v = journeyView(journey(legs, 1), NOW, names)
     expect(v.legs[1]).toEqual({ kind: 'change', stationId: '635', name: '14 St-Union Sq', minutes: null, transferKey: '635N>635N>4' })
-    expect(v.transfersText).toBe('1 transfer')
+    expect(v.transfersText).toBe('1 change')
     expect(v.routes).toEqual(['L', '4'])
-    expect(v.spoken).toContain('15 minutes, 1 transfer: L, then 4.')
+    expect(v.spoken).toContain('15 minutes, 1 change: L, then 4.')
   })
 
   it('shows a 180 s change as 3 min', () => {
@@ -105,7 +105,7 @@ describe('journeyView', () => {
     const legs = [ride('L', 'L08', '635', T, T + 600), walk('635N', '630N', T + 600, 300, false), ride('4', '630', 'L03', T + 960, T + 1200)]
     const v = journeyView(journey(legs, 2), NOW, names)
     expect(v.legs[1]).toEqual({ kind: 'walk', toStationId: '630', to: 'Lexington Av/63 St', minutes: 5 })
-    expect(v.transfersText).toBe('2 transfers')
+    expect(v.transfersText).toBe('2 changes')
   })
 
   it('calls a walk between two stations of one name a change', () => {
@@ -132,7 +132,7 @@ describe('journeyView', () => {
     expect(v.legs).toHaveLength(1)
     expect(v.routes).toEqual([])
     expect(v.departClock).toBe('8:12')
-    expect(v.spoken).toBe('Leaves 8:12, in 4 minutes. Arrives 8:22. 10 minutes, no transfers. Scheduled.')
+    expect(v.spoken).toBe('Leaves 8:12, in 4 minutes. Arrives 8:22. 10 minutes, no changes. Scheduled.')
   })
 
   it('says "now" when the train is under 30 s away', () => {
@@ -245,7 +245,7 @@ describe('tripAnnouncement and shouldAnnounceTrip', () => {
     journeys: [],
   })
   it('counts trips and gives the first arrival', () => {
-    expect(tripAnnouncement({ from: 'A', to: 'B' }, ready('ends'), [one, one])).toBe('2 trips. First arrives 8:47, 35 minutes, 1 transfer.')
+    expect(tripAnnouncement({ from: 'A', to: 'B' }, ready('ends'), [one, one])).toBe('2 trips. First arrives 8:47, 35 minutes, 1 change.')
     expect(tripAnnouncement({ from: 'A', to: 'B' }, ready('ends'), [one])).toMatch(/^1 trip\. /)
   })
   it('falls back to the message when nothing is ready to list', () => {

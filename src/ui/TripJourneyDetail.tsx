@@ -1,9 +1,10 @@
 import { useRef } from 'react'
+import { useFocusLostOnUnmount } from './ArrivalRows'
 import type { Network } from '../lib/network'
 import type { JourneyView } from '../lib/tripView'
 import { RouteChip } from './RouteChip'
 import { JourneyLegs, type JourneyLegsProps } from './TripLegs'
-import { useFocusLostWithin } from './useFocusLostWithin'
+import { useJourneyFocusLost } from './useJourneyFocusLost'
 
 interface JourneyChipsProps {
   network: Network
@@ -26,6 +27,29 @@ export function JourneyChips({ network, view, className }: JourneyChipsProps) {
   )
 }
 
+interface BackButtonProps {
+  onBack: () => void
+  /** The button went while focused (the plan left one journey, so there is no list): focus moves on. */
+  onFocusLost: () => void
+}
+
+function BackButton({ onBack, onFocusLost }: BackButtonProps) {
+  const button = useRef<HTMLButtonElement>(null)
+  useFocusLostOnUnmount(button, onFocusLost)
+  return (
+    <button
+      ref={button}
+      type="button"
+      data-detail-back
+      onClick={onBack}
+      aria-label="Back to all trips"
+      className="-ml-2 flex min-h-11 cursor-pointer items-center px-2 text-sm text-ink-dim underline hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      <span aria-hidden="true">‹ All trips</span>
+    </button>
+  )
+}
+
 interface TripJourneyDetailProps extends JourneyLegsProps {
   /** There is a list to go back to (more than one journey). */
   canGoBack: boolean
@@ -38,20 +62,12 @@ interface TripJourneyDetailProps extends JourneyLegsProps {
 export function TripJourneyDetail({ canGoBack, onBack, onFocusLost, ...legs }: TripJourneyDetailProps) {
   const { network, view } = legs
   const root = useRef<HTMLDivElement>(null)
-  useFocusLostWithin(root, onFocusLost)
+  const heading = useRef<HTMLHeadingElement>(null)
+  useJourneyFocusLost(root, onFocusLost)
   return (
     <div ref={root} data-journey-key={view.key} className="mt-2">
-      {canGoBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to all trips"
-          className="-ml-2 flex min-h-11 cursor-pointer items-center px-2 text-sm text-ink-dim underline hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
-        >
-          <span aria-hidden="true">‹ All trips</span>
-        </button>
-      )}
-      <h3 tabIndex={-1} data-detail-heading className="text-base outline-none focus-visible:outline-2 focus-visible:outline-focus">
+      {canGoBack && <BackButton onBack={onBack} onFocusLost={() => requestAnimationFrame(() => heading.current?.focus({ preventScroll: true }))} />}
+      <h3 ref={heading} tabIndex={-1} data-detail-heading className="text-base outline-none focus-visible:outline-2 focus-visible:outline-focus">
         <span aria-hidden="true">
           {view.departClock} → {view.arriveClock} · {view.minutes} min
         </span>

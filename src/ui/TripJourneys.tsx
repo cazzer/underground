@@ -1,11 +1,11 @@
-import { useCallback, useRef, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { ExitLineView } from '../lib/exitView'
 import type { Network } from '../lib/network'
 import type { TransferLineView } from '../lib/transferView'
 import { focusAfterViewChange, type TripSelection } from '../lib/tripSelection'
 import type { JourneyView } from '../lib/tripView'
 import { JourneyChips, TripJourneyDetail } from './TripJourneyDetail'
-import { useFocusLostWithin } from './useFocusLostWithin'
+import { useJourneyFocusLost } from './useJourneyFocusLost'
 
 interface TripJourneysProps {
   network: Network
@@ -40,7 +40,7 @@ interface TripListProps {
 /** One collapsed row per journey, soonest arrival first: when it leaves and arrives, how long, changes, lines and where its times come from. */
 function TripList({ network, views, onOpen, onFocusLost }: TripListProps) {
   const list = useRef<HTMLOListElement>(null)
-  useFocusLostWithin(list, onFocusLost)
+  useJourneyFocusLost(list, onFocusLost)
   return (
     <ol ref={list} className="mt-2" aria-label="Trips">
       {views.map((view) => (
@@ -81,7 +81,9 @@ function TripList({ network, views, onOpen, onFocusLost }: TripListProps) {
 export function TripJourneys({ network, views, selection, onOpen, onBack, panelHeading, onStation, drawnKeys, onShowTrain, exits, transfers }: TripJourneysProps) {
   const root = useRef<HTMLDivElement>(null)
   const latest = useRef({ view: selection.view, keys: views.map((v) => v.key) })
-  latest.current = { view: selection.view, keys: views.map((v) => v.key) }
+  useLayoutEffect(() => {
+    latest.current = { view: selection.view, keys: views.map((v) => v.key) }
+  })
 
   // One frame later the new view has mounted. Not connected: the panel itself went (Close trip moves focus on its own).
   const moveFocus = useCallback(
@@ -97,6 +99,7 @@ export function TripJourneys({ network, views, selection, onOpen, onBack, panelH
               ? [...el.querySelectorAll<HTMLElement>('button[data-journey-key]')].find((b) => b.dataset.journeyKey === target.key)
               : panelHeading.current
         node?.focus({ preventScroll: true })
+        if (target.kind === 'row') node?.scrollIntoView({ block: 'nearest' })
       })
     },
     [panelHeading],
@@ -106,7 +109,9 @@ export function TripJourneys({ network, views, selection, onOpen, onBack, panelH
     requestAnimationFrame(() => {
       const heading = root.current?.querySelector<HTMLElement>('[data-detail-heading]')
       heading?.focus({ preventScroll: true })
-      heading?.closest('[data-journey-key]')?.scrollIntoView({ block: 'nearest' })
+      // The top of the view: Back when there is one, else the heading.
+      const top = root.current?.querySelector<HTMLElement>('[data-detail-back]') ?? heading
+      top?.scrollIntoView({ block: 'nearest' })
     })
   }
   const back = () => {
@@ -120,6 +125,7 @@ export function TripJourneys({ network, views, selection, onOpen, onBack, panelH
       {selection.view === 'list' && <TripList network={network} views={views} onOpen={open} onFocusLost={moveFocus} />}
       {opened && (
         <TripJourneyDetail
+          key={opened.key}
           network={network}
           view={opened}
           canGoBack={selection.canGoBack}

@@ -149,7 +149,7 @@ export interface JourneyView {
 }
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
-const transfersTextOf = (n: number): string => (n === 0 ? 'No transfers' : plural(n, 'transfer'))
+const transfersTextOf = (n: number): string => (n === 0 ? 'No changes' : plural(n, 'change'))
 const walkMinutes = (durationS: number): number => Math.max(1, Math.round(durationS / 60))
 
 function legViews(j: TripJourney, names: TripNames): LegView[] {

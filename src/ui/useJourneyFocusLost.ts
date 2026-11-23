@@ -10,7 +10,7 @@ function journeyKeyOf(el: Element): string | null {
  * `useFocusLostOnUnmount` (ArrivalRows), but for a whole view: its layout cleanup runs before React removes the
  * nodes, so focus can still be read.
  */
-export function useFocusLostWithin(el: RefObject<HTMLElement | null>, onFocusLost: (journeyKey: string | null) => void): void {
+export function useJourneyFocusLost(el: RefObject<HTMLElement | null>, onFocusLost: (journeyKey: string | null) => void): void {
   const lost = useRef(onFocusLost)
   useLayoutEffect(() => {
     lost.current = onFocusLost

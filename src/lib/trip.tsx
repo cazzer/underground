@@ -5,7 +5,7 @@ import type { ArrivalsSource } from './live/arrivals'
 import type { TripJourney } from './route/plan'
 import { useTrainSelection } from './trainSelection'
 import { journeyKeys, reconcileOpened, tripSelection, type OpenedJourney, type TripSelection } from './tripSelection'
-import type { TripEnds, TripPlanState } from './tripView'
+import { plannable, tripKey, type TripEnds, type TripPlanState } from './tripView'
 
 export type TripEnd = keyof TripEnds
 
@@ -39,7 +39,7 @@ interface TripValue {
   backToList: () => void
   /** Counts the times the opened journey dropped out of a refreshed plan; `remaining` is how many trips were left. */
   dropped: { seq: number; remaining: number }
-  /** The "no longer offered" line shows: a drop in this plan, until the visitor opens or goes back. */
+  /** The "no longer offered" line shows: a drop in this plan, until the next settled refresh, 6 s, or the visitor opens or goes back. */
   dropNoteShown: boolean
 }
 
@@ -49,6 +49,9 @@ interface TripProviderProps {
   arrivals: ArrivalsSource | null
   children: ReactNode
 }
+
+/** How long the visible "no longer offered" line stays. */
+const DROP_NOTE_MS = 6000
 
 const TripContext = createContext<TripValue | null>(null)
 
@@ -64,6 +67,7 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   const [opened, setOpened] = useState<OpenedJourney | null>(null)
   const [dropped, setDropped] = useState({ seq: 0, remaining: 0 })
   const [dropNoteFor, setDropNoteFor] = useState<string | null>(null)
+  const dropPlan = useRef<TripPlanState | null>(null)
   const sourceRef = useRef(arrivals)
   useEffect(() => {
     sourceRef.current = arrivals
@@ -86,8 +90,28 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
     if (next.dropped) {
       setDropped((d) => ({ seq: d.seq + 1, remaining: keys.length }))
       setDropNoteFor(plan.key)
+      dropPlan.current = plan
     }
   }, [plan, keys, opened])
+
+  // Other ends, whatever the plan's status: nothing stays opened from a pair the visitor left.
+  const endsKey = plannable(ends) ? tripKey(ends.from, ends.to) : null
+  useEffect(() => {
+    setOpened((o) => (o !== null && o.planKey !== endsKey ? null : o))
+  }, [endsKey])
+
+  // The drop note lasts until the next settled refresh (a new plan object) or 6 s.
+  useEffect(() => {
+    if (dropPlan.current !== null && dropPlan.current !== plan) {
+      dropPlan.current = null
+      setDropNoteFor(null)
+    }
+  }, [plan])
+  useEffect(() => {
+    if (dropNoteFor === null) return
+    const timer = window.setTimeout(() => setDropNoteFor(null), DROP_NOTE_MS)
+    return () => window.clearTimeout(timer)
+  }, [dropNoteFor])
 
   const setOpen = useCallback((next: boolean) => {
     setOpenState(next)
