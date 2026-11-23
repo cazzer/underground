@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { CircleGeometry, Color, DynamicDrawUsage, RingGeometry, type InstancedMesh } from 'three'
 import { useFocus } from '../lib/focus'
+import { interiorOpacity } from '../lib/interiorReveal'
 import { dimLineRgbInto, srgb01 } from '../lib/lineDim'
 import { writeMarkerMatrices } from '../lib/markerMatrices'
 import type { Station } from '../lib/network'
@@ -14,6 +15,7 @@ import { FocusRing } from './FocusRing'
 import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 import { useHeld } from './useHeld'
+import type { CoveredStation } from './useSceneInteriors'
 
 const BACKGROUND = srgb01(theme.background)
 
@@ -21,9 +23,11 @@ interface StationsProps {
   stations: readonly Station[]
   /** Draw the focused station's marker too (it has no interior, or its load failed). */
   focusedMarker: boolean
-  /** Stations a drawn interior stands in for beside the focused one (its covered complex siblings, every other drawn
-   *  interior's stations): their markers hide with the focused one's. */
+  /** The focused interior's covered complex siblings: their markers hide with the focused one's. */
   hiddenStations: readonly string[]
+  /** Stations a drawn interior other than the focused one stands in for: their rings fade toward the background by
+   *  interiorOpacity x that interior's presence, so a joining or leaving view interior leaves no gap and no pop. */
+  covered: readonly CoveredStation[]
   /** Every station the trip's drawn journey calls at (TripRouteDraw.stations); null with none. */
   tripStations: readonly string[] | null
   /** The trip's station marks (TripRouteDraw.marks); null with none: a focus ring on one draws outside it. */
@@ -42,7 +46,7 @@ interface StationsProps {
  * shows, the rings of stations its journey doesn't call at mix toward the background by the network's dim (as the
  * lines do, lineDim.ts), rewritten only while that dim or the journey's stations change.
  */
-export function Stations({ stations, focusedMarker, hiddenStations, tripStations, tripMarks, levels, fix }: StationsProps) {
+export function Stations({ stations, focusedMarker, hiddenStations, covered, tripStations, tripMarks, levels, fix }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
   const { focusedId } = useFocus()
@@ -82,6 +86,16 @@ export function Stations({ stations, focusedMarker, hiddenStations, tripStations
   }, [stations, heldTrip])
   const tint = useMemo(() => ({ full: new Float32Array([stroke.r, stroke.g, stroke.b]), dimmed: new Float32Array(3) }), [stroke])
   const tinted = useRef<{ dim: number; onTrip: Uint8Array | null }>({ dim: NaN, onTrip: null })
+  /** Each covered station's instance and the fade its ring was last written at (NaN: rewrite it). */
+  const fades = useMemo(() => {
+    const indexOf = new Map(stations.map((s, i) => [s.id, i]))
+    const list = covered.filter((c) => indexOf.has(c.id))
+    return { index: Int32Array.from(list, (c) => indexOf.get(c.id)!), presence: list.map((c) => c.presence), last: new Float32Array(list.length).fill(NaN), rgb: new Float32Array(3) }
+  }, [stations, covered])
+  // A station no longer covered gets its own ring color back: the next frame rewrites every ring.
+  useLayoutEffect(() => {
+    tinted.current.dim = NaN
+  }, [fades])
 
   useEffect(
     () => () => {
@@ -117,8 +131,21 @@ export function Stations({ stations, focusedMarker, hiddenStations, tripStations
       const colors = r.instanceColor!.array as Float32Array
       for (let i = 0; i < onTrip.length; i++) colors.set(onTrip[i] ? tint.full : tint.dimmed, i * 3)
       r.instanceColor!.needsUpdate = true
+      fades.last.fill(NaN)
     }
     const d = cameraDistance(state)
+    const reveal = interiorOpacity(d)
+    let faded = false
+    for (let k = 0; k < fades.index.length; k++) {
+      const amount = reveal * fades.presence[k]!.value
+      if (amount === fades.last[k]) continue
+      fades.last[k] = amount
+      const i = fades.index[k]!
+      const base = onTrip[i] || !(t.dim > 0) ? tint.full : tint.dimmed
+      ;(r.instanceColor!.array as Float32Array).set(dimLineRgbInto(fades.rgb, base, BACKGROUND, amount), i * 3)
+      faded = true
+    }
+    if (faded) r.instanceColor!.needsUpdate = true
     const scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
     const last = drawn.current
     if (scale === last.scale && hidden === last.hidden) return

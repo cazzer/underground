@@ -41,6 +41,12 @@ describe('viewInteriorIds', () => {
     expect(viewInteriorIds(['X99', 'L08', 'L10', 'A02', 'A03'], 'X99', index)).toEqual(['L08', 'L10', 'A02'])
   })
 
+  it('passes over a skipped file without spending a slot, and takes a lower cap', () => {
+    const view = ['L08', 'L10', 'A02', 'A03']
+    expect(viewInteriorIds(view, null, index, 3, (f) => f === 'L10')).toEqual(['L08', 'A02', 'A03'])
+    expect(viewInteriorIds(view, 'L08', index, 2)).toEqual(['L10'])
+  })
+
   it('is empty until the index is ready, and the same empty array each time', () => {
     expect(viewInteriorIds(['L08'], null, { status: 'loading' })).toEqual([])
     expect(viewInteriorIds(['L08'], null, { status: 'error', message: 'x' })).toEqual([])

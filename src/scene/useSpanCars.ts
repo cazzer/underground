@@ -3,7 +3,7 @@ import { BackSide, type BufferGeometry, Color, DynamicDrawUsage, type InstancedM
 import { type Consist, MAX_CARS } from '../lib/live/consist'
 import { consistSpanInto, type ConsistSpan } from '../lib/live/consistLayout'
 import { slotScale, TRAIN_CAPACITY, type SlotTable } from '../lib/live/slots'
-import { trainWeightIn, veilTint, type PlatformSpan, type SpanSet } from '../lib/platformSpan'
+import { trainWeightIn, veilTint, type ShownSpan, type SpanSet } from '../lib/platformSpan'
 import { theme } from '../theme'
 import { interiorLook } from './interiorLook'
 import type { TrainCarsLayer } from './useTrainCars'
@@ -127,7 +127,7 @@ export function useSpanCars(cars: TrainCarsLayer): SpanCarsLayer {
       const g = table.drawGeometry[i]!
       consistSpanInto(span, g.line.length, table.displayed[i]!, consistOf(i), mix * slotScale(table, i, localS))
     }
-    const carWeight = (c: number, list: readonly PlatformSpan[]): number => trainWeightIn(span.rear + (c + 0.5) * span.step, list)
+    const carWeight = (c: number, list: readonly ShownSpan[]): number => trainWeightIn(span.rear + (c + 0.5) * span.step, list)
     return {
       prepare() {
         for (const m of [bodies.current, halos.current, rims.current, gaps.current, rimCaps.current, gapCaps.current]) {

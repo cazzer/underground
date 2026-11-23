@@ -28,6 +28,23 @@ export const MAX_VIEW_STATIONS = 4
  * level label divs and its share of the lifted trains, so three keeps a phone's frame rate (the look card's cap).
  */
 export const MAX_VIEW_INTERIORS = 3
+/** On a phone (the canvas's shorter side under this, the street labels' breakpoint) at most PHONE_VIEW_INTERIORS draw. */
+export const PHONE_SIDE_PX = 600
+export const PHONE_VIEW_INTERIORS = 2
+
+/** How many interiors draw at once on a canvas of `width` x `height` px: MAX_VIEW_INTERIORS, or PHONE_VIEW_INTERIORS on a phone. */
+export function viewInteriorCap(width: number, height: number): number {
+  return Math.min(width, height) < PHONE_SIDE_PX ? PHONE_VIEW_INTERIORS : MAX_VIEW_INTERIORS
+}
+
+/** A view-driven fetch (an interior, o3r.5's streets) that failed is not tried again for this long, ms. */
+export const VIEW_RETRY_MS = 30_000
+
+/** Whether `id` failed within VIEW_RETRY_MS of `nowMs` (`failedAt`: id to the failure's time, ms). */
+export function failedRecently(failedAt: ReadonlyMap<string, number>, id: string, nowMs: number): boolean {
+  const at = failedAt.get(id)
+  return at !== undefined && nowMs - at < VIEW_RETRY_MS
+}
 /** Ground reach from the orbit target, as a share of the camera distance (a horizon guard; test 15 pins it). */
 export const REACH_SHARE = 1.5
 /** A previous pick stays inside the free rect with each side moved out by this share of its width / height. */

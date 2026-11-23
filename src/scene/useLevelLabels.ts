@@ -45,20 +45,25 @@ export function useLevelLabels(
   /** The blocker slot this interior holds, null when none was free. */
   const slot = useRef<number | null>(null)
 
+  // Only an interior with labels holds a slot (the focused one: o3r.4's view interiors draw none).
+  const any = labels.length > 0
   useEffect(() => {
+    if (!any) return
     const held = claimBlockerSlot(blockers)
     slot.current = held
     return () => {
       slot.current = null
       if (held !== null) releaseBlockerSlot(blockers, held)
     }
-  }, [blockers])
+  }, [blockers, any])
 
   useEffect(() => {
     if (!host) return
     const made = labels.map((label) => {
       const el = document.createElement('div')
       el.className = CLASS
+      // Decoration: the station panel names the station, and the levels mean nothing read out of place.
+      el.setAttribute('aria-hidden', 'true')
       el.style.zIndex = '0'
       el.style.visibility = 'hidden'
       el.textContent = label.text

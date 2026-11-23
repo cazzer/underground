@@ -33,6 +33,8 @@ import { LocationCapSource } from './LocationCapSource'
 import { ViewStationsSource } from './ViewStationsSource'
 import { ScenePicker } from './ScenePicker'
 import { ScreenVeil } from './ScreenVeil'
+import { PresenceDriver } from './InteriorPresence'
+import { interiorLook } from './interiorLook'
 import { StationInterior } from './StationInterior'
 import { StationStreets } from './StationStreets'
 import { StationTies } from './StationTies'
@@ -102,7 +104,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   /** Written by ViewStationsSource: the station leads in view (empty under the cap), whose interiors draw. */
   const viewStations = useState(createViewStationSet)[0]
   /** The focused interior and those of the stations in view (o3r.4), with their spans and the stations they stand in for. */
-  const { drawn, spans, spansByDeck, hiddenStations, hiddenSiblings, markHidden, veiled } = useSceneInteriors(network, interior, viewStations, index, siblings)
+  const scene = useSceneInteriors(network, interior, viewStations, index, siblings)
+  const { shown, presences, spans, spansByDeck, hiddenStations, hiddenSiblings, covered, markHidden, veiled } = scene
   /** The trip's path the focused interior draws (the first listed for it): its way out or a change of trains. */
   const path = interior ? (stationPaths.find((p) => p.interiorId === interior.stationId)?.choice ?? null) : null
   // `outOfService` is a new array every render: its ids say when the machines out really change.
@@ -139,20 +142,21 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         markHidden={markHidden}
         fix={here?.ground ?? null}
       />
-      <StationTies network={network} focusedMarker={focusedMarker} hiddenStations={hiddenStations} levels={tripLevels} />
+      <StationTies network={network} focusedMarker={focusedMarker} hiddenStations={hiddenStations} covered={covered} levels={tripLevels} />
       <Stations
         stations={network.stations}
         focusedMarker={focusedMarker}
-        hiddenStations={hiddenStations}
+        hiddenStations={hiddenSiblings}
+        covered={covered}
         tripStations={tripRoute?.stations ?? null}
         tripMarks={tripRoute?.marks ?? null}
         levels={tripLevels}
         fix={here?.ground ?? null}
       />
-      <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
+      <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenStations} />
       {live && (
         <ErrorBoundary fallback={null} onError={onLiveError}>
-          <LiveTrains {...live} network={network} trainPick={trainPick} deckSpans={spansByDeck} view={bandView} anchor={anchor} />
+          <LiveTrains {...live} network={network} trainPick={trainPick} deckSpans={spansByDeck} presence={scene.store} view={bandView} anchor={anchor} />
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
@@ -170,7 +174,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         tripLevels={tripLevels}
       />
       {/* Each in its own boundary: a crash (logged) draws nothing for that interior instead of blanking the scene. */}
-      {drawn.map((m) => (
+      {shown.map((m) => (
         <ErrorBoundary key={m.stationId} fallback={null}>
           <StationInterior
             model={m}
@@ -178,10 +182,13 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
             outOfService={m === interior ? outOfService : NO_IDS}
             labelBlockers={labelBlockers}
             path={m === interior ? path : null}
+            presence={presences.get(m.stationId)!}
+            labels={m === interior}
           />
         </ErrorBoundary>
       ))}
-      {veiled && <ScreenVeil />}
+      <PresenceDriver store={scene.store} onFaded={scene.onFaded} />
+      {interiorLook.veil === 'screen' && <ScreenVeil store={scene.store} />}
       <CameraRig
         network={network}
         insets={insets}

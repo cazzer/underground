@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { failedRecently } from '../lib/viewStations'
 import { buildInteriorModel, type InteriorModel } from '../scene/interiorModel'
 import { createInteriorCache } from './interiorCache'
 import { deriveInteriorLoad, focusedMarkerShown, interiorIdOf, modelsToLoad, NO_SIBLINGS, siblingIdsOf, viewInteriorIds, type IndexLoad, type InteriorLoad, type SettledLoad } from './interiorLoad'
@@ -129,14 +130,19 @@ export function useInteriorModel(id: string | null): InteriorModel | null {
 const NO_MODELS: ReadonlyMap<string, InteriorModel> = new Map()
 
 /**
- * Several interiors' models by file id, from the same cache: those loaded so far (a failure is logged and left out).
- * The map is built from the ids loaded at render (`loadedKey`) and keeps its identity until that changes. A load that
- * settles between a render and its effect is caught by the effect (`modelsToLoad`'s `stale`), which re-renders.
+ * Several interiors' models by file id, from the same cache: those loaded so far (a failure is logged, reported to
+ * `onError` and left out). The map is built from the ids loaded at render (`loadedKey`) and keeps its identity until
+ * that changes. A load that settles between a render and its effect is caught by the effect (`modelsToLoad`'s `stale`),
+ * which re-renders.
  */
-export function useInteriorModels(ids: readonly string[]): ReadonlyMap<string, InteriorModel> {
+export function useInteriorModels(ids: readonly string[], onError?: (id: string) => void): ReadonlyMap<string, InteriorModel> {
   const key = ids.join(',')
   const loadedKey = ids.filter((id) => cache.peek(id)).join(',')
   const [, setSettled] = useState(0)
+  const errorRef = useRef(onError)
+  useEffect(() => {
+    errorRef.current = onError
+  }, [onError])
   useEffect(() => {
     let cancelled = false
     const bump = (): void => {
@@ -144,7 +150,12 @@ export function useInteriorModels(ids: readonly string[]): ReadonlyMap<string, I
     }
     const { fetch, stale } = modelsToLoad(key === '' ? [] : key.split(','), (id) => cache.peek(id) !== undefined, loadedKey)
     if (stale) bump()
-    for (const id of fetch) cache.get(id).then(bump, (err: unknown) => console.error(`Failed to load the interior of station ${id}`, err))
+    for (const id of fetch) {
+      cache.get(id).then(bump, (err: unknown) => {
+        console.error(`Failed to load the interior of station ${id}`, err)
+        errorRef.current?.(id)
+      })
+    }
     return () => {
       cancelled = true
     }
@@ -156,16 +167,29 @@ export function useInteriorModels(ids: readonly string[]): ReadonlyMap<string, I
 }
 
 const NO_VIEW_MODELS: readonly InteriorModel[] = Object.freeze([])
+const NO_VIEW_IDS: readonly string[] = Object.freeze([])
+
+/** View interior files that failed, by id, to the failure's time (performance.now() ms): skipped for VIEW_RETRY_MS. */
+const viewFailedAt = new Map<string, number>()
 
 /**
- * The loaded interiors of the stations in view other than the focused one (o3r.4), in view order, at most
- * MAX_VIEW_INTERIORS with the focused one counted (`viewInteriorIds`), from the same cache. Fetches only for the ids in
- * `view`, o3r.2's camera-driven set: empty from REVEAL_FAR out and while the location cap is in force, and never keyed
- * by the location fix or its nearest station.
+ * The loaded interiors of the stations in view other than the focused one (o3r.4), in view order, at most `cap` with
+ * the focused one counted (`viewInteriorIds`), from the same cache. Fetches only for the ids in `view`, o3r.2's
+ * camera-driven set: empty from REVEAL_FAR out and while the location cap is in force, and never keyed by the location
+ * fix or its nearest station. A file that failed is passed over for VIEW_RETRY_MS (logged once per failure), its slot
+ * going to the next station in view. The result keeps its identity while the files and their models stay the same, so
+ * a station without an interior entering the view rebuilds nothing.
  */
-export function useViewInteriors(view: readonly string[], focusedId: string | null, index: IndexLoad): readonly InteriorModel[] {
-  const ids = useMemo(() => viewInteriorIds(view, focusedId, index), [view, focusedId, index])
-  const models = useInteriorModels(ids)
+export function useViewInteriors(view: readonly string[], focusedId: string | null, index: IndexLoad, cap: number): readonly InteriorModel[] {
+  // Bumped on a failure, so the next station in view takes its slot.
+  const [, setFailures] = useState(0)
+  const key = viewInteriorIds(view, focusedId, index, cap, (file) => failedRecently(viewFailedAt, file, performance.now())).join(',')
+  const ids = useMemo(() => (key === '' ? NO_VIEW_IDS : key.split(',')), [key])
+  const onError = useCallback((id: string) => {
+    viewFailedAt.set(id, performance.now())
+    setFailures((n) => n + 1)
+  }, [])
+  const models = useInteriorModels(ids, onError)
   return useMemo(() => {
     const out = ids.flatMap((id) => models.get(id) ?? [])
     return out.length > 0 ? out : NO_VIEW_MODELS

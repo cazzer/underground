@@ -155,11 +155,18 @@ const NO_FILES: readonly string[] = Object.freeze([])
 
 /**
  * The interior file ids to load for the stations in view (`view`: o3r.2's leads, focused first), other than the focused
- * station's: in view order, each file once, stations the index doesn't list skipped, at most `max` files with the
- * focused one's counted (its slot is kept while it loads or after it fails, so the set doesn't swap as it lands).
- * Empty until the index is ready. Only ids in `view` ever appear, so the fetch follows the camera and nothing else.
+ * station's: in view order, each file once, stations the index doesn't list skipped, and files `skip` names (one that
+ * failed lately) passed over without taking a slot; at most `max` files with the focused one's counted (its slot is kept
+ * while it loads or after it fails, so the set doesn't swap as it lands). Empty until the index is ready. Only ids in
+ * `view` ever appear, so the fetch follows the camera and nothing else.
  */
-export function viewInteriorIds(view: readonly string[], focusedId: string | null, index: IndexLoad, max = MAX_VIEW_INTERIORS): readonly string[] {
+export function viewInteriorIds(
+  view: readonly string[],
+  focusedId: string | null,
+  index: IndexLoad,
+  max = MAX_VIEW_INTERIORS,
+  skip: (file: string) => boolean = () => false,
+): readonly string[] {
   if (index.status !== 'ready') return NO_FILES
   const focusedFile = interiorIdOf(focusedId, index)
   const room = max - (focusedFile ? 1 : 0)
@@ -167,7 +174,7 @@ export function viewInteriorIds(view: readonly string[], focusedId: string | nul
   for (const id of view) {
     if (out.length >= room) break
     const file = interiorIdOf(id, index)
-    if (file === null || file === focusedFile || out.includes(file)) continue
+    if (file === null || file === focusedFile || out.includes(file) || skip(file)) continue
     out.push(file)
   }
   return out.length > 0 ? out : NO_FILES

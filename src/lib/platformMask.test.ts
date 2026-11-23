@@ -5,6 +5,9 @@ import { FADE_INPUTS, maskBreaks, writePlatformFade } from './platformMask'
 import { MASK_INSET_M } from './platformSpan'
 import { EMPTY_PROFILE } from './trackProfile'
 
+/** A span as a drawn interior shows it, fully present. */
+const shown = (d0: number, d1: number) => ({ span: { d0, d1 }, presence: { value: 1 } })
+
 /** A straight east-running path with vertices at `xs` (its distances). */
 function path(id: string, xs: number[]): ShapePath {
   return {
@@ -47,7 +50,7 @@ describe('writePlatformFade', () => {
   const fade = new Float32Array((1 + xs.length - 1) * FADE_INPUTS).fill(9)
 
   it('weighs each segment end of the span shapes, and zeroes every other segment', () => {
-    writePlatformFade(fade, [a, b], first, new Map([['a', [{ d0: 160, d1: 240 }]]]))
+    writePlatformFade(fade, [a, b], first, new Map([['a', [shown(160, 240)]]]))
     const weightAt = (d: number) => {
       const i = xs.indexOf(d)
       return fade[(1 + i - 1) * FADE_INPUTS + 1]!
@@ -68,7 +71,7 @@ describe('writePlatformFade', () => {
     // b drawn second, after a's first segment; a's second segment is left out (-1).
     const c = path('c', [100, 200, 300])
     const out = new Float32Array(3 * FADE_INPUTS).fill(9)
-    writePlatformFade(out, [c, b], new Map([['c', Int32Array.of(0, -1)], ['b', Int32Array.of(1)]]), new Map([['c', [{ d0: 0, d1: 400 }]]]))
+    writePlatformFade(out, [c, b], new Map([['c', Int32Array.of(0, -1)], ['b', Int32Array.of(1)]]), new Map([['c', [shown(0, 400)]]]))
     expect([...out]).toEqual([1, 1, 0, 0, 0, 0])
   })
 
@@ -77,7 +80,7 @@ describe('writePlatformFade', () => {
     const at = [...maskBreaks({ d0: 0, d1: 150 }), 500, ...maskBreaks({ d0: 900, d1: 1050 })]
     const d = path('d', at)
     const out = new Float32Array((at.length - 1) * FADE_INPUTS)
-    const spans = new Map([['d', [{ d0: 0, d1: 150 }, { d0: 900, d1: 1050 }]]])
+    const spans = new Map([['d', [shown(0, 150), shown(900, 1050)]]])
     writePlatformFade(out, [d], new Map([['d', Int32Array.from(at.slice(1), (_, i) => i)]]), spans)
     const endWeight = (x: number) => out[(at.indexOf(x) - 1) * FADE_INPUTS + 1]
     expect(endWeight(MASK_INSET_M)).toBe(1)
