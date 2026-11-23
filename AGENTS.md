@@ -373,7 +373,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     at priority 0 each frame; read a frame late); street names also keep clear of the interior's outlines
     (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing). Sized after mount,
     after `document.fonts.ready` and when a resize flips phone and desktop sizes; opacity `streetLabelOpacity` (the level labels' depth gate)
-    While mounted it writes Scene's `StreetMask` (anchor and file radius), which the basemap's roads give way to
+    While mounted it claims one slot of Scene's `StreetMask` (`claimMaskSlot`, `writeMaskSlot` with anchor and file
+    radius, `releaseMaskSlot`; `MASK_N` 4 slots, a full mask logs once and returns no slot), which the basemap's roads give way to
   - `useLocationCap.ts` / `LocationCapSource.tsx` the location zoom cap's driver (the fly request in a layout effect, pointer
     events through `useViewMoves`), run once by Scene inside the Canvas whether or not the basemap is; the shared handle is
     `lib/basemap/locationCapHandle.ts` (`isCapped()`, `subscribe`), which Scene creates and passes to Basemap
@@ -393,8 +394,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     to 0 over 7 km more; the network's bounding box would sit outside the bbox once padded), the bbox edge (`EDGE_GLSL` /
     `edgeAlpha`: 0 at the spec bbox, in over `edgeFadeFor(distance)`, 4% of the camera distance held to 100 m..3 km and
     written per frame, so a station near the edge keeps its streets close in), and for roads the street mask
-    (`MASK_GLSL` / `maskAlpha`): inside the focused station's street radius they fade out as its streets fade in, the
-    exact complement of that layer's 70 m edge fade, at the station layer's `interiorOpacity`. Scene wraps it in an
+    (`MASK_GLSL` / `maskAlphaAt`, over `maskAlpha` per disc): inside a drawn station's street radius they fade out as its
+    streets fade in, the exact complement of that layer's 70 m edge fade, at the station layer's `interiorOpacity`. The mask
+    is `MASK_N` (4) discs in fixed uniform arrays (`maskDiscs` vec4 x, z, ramp start, radius; `maskStrength` per slot, 0 when
+    free; `writeMaskUniforms` per frame), a loop sized by the `MASK_N` define like `NET_EDGES`, read from one interpolated
+    ground point (`vGround`); overlapping discs keep the least alpha. Only the focused station claims one today. Scene wraps it in an
     `ErrorBoundary` with a null fallback: a crash there logs once and draws no basemap. Dev only:
     `__underground.basemapSegments()` (camera distance, per-class used/capacity/visible) and a `basemap:apply`
     performance measure per tile-set change

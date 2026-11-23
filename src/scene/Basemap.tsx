@@ -2,8 +2,8 @@
  * The citywide basemap: faint roads, water and parks from the tile store (useBasemapTiles.ts), one LineSegments2 per
  * class (basemapLayer.ts), under the route lines. Each frame (priority 0, after the store's update) it rewrites the
  * pooled buffers when the drawn tile set changed, re-mixes each class's stroke and resizes the bbox edge fade when the
- * camera distance changed (classFade.ts, edgeFade.ts), moves the road mask to the focused station's street layer, if
- * one is drawn (streetMask.ts), and lets a pool that has stayed mostly empty shrink. Every class thins out away from
+ * camera distance changed (classFade.ts, edgeFade.ts), moves the road mask's discs to the station street layers drawn
+ * (streetMask.ts), and lets a pool that has stayed mostly empty shrink. Every class thins out away from
  * the network and stops at the spec bbox (edgeFade.ts). A steady frame allocates nothing.
  */
 import { useFrame } from '@react-three/fiber'
@@ -15,14 +15,14 @@ import { edgeFadeFor, NETWORK_FADE_M, NETWORK_PAD_M, sceneBox } from '../lib/bas
 import { BASEMAP_CLASSES, isRoadClass, type BasemapClass } from '../lib/basemap/featureClass'
 import { isNoOutline, networkHull } from '../lib/basemap/networkHull'
 import type { LocationCap } from '../lib/basemap/locationCapHandle'
-import { maskInner, type StreetMask } from '../lib/basemap/streetMask'
+import type { StreetMask } from '../lib/basemap/streetMask'
 import { planPool } from '../lib/basemap/tilePool'
 import type { ShapePath, Station } from '../lib/network'
 import { interiorOpacity } from '../lib/interiorReveal'
 import { packTracks } from '../lib/routeTracks'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
-import { createExtentUniforms, createMaskUniforms } from './basemapLineMaterial'
+import { createExtentUniforms, createMaskUniforms, writeMaskUniforms } from './basemapLineMaterial'
 import { createClassLayer, type ClassLayer } from './basemapLayer'
 import { cameraDistance } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
@@ -57,7 +57,7 @@ interface BasemapProps {
   config: BasemapConfig
   /** The network's stations: the basemap thins out away from their outline. */
   stations: readonly Station[]
-  /** Written by StationStreets while a station street layer is mounted. */
+  /** A slot per station street layer, written by StationStreets while it is mounted. */
   mask: StreetMask
   /** The network's shapes, unbanded (the band shader shifts these): roads running under them are left out. */
   shapes: readonly ShapePath[]
@@ -131,15 +131,8 @@ export function Basemap({ config, stations, mask, shapes, tripLevels, locationCa
       for (const e of entries) e.layer.setVisibility(classVisibility(e.cls, d), e.stroke, background, dim)
       extent.edgeFadeM.value = edgeFadeFor(d)
     }
-    if (mask.present) {
-      maskUniforms.maskCenter.value.set(mask.x, mask.z)
-      maskUniforms.maskInner.value = maskInner(mask.radiusM)
-      maskUniforms.maskOuter.value = mask.radiusM
-      // The station's streets draw at this opacity (StationStreets.tsx); the roads give way by as much.
-      maskUniforms.maskStrength.value = interiorOpacity(d)
-    } else {
-      maskUniforms.maskStrength.value = 0
-    }
+    // The stations' streets draw at this opacity (StationStreets.tsx); the roads give way by as much.
+    writeMaskUniforms(maskUniforms, mask, interiorOpacity(d))
   }, 0)
 
   return (

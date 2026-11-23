@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, type Group } from 'three'
 import { interiorCovers, interiorStationIds } from '../data/interiorLoad'
 import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
-import type { StreetMask } from '../lib/basemap/streetMask'
+import { claimMaskSlot, releaseMaskSlot, writeMaskSlot, type StreetMask } from '../lib/basemap/streetMask'
 import { clipLineBuffers } from '../lib/clipLineBuffers'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { useFocus } from '../lib/focus'
@@ -48,7 +48,7 @@ interface StationStreetsProps {
   labelBlockers: LabelBlockers
   /** For the station markers the labels keep clear of. */
   network: Network
-  /** Set while a layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
+  /** A slot is claimed while a layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
   mask: StreetMask
   /** The entrances of the trip's way out and way in (useTripExit, useTripBoard): the first this layer's file has is
    *  placed first and tinted; empty for none. */
@@ -156,13 +156,11 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
   }, [pathLabels, layer])
   const marks = useLineLayer(markBuffers, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
   useLayoutEffect(() => {
-    mask.present = true
-    mask.x = layer.anchor.x
-    mask.z = layer.anchor.z
-    mask.radiusM = layer.file.radiusM
-    return () => {
-      mask.present = false
-    }
+    // A full mask has logged; this layer then draws over the roads it would mask.
+    const slot = claimMaskSlot(mask)
+    if (slot === null) return
+    writeMaskSlot(mask, slot, layer.anchor.x, layer.anchor.z, layer.file.radiusM)
+    return () => releaseMaskSlot(mask, slot)
   }, [layer, mask])
   // A rebuilt layer (the mode changes when the interior lands) starts at full opacity: catch it up.
   useLayoutEffect(() => {
