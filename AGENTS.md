@@ -30,6 +30,9 @@ and 3) and its entrances dim beside a focused station (full ink with none focuse
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 It polls `/alerts` the same way and the station panel lists the MTA's service changes at the open station (skips, suspensions, notices: 08r.4). The train panel strikes through a next stop its route and direction skip, and an arrivals row for a route that skips the station says so (08r.7). A header chip "N service changes" opens a list of every change in effect now or starting within 24 h (08r.5).
+Picking a skip or suspension in that list draws it on the map (08r.6): the network dims as under a trip, the affected stretch
+redraws at full colour on its direction's track (a suspended one dashed), each skipped station gets a hollow ring with a
+cross, and the camera frames it top-down; the row says "Drawn from the MTA notice". Closing the list, Esc or a second press ends it.
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
 With the Worker configured the search dialog also finds streets, intersections ("Bedford Av & N 7 St"), addresses and places through `/geocode` (2q7.16, 2q7.14; none of it without `VITE_RT_URL`).
 Trip planning is behind `FEATURES.navigation` (`src/config.ts`), off by default.
@@ -205,6 +208,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Trip walk tokens (TripDashes.tsx, 2q7.45.4): `tripWalkDashPx` (6) and `tripWalkGapPx` (4), CSS px at the view's target, dash the
   trip's walks between stations and its straight-drawn rides; the walks and the trip marks are `exitPath`, at least 2.5:1 over every
   route dimmed by `tripNetworkDim` (2.66:1 over N/Q/R/W) and, faint, on the background (3.03:1; themeTrip.test.ts).
+  Service change tokens (08r.6, themeChange.test.ts): `changeSkipMark` (ink, a skipped station's ring and cross in TripMarks;
+  at least 3:1 on the background, 14.4:1, and over every route dimmed by `tripNetworkDim`, 6.76:1 over N), `changeSuspendedDim`
+  (0.35: a suspended stretch's route colour mixed this far toward the background, at least 1.45x its dimmed route, 1.51x
+  for SI, and 2:1 on the background, 2.04:1 SI) and `changeSuspendedDashPx` / `GapPx` (5 / 4, CSS px at the view's target).
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -254,7 +261,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     destinations" button, arrivals notes. An interior's panel size alone still never moves the camera. On a 390×844 phone (free
     bottom 393.5 px under the open panel, 690 px under the bar) 127 lands with 10 of its 16 marks and 120 with 2 of 6; collapsed, all
     of both; the outage disclosure arriving (52 px) reframes 127 from 8 to 10 and leaves 120 at 2 (`panelGrow.data.test.ts`);
-    `useRouteFlight.ts` the trip route frame (2q7.45.5; see Rendering conventions: `lib/routeFrame.ts` the route's ground points and `frameTopDown`, the pure top-down fit into the free rect;
+    `useRouteFlight.ts` the route view's frame, a trip's or a picked service change's (2q7.45.5, 08r.6; see Rendering conventions: `lib/routeFrame.ts` the route's ground points and `frameTopDown`, the pure top-down fit into the free rect;
     `lib/routeFrameRule.ts` `routeFrameDecision`, when it fires; `useViewMoved.ts` a drag, pinch or wheel past the click slop (locationCap.ts's rules, unchanged); `useRouteReframe.ts` and `lib/routeReframe.ts`
     its reframes after landing; `routeFlightState.ts` what they share; CameraRig calls the hook and passes its landing call every landing, `onStart` is untouched);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
@@ -266,7 +273,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     presence; while any presence changes a frame rewrites only the shapes the spans touch (`writeShapeFade`) and uploads only
     their ranges, and with every presence still nothing; `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
-    if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`.
+    if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands` (dashed too, along the buffers' `distances`: the band shift moves positions only; TripLines' suspended stretch).
     Each BandLineMaterial also has its own `lineDim` uniform (not in `BAND_UNIFORMS`): `DIM_GLSL`'s `dimLine` mixes the
     fragment's color toward `lineDimColor` (theme.background, sRGB) in sRGB, exactly as `mixHex` does, never by opacity
     (`src/lib/lineDim.ts` `dimLineRgb` is its JS twin; `lineDim.test.ts` pins the GLSL and checks both against mixHex); with
@@ -280,9 +287,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     StationStreets write the same `lineDim`, and Basemap mixes every class's stroke the same amount toward the background in
     sRGB after its distance fade (`basemapLayer.ts` `setVisibility`'s `dim`), so no road, water or park outshines a dimmed line
     (`themeTrip.test.ts`). `TripLines.tsx` (render order 2.1, a child of SubwayLines in a null-fallback ErrorBoundary keyed by
-    the last route's key, so a new route remounts it): the selected journey's ride legs (`useTripRoute`)
+    the last route's key, so a new route remounts it): the route view's rides (`TripRouteDraw`, `kind` 'trip' from `useTripRoute`
+    or 'change' from `useChangeRoute`, 08r.6; a change's `suspended` stretch is a second banded windowed layer at 2.15, dashed by
+    `changeSuspendedDashPx`/`GapPx` along the buffers' `distances` (`dashScale` 1 / `metersPerPx` per frame), its route colour
+    dimmed `changeSuspendedDim`, opacity `tripOpacity`)
     as `tripLineBuffers` (`src/lib/tripLineBuffers.ts`, pure: each ride span's overlapping shape segments copied with the same
-    positions, heights and band inputs as `buildLineBuffers`, cover ignored, plus `segmentWindow`'s (t0, t1); no new
+    positions, heights and band inputs as `buildLineBuffers`, cover ignored, plus `segmentWindow`'s (t0, t1) and each segment's
+    ends' distances along its shape; no new
     vertices, `lineBreaks` untouched), in route colors under `theme.routeLineMix` whatever `?lines=` says (a route routes.json
     lacks warns once and takes its drawn shape's route's color, else the ride is left out), with
     `usePlatformFade` (a stretch two rides share fades on the first copy only); per frame at 0 its `scale.y`, width (base to
@@ -296,9 +307,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     ride its stop polyline in its route color, a route routes.json lacks warned once and left out; dash distances in meters
     restarting at 0 per polyline), `dashScale` = 1 / `metersPerPx` (lib/follow.ts) per frame so `tripWalkDashPx`/`GapPx` hold on
     screen at the target, width `tripWidthPx`, the faint dim, opacity `tripOpacity` (`EmphasisLevels`, the shown ease); and
-    `TripMarks.tsx`, three InstancedMeshes at MARKER_Y (a `theme.background` disc 4.4 at `TRIP_MARK_HALO` 1.2, the `exitPath`
+    `TripMarks.tsx`, four InstancedMeshes at MARKER_Y (a `theme.background` disc 4.4 at `TRIP_MARK_HALO` 1.2, the `exitPath`
     ring 4.5 from `TRIP_MARK_INNER` 0.62 to 1, a dot 4.55 at `TRIP_MARK_DOT` 0.4 for the start and end only, so a change reads
-    hollow), radius `screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS 9)` (cameraDistance.ts: 1.6x the station marker,
+    hollow, and for a service change's `skip` role (08r.6) no dot but a cross 4.56, two arms `SKIP_CROSS_WIDTH` 0.2 wide reaching
+    `SKIP_CROSS_HALF` 0.62, one outline so nothing draws twice as it fades; its `look` prop, the route's `kind`, colours every
+    mesh `changeSkipMark` for a change, `exitPath` for a trip; a skip mark is full size), radius `screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS 9)` (cameraDistance.ts: 1.6x the station marker,
     5..13 px), a change at `CHANGE_MARK_SHARE` 0.7 of it, and a start the location reticle overlaps (the fix within its radius
     plus the reticle's outer radius, `reticleClearanceInto` in hereShape.ts: `TICK_OUTER` × its scale) grown so its ring ends
     2 px past the reticle's far edge, at most `START_GROWTH_CAP` 2.5×, easing in over the reticle's radius of offset
@@ -778,7 +791,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `stationSearch.ts` ranks stations for a query with `matchName` (exact, prefix, typo-tolerant; a number only prefix-matches as the
     last word and never with an explicit ordinal, so "14 st" and "14th" skip 145 St; half-typed long forms and ordinals
     like "14 stre" and "14t" keep matching). `stationHash.ts` parses and builds `#station=<id>`
-  - `panelCollapse.tsx` `PanelCollapseProvider` (in `App.tsx`, inside `TripProvider`) and the collapse flags of the station, trip and service changes panels, and the changes list's open flag (08r.5: `changesOpened` / `changesClosed`, no `seq`; the list's collapse resets on close)
+  - `panelCollapse.tsx` `PanelCollapseProvider` (in `App.tsx`, inside `TripProvider`) and the collapse flags of the station, trip and service changes panels, and the changes list's open flag (08r.5: `changesOpened` / `changesClosed`, no `seq`; the list's collapse resets on close),
+    and the picked change (08r.6: `changePick` `{ alertId, seq }`, `seq` from the `picks` counter so a pick after a clear frames again;
+    `changePicked` sets it, or clears it when it names the one picked; `changePickCleared` (Esc); `changesClosed` clears it; a
+    collapse, a train cover and a station pick keep it; none moves `seq`. Read by `usePanelCollapse().changePick`, set by
+    `usePanelCollapseControls().pickChange` / `clearChangePick`)
     (`panelCollapseState.ts`, pure: `frontPanel` mirrors Hud's bottom slot order, train > notice > changes > trip > station, Hud reads it through `usePanelCollapse().front`; `collapseReducer`, `collapsedFront`).
     `usePanelCollapse(): { collapsed, seq, front }` is the scene's read-only view (memoised; `front` is `frontPanel`'s, which the trip route reads: with the changes list in front `front` is `'changes'`, so the trip route un-dims and no route frame or reframe fires, as under a train panel; `useCollapseReframe` treats a station panel as in front only for `'station'` or none, and a collapse or expand of the changes list never arms it): `collapsed` is true only while the panel in front is a collapsed station, trip or changes panel (false with none, and with a train panel or notice in front), and `seq` increments only on a user collapse or expand of
     the panel in front (never on a size change, a station change, a panel closing or a cover; `collapsed` can change without it, so key on `seq`;
@@ -1035,7 +1052,24 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   schedule answers, `overlay` null; `planTrip` is the scheduled-only form); `NoServiceError`
   when the calendar has no service on that date; User Timing measures `trip:fetch`, `trip:build`, `trip:overlay` and `trip:route`).
   Nothing here loads at startup; the trip panel opening is the first caller
-- Service changes list (08r.5): `src/lib/live/alertList.ts` (pure) builds the header chip and the list from `useAlerts`' input: `alertListView(alerts, routeOrder, nowS)` is `off` (not configured), `connecting`, `unknown` (the one freshness rule, `alertsStatus` in `alertJoin.ts`, which the station join shares) or a `list` of `AlertListRow`s (alert id, lines folded and in route order, the MTA header verbatim, `when`, a sort key) grouped Now (a period holds `nowS`: "Until Fri 11:45 PM", or no text when open-ended: the heading says Now) and Later today (the earliest start within `ALERT_WINDOW_S`: `laterWhen`, "Today 2:30 PM", "Tonight 11:45 PM" from 6 PM, "Tomorrow 4 AM", New York time; `alertJoin.ts`' `relevantPeriod` picks the period); alerts outside both are dropped. `alertChip(body, open)`: "3 service changes" (those in effect, with a warning swatch), "2 service changes later", "Service changes unavailable" (no mark), and while the panel is open "No service changes" / "Service changes"; null otherwise, so the chip is absent when unconfigured, connecting or empty. `ServiceChangesChip.tsx` (Hud header, under the schedule line: `aria-expanded`, `aria-controls` only while the panel is in front, a 44 px target round a 24 px chip, the pressed state an ink fill, the focus outline on the 24 px chip not the target, a hover state on the dim unavailable chip too, never a live region: the count is never spoken on a poll; a chip that unmounts holding focus hands it on one frame later, `useChangesPanel`'s `chipFocusLost`) toggles `useChangesPanel.ts` (opens the list expanded, first clearing a train panel or notice, focus to the heading one frame later; closing from the chip leaves focus on it, from Close or Esc inside the panel it goes to the chip, else the trip heading, else the station's, else Search; moves no camera; a directions pick closes it). `ServiceChangesPanel.tsx` is the panel (`aside` "Service changes", modelled on TripPanel: heading, "Close", the collapse chevron to a bar through `usePanelToggle('changes')`, "more below" fade; kept mounted but hidden and inert under a train panel or notice; in front of the trip panel, which stays mounted hidden and inert under it, and of the station panel, which is unmounted while the list is in front and returns when it closes; a map tap or auto-focus keeps the list open, but a station chosen in the HUD's search (`onSearchChoose`) or a directions pick (`openTrip`) closes it): "Now" and "Later today" sections of `ServiceChangeRow.tsx` (route chips, the `when`, the MTA header as a plain `whitespace-pre-line` text node; plain text now, 08r.6 swaps the row's inner `div` for a `button`), or a dim "Checking for service changes", "Service changes unavailable" or "No service changes in the next 24 hours." No live region anywhere in it. The header grows a row once the first /alerts poll settles (an inset change only: it starts no flight).
+- Service changes list (08r.5): `src/lib/live/alertList.ts` (pure) builds the header chip and the list from `useAlerts`' input: `alertListView(alerts, routeOrder, nowS, drawable)` is `off` (not configured), `connecting`, `unknown` (the one freshness rule, `alertsStatus` in `alertJoin.ts`, which the station join shares) or a `list` of `AlertListRow`s (alert id, lines folded and in route order, the MTA header verbatim, `when`, a sort key, `drawable`: App's per-snapshot set of `changeDrawable` ids) grouped Now (a period holds `nowS`: "Until Fri 11:45 PM", or no text when open-ended: the heading says Now) and Later today (the earliest start within `ALERT_WINDOW_S`: `laterWhen`, "Today 2:30 PM", "Tonight 11:45 PM" from 6 PM, "Tomorrow 4 AM", New York time; `alertJoin.ts`' `relevantPeriod` picks the period); alerts outside both are dropped. `alertChip(body, open)`: "3 service changes" (those in effect, with a warning swatch), "2 service changes later", "Service changes unavailable" (no mark), and while the panel is open "No service changes" / "Service changes"; null otherwise, so the chip is absent when unconfigured, connecting or empty. `ServiceChangesChip.tsx` (Hud header, under the schedule line: `aria-expanded`, `aria-controls` only while the panel is in front, a 44 px target round a 24 px chip, the pressed state an ink fill, the focus outline on the 24 px chip not the target, a hover state on the dim unavailable chip too, never a live region: the count is never spoken on a poll; a chip that unmounts holding focus hands it on one frame later, `useChangesPanel`'s `chipFocusLost`) toggles `useChangesPanel.ts` (opens the list expanded, first clearing a train panel or notice, focus to the heading one frame later; closing from the chip leaves focus on it, from Close or Esc inside the panel it goes to the chip, else the trip heading, else the station's, else Search; moves no camera; a directions pick closes it). `ServiceChangesPanel.tsx` is the panel (`aside` "Service changes", modelled on TripPanel: heading, "Close", the collapse chevron to a bar through `usePanelToggle('changes')`, "more below" fade; kept mounted but hidden and inert under a train panel or notice; in front of the trip panel, which stays mounted hidden and inert under it, and of the station panel, which is unmounted while the list is in front and returns when it closes; a map tap or auto-focus keeps the list open, but a station chosen in the HUD's search (`onSearchChoose`) or a directions pick (`openTrip`) closes it): "Now" and "Later today" sections of `ServiceChangeRow.tsx` (route chips, the `when`, the MTA header as a plain `whitespace-pre-line` text node; a `drawable` row is a `button` with that content as its name,
+  `aria-pressed`, `aria-description` "Show on the map" or, pressed, its note, a leading `border-focus` bar while pressed and an
+  aria-hidden dim note line under it (`changeDrawNote`: "Drawn from the MTA notice", "… · skipped stops probably as shown", or
+  "Not drawn on the map: no line matches the notice"); a press keeps focus and speaks nothing more; the rest stay a `div`), or a dim "Checking for service changes", "Service changes unavailable" or "No service changes in the next 24 hours." No live region anywhere in it. The header grows a row once the first /alerts poll settles (an inset change only: it starts no flight).
+- Service change on the map (08r.6): `src/lib/changeDraw.ts` (pure) `serviceChangeDraw(alert, { shapes, stationById, stopStations }, key)`
+  builds the route view (`TripRouteDraw` `kind: 'change'`, below): per route and direction the informed stations' child stops are
+  ordered along the route's first shape of that direction (primary first) that passes within `MAX_STOP_OFFSET_M` of all of them,
+  then found on the drawn lines by `rideSpan` (a straight fallback, or a run no shape orders, warns and draws nothing). A skip
+  (`skipSetsOf`): the informed stretch as `rides`, on the set's direction or both, and a `skip` mark per skipped station (once,
+  at the member's own point); a part suspension or a suspension with stops: the stretch as `suspended`, no marks; a suspension
+  naming a route only: every primary shape of it whole. Any other kind, or nothing drawn, is null. `frameStations` are the
+  informed stations' points (a whole route: all its stations). `changeDrawable` (cheap, no geometry) and `changeDrawNote`.
+  `src/data/useChangeRoute.ts` draws the pick while the list still lists it (memo on the pick, the alert's type, header and
+  entities, the paths; a throw logs and draws nothing; no fetch). App: `route = changeRoute?.route ?? tripRoute`, shown while
+  its panel is in front (`'changes'` for a change, `'trip'` for a trip; a trip under the list waits), so Scene draws it through
+  SubwayLines (the held route eases out, a trip to change swap remounts TripLines' boundary) and CameraRig frames it.
+  `src/ui/useHudSearch.ts` holds the HUD's search dialog handlers (split out of Hud.tsx for the line cap). Esc in an expanded
+  list with a pick clears the pick (focus stays), then closes the list (`usePanelEscape`).
 - Navigation UI (2q7.9): Behind `FEATURES.navigation` (`src/config.ts`, default false): `Hud.tsx` passes `openTrip` to the search dialog and the station panel (`ArrivalsPanel`'s `onDirections` is optional) and mounts `TripAnnouncer` only while it is true; every hook and scene input below keys on `useTrip().open`, which only `openTrip` sets, so with it false none of them fetches or draws. `src/lib/trip.tsx` `TripProvider` (wraps `MapView` in `App.tsx`)
   and `useTrip` hold open, From and To in memory for the session (no URL, history or storage). `src/data/useTripPlan.ts` plans when
   both ends are set and differ, leaving now (live clock once a snapshot has set it, else the device's), drops stale replies by request
@@ -1367,7 +1401,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   the follow anchor (with the last frame's band view); -2 CameraRig (the follow's `beforeFlight`, the flight step,
   focus, the polar lock), the touch twist's goal (`useTouchOrbit`) and the orbit's bounds; -1 drei's `update()`; -0.75 the train follow; -0.5 the orbit's pivot
   and pan clamp; -0.25 the band view and the interiors' presence (`PresenceDriver`); 0 the draws (and `useBasemapTiles` reading the camera, read-only).
-- The trip route frame (`useRouteFlight.ts`, 2q7.45.5): with the trip panel in front, a settled plan (its ends and attempt, never a
+- The route frame (`useRouteFlight.ts`, 2q7.45.5; a picked service change, 08r.6, frames the same way with the changes list in
+  front, once per pick: its token is `changeToken(key)` (`CHANGE_PLAN` + `<alertId>#<pick seq>`, `isChangeToken`), never silent,
+  its points the rides, suspended stretches and `frameStations`; each kind keeps its own `RouteMemo`, so closing the list never
+  frames an already-framed trip again, and the trip's plan resets never forget a change's flight; the reframes read the front by kind).
+  The trip: with the trip panel in front, a settled plan (its ends and attempt, never a
   silent tick or poll) or a journey or list the visitor opens or leaves (the token is the view plus the journey key, so the first
   journey reframes too) flies the camera top-down and north-up to the whole selected journey, every point of its spans and stations
   (`routeFramePoints` over `useTripRoute`'s ride spans, the same ones TripLines draws, and its straight ones (TripDashes), which App passes down through Scene as CameraRig's `tripRoute`, plus the journey's stations; with no route to draw, its patterns still loading, its spans unmappable or only changes inside a station, nothing frames; `front` is `usePanelCollapse().front === 'trip'`) inside the free rect less 32 px (`frameTopDown`: the
@@ -1401,9 +1439,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: station streets (focused and in view) 0.35, cross-fading by look A's
   veil share into their veiled stroke at 7.5 above the veil (`PresenceStore.veilShare`; TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
-  0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`), a straight-drawn trip ride 2.2 (`TripDashes.tsx`),
+  0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`), a service change's suspended stretch 2.15 (`TripLines.tsx`, dashed), a straight-drawn trip ride 2.2 (`TripDashes.tsx`),
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo 4.4, trip walks 4.45
-  (`TripDashes.tsx`; 7.55 above the veil while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused) and it reveals), trip mark ring 4.5 and dot 4.55
+  (`TripDashes.tsx`; 7.55 above the veil while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused) and it reveals), trip mark ring 4.5 and dot 4.55, a skip mark's cross 4.56
   (`TripMarks.tsx`), train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
