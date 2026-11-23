@@ -123,6 +123,25 @@ describe('a location fix never reaches a geocode request', () => {
     expect(tested).toBeGreaterThan(5)
   })
 
+  it('(f) two fixes found in the dialog, far apart: the view still at the first sends no focus', () => {
+    let tested = 0
+    for (let i = 0; i < 200; i++) {
+      const a = randomFix()
+      const b = randomFix()
+      if (!a || !b || distance(a.placement.ground, b.placement.ground) < 8000) continue
+      tested++
+      forgetLocate()
+      rememberUnviewedFix({ center: a.placement.viewCenter, radiusM: a.placement.viewRadiusM, nearestId: a.placement.nearest.id })
+      rememberUnviewedFix({ center: b.placement.viewCenter, radiusM: b.placement.viewRadiusM, nearestId: b.placement.nearest.id })
+      for (const fix of [b.placement, null]) {
+        expectNoFix(urlFor(fix, a.placement.ground, null), a.latLon)
+        expectNoFix(urlFor(fix, a.placement.ground, null), b.latLon)
+        expectNoFix(urlFor(fix, a.placement.nearest.pos, a.placement.nearest.id), a.latLon)
+      }
+    }
+    expect(tested).toBeGreaterThan(5)
+  })
+
   it('(d) shown with the view far away: only the map\'s own rounded focus goes, far from the fix', () => {
     let withFocus = 0
     for (let i = 0; i < 200; i++) {

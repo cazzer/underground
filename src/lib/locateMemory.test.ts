@@ -57,6 +57,45 @@ describe('the two memory slots', () => {
     expect(excludedByLocate(locateMemoryFor(HERE), east(HERE, 9000), 'B')).toBe(true)
   })
 
+  it('a second unviewed fix does not replace an unforgotten first', () => {
+    const second = east(HERE, 20000)
+    rememberUnviewedFix(memory('B1', HERE))
+    rememberUnviewedFix(memory('B2', second))
+    // The view stayed at the first one while the user travelled.
+    expect(ids(HERE).sort()).toEqual(['B1', 'B2'])
+    expect(excludedByLocate(locateMemoryFor(HERE), HERE, null)).toBe(true)
+    // Leaving the first forgets only the first; the second, never visited, holds.
+    expect(ids(east(HERE, 9000))).toEqual(['B2'])
+  })
+
+  it('a press repeated on the spot takes the earlier entry\'s place; a different spot or station does not', () => {
+    const far = east(HERE, 20000)
+    rememberUnviewedFix(memory('B1', HERE))
+    rememberUnviewedFix(memory('B2', far))
+    rememberUnviewedFix(memory('B1', east(HERE, 30)))
+    expect(ids(null).sort()).toEqual(['B1', 'B2'])
+    rememberUnviewedFix(memory('B3', east(HERE, 30)))
+    expect(ids(null).sort()).toEqual(['B1', 'B2', 'B3'])
+  })
+
+  it('a new circle that does not cover an earlier fix is added beside it', () => {
+    rememberUnviewedFix(memory('B1', HERE))
+    rememberUnviewedFix({ center: east(HERE, 8000), radiusM: 3000, nearestId: 'B1' })
+    expect(locateMemoryFor(null)).toHaveLength(2)
+  })
+
+  it('keeps every distinct unviewed fix: no cap drops the oldest', () => {
+    for (let i = 0; i < 12; i++) rememberUnviewedFix(memory(`F${i}`, east(HERE, i * 10000)))
+    expect(ids(null)).toHaveLength(12)
+  })
+
+  it('an armed entry is not replaced by a new find on top of it', () => {
+    rememberUnviewedFix(memory('B1', HERE))
+    expect(ids(HERE)).toEqual(['B1'])
+    rememberUnviewedFix(memory('B2', east(HERE, 100)))
+    expect(ids(HERE).sort()).toEqual(['B1', 'B2'])
+  })
+
   it('each slot is forgotten by its own rule', () => {
     const elsewhere = east(HERE, 20000)
     rememberLocate(memory('A'))
