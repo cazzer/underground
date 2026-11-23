@@ -10,7 +10,7 @@ import type { RoutesFile, ShapesFile, TripIndexFile } from '../../data/schema'
 import { toGround } from '../projection'
 import { buildTripLookup } from '../realtime/tripLookup'
 import { realGroupById, realStations } from '../realGroups.testdata'
-import { serviceIndex, type ServiceOf } from './alertAdded'
+import { serviceIndex, type NormalService } from './alertAdded'
 import { joinStationChanges, type StationChange } from './alertJoin'
 import { skipSetsOf } from './alertStations'
 import { serviceChangeView } from './alertText'
@@ -38,11 +38,11 @@ const terminalOf = terminalsOf(
 const EXPRESS_AT = 1796190000
 
 /** The Worker's answer at `nowS` (it is polled then), joined at that moment. */
-function joinAt(id: string, nowS: number, serviceOf: ServiceOf | null = null) {
+function joinAt(id: string, nowS: number, serviceOf: NormalService = null) {
   const input = { configured: true, snapshot: transformAlerts(FEED, nowS).snapshot, failures: 0, schemaMismatch: false }
   return joinStationChanges(realGroupById.get(id)!, stationById, input, nowS, routeOrder, serviceOf)
 }
-const changesAt = (id: string, nowS: number, serviceOf: ServiceOf | null = null): StationChange[] => {
+const changesAt = (id: string, nowS: number, serviceOf: NormalService = null): StationChange[] => {
   const { panel } = joinAt(id, nowS, serviceOf)
   return panel.kind === 'changes' ? panel.changes : []
 }
@@ -162,7 +162,7 @@ describe('joinStationChanges for an Express to Local change', () => {
   const serviceOf = serviceIndex(lookup, stationById)
   /** 2026-12-19 06:01 GMT, inside the D's uptown local run (36538). */
   const LOCAL_AT = 1797660060
-  const local = (id: string, nowS: number, with_: ServiceOf | null) => changesAt(id, nowS, with_).filter((c) => /:(36538|31871)$/.test(c.alertId)).map(summary)
+  const local = (id: string, nowS: number, with_: NormalService) => changesAt(id, nowS, with_).filter((c) => /:(36538|31871)$/.test(c.alertId)).map(summary)
 
   it('81 St: the uptown D stops here, a row of our own over the header', () => {
     expect(local('A21', LOCAL_AT, serviceOf)).toEqual(['36538 addedN D now'])
@@ -180,13 +180,20 @@ describe('joinStationChanges for an Express to Local change', () => {
     expect(local('A24', LOCAL_AT, serviceOf)).toEqual(['36538 otherN D now'])
   })
 
-  it('quotes it while the normal service is unknown, and says the join is not yet known', () => {
-    expect(local('A21', LOCAL_AT, null)).toEqual(['36538 otherN D now'])
-    expect(joinAt('A21', LOCAL_AT, null).known).toBe(false)
+  it('quotes it while the normal service loads, and says the join is not yet known', () => {
+    expect(local('A21', LOCAL_AT, 'loading')).toEqual(['36538 otherN D now'])
+    expect(joinAt('A21', LOCAL_AT, 'loading').known).toBe(false)
     expect(joinAt('A21', LOCAL_AT, serviceOf).known).toBe(true)
   })
 
-  it('74 St-Broadway: the 7X stops here, the 7 (which always does) only quoted', () => {
-    expect(local('710', FEED_AT, serviceOf)).toEqual(['31871 addedN 7X now', '31871 otherN 7 now'])
+  it('settles as known, the change a plain notice, when no normal service will come', () => {
+    expect(local('A21', LOCAL_AT, null)).toEqual(['36538 otherN D now'])
+    expect(joinAt('A21', LOCAL_AT, null).known).toBe(true)
+  })
+
+  it('74 St-Broadway: one row for the 7X stopping here, the same alert\'s 7 row dropped', () => {
+    expect(local('710', FEED_AT, serviceOf)).toEqual(['31871 addedN 7X now'])
+    // Without the normal service both routes are the one plain notice.
+    expect(local('710', FEED_AT, null)).toEqual(['31871 otherN 77X now'])
   })
 })

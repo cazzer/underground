@@ -37,19 +37,20 @@ function sliceAround(run: readonly StopId[], added: ReadonlySet<StopId>): StopId
 /**
  * Per added set (alertAdded.ts), the route's primary stations and the added ones ordered along its shape, cut to one
  * station either side of the added stretch, as a drawn-shape ride; an 'added' mark at each added station (once,
- * whatever sets add it). A run no shape orders, or one on no drawn line, warns and draws only the marks. Nothing
+ * whatever sets add it, and one per complex, its first added member, as for a reroute). A run no shape orders, or one on no drawn line, warns and draws only the marks. Nothing
  * without `ctx.serviceOf`.
  */
 export function localChangeDraw(alert: ServiceAlert, ctx: ChangeDrawContext): StopsDraw {
   const out: StopsDraw = { rides: [], marks: [], stations: [], frame: [] }
   if (ctx.serviceOf === null) return out
-  const marked = new Set<StationId>()
+  const leads = new Set<StationId>()
   const stations = new Set<StationId>()
   for (const set of addedSetsOf(alert, { stationById: ctx.stationById, serviceOf: ctx.serviceOf })) {
     for (const id of set.stations) {
       stations.add(id)
-      if (!marked.has(id)) out.marks.push(mark(ctx.stationById.get(id)!, 'added'))
-      marked.add(id)
+      const st = ctx.stationById.get(id)!
+      if (!leads.has(st.leadId)) out.marks.push(mark(st, 'added'))
+      leads.add(st.leadId)
     }
     const primary = ctx.serviceOf(set.route, set.direction)?.primary ?? []
     const run = orderedRun(set.route, set.direction, [...new Set([...primary, ...set.stations])].filter((id) => ctx.stationById.has(id)), ctx)

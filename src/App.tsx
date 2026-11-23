@@ -78,7 +78,7 @@ function MapView({ network, bands, live }: MapViewProps) {
   const interiorSettled = interior.index.status !== 'loading' && interior.load.status !== 'loading'
   const outages = joinPanelOutages(interiorOutages, model?.interior ?? null, interiorSettled, stationEquipment(equipment, focusedId), ene, nowS)
   // The MTA's service changes: the focused station's rows, the skip sets, the header's list and the picked one's drawing.
-  const { changes, skips, changeList, changeNote, changeRoute } = useServiceChanges({ network, paths, focusedId, nowS, lookup: live.arrivals?.lookup ?? null })
+  const { changes, skips, changeList, changeNote, changeRoute } = useServiceChanges({ network, paths, focusedId, nowS, lookup: live.lookup, lookupFailed: live.lookupFailed })
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
   // Only once the visitor chose the To (an end filled from the fix, then swapped there, waits for a focus or pick).

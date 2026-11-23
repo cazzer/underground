@@ -29,6 +29,12 @@ export interface RouteService {
 /** A route and direction's normal service; null when it has no primary pattern. */
 export type ServiceOf = (route: RouteId, direction: Direction) => RouteService | null
 
+/** What the app knows of normal service: an index, `'loading'` while a source may still arrive, or null when none will. */
+export type NormalService = ServiceOf | 'loading' | null
+
+/** The index, or null while it loads or when there is none. */
+export const serviceOrNull = (service: NormalService): ServiceOf | null => (typeof service === 'function' ? service : null)
+
 /** A child stop's parent station ("A21N" is A21). */
 const stationOfStop = (stop: string): StationId => stop.slice(0, -1)
 

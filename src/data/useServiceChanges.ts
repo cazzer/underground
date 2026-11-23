@@ -4,6 +4,7 @@ import { useAlerts } from './useAlerts'
 import { useChangeRoute } from './useChangeRoute'
 import { useNormalStops } from './useNormalStops'
 import { changeDrawable, changeDrawNote, type ChangeDraw } from '../lib/changeDraw'
+import { serviceOrNull } from '../lib/live/alertAdded'
 import { joinStationChanges } from '../lib/live/alertJoin'
 import { alertListView, listedAs, type AlertListBody } from '../lib/live/alertList'
 import { alertSkipsOf, type AlertSkips } from '../lib/live/alertSkips'
@@ -25,8 +26,10 @@ interface ServiceChangesInput {
   focusedId: string | null
   /** The live clock (eneNowS). */
   nowS: number
-  /** The live layer's trip lookup, once loaded: normal service for an Express to Local change. */
+  /** The live layer's trip lookup, once its static load is ready: normal service for an Express to Local change. */
   lookup: TripLookup | null
+  /** That load failed, or live data is off: normal service falls back to the planner's patterns. */
+  lookupFailed: boolean
 }
 
 export interface ServiceChanges {
@@ -48,17 +51,18 @@ export interface ServiceChanges {
  * picked one's drawing and note. A pick the list no longer shows (ended, gone, data stale) is dropped, so Esc closes
  * the list at once.
  */
-export function useServiceChanges({ network, paths, focusedId, nowS, lookup }: ServiceChangesInput): ServiceChanges {
+export function useServiceChanges({ network, paths, focusedId, nowS, lookup, lookupFailed }: ServiceChangesInput): ServiceChanges {
   const alerts = useAlerts(ALERTS_URL)
   const skips = useMemo(() => alertSkipsOf(alerts.snapshot, alerts.schemaMismatch, network.stationById), [alerts.snapshot, alerts.schemaMismatch, network])
   const routeOrder = useMemo(() => new Map(network.routes.map((r, i) => [r.id, i])), [network])
   const terminalOf = useMemo(() => terminalsOf(network.shapes, network.stations), [network])
   const wantsService = useMemo(() => (alerts.snapshot?.alerts ?? []).some((a) => alertKindOf(a.type) === 'local'), [alerts.snapshot])
-  const serviceOf = useNormalStops(lookup, wantsService, network)
+  const normal = useNormalStops(lookup, lookupFailed, wantsService, network)
+  const serviceOf = serviceOrNull(normal)
   const focusedGroup = focusedId ? network.groupById.get(focusedId) : undefined
   const changes = focusedGroup
     ? serviceChangeView(
-        joinStationChanges(focusedGroup, network.stationById, alerts, nowS, routeOrder, serviceOf),
+        joinStationChanges(focusedGroup, network.stationById, alerts, nowS, routeOrder, normal),
         focusedGroup,
         network.routeById,
         nowS,

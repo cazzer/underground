@@ -34,7 +34,7 @@ Picking a skip or suspension in that list draws it on the map (08r.6): the netwo
 redraws at full colour on its direction's track (a suspended one dashed), each skipped station gets a hollow ring with a
 cross, and the camera frames it top-down; the row says "Drawn from the MTA notice". Closing the list, Esc or a second press ends it.
 An Express to Local change (08r.8) draws the stretch it runs local over and marks each stop it adds (informed stops the route doesn't
-call at in normal service, from the trip patterns) with a ring and a dot ("Drawn from the MTA notice and our timetable"); the station
+call at in normal service, from the trip patterns) with a ring and a dot ("Drawn from the MTA notice and the regular schedule"); the station
 panel at an added stop says "[D] stops here (runs local)". A reroute shows only the stations its notice names (informed stops and the
 header's "between X and Y"), each a plain ring, and no path ("Stations named in the MTA notice · the new route isn't drawn").
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
@@ -171,7 +171,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/config.ts`: build-time feature switches, plain constants (no remote flag service). `FEATURES.navigation` (default
   false, 2q7.51): off, the HUD offers no directions (no From/To on search rows, no "Directions from/to here", no trip panel or
   `TripAnnouncer`), so the trip never opens and nothing trip-only draws or loads (the router chunk, timetables, transfers,
-  `tripPatterns()`, the trip's interiors and street files); search, its flights and the location row are unchanged. True restores navigation.
+  the trip's interiors and street files; `tripPatterns()` loads only as `useNormalStops`' fallback, below); search, its flights and the location row are unchanged. True restores navigation.
 - `src/theme.ts`: all colors, line widths, fonts. Blueprint is the only theme (the user's pick): don't add
   other presets, and don't make evidence or cards in other themes. Route colors are
   GTFS data drawn through `theme.routeLineMix` (mixed toward a theme color; amount 1 = mono), then
@@ -1026,12 +1026,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `RouteAddedSet`: per route and direction of an Express to Local alert (an entity with no direction counts for both) the informed stops
   outside normal service, narrowed to the header's `headerStopNamed` ones when any remain. Known miss: an alert whose route's primary is
   the local pattern (the E's) adds nothing and lists as a notice. The join's `added` change (`ChangeKind`, after skipped and suspended)
-  is a station in an added set, its direction the set's (both: null); with `serviceOf` null (patterns not loaded) a local alert is
-  `other` and the join isn't `known`, so the row turning `added` is never announced; `alertText` words it "stops here (runs local)" /
+  is a station in an added set, its direction the set's (both: null); until the normal service loads a local alert is
+  `other` and the join isn't `known` while it is `'loading'`, so the row turning `added` is never announced; `alertText` words it "stops here (runs local)" /
   "stop here (run local)", spoken "The D train runs local and stops here, uptown only, until …", ended "The local stop for … has ended."
-  `src/data/useNormalStops.ts` gives App's `serviceOf`: the live layer's TripLookup (`live.arrivals.lookup`, no fetch of its own) when
-  loaded, else, only while the snapshot holds a local alert, `tripPatterns()` (the planner chunk's trip-index fetch) with the network's
-  primary shapes; a failure logs once. `src/data/useServiceChanges.ts` holds App's alert wiring (the join, the skip sets, the list and
+  `src/data/useNormalStops.ts` gives the normal service (`NormalService`: an index, `'loading'`, or null when none will come): the
+  live layer's TripLookup (`live.lookup`, its static load, ready before any snapshot; no fetch of its own), `'loading'` while that
+  runs; only when it failed (or live data is off) and the snapshot holds a local alert, `tripPatterns()` (the planner chunk's
+  trip-index fetch) with the network's primary shapes; a failed fallback logs once and gives null, so the join settles with local
+  alerts as plain `other` rows. An alert's `other` rows at a station are dropped where it has an `added` row in the same direction
+  (the 7 under the 7X at 74 St). `src/data/useServiceChanges.ts` holds App's alert wiring (the join, the skip sets, the list and
   its drawable set, the picked change's drawing and note). `alertJoin.data.test.ts` runs the recorded feed (`worker/fixtures/alerts.json`) through the Worker's transform onto the real stations.
   `alertSkips.ts` (08r.7) is the same skip sets as a lookup for the train and station panels (App, through `useServiceChanges`, builds one `AlertSkips` per snapshot with `alertSkipsOf`, indexed by route, and passes it through Hud to
   `TrainPanel` and `ArrivalsPanel`; both joins share `skipSetsOf`, so they agree): `skipAt(skips, route, direction, stationIds, nowS)` gives `'skips'`, `'probably'` (a `probable` set: a note only, never a strike) or null; only
@@ -1088,14 +1091,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   at the member's own point); a part suspension or a suspension with stops: the stretch as `suspended`, no marks; a suspension
   naming a route only: every primary shape of it whole. Express to Local and reroute (08r.8, `changeDrawStops.ts`): per added set the
   route's primary stations and the added ones ordered along its shape and cut to one station either side of the added stretch, as a
-  ride (36538: 59 St to 125 St on the uptown D track), with an `added` mark per added stop; a reroute draws no ride, only a `named`
+  ride (36538: 59 St to 125 St on the uptown D track), with an `added` mark per added stop (one per complex, by `leadId`); a reroute draws no ride, only a `named`
   mark per station its notice names (informed, then `headerEnds`; one per complex, by `leadId`: 36553 marks Canal St and DeKalb Av),
   every named member kept in `stations`, `frameStations` the marks. Any other kind, or nothing drawn, is null. `frameStations` are
   otherwise the informed stations' points (a whole route: all its stations). `ChangeDraw.basis` is `notice`, `timetable` (local) or
   `names` (reroute). `changeDrawable(alert, stationById, serviceOf)` (cheap, no geometry) follows the same rules (a suspension
   needs a route listing two stations, or a whole route some station serves; a local change an added set, none while `serviceOf` is
   null; a reroute a named station), so a row is a button exactly when it draws (`changeDraw.data.test.ts` checks every fixture
-  alert at three times); `changeDrawNote` ("Drawn from the MTA notice and our timetable", "Stations named in the MTA notice · the
+  alert at three times); `changeDrawNote` ("Drawn from the MTA notice and the regular schedule", "Stations named in the MTA notice · the
   new route isn't drawn").
   `src/data/useChangeRoute.ts` draws the pick while the list still lists it (memo on the pick, the alert's type, header and
   entities, the paths, `serviceOf`; a throw logs and draws nothing; no fetch). App: `route = changeRoute?.route ?? tripRoute`, shown while

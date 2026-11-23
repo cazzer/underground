@@ -19,7 +19,7 @@ async function themes() {
 const routes: { id: string; color: string }[] = JSON.parse(readFileSync(new URL('../public/data/routes.json', import.meta.url), 'utf8')).routes
 
 /** The skip mark must read at 3:1 on the background and over every dimmed line (it sits on one); blueprint measures 14.4:1 and 6.76:1 (over the dimmed N). */
-const MIN_SKIP = 3
+const MIN_CHANGE_MARK = 3
 // Floors pinned under the blueprint values measured at changeSuspendedDim 0.35 and tripNetworkDim 0.7 (08r.6): a
 // suspended dash is at least 1.51x its route's dimmed contrast (SI, the closest; the faint trip line's ratio, the same
 // mix), and the dimmest dash (SI) reads 2.04:1 on the background.
@@ -29,10 +29,10 @@ const MIN_SUSPENDED_ON_BACKGROUND = 2
 describe('service change tokens', () => {
   it('keep the skip mark at 3:1 on the background and over every route dimmed by the network dim', async () => {
     for (const t of Object.values(await themes())) {
-      expect(contrastRatio(t.changeMark, t.background), `${t.name} skip on background`).toBeGreaterThanOrEqual(MIN_SKIP)
+      expect(contrastRatio(t.changeMark, t.background), `${t.name} skip on background`).toBeGreaterThanOrEqual(MIN_CHANGE_MARK)
       for (const r of routes) {
         const dimmed = mixHex(routeLineColor(`#${r.color}`, t.routeLineMix, t.background), t.background, t.tripNetworkDim)
-        expect(contrastRatio(t.changeMark, dimmed), `${t.name} skip over dimmed ${r.id}`).toBeGreaterThanOrEqual(MIN_SKIP)
+        expect(contrastRatio(t.changeMark, dimmed), `${t.name} skip over dimmed ${r.id}`).toBeGreaterThanOrEqual(MIN_CHANGE_MARK)
       }
     }
   })

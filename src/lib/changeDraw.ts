@@ -25,7 +25,7 @@ export interface ChangeDraw {
   /** Some skipped stations are our guess from the stops listed (RouteSkipSet.probable): the panel says "probably". */
   probable: boolean
   /**
-   * What the drawing rests on: the notice alone, the notice and our timetable (an Express to Local change's added stops
+   * What the drawing rests on: the notice alone, the notice and the regular schedule (an Express to Local change's added stops
    * are the informed ones the route doesn't normally call at), or only the stations the notice names (a reroute).
    */
   basis: 'notice' | 'timetable' | 'names'
@@ -147,13 +147,13 @@ export function changeDrawable(alert: ServiceAlert, stationById: ReadonlyMap<Sta
 
 export const DRAWN_NOTE = 'Drawn from the MTA notice'
 export const PROBABLE_NOTE = `${DRAWN_NOTE} · skipped stops probably as shown`
-export const TIMETABLE_NOTE = 'Drawn from the MTA notice and our timetable'
+export const TIMETABLE_NOTE = 'Drawn from the MTA notice and the regular schedule'
 export const NAMES_NOTE = "Stations named in the MTA notice · the new route isn't drawn"
 export const NOT_DRAWN_NOTE = "Can't be drawn on the map"
 
 /**
  * The picked row's dim line: the drawing is ours, from the MTA's notice (and the skips our guess, or the added stops
- * from our timetable), only the stations a reroute names, or nothing drew.
+ * from the regular schedule), only the stations a reroute names, or nothing drew.
  * `from` is the start of a change not yet in effect ("11:45 PM", nyWhen's wording), so the map isn't read as now.
  */
 export function changeDrawNote(draw: ChangeDraw | null, from: string | null = null): string {

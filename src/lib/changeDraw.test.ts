@@ -125,3 +125,18 @@ describe('changeDrawNote', () => {
     ])
   })
 })
+
+describe('serviceChangeDraw for an Express to Local change', () => {
+  it('marks an added complex once, at its first added member, and draws the stretch round it', () => {
+    // G2b is G2's complex sibling; the G normally calls at G1, G3 and G4 only.
+    const sibling: Station = { ...station('G2b', 'Bravo St', 520), leadId: 'G2' }
+    const all = [...stations, sibling]
+    const service = { normal: new Set(['G1', 'G3', 'G4']), primary: ['G1', 'G3', 'G4'] }
+    const local: ChangeDrawContext = { ...ctx, stationById: new Map(all.map((s) => [s.id, s])), stopStations: stopStations(all), serviceOf: () => service }
+    const d = serviceChangeDraw(alert('Planned - Express to Local', '[G] runs local', [at('G2', 'N'), at('G2b', 'N')]), local, 'k')!
+    expect(d.route.marks.map((m) => `${m.stationId}:${m.role}`)).toEqual(['G2:added'])
+    expect([...d.route.stations].sort()).toEqual(['G1', 'G2', 'G2b', 'G3'])
+    expect(d.route.rides).toHaveLength(1)
+    expect(d.basis).toBe('timetable')
+  })
+})
