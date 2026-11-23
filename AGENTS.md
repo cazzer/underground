@@ -105,12 +105,13 @@ so dev and preview serve under that path.
   300 m, junctions shared, OSM node ids, x/z in dm around the stations.json point, edges with kind and length; oneway ignored)
   for every station from the street pin. Rerun after `data` or `data:streets:fetch`; `walkOutputs.test.ts` fails while stale.
   Caps in `budget.ts` (64 KB per file, 4.6 MB total), outside the startup budget.
-- `npm run data:search:streets`: offline; builds the citywide street and intersection search index from the street pin and
-  `stations.json` into 64 hash-bucket shards, `public/data/search/streets/00.json` to `3f.json` (`src/data/searchSchema.ts`;
-  about 3,200 streets with a site per nearby station, 11,500 intersections; the borough is the nearest station's). Rerun after
-  `data`, `data:streets:fetch`, a change to the `searchText.ts` synonyms, `GENERIC_TOKENS` (`src/lib/searchBucket.ts`) or
-  `isStreet`; `streetIndexOutputs.test.ts` fails while stale. Caps in `budget.ts` (36 KB per shard, 660 KB total); a shard over
-  its cap means 128 buckets, not dropped content. Outside the startup budget, and nothing loads it yet (2q7.14).
+- `npm run data:search:streets`: offline; builds the citywide street and intersection index from the street pin and
+  `stations.json` into one file, `worker/data/streetIndex.json` (`worker/src/streetIndexSchema.ts`: about 3,200 streets with a
+  site per nearby station, 11,500 intersections as pairs of street indices, and the two-character `keys` that pick a query's
+  candidates; the borough is the nearest station's). The Worker bundles it, so the client never loads it and it is outside the
+  startup budget. Rerun after `data`, `data:streets:fetch`, a change to the `searchText.ts` synonyms (`worker/src/searchText.ts`),
+  `GENERIC_TOKENS` (`worker/src/streetKeys.ts`) or `isStreet`; `streetIndexOutputs.test.ts` fails while stale. Cap in `budget.ts`:
+  `STREET_INDEX_RAW_CAP_BYTES` (900,000 raw bytes: a Worker's size limit counts the script uncompressed; 689,437 today, 181 KB gzipped).
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
 via `.github/workflows/deploy.yml` (Actions to Pages), which also runs daily (09:23 UTC schedule: it redeploys Pages and the unchanged Worker) so the dated
@@ -368,7 +369,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and `rememberAnswer`: a session memory cache of complete answers only, 50 entries), `data/geocodeFetch.ts` (`geocodeRequestUrl`,
   `parseGeocodeResponse` checking every row at the boundary, `fetchGeocode`: `cache: 'no-store'`, `credentials: 'omit'`, 8 s timeout,
   failures as `GeocodeAnswer` kinds, never an error's message), `lib/geocodeView.ts` (what shows and what the polite region says: one
-  sentence per settled query, "Still searching" only after 2 s, the unavailable sentence once per dialog session (`nextErrorSpoken`); the Worker's `street` rows are dropped, 2q7.14 owns streets),
+  sentence per settled query, "Still searching" only after 2 s, the unavailable sentence once per dialog session (`nextErrorSpoken`); rows whose source is `osm` (the Worker's street index: `street` and `intersection`) are hidden for now, the UI for them comes next, 2q7.14),
   `lib/searchItems.ts` (stations then places as one keyed list),
   `lib/placeLabel.ts` (`displayCase`: GeoSearch names are UPPERCASE, so an all-caps segment is re-cased; `placeText`, `distanceText`,
   `placePick`: the place's ground point and nearest station). `SearchResults.tsx` renders them: a "Stations" list and, with places, an "Addresses and places" heading over a second list of `PlaceResult.tsx` rows, each primary button named
@@ -525,10 +526,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     step-free line, or "No step-free way" when the layout has none (silent when only an outage removed it); the spoken
     sentence);
     `walkFixture.ts` the tests' synthetic walk graphs
-  - `searchBucket.ts` which hash bucket a street or intersection entry is filed in and which one a query reads
-    (`entryBucketKeys`, `queryBucketKey`, FNV-1a over the first two characters of the first distinctive token; `.ts` imports,
-    scripts share it); `searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and `osaDistance`;
-    `stationSearch.ts` ranks stations for a query (exact, prefix, typo-tolerant; a number only prefix-matches as the
+  - Name matching lives in the Worker's source, shared the way `normalizeQuery` is (the client imports `worker/src/...`; scripts load
+    it through `.ts` imports): `worker/src/searchText.ts` name/query tokens (accents, ordinals, abbreviation synonyms) and
+    `osaDistance`; `worker/src/nameMatch.ts` (`matchName`: the exact/prefix/fuzzy token scoring, with `whole` when every name word
+    was used and `partialLast` false for a finished last word; `typedTokens`); `worker/src/streetKeys.ts` (`entryKeys`, `queryKey`,
+    `GENERIC_TOKENS`: the two-character key a street is filed under and a query reads; the guarantee and its limits are in its header).
+    `stationSearch.ts` ranks stations for a query with `matchName` (exact, prefix, typo-tolerant; a number only prefix-matches as the
     last word and never with an explicit ordinal, so "14 st" and "14th" skip 145 St; half-typed long forms and ordinals
     like "14 stre" and "14t" keep matching). `stationHash.ts` parses and builds `#station=<id>`
   - `panelCollapse.tsx` `PanelCollapseProvider` (in `App.tsx`, inside `TripProvider`) and the collapse flags of the station and trip panels
@@ -851,10 +854,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Loaded by `src/data/loadStationWalk.ts` (`decodeStationWalk`: meters, CSR adjacency, per-edge checks, to `WalkGraph`) and
   `useStationWalk.ts` (cached per station). The request names a station, so fetch a shard only for a station the user picked,
   focused or chose as a trip endpoint, never the one nearest a location fix without a user action.
-- `public/data/search/streets/<bucket>.json`: 64 street and intersection search shards (`StreetSearchShard`,
-  `src/data/searchSchema.ts`), built by `scripts/build-street-index.ts` (IO only) through `scripts/lib/streetIndex.ts` (pure:
-  `buildStreetIndex`, `displayStreetName`; reads the pin with `loadPin`, `isStreet` and `streetKey`) and `streetIndexShards.ts`
-  (`bucketStreetShards`). Not loaded by the client yet (2q7.14).
+- `worker/data/streetIndex.json`: the street and intersection index (`StreetIndexFile`, `worker/src/streetIndexSchema.ts`, format 2;
+  one row per line, ODbL, credited "© OpenStreetMap contributors"), built by `scripts/build-street-index.ts` (IO only) through
+  `scripts/lib/streetIndex.ts` (pure: `buildStreetIndex`, `displayStreetName`; reads the pin with `loadPin`, `isStreet` and
+  `streetKey`; its entry types are `streetIndexTypes.ts`) and `streetIndexPack.ts` (`packStreetIndex`: drops each site's station id,
+  turns intersections into street-index pairs, writes `keys`; refuses a name holding ", "). Bundled into the Worker and searched by
+  `/geocode` (2q7.14); never imported by the client (the build is checked: a street-only name must not appear in `dist/assets`).
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
@@ -909,8 +914,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `score-archetypes.ts <feedDir> [--oracle file]` prints the report to stdout and writes nothing. The 2021 draft NYCT
     pathways feed it reads must never be committed, shipped, or used as a source; it refuses a dir inside any git work tree
 - `worker/`: Cloudflare Worker that serves decoded MTA realtime as JSON at `/rt`, the trimmed E&E outage
-  list at `/ene` (equipment code, reason, since, returnAt; the client re-export is 2q7.21), and `/geocode` (NYC GeoSearch
-  then Photon, merged, at most 8 `{label, kind, lat, lon, source}`)
+  list at `/ene` (equipment code, reason, since, returnAt; the client re-export is 2q7.21), and `/geocode` (the bundled street
+  index, NYC GeoSearch, then Photon, merged, at most 8 `{label, kind, lat, lon, source}`; kinds `address`, `place`, `street`,
+  `intersection`, `area`; sources `geosearch`, `photon`, `osm`)
   - `src/schema.ts` the JSON contracts (types and consts only); the client re-exports them (`src/data/realtime.ts`)
   - `src/index.ts` routing (a `Map` of path to handler: `/rt` and `/ene` are `CachedRoute`s through `serveCached`, `/geocode`
     goes to `serveGeocode`; `/rt` 15 s, `/ene` 120 s), CORS;
@@ -921,14 +927,28 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `/geocode`: `serveGeocode.ts` (IO orchestration, never throws: 403 unless an allowed Origin, then 429 `rate-limited` (with
     `retry-after` 60, exposed to CORS, no upstream call) for a client over `clientLimit.ts`'s limit, before parsing and both
     caches so a client can't probe the cache, then 400, the per-isolate LRU, the
-    edge cache, then the sources: GeoSearch first and Photon only when it had no place-like hit (an address hit satisfies a
+    edge cache, then the street index (local, free of the upstream budgets), then the sources: an intersection hit calls neither;
+    else GeoSearch first and Photon only when the index had no row and GeoSearch no place-like hit (an address hit satisfies a
     house-number query), or both at once for a query that looks like a business; only complete answers are cached, a source
     that timed out, failed to connect or answered 429 or 5xx is skipped for 30 s, 503 `busy` (with `retry-after`, exposed to CORS)
     when nothing may be called; one `geocode-miss` log line, counts and fixed codes
     only, never `q`, the focus or a label); `geocodeQuery.ts` / `geocodeText.ts` (parse, normalize, key, heuristics);
-    `geosearch.ts` / `photon.ts` (the pure trims; Photon rows for transit, another state or country dropped) over
-    `geocodeCandidate.ts`; `geocodeMerge.ts` (dedupe: PAD aliases, cross-source twins; rank); `geocodeOutcome.ts` (status,
-    attribution, `incomplete`, the log line); `clientLimit.ts` (the per-client limit: Cloudflare's Workers Rate Limiting
+    `geosearch.ts` / `photon.ts` (the pure trims; Photon rows for transit, another state or country dropped; both drop every
+    `street` row, the index's replace them) over `geocodeCandidate.ts`; `geocodeMerge.ts` (dedupe: PAD aliases, cross-source
+    twins; rank; `combineRows`: the index's whole-name rows, at most 5, then the upstream rows, then its half-typed rows, at least
+    2 places kept for them); `geocodeOutcome.ts` (status, attribution, `incomplete`, the log line, whose `osm` count is the index's
+    rows shown; with index rows and every upstream failed the answer is a 200, `incomplete`, never cached; 502 or 503 only with no
+    index row either);
+    the street index: `streetIndexData.ts` (imports `../data/streetIndex.json` once per isolate; only `index.ts` and its test import
+    it, so the client never bundles it; about 7 to 10 ms of startup by `wrangler check startup`, 3.5 MB of heap) over `streetIndex.ts` (`loadStreetIndex`: checks
+    the format and every index, throws a fixed message so a bad index fails startup loudly; builds the key map and per-street
+    crossings), `streetSearch.ts` (`searchStreets` -> `{ whole, partial }` candidates, source `osm`, label "Name, Borough", an
+    intersection "A & B, Borough" in the index's order whatever the typed order; the query's key picks at most about 110 streets to
+    score, under 0.5 ms; a query with "&", "/", "@", "+" or the words "and" / "at" looks for intersections first, the side before the
+    separator a finished word, then streets on the whole text; ranked by score, nearness to the focus, street class, label; one
+    row per label; a street answers with its site nearest the focus, else its middle one, `streetQuery.ts`), `streetIndexSchema.ts`
+    (the file contract and `BOROUGH_NAMES`; types only, safe for the client), `streetKeys.ts`, `nameMatch.ts`, `searchText.ts`;
+    `streetFixture.ts` is the tests' mini index; `clientLimit.ts` (the per-client limit: Cloudflare's Workers Rate Limiting
     binding `GEOCODE_CLIENT_LIMIT`, 30 per 60 s per client per location, approximate; the key is `CF-Connecting-IP` through `clientKey.ts` (IPv4 and
     IPv4-mapped IPv6 on the full address, other IPv6 on its /64; clients sharing an address, CGNAT or Private Relay, share the
     count); Cloudflare holds the counter and the address is never logged, stored or echoed; fails open, logging one fixed code
@@ -943,11 +963,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `proto/subway-rt.proto` trimmed subset of gtfs-realtime + nyct-subway
   - `fixtures/` recorded feeds for tests (see its README; `ene.json` is the E&E sample, `geocode.json` the GeoSearch and
     Photon answers)
+  - `data/streetIndex.json` the generated street index (`npm run data:search:streets`; see the scripts entry above), a plain JSON
+    import that wrangler's bundler inlines: about 690 KB raw, 181 KB gzipped, the Worker's bundle 922 KiB (220 KiB gzipped) against
+    a 64 MiB limit; `npx wrangler check startup` measures its startup
 - `docs/research/`: research notes (`data-sources.md`)
 
 ## Hard rules
 - Hand-written source files stay at or under 300 lines (aim for 200). Split before exceeding.
-  Exempt: generated JSON in `public/data/` (one entry per line so refresh diffs stay small) and
+  Exempt: generated JSON in `public/data/` and `worker/data/` (one entry per line so refresh diffs stay small) and
   generated code in `worker/src/gen/` (CI regenerates it and fails on any diff).
 - Tests only where they verify real functionality: pure logic and data transforms.
   No snapshot tests, no component tests by default. Colocate as `*.test.ts`.
@@ -1284,6 +1307,14 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   location flight's center, or is the station nearest the fix (`lib/geocodeFocus.ts`; `lib/locateMemory.ts` remembers the flight's circle
   and nearest station id in memory, through later flights and a cleared fix, until the camera target is farther from it than the guard,
   when it is forgotten; the fix is only read there, to exclude, and no URL builder takes it). The dialog states this on screen.
+- **Street and intersection search runs in the Worker, on a bundled index (2q7.14).** `worker/data/streetIndex.json` (OSM
+  streets within 300 m of a station, ODbL; the file, its pin `data/streets/` and the scripts that build it are in the public repo,
+  which is how the derivative database is offered) is a module of the Worker, not a client file: the client downloads nothing of
+  it, and a typed street goes to `/geocode` like any address (so it falls under the Address search rules below, no query logged).
+  `/geocode` rows from it carry source `osm` and the credit "© OpenStreetMap contributors" in `attribution`. It is refreshed by
+  `refresh-data.yml` with the rest of the data and deployed by merging to `main`; a malformed committed index fails the Worker's
+  startup (and so `/rt`), which `streetIndexOutputs.test.ts`, the Worker's `streetIndexData.test.ts` and the PR review catch first.
+  Contract v2 (`GEOCODE_SCHEMA_VERSION`): an old client against the new Worker reads "address search unavailable" until reload.
 - **Walk shards are fetched only on a user action.** `data/walk/<id>.json` reveals its station id to the static host, so
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`
   of a fix); no request carries the fix or the destination, and routing runs on the device.
@@ -1317,11 +1348,11 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`; the supplemented zip becomes `timetable/dated/` in each Pages deploy, never in git (`npm run data:dated`). The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.2 KB today,
-  about 800 B of headroom; the depths file is about 1.6 KB of it; `route/transfers.json` is on demand, in the trip planner's chunk, with its own cap); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), and 36 KB per `public/data/search/streets/` shard with a total, 16 KB for `public/data/stations/equipment.json`).
+  about 800 B of headroom; the depths file is about 1.6 KB of it; `route/transfers.json` is on demand, in the trip planner's chunk, with its own cap); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), 16 KB for `public/data/stations/equipment.json`; the Worker's `worker/data/streetIndex.json` is outside `public/data` and has a raw cap of its own).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow
-  the stations), then `npm run data:walk`, then `npm run data:search:streets`, change `public/data`. A station new to the feed gets a street file from whatever pinned ways lie
+  the stations), then `npm run data:walk`, then `npm run data:search:streets`, change `public/data` or `worker/data/streetIndex.json` (the one file the refresh writes outside `public/data`; both workflow jobs allow exactly that path). A station new to the feed gets a street file from whatever pinned ways lie
   near it, with a `WARNING:` line in the log (`data:streets` prints it for any station the pin manifest's `stationIds`
   lacks); it does not block the refresh, and the next `data:streets:fetch` covers it. The workflow runs typecheck, tests, and build before pushing, but the
   PR itself shows no check status (GITHUB_TOKEN PRs don't trigger workflows).

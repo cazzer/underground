@@ -7,6 +7,7 @@ name: Refresh GTFS data
 #
 # Two jobs so the write token never sits next to npm:
 #   generate  read-only; runs npm (data, data:stations, data:streets, data:walk, data:search:streets, typecheck, test, build); uploads public/data
+#             and worker/data/streetIndex.json (the Worker's bundled street index, the one file outside public/data)
 #   publish   write token; never runs npm; commits the artifact and opens/updates the PR
 #
 # GitHub disables scheduled workflows after 60 days without repo activity; re-enable
@@ -89,9 +90,9 @@ jobs:
           if [ "$status" -ne 0 ]; then tail -n 40 "$RUNNER_TEMP/walk.log" | tee -a "$RUNNER_TEMP/data.log"; fi
           exit "$status"
 
-      # The street search shards follow the stations (each street's borough and site stations) and the pin; also writes
-      # only under public/data/.
-      - name: Regenerate street search shards
+      # The street index follows the stations (each street's borough and site stations) and the pin. It is the one
+      # output outside public/data/: worker/data/streetIndex.json, bundled into the Worker (2q7.14).
+      - name: Regenerate street index
         run: npm run data:search:streets 2>&1 | tee -a "$RUNNER_TEMP/data.log"
 
       - name: Check for changes
@@ -105,10 +106,10 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # The refresh may only touch public/data.
-          stray=$(printf '%s\n' "$changed" | grep -v '^public/data/' || true)
+          # The refresh may only touch public/data and the Worker's street index.
+          stray=$(printf '%s\n' "$changed" | grep -Ev '^(public/data/|worker/data/streetIndex\.json$)' || true)
           if [ -n "$stray" ]; then
-            echo "::error::Unexpected changes outside public/data:"
+            echo "::error::Unexpected changes outside public/data and worker/data/streetIndex.json:"
             echo "$stray"
             exit 1
           fi
@@ -130,6 +131,8 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           cp -R public/data "$RUNNER_TEMP/out/data"
+          mkdir -p "$RUNNER_TEMP/out/worker-data"
+          cp worker/data/streetIndex.json "$RUNNER_TEMP/out/worker-data/streetIndex.json"
           cp "$RUNNER_TEMP/data.log" "$RUNNER_TEMP/out/data.log"
       - uses: actions/upload-artifact@v7
         if: steps.diff.outputs.changed == 'true'
@@ -179,17 +182,27 @@ jobs:
             exit 1
           fi
 
+          # The one file outside public/data: exactly worker/data/streetIndex.json, a plain file, nothing beside it.
+          wd="$RUNNER_TEMP/out/worker-data"
+          odd=$(find "$wd" -mindepth 1 ! \( -type f -name streetIndex.json \))
+          if [ -n "$odd" ] || [ ! -f "$wd/streetIndex.json" ]; then
+            echo "::error::Artifact worker-data is not exactly streetIndex.json:"
+            printf '%s\n' "$odd" | grep -v '^$' || true
+            exit 1
+          fi
+
           rm -rf public/data
           cp -R "$art" public/data
+          cp "$wd/streetIndex.json" worker/data/streetIndex.json
           git config user.name 'github-actions[bot]'
           git config user.email "$BOT_EMAIL"
           git checkout -B "$BRANCH"
-          git add -A public/data
+          git add -A public/data worker/data/streetIndex.json
 
-          # Belt and braces: the artifact may only change public/data.
-          stray=$(git status --porcelain --no-renames | grep -v '^.. public/data/' || true)
+          # Belt and braces: the artifact may only change public/data and the Worker's street index.
+          stray=$(git status --porcelain --no-renames | grep -Ev '^.. (public/data/|worker/data/streetIndex\.json$)' || true)
           if [ -n "$stray" ]; then
-            echo "::error::Unexpected changes outside public/data:"
+            echo "::error::Unexpected changes outside public/data and worker/data/streetIndex.json:"
             echo "$stray"
             exit 1
           fi
@@ -217,7 +230,7 @@ jobs:
               echo "pushed=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            if git diff --quiet "origin/$BRANCH" -- public/data; then
+            if git diff --quiet "origin/$BRANCH" -- public/data worker/data/streetIndex.json; then
               echo "$BRANCH already has this data; nothing new."
               echo "pushed=false" >> "$GITHUB_OUTPUT"
               exit 0
@@ -235,7 +248,7 @@ jobs:
         if: steps.push.outputs.pushed == 'true'
         run: |
           {
-            echo "Regenerated \`public/data\` from \`$FEED_URL\`."
+            echo "Regenerated \`public/data\` (and the Worker's \`worker/data/streetIndex.json\`) from \`$FEED_URL\`."
             echo
             echo "- feedVersion: \`$OLD_VERSION\` -> \`$NEW_VERSION\`"
             echo "- Last-Modified: ${LAST_MODIFIED:-unknown}"
