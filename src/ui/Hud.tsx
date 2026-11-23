@@ -27,7 +27,7 @@ import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
 import { TripAnnouncer } from './TripAnnouncer'
 import { TripPanel, type TripLines } from './TripPanel'
-import { usePlaceLine } from './usePlaceLine'
+import type { PlaceLine } from './usePlaceLine'
 import { useHudInsets } from './useHudInsets'
 import { useLineFilter } from './useLineFilter'
 import { useTripPanel } from './useTripPanel'
@@ -48,6 +48,8 @@ interface HudProps {
   onPanel: (rect: ScreenRect | null) => void
   /** The location button's state and actions. */
   locate: LocateControls
+  /** The picked place's line state (App owns it: the scene draws its pin). */
+  place: PlaceLine
   /** Shown under the location message when a `#station=` link named no station. */
   linkNotice: { show: boolean; onDismiss: () => void }
   /** The trip panel's exit and transfer lines and the station index its steps read. */
@@ -58,7 +60,7 @@ interface HudProps {
   siblingsOf: (stationId: string) => readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const lineFilter = useLineFilter(focusedId)
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
@@ -101,7 +103,6 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     if (hadFocus) searchButton.current?.focus({ preventScroll: true })
   }, [dismiss])
   const search = useRef<StationSearchHandle>(null)
-  const place = usePlaceLine()
   // Mirrors the dialog's native open state (set on open and on its close event); the Esc guard reads it.
   const [searchOpen, setSearchOpen] = useState(false)
   // Cancel and Esc leave focus to the dialog, which hands it back to the button that was focused when it

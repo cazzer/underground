@@ -33,6 +33,7 @@ import { StationTies } from './StationTies'
 import { Stations } from './Stations'
 import { SubwayLines } from './SubwayLines'
 import { ViewCenterSource } from './ViewCenterSource'
+import { PlacePin } from './PlacePin'
 import { YouAreHere } from './YouAreHere'
 
 /** TEMPORARY `?basemap=off` (basemapLook.ts) draws no basemap and loads no tiles. */
@@ -63,6 +64,8 @@ interface SceneProps {
   panel: ScreenRect | null
   /** The user's location, once found inside the covered area; null draws no marker. */
   here: { ground: Ground; accuracyM: number } | null
+  /** The searched place's ground point while its line shows (the user's search pick, never the fix); null draws no pin. */
+  placePin: Ground | null
   /** The trip's way out at its To station and its transfers through complexes, by interior file id; each draws only
    *  while its interior is the focused one (the first for an interior wins). */
   stationPaths: readonly StationPathDraw[]
@@ -72,7 +75,7 @@ interface SceneProps {
   tripOpen: boolean
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, stationPaths, exitLabel, tripOpen }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, exitLabel, tripOpen }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -126,6 +129,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
+      {placePin && <PlacePin ground={placePin} />}
       <StationStreets
         interior={interior}
         interiorPending={!interior && !focusedMarker}

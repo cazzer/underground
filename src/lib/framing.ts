@@ -1,5 +1,7 @@
+import { createFollowView, followTargetInto } from './follow'
 import type { Bounds } from './network'
 import type { Ground } from './projection'
+import { tiltForDistance } from './tilt'
 
 export function boundsCenter(b: Bounds): Ground {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 }
@@ -49,10 +51,12 @@ export function frameBounds(
 }
 
 /**
- * Top-down framing of a circle of `radiusM` around `center` in the band between the HUD insets,
- * with the distance clamped to [minDistance, maxDistance]. The inset shift is recomputed at the
- * clamped distance (frameBounds' own target belongs to its unclamped distance), so `center` stays
- * centered in the free band even when the clamp bites.
+ * Framing of a circle of `radiusM` around `center` in the band between the HUD insets, with the distance clamped to
+ * [minDistance, maxDistance]. The target is aimed (followTargetInto, exact under perspective) at the camera's real
+ * tilt for the clamped distance, north-up, so `center` sits in the free band's middle even when the clamp bites and
+ * when the view is tipped (a top-down distance gives the plain inset shift). Horizontally it stays centered. It
+ * assumes a north-up view: a point flight drops focus, so the view springs back to north-up, and a spring not yet
+ * finished at the landing leaves the point slightly off-center.
  */
 export function framePoint(
   center: Ground,
@@ -66,6 +70,13 @@ export function framePoint(
   const square = { minX: center.x - radiusM, maxX: center.x + radiusM, minZ: center.z - radiusM, maxZ: center.z + radiusM }
   const fitted = frameBounds(square, viewport, insets, fovDeg).distance
   const distance = Math.min(Math.max(fitted, minDistance), maxDistance)
-  const metersPerPx = (2 * distance * Math.tan((fovDeg * Math.PI) / 360)) / viewport.height
-  return { distance, target: { x: center.x, z: center.z - ((insets.top - insets.bottom) / 2) * metersPerPx } }
+  const view = createFollowView()
+  view.distance = distance
+  view.polar = tiltForDistance(distance)
+  view.tanHalfFov = Math.tan((fovDeg * Math.PI) / 360)
+  view.aspect = viewport.width / viewport.height
+  // The free band's middle is (top - bottom) / 2 px below the viewport's; screen up is +ndcY.
+  view.ndcY = (insets.bottom - insets.top) / viewport.height
+  const target = followTargetInto({ x: center.x, y: 0, z: center.z }, view, { x: 0, z: 0 })
+  return { distance, target }
 }

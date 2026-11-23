@@ -30,6 +30,12 @@ describe('interior band and deck render orders', () => {
     expect(strokeOrders(0, 1)).toMatchObject({ fine: 8, strong: 9 })
   })
 
+  it("draw the place pin's halo under it, both over the location reticle and under the veil", () => {
+    expect(RENDER_ORDER.placePinHalo).toBeGreaterThan(RENDER_ORDER.here)
+    expect(RENDER_ORDER.placePin).toBeGreaterThan(RENDER_ORDER.placePinHalo)
+    expect(RENDER_ORDER.placePin).toBeLessThan(RENDER_ORDER.interiorVeil)
+  })
+
   it('throw past the decks there are orders for', () => {
     expect(() => strokeOrders(3, 3)).toThrow()
     expect(() => spanCarOrders(MAX_DECKS)).toThrow()

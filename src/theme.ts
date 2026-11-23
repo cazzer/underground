@@ -26,6 +26,14 @@ export interface Theme {
   hereAccuracyOpacity: number
   hereLineWidth: number
   /**
+   * The pin on a searched place, street or intersection (PlacePin.tsx): a diamond outline and dot. At least 3:1 on the
+   * background and held apart from `here`, `stationFocus`, `exitPath`, the selected-train rim and every drawn route
+   * color, also under simulated red-green color blindness (theme.test.ts). Its shape (a diamond, not a ring) carries the rest.
+   */
+  placePin: string
+  /** The pin outline's width in CSS px. */
+  placePinWidth: number
+  /**
    * Rim drawn around the selected train (dot and cars), outside a background-colored gap. A hue no route line
    * uses, at least 3:1 on the background; theme.test.ts holds it apart from every route line color. Interior
    * tokens may share its hue: the street layer is veiled under an interior.
@@ -133,6 +141,8 @@ export const THEMES = {
     here: '#5ce1ff',
     hereAccuracyOpacity: 0.15,
     hereLineWidth: 1.5,
+    placePin: '#f5ff00',
+    placePinWidth: 2,
     trainSelectedRim: '#ff5cf0',
     trainCarSideShade: 0.55,
     trainCarEndShade: 0.75,

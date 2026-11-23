@@ -170,12 +170,18 @@ export function bareStationPoints(stationId: string, streets: StreetLayer | null
   return streets.marks.map((m) => ({ x: streets.anchor.x + m.x, z: streets.anchor.z + m.z }))
 }
 
+/** A searched place lands this far out: tilted, at street zoom, inside the focus range (placeHold.ts keeps auto-focus out). */
+export const PLACE_LANDING_DISTANCE = 600
+
 /**
- * Fly-to for a ground point (a location fix): `radiusM` in view, landing outside the focus range at no less than
- * EXIT_DISTANCE, where the view is still top-down (the tilt's far end).
+ * Fly-to for a ground point. A location fix (`'locate'`) lands with `radiusM` in view, outside the focus range at no
+ * less than EXIT_DISTANCE, where the view is still top-down (the tilt's far end); a searched place (`'place'`) lands
+ * at PLACE_LANDING_DISTANCE, tilted, whatever the radius. Either way the point sits in the middle of the free area.
  */
 export function pointFlight(req: PointRequest, viewport: Viewport, insets: Insets, fovDeg: number, maxDistance: number): Destination {
-  const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, EXIT_DISTANCE, maxDistance)
+  const place = req.source === 'place'
+  const lo = place ? Math.min(PLACE_LANDING_DISTANCE, maxDistance) : EXIT_DISTANCE
+  const { distance, target } = framePoint(req.center, req.radiusM, viewport, insets, fovDeg, lo, place ? lo : maxDistance)
   return { stationId: null, target: new Vector3(target.x, 0, target.z), distance, azimuth: null, follows: false }
 }
 
