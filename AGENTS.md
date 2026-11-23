@@ -28,6 +28,7 @@ neighbour's budgeted (beside a focused station a phone's 1 entrance and 1 street
 and 3) and its entrances dim beside a focused station (full ink with none focused).
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
+It polls `/alerts` the same way and the station panel lists the MTA's service changes at the open station (skips, suspensions, notices: 08r.4).
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
 With the Worker configured the search dialog also finds streets, intersections ("Bedford Av & N 7 St"), addresses and places through `/geocode` (2q7.16, 2q7.14; none of it without `VITE_RT_URL`).
 Trip planning is behind `FEATURES.navigation` (`src/config.ts`), off by default.
@@ -132,7 +133,7 @@ via `.github/workflows/deploy.yml` (Actions to Pages), which also runs daily (09
 timetables, built in each deploy, roll forward; GitHub disables schedules after 60 days without repo activity.
 
 Worker (its own package and lockfile; run `npm --prefix worker ci` once):
-- `npm --prefix worker run dev`: `wrangler dev` serves `/rt`, `/ene` and `/geocode` on `http://localhost:8787`
+- `npm --prefix worker run dev`: `wrangler dev` serves `/rt`, `/ene`, `/alerts` and `/geocode` on `http://localhost:8787`
   (`/geocode` answers only an allowed Origin: `curl -H 'Origin: http://localhost:5173' 'http://localhost:8787/geocode?q=120%20Broadway'`)
 - `npm --prefix worker run typecheck` / `test` / `gen`: `gen` regenerates `src/gen/`
   from `proto/subway-rt.proto`
@@ -248,7 +249,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     turn, reduced motion snaps. The window closes on that reframe, on any `pointerdown` or `keydown` (so "Show all N destinations",
     "Show fewer" or the outage disclosure never move the camera, even tapped within 2 s), a fly request, or its expiry; after it, of the panel's changes
     only a user collapse or expand moves the camera. What can still grow a bare station's phone panel after landing: the "Out of
-    service (N)" disclosure once the equipment index or /ene joins, "status unavailable", the first arrivals and their "Show all N
+    service (N)" disclosure once the equipment index or /ene joins, "status unavailable", the "Service changes (N)" disclosure or "Service changes unavailable" once /alerts joins, the first arrivals and their "Show all N
     destinations" button, arrivals notes. An interior's panel size alone still never moves the camera. On a 390×844 phone (free
     bottom 393.5 px under the open panel, 690 px under the bar) 127 lands with 10 of its 16 marks and 120 with 2 of 6; collapsed, all
     of both; the outage disclosure arriving (52 px) reframes 127 from 8 to 10 and leaves 120 at 2 (`panelGrow.data.test.ts`);
@@ -553,6 +554,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   "Estimated layout"; the disclosure's focus goes to the station heading if it unmounts while focused), or a dim
   "status unavailable" line; one always-mounted polite sr-only region speaks only a change to the machines out at the station
   whose panel stays open and clears its text after 6 s (`outageAnnounce.ts`, pure; silent on open, station change or stale data)
+  `ServiceChangeStatus.tsx` (08r.4) the panel's service changes after `OutageStatus`, built like it (`DisclosureToggle.tsx`, the button `OutageStatus` also uses, with a label and a `bg-status-*` swatch class): a closed
+  "Service changes (N)" disclosure (aria-expanded, focus to the heading if it unmounts while focused) over rows, each our short line (route chips, "skips this
+  station · downtown only · until Fri 11:45 PM", "probably skips this station" when the skip set is our guess, "no service here", "service change") over the MTA's
+  `en` header in its own `whitespace-pre-line` paragraph as a plain text node (verbatim: never edited, truncated, re-cased or built from the html string; no
+  `dangerouslySetInnerHTML`); a dim "Service changes unavailable" line when the snapshot is stale or the version differs (never "none"); nothing without `VITE_RT_URL`.
+  The heading's sr-only text (and the collapsed bar's label) adds "Downtown 1 trains skip this station now." only when this station is skipped now and the header named it
+  (`skipSpoken`); one always-mounted polite sr-only region speaks only a change at the open station, never on open, poll or station change (`alertAnnounce.ts`, like `outageAnnounce.ts`).
+  `usePanelReport.ts` is the HUD's panel measuring effect (moved out of Hud.tsx to keep it under 300 lines).
   `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a labelled input over lists of result rows (`ResultRow.tsx`: a primary button with `SearchResult.tsx` or `PlaceResult.tsx` content and, in the HUD's search, given `onDirections`, "From" and "To" buttons named "Directions from/to <name>", `lib/searchRowActions.ts`; a directions pick calls `openTrip`, with a place's nearest station and name). The top bar is `SearchBar.tsx`. It is not a combobox, because a listbox option can't hold buttons. Every button is in Tab order; arrows move focus (`lib/searchNav.ts`: Down from the input, Up/Down between rows, Left/Right/Home/End within one, a printable key back to the input); Enter in the input picks the highlighted first row (the input's description says so, read on focus); a first row that came from `/geocode` is neither highlighted nor picked while the lookup is pending, since it belongs to the previous text (`enterTarget` in `lib/searchItems.ts`; a station first row always is the current text's). A station row shows the name and access icon, the borough on a dim line only for names whose stations span boroughs
   (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart; choosing a result
   calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). Optional `label`
@@ -952,6 +961,20 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `src/lib/clipLineBuffers.ts` cuts a plain layer's buffers, positions and colors interpolated at the cuts. The clip reads
   ground paths only, not depth, so the station layer skips it at a station with an interior (the basemap's roads,
   masked there, stay cut)
+- The generic Worker JSON poll (08r.4), shared by `/ene` and `/alerts`: `src/data/workerFetch.ts` (`fetchWorkerJson`: one poll, failures as `ok: false`, a 503 warming flagged),
+  `src/lib/live/workerPoll.ts` (`applyWorkerPoll`, pure: state, delay, log, whether to publish; a `PollPolicy` gives the interval, the staleness age and the log label),
+  `src/data/useWorkerPoll.ts` (one request at a time, a hidden tab aborts, backoff, a republish when the snapshot goes stale). `useEne` / `enePoll.ts` / `eneFetch.ts` are thin wrappers over them (the `?ene=` dev fake aside).
+- `src/data/useAlerts.ts` polls the Worker's `/alerts` (`ALERTS_URL` = `alertsUrlFrom(RT_URL)`, null without `VITE_RT_URL` or on an MTA host: nothing fetches) every 120 s through
+  `useWorkerPoll`; `alertsFetch.ts` validates one body. Pure joins in `lib/live/`: `alertStations.ts` (`alertKindOf`: the free-text type to skip / part suspended / suspended / other;
+  `headerNamedStations`: the stations a header names, by whole-word match of a name or a part of it (split on `-`, `/`, parentheses; `searchTokens` canon, so Av/Avenue) in the clause after
+  the first "skip" up to a line break, ";", ". ", " due to ", " for " or " while "; `stretchEnds`: the two farthest-apart informed stations; `skipSetsOf` / `RouteSkipSet`: per route of a skip
+  alert the stations skipped, `probable` and `direction`, which later features reuse: header-named ∩ informed, else the informed stops (all when two or fewer, else minus the stretch's ends),
+  marked probable), `alertJoin.ts` (`joinStationChanges`: the focused group, any member's stops; an entity reaches it by a member's stop, or a whole-route entity of one of its lines (`lineKey`, so 7X
+  reaches the 7); per route a skipped / suspended / other change (skip: in the skip set; Part Suspended: inside the informed stretch with its ends excluded, one stop is itself; Suspended: informed or
+  route-only), merged by alert, kind and direction, in effect first; a route-only alert such as Delays is "other" at every station of its lines; the period is re-checked against the clock;
+  a snapshot over `ALERTS_MAX_AGE_S` 480 s old by the live clock, a version mismatch or two failed polls with nothing yet is unknown, never "no changes"), `alertText.ts` (`serviceChangeView`: rows, the
+  direction words uptown / downtown at a Manhattan station else north / southbound, and `skipSpoken`), `nyWhen.ts` ("7:45 AM", "tomorrow 5 AM", "Fri 11:45 PM", "Dec 31"; `eneText`'s
+  return labels use it) and `alertAnnounce.ts`. `alertJoin.data.test.ts` runs the recorded feed (`worker/fixtures/alerts.json`) through the Worker's transform onto the real stations.
 - `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,
   one request at a time, a hidden tab aborts and stops, backoff via `lib/live/enePoll.ts`; `eneFetch.ts` validates one body
   (`realtimeFetch.ts`'s timeout, errors and `parseRetryAfter` are reused). Pure joins in `lib/live/`: `eneJoin.ts`
@@ -1089,7 +1112,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   the rules a client may rely on; `DatedTimetableIndex` for `dated/index.json`) and
   `timetableCodec.ts` `decodePatternTimes` (pure, `.ts` imports): a pattern's trips to arrival and departure seconds
 - `src/data/realtime.ts`: client re-export of the realtime JSON types and `RT_URL`, the `/geocode` contract and the Worker's
-  `normalizeQuery` / `NYC_BBOX` (so the client's minimum length and cache key agree with the Worker's), `ENE_URL` and `GEOCODE_URL`
+  `normalizeQuery` / `NYC_BBOX` (so the client's minimum length and cache key agree with the Worker's), `ENE_URL`, `ALERTS_URL` and `GEOCODE_URL`
   (siblings of `RT_URL`; an MTA host gives null); no fetching
 - `src/data/stationSchema.ts`: the `StationInterior` contract for `public/data/stations/<id>.json`,
   `PackedDepthsFile` for `public/data/station-depths.json`, and `StationDepthsFile`, its per-track decoded form
@@ -1181,7 +1204,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `intersection`, `area`; sources `geosearch`, `photon`, `osm`)
   - `src/schema.ts` the JSON contracts (types and consts only); the client re-exports them (`src/data/realtime.ts`)
   - `src/index.ts` routing (a `Map` of path to handler: `/rt` and `/ene` are `CachedRoute`s through `serveCached`, `/geocode`
-    goes to `serveGeocode`; `/rt` 15 s, `/ene` 120 s), CORS;
+    goes to `serveGeocode`; `/alerts` is a `CachedRoute` too; `/rt` 15 s, `/ene` and `/alerts` 120 s), CORS;
     `serveCached.ts` the per-route memo, Cache API layer and herd guard (`serveCached`, with a 15 s backoff after a failed
     refresh; its `x-rt-cache` and `x-rt-expires` header names are shared by both routes); `cache.ts` pure memo/herd-guard
     decision and the per-route TTLs; `upstream.ts` feed and outage fetches (`fetchBytes`: 5 s timeout, 2 MB cap; `readBody`
@@ -1220,6 +1243,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     entry to its constants); `rateLimit.ts` (per-isolate token buckets: 20 at 2/s overall, 5 at 0.5/s for
     Photon); `lru.ts` (`TtlLru`, 500 entries, 1 h); `geocodeUpstream.ts` (3 s timeout, 256 KB cap, descriptive User-Agent,
     fixed error codes only: a fetch error's text can hold the query)
+  - `/alerts` (08r.4): `alerts.ts` pure `transformAlerts(json, generatedAt)` over `upstream.ts`' `fetchAlerts` (`camsys%2Fsubway-alerts.json`, about 1 MB, under the 2 MB
+    cap; `fetchJson` is shared with `fetchEne` and reports the body size) to the `ServiceAlert` contract in `schema.ts`: alerts with a period in effect or starting within
+    `ALERT_WINDOW_S` (24 h; `display_before_active` ignored; periods not clipped, at most 4), each `{ id, type (alert_type, free text), header, period, periods,
+    entities }` with the `en` `header_text` byte for byte (a header over 1000 characters drops the alert, never truncates it), entities `{ route, stop (parent
+    station id or null), direction (0 N, 1 S, absent null) }` deduped and capped at 120; `description_text`, the `en-html` strings and `affected_stations` are never read.
+    A bad row is dropped and counted; a non-array `entity` throws. One counts-only `alerts-miss` log line (no header text). About 13 KB raw today.
   - `src/transform.ts` pure decode-to-snapshot logic; `ene.ts` pure E&E transform (`parseNyTime`,
     `transformEne`; the feed's `isupcomingoutage` is unreliable, so it is ignored: a row is skipped only if it has
     not started yet); `cors.ts` allowed origins
@@ -1642,6 +1671,11 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   stops are in one of them gets `chooseTransfer` (machines out avoided as for the exit) and a transfer line; the map draws, per
   interior, the selected journey's change there (none when it is across one platform). The router's change time stays transfers.json's (180 s at
   Union Sq). Revisit fetching all of them above about 8 authored files.
+- **MTA service alerts (08r.4).** `/alerts` is a Worker route like `/ene` (120 s memo and edge cache, CORS, one counts-only `alerts-miss` log line): the client never fetches the MTA's alerts
+  feed (`camsys%2Fsubway-alerts.json`), and an MTA host in `VITE_RT_URL` turns it off. The MTA terms (clause 5) forbid editing the alert text: the Worker passes the `en` `header_text` through
+  byte for byte and the panel shows it as plain text under our own derived line, never edited, truncated, re-cased, rebuilt from the `en-html` string or put through html; the panel's credit is the
+  footer's MTA attribution. Our line is kept apart from the MTA's and says "probably" when it is a guess. Which stations a skip covers comes from the header's named stations ∩ the informed stops
+  (`skipSetsOf`), never from the feed's `affected_stations` (upstream stations, not read); `description_text` is not shipped. The query-free route sends and stores nothing about the visitor.
 - **Location never leaves the device.** The location button, and the search dialog's "Use my location" (2q7.46: no camera
   move; its "My location" row in the HUD's search flies as a `'locate'` point flight), make one `getCurrentPosition` per press (no
   `watchPosition`) and keep the result in memory only: no storage, URL, log or request carries it (the address search's `focus` is
