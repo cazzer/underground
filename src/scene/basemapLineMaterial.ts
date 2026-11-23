@@ -1,31 +1,48 @@
 /**
  * LineMaterial for every basemap class, with three factors on its fragment alpha (a fragment at 0 is discarded):
- * - the street mask (src/lib/basemap/streetMask.ts): inside the focused station's street radius a road fades out as the
- *   station's own streets fade in. MASK_GLSL is maskAlpha's twin. Road materials share one MaskUniforms by reference,
- *   so one write per frame (Basemap.tsx) moves them all; water and parks get their own, left at strength 0.
+ * - the street mask (src/lib/basemap/streetMask.ts): inside any drawn station's street radius (MASK_N discs) a road
+ *   fades out as that station's own streets fade in, keeping the least alpha any disc gives it. MASK_GLSL is
+ *   maskAlphaAt's twin. Road materials share one MaskUniforms by reference, so one write per frame (Basemap.tsx,
+ *   writeMaskUniforms) moves them all; water and parks get their own, left at strength 0.
  * - the network fade and the bbox edge (src/lib/basemap/edgeFade.ts): the basemap thins out away from the subway and
  *   stops at the spec bbox. NETWORK_GLSL and EDGE_GLSL are networkAlpha's and edgeAlpha's twins. One ExtentUniforms is
  *   shared by every class; Basemap writes the edge width per frame.
  * Change a twin and its GLSL together. It never reads the band view and stays out of BAND_UNIFORMS.
  */
-import { Vector2, Vector3, Vector4, type IUniform } from 'three'
+import { Vector3, Vector4, type IUniform } from 'three'
 import { LineMaterial, type LineMaterialParameters } from 'three/examples/jsm/lines/LineMaterial.js'
 import type { SceneBox } from '../lib/basemap/edgeFade'
 import { HULL_MAX_EDGES, type HullEdge } from '../lib/basemap/networkHull'
+import { MASK_N, maskInner, type StreetMask } from '../lib/basemap/streetMask'
 import { replaceOnce, type PatchOwner } from './bandLineMaterial'
 
 const OWNER: PatchOwner = { label: 'Basemap shader', file: 'basemapLineMaterial.ts' }
 
 export interface MaskUniforms {
-  maskCenter: IUniform<Vector2>
-  maskInner: IUniform<number>
-  maskOuter: IUniform<number>
-  /** The station street layer's opacity; 0 leaves every road as drawn. */
-  maskStrength: IUniform<number>
+  /** Per slot (MASK_N): center x, z, then the ramp's start and end (maskInner, radius), scene meters. */
+  maskDiscs: IUniform<Vector4[]>
+  /** Per slot: its station street layer's opacity; 0 (a free slot) leaves every road as drawn. */
+  maskStrength: IUniform<number[]>
 }
 
 export function createMaskUniforms(): MaskUniforms {
-  return { maskCenter: { value: new Vector2() }, maskInner: { value: 0 }, maskOuter: { value: 0 }, maskStrength: { value: 0 } }
+  return {
+    maskDiscs: { value: Array.from({ length: MASK_N }, () => new Vector4()) },
+    maskStrength: { value: new Array<number>(MASK_N).fill(0) },
+  }
+}
+
+/** Copies the mask's present slots into the uniforms at `strength` (the station layers' opacity); the rest at 0. Allocates nothing. */
+export function writeMaskUniforms(uniforms: MaskUniforms, mask: StreetMask, strength: number): void {
+  for (let i = 0; i < MASK_N; i++) {
+    const slot = mask.slots[i]!
+    if (slot.present) {
+      uniforms.maskDiscs.value[i]!.set(slot.x, slot.z, maskInner(slot.radiusM), slot.radiusM)
+      uniforms.maskStrength.value[i] = strength
+    } else {
+      uniforms.maskStrength.value[i] = 0
+    }
+  }
 }
 
 export interface ExtentUniforms {
@@ -62,37 +79,41 @@ const FRAG_DECLARE_ANCHOR = 'uniform float opacity;'
 const FRAG_COLOR_ANCHOR = 'gl_FragColor = vec4( diffuseColor.rgb, alpha );'
 
 /**
- * The mask and edge factors read quantities linear in the ground point (the offset from the mask center, distances
- * inside the bbox sides), so they are computed per segment end and interpolate exactly; the distance outside the
- * network outline is a max of linear terms, so along a long segment crossing a hull corner it interpolates slightly
- * high (a touch more fade), which a 7 km fade hides. Working in offsets also keeps the fragment shader's numbers small.
+ * The mask and edge factors read quantities linear in the ground point (the ground point itself, distances inside
+ * the bbox sides), so they are computed per segment end and interpolate exactly; the distance outside the network
+ * outline is a max of linear terms, so along a long segment crossing a hull corner it interpolates slightly high (a
+ * touch more fade), which a 7 km fade hides. The mask reads one ground point for all its discs rather than an offset
+ * per disc, so it needs one varying; at tens of km a highp float still resolves millimeters (vEdgeInside's sizes too).
  */
 const VERT_GLSL = /* glsl */ `
-uniform vec2 maskCenter;
 uniform vec4 edgeBox;
 uniform vec3 netEdges[ NET_EDGES ];
-varying vec2 vMaskOffset;
+varying vec2 vGround;
 varying vec4 vEdgeInside;
 varying float vNetOutside;
 `
 
 const VERT_MAIN_GLSL = /* glsl */ `
 vec2 groundXZ = ( modelMatrix * vec4( position.y < 0.5 ? instanceStart : instanceEnd, 1.0 ) ).xz;
-vMaskOffset = groundXZ - maskCenter;
+vGround = groundXZ;
 vEdgeInside = vec4( groundXZ.x - edgeBox.x, edgeBox.y - groundXZ.x, groundXZ.y - edgeBox.z, edgeBox.w - groundXZ.y );
 vNetOutside = - 1e9;
 for ( int i = 0; i < NET_EDGES; i ++ ) vNetOutside = max( vNetOutside, dot( netEdges[ i ].xy, groundXZ ) - netEdges[ i ].z );
 `
 
 export const MASK_GLSL = /* glsl */ `
-uniform float maskInner;
-uniform float maskOuter;
-uniform float maskStrength;
-varying vec2 vMaskOffset;
+uniform vec4 maskDiscs[ MASK_N ];
+uniform float maskStrength[ MASK_N ];
+varying vec2 vGround;
 
 float basemapMask() {
-	float ramp = clamp( ( length( vMaskOffset ) - maskInner ) / max( maskOuter - maskInner, 1e-3 ), 0.0, 1.0 );
-	return 1.0 - maskStrength * ( 1.0 - ramp );
+	float a = 1.0;
+	for ( int i = 0; i < MASK_N; i ++ ) {
+		vec4 disc = maskDiscs[ i ];
+		float ramp = clamp( ( length( vGround - disc.xy ) - disc.z ) / max( disc.w - disc.z, 1e-3 ), 0.0, 1.0 );
+		a = min( a, 1.0 - maskStrength[ i ] * ( 1.0 - ramp ) );
+	}
+	return a;
 }
 `
 
@@ -118,7 +139,7 @@ float basemapNetwork() {
 }
 `
 
-/** LineMaterial's vertex shader passing on each fragment's mask offset, bbox distances and distance outside the network. Throws on a moved anchor. */
+/** LineMaterial's vertex shader passing on each fragment's ground point, bbox distances and distance outside the network. Throws on a moved anchor. */
 export function patchBasemapVertex(src: string): string {
   const out = replaceOnce(src, VERT_DECLARE_ANCHOR, `${VERT_DECLARE_ANCHOR}\n${VERT_GLSL}`, OWNER)
   return replaceOnce(out, VERT_END_ANCHOR, `${VERT_END_ANCHOR}\n${VERT_MAIN_GLSL}`, OWNER)
@@ -142,7 +163,7 @@ export class BasemapLineMaterial extends LineMaterial {
     this.vertexShader = patchBasemapVertex(this.vertexShader)
     this.fragmentShader = patchBasemapFragment(this.fragmentShader)
     Object.assign(this.uniforms, mask, extent)
-    // The array and its loop are sized to the real hull; a different count is a different program.
-    this.defines = { ...this.defines, NET_EDGES: extent.netEdges.value.length }
+    // The arrays and their loops are sized to the real hull and the mask's slots; a different count is a different program.
+    this.defines = { ...this.defines, NET_EDGES: extent.netEdges.value.length, MASK_N }
   }
 }
