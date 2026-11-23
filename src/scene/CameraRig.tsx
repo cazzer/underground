@@ -26,6 +26,7 @@ import { usePathProbe } from './usePathProbe'
 import { useFocusGroups } from './useFocusGroups'
 import { useInteriorReframe } from './useInteriorReframe'
 import { usePlaceHold } from './usePlaceHold'
+import { useRouteFlight } from './useRouteFlight'
 import { useStationFlights } from './useStationFlights'
 import { useStationOrbit } from './useStationOrbit'
 import { useTrainFollow } from './useTrainFollow'
@@ -130,6 +131,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     [camera],
   )
   const follow = useTrainFollow({ controls, camera, flight, startFlight, anchor, free, viewport: size })
+  const { interrupt: routeInterrupt } = useRouteFlight({ controls, camera, flight, layout: latest, network, flyRequest, startFlight, following: follow.active, gesture, tookOver, panel, size, insets })
   // While following, the follow owns the target: the orbit neither pivots nor clamps the pan.
   const flying = useCallback(() => flight.current !== null || follow.active(), [follow.active])
   const busy = useCallback(() => flight.current !== null || hold.current !== null || follow.active(), [follow.active])
@@ -241,9 +243,10 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     collapse.current = null
     tookOver.current = true
     gesture.current = true
+    routeInterrupt()
     onGestureStart()
     follow.onGestureStart()
-  }, [camera, onGestureStart, follow.onGestureStart])
+  }, [camera, onGestureStart, follow.onGestureStart, routeInterrupt])
   const onEnd = useCallback(() => {
     gesture.current = false
     gestureEnded.current = true
