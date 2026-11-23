@@ -2,6 +2,7 @@ import { useCallback, useId, useRef, type Ref, type RefObject } from 'react'
 import type { RouteId } from '../data/schema'
 import type { AlertChip, AlertListBody, AlertListRow } from '../lib/live/alertList'
 import type { Route } from '../lib/network'
+import { usePanelCollapse, usePanelCollapseControls } from '../lib/panelCollapse'
 import { CollapseButton, ExpandBar } from './PanelBar'
 import { ServiceChangeRow } from './ServiceChangeRow'
 import { usePanelToggle } from './usePanelToggle'
@@ -15,6 +16,8 @@ const PANEL =
 
 interface ServiceChangesPanelProps {
   body: AlertListBody
+  /** The picked row's note (changeDrawNote), shown under it; null with no pick. */
+  note: string | null
   /** The header chip's text: the collapsed bar's. */
   chip: AlertChip | null
   routeById: ReadonlyMap<RouteId, Route>
@@ -27,21 +30,30 @@ interface ServiceChangesPanelProps {
   ref: Ref<HTMLElement>
 }
 
-function Group({ title, rows, routeById }: { title: string; rows: AlertListRow[]; routeById: ReadonlyMap<RouteId, Route> }) {
+/** What every row reads: the routes, which one is picked (its note), and the press. */
+interface RowsProps {
+  routeById: ReadonlyMap<RouteId, Route>
+  pickedId: string | null
+  note: string | null
+  onPick: (alertId: string) => void
+}
+
+function Group({ title, rows, routeById, pickedId, note, onPick }: { title: string; rows: AlertListRow[] } & RowsProps) {
   if (rows.length === 0) return null
   return (
     <section className="mt-3 first:mt-0">
       <h3 className="text-xs text-ink-dim">{title}</h3>
       <ul>
         {rows.map((row) => (
-          <ServiceChangeRow key={row.id} row={row} routeById={routeById} />
+          <ServiceChangeRow key={row.id} row={row} routeById={routeById} picked={row.id === pickedId} note={row.id === pickedId ? note : null} onPick={onPick} />
         ))}
       </ul>
     </section>
   )
 }
 
-function Body({ body, routeById }: { body: AlertListBody; routeById: ReadonlyMap<RouteId, Route> }) {
+function Body({ body, routeById, pickedId, note, onPick }: { body: AlertListBody } & RowsProps) {
+  const rows: RowsProps = { routeById, pickedId, note, onPick }
   switch (body.kind) {
     case 'off':
       return null
@@ -53,8 +65,8 @@ function Body({ body, routeById }: { body: AlertListBody; routeById: ReadonlyMap
       if (body.now.length === 0 && body.later.length === 0) return <p className="text-sm text-ink-dim">No service changes in the next 24 hours.</p>
       return (
         <>
-          <Group title="Now" rows={body.now} routeById={routeById} />
-          <Group title="Later today" rows={body.later} routeById={routeById} />
+          <Group title="Now" rows={body.now} {...rows} />
+          <Group title="Later today" rows={body.later} {...rows} />
         </>
       )
   }
@@ -62,11 +74,13 @@ function Body({ body, routeById }: { body: AlertListBody; routeById: ReadonlyMap
 
 /**
  * The MTA's service changes in effect now or starting within a day: the header chip opens it into the bottom slot
- * (in front of the trip and station panels, behind a train panel or notice, which it stays mounted under). Rows are
- * plain text, no live region: polls never speak the list or its count. "Close" or Esc closes it; the chevron
- * collapses it to a bar.
+ * (in front of the trip and station panels, behind a train panel or notice, which it stays mounted under). A row the
+ * map can draw is a toggle that draws it (08r.6); the rest are plain text. No live region: polls never speak the list
+ * or its count. "Close" or Esc closes it (Esc clears a drawn change first); the chevron collapses it to a bar.
  */
-export function ServiceChangesPanel({ body, chip, routeById, covered, headingRef, onClose, ref }: ServiceChangesPanelProps) {
+export function ServiceChangesPanel({ body, note, chip, routeById, covered, headingRef, onClose, ref }: ServiceChangesPanelProps) {
+  const { changePick } = usePanelCollapse()
+  const { pickChange } = usePanelCollapseControls()
   const own = useRef<HTMLElement | null>(null)
   const content = useRef<HTMLDivElement>(null)
   const { collapsed, collapse, expand } = usePanelToggle('changes', headingRef)
@@ -109,7 +123,7 @@ export function ServiceChangesPanel({ body, chip, routeById, covered, headingRef
           </div>
         )}
         <div id={bodyId} hidden={collapsed} className="mt-2">
-          <Body body={body} routeById={routeById} />
+          <Body body={body} routeById={routeById} pickedId={changePick?.alertId ?? null} note={note} onPick={pickChange} />
         </div>
       </div>
       {more && !collapsed && <div aria-hidden="true" className="pointer-events-none sticky bottom-0 -mx-4 -mb-8 h-8 bg-linear-to-t from-panel to-transparent" />}

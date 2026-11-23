@@ -26,36 +26,38 @@ const feed = (alerts: ServiceAlert[], over: Partial<AlertsInput> = {}, generated
   ...over,
 })
 const list = (alerts: ServiceAlert[], nowS = NOW) => {
-  const body = alertListView(feed(alerts), ORDER, nowS)
+  const body = alertListView(feed(alerts), ORDER, nowS, NEVER)
   if (body.kind !== 'list') throw new Error(`expected a list, got ${body.kind}`)
   return body
 }
+/** No row drawable, unless a test says otherwise. */
+const NEVER = () => false
 const ids = (rows: { id: string }[]) => rows.map((r) => r.id)
 
 describe('alertListView status', () => {
   it('is off when not configured', () => {
-    expect(alertListView({ configured: false, snapshot: null, failures: 0, schemaMismatch: false }, ORDER, NOW)).toEqual({ kind: 'off' })
+    expect(alertListView({ configured: false, snapshot: null, failures: 0, schemaMismatch: false }, ORDER, NOW, NEVER)).toEqual({ kind: 'off' })
   })
 
   it('is connecting with no snapshot and under two failures', () => {
-    for (const failures of [0, 1]) expect(alertListView({ configured: true, snapshot: null, failures, schemaMismatch: false }, ORDER, NOW)).toEqual({ kind: 'connecting' })
+    for (const failures of [0, 1]) expect(alertListView({ configured: true, snapshot: null, failures, schemaMismatch: false }, ORDER, NOW, NEVER)).toEqual({ kind: 'connecting' })
   })
 
   it('is unknown after two failures with no snapshot', () => {
-    expect(alertListView({ configured: true, snapshot: null, failures: 2, schemaMismatch: false }, ORDER, NOW)).toEqual({ kind: 'unknown' })
+    expect(alertListView({ configured: true, snapshot: null, failures: 2, schemaMismatch: false }, ORDER, NOW, NEVER)).toEqual({ kind: 'unknown' })
   })
 
   it('is unknown when the snapshot is over 480 s old, but not at 480', () => {
-    expect(alertListView(feed([alert()], {}, NOW - 481), ORDER, NOW)).toEqual({ kind: 'unknown' })
-    expect(alertListView(feed([alert()], {}, NOW - 480), ORDER, NOW).kind).toBe('list')
+    expect(alertListView(feed([alert()], {}, NOW - 481), ORDER, NOW, NEVER)).toEqual({ kind: 'unknown' })
+    expect(alertListView(feed([alert()], {}, NOW - 480), ORDER, NOW, NEVER).kind).toBe('list')
   })
 
   it('is unknown on a schema mismatch, even with a fresh snapshot', () => {
-    expect(alertListView(feed([alert()], { schemaMismatch: true }), ORDER, NOW)).toEqual({ kind: 'unknown' })
+    expect(alertListView(feed([alert()], { schemaMismatch: true }), ORDER, NOW, NEVER)).toEqual({ kind: 'unknown' })
   })
 
   it('keeps a stale snapshot unknown, never an empty list', () => {
-    expect(alertListView(feed([], {}, NOW - 600), ORDER, NOW)).toEqual({ kind: 'unknown' })
+    expect(alertListView(feed([], {}, NOW - 600), ORDER, NOW, NEVER)).toEqual({ kind: 'unknown' })
   })
 })
 
@@ -63,7 +65,7 @@ describe('alertListView groups', () => {
   it('puts an alert in effect under Now with "Until" and its end as the sort key', () => {
     const { now, later } = list([alert()])
     expect(later).toEqual([])
-    expect(now).toEqual([{ id: 'lmm:planned_work:1', routeIds: ['1'], header: 'Some trains are delayed', when: 'Until 3:30 PM', atS: NOW + 3600 }])
+    expect(now).toEqual([{ id: 'lmm:planned_work:1', routeIds: ['1'], header: 'Some trains are delayed', when: 'Until 3:30 PM', atS: NOW + 3600, drawable: false }])
   })
 
   it('says nothing for an open-ended period, and for one with no start (the heading says Now)', () => {
@@ -163,7 +165,7 @@ describe('laterWhen', () => {
 })
 
 describe('alertChip', () => {
-  const row = (id: string) => ({ id, routeIds: [], header: id, when: '', atS: null })
+  const row = (id: string) => ({ id, routeIds: [], header: id, when: '', atS: null, drawable: false })
   const chip = (body: AlertListBody, open = false) => alertChip(body, open)
 
   it('is null when off, and when connecting or empty with the panel closed', () => {

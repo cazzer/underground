@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAlerts } from './data/useAlerts'
 import { useBands } from './data/useBands'
+import { useChangeRoute } from './data/useChangeRoute'
 import { useEne } from './data/useEne'
 import { useEquipmentIndex } from './data/useEquipmentIndex'
 import { ALERTS_URL, ENE_URL } from './data/realtime'
@@ -15,6 +16,7 @@ import { useTripExit } from './data/useTripExit'
 import { useTripRoute } from './data/useTripRoute'
 import { useTripTransfers } from './data/useTripTransfers'
 import { usePlaceLine } from './ui/usePlaceLine'
+import { changeDrawable, changeDrawNote } from './lib/changeDraw'
 import { FocusProvider, useFocus } from './lib/focus'
 import { joinStationChanges } from './lib/live/alertJoin'
 import { alertSkipsOf } from './lib/live/alertSkips'
@@ -57,6 +59,7 @@ interface MapViewProps {
 function MapView({ network, bands, live }: MapViewProps) {
   const { focusedId, flyToPoint } = useFocus()
   const banded = useBands(bands)
+  const paths = banded?.shapes ?? network.shapes
   const locate = useLocate(network, flyToPoint)
   // The picked place: its line is the HUD's, its pin the scene's.
   const place = usePlaceLine()
@@ -94,8 +97,12 @@ function MapView({ network, bands, live }: MapViewProps) {
   const changes = focusedGroup
     ? serviceChangeView(joinStationChanges(focusedGroup, network.stationById, alerts, nowS, routeOrder), focusedGroup, network.routeById, nowS, terminalOf)
     : NO_CHANGES
-  // Every change in effect or within a day, for the header chip and its list.
-  const changeList = alertListView(alerts, routeOrder, nowS)
+  // Every change in effect or within a day, for the header chip and its list; the ones the map can draw are buttons.
+  const drawableIds = useMemo(
+    () => new Set((alerts.snapshot?.alerts ?? []).filter((a) => changeDrawable(a, network.stationById)).map((a) => a.id)),
+    [alerts.snapshot, network],
+  )
+  const changeList = alertListView(alerts, routeOrder, nowS, (a) => drawableIds.has(a.id))
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
   // Only once the visitor chose the To (an end filled from the fix, then swapped there, waits for a focus or pick).
@@ -112,13 +119,18 @@ function MapView({ network, bands, live }: MapViewProps) {
   // The selected journey's ride legs on the drawn lines; drawn (and the network dimmed) while the trip panel is in front.
   const tripRoute = useTripRoute({
     network,
-    paths: banded?.shapes ?? network.shapes,
+    paths,
     open: trip.open,
     plan: trip.plan,
     selection: trip.selection,
     journey: trip.selectedJourney,
   })
-  const tripShown = usePanelCollapse().front === 'trip'
+  // A picked service change draws in the trip's place while the changes list is in front (a trip under it waits).
+  const { front, changePick } = usePanelCollapse()
+  const changeRoute = useChangeRoute({ network, paths, snapshot: alerts.snapshot, pick: changePick, listed: changeList })
+  const route = changeRoute?.route ?? tripRoute
+  const routeShown = route !== null && (route.kind === 'change' ? front === 'changes' : front === 'trip')
+  const changeNote = changePick ? changeDrawNote(changeRoute) : null
   // A complex is one station (the catalog's complex): its other members, for the trip panel and directions.
   const siblingsOf = useCallback(
     (id: string): readonly string[] => network.groupById.get(id)?.memberIds.filter((m) => m !== id) ?? NO_SIBLINGS,
@@ -195,8 +207,8 @@ function MapView({ network, bands, live }: MapViewProps) {
               stationPaths={stationPaths}
               pathLabels={pathLabels}
               tripOpen={trip.open}
-              tripRoute={tripRoute}
-              tripShown={tripShown}
+              route={route}
+              routeShown={routeShown}
             />
             {/* Decoration: a crash here shows the map at once. */}
             <ErrorBoundary fallback={null}>
@@ -220,6 +232,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           changes={changes}
           skips={skips}
           changeList={changeList}
+          changeNote={changeNote}
           tripLines={tripLines}
           focusSiblings={focusSiblings}
           siblingsOf={siblingsOf}

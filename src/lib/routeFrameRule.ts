@@ -1,15 +1,29 @@
 /**
- * When the camera frames the selected trip route (2q7.45.5). Pure; useRouteFlight applies it. A route is a plan (the
- * ends and the visitor's attempt, which a silent refresh never raises) and the journey the map draws. A new plan
+ * When the camera frames the route view (2q7.45.5; 08r.6). Pure; useRouteFlight applies it. A trip's route is a plan
+ * (the ends and the visitor's attempt, which a silent refresh never raises) and the journey the map draws. A new plan
  * frames it once, unless the visitor moved the view while it loaded; a journey the visitor opened or went back to
- * frames it again; a silent replan frames nothing, however it swaps the journey.
+ * frames it again; a silent replan frames nothing, however it swaps the journey. A picked service change is a token of
+ * its own (CHANGE_PLAN + its pick's key, never silent), so each pick frames once while the list is in front.
  */
 
 export interface RouteToken {
-  /** `<tripKey>#<attempt>` of the settled plan. */
+  /** `<tripKey>#<attempt>` of the settled plan; a change's CHANGE_PLAN + `<alertId>#<pick seq>`. */
   plan: string
-  /** `journeyKey` of the journey the map draws. */
+  /** `journeyKey` of the journey the map draws; a change's `<alertId>#<pick seq>`. */
   journey: string
+}
+
+/** The plan prefix of a picked service change's token. */
+export const CHANGE_PLAN = 'change:'
+
+/** The token of a picked service change's route view, keyed by its pick (TripRouteDraw.key). */
+export function changeToken(key: string): RouteToken {
+  return { plan: `${CHANGE_PLAN}${key}`, journey: key }
+}
+
+/** Whether `token` frames a picked service change, not a trip. */
+export function isChangeToken(token: RouteToken): boolean {
+  return token.plan.startsWith(CHANGE_PLAN)
 }
 
 /** What the hook remembers between runs. */
@@ -25,7 +39,7 @@ export interface RouteInput {
   route: RouteToken | null
   /** The plan object just changed and its trigger was a tick or a poll. */
   silent: boolean
-  /** The trip panel is in front (no train panel or notice over it). */
+  /** The route's panel is in front (the trip panel for a trip, the changes list for a change; no train panel or notice over it). */
   front: boolean
   /** A flight is under way: this rule's own (it flies again) or another's (it skips). */
   flying: 'mine' | 'other' | null

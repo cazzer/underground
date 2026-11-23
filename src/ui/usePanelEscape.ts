@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { usePanelCollapse, usePanelCollapseControls } from '../lib/panelCollapse'
 import type { FrontPanel } from '../lib/panelCollapseState'
 
 interface PanelEscape {
@@ -14,8 +15,14 @@ interface PanelEscape {
   closeStation: () => void
 }
 
-/** Esc closes the front panel: the train panel, then the notice, then the service changes list, then the trip panel, then the station's. */
+/**
+ * Esc closes the front panel: the train panel, then the notice, then the service changes list (an expanded list with a
+ * change drawn clears the drawing first, focus staying where it is), then the trip panel, then the station's.
+ */
 export function usePanelEscape({ front, searchOpen, closeTrain, closeNotice, closeChanges, escapeTrip, closeStation }: PanelEscape): void {
+  const { changePick } = usePanelCollapse()
+  const { changesCollapsed, clearChangePick } = usePanelCollapseControls()
+  const clearsPick = changePick !== null && !changesCollapsed
   useEffect(() => {
     if (front === null || searchOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
@@ -23,11 +30,11 @@ export function usePanelEscape({ front, searchOpen, closeTrain, closeNotice, clo
       if (e.key !== 'Escape' || document.querySelector('dialog:modal')) return
       if (front === 'train') closeTrain()
       else if (front === 'notice') closeNotice()
-      else if (front === 'changes') closeChanges()
+      else if (front === 'changes') (clearsPick ? clearChangePick : closeChanges)()
       else if (front === 'trip') escapeTrip()
       else closeStation()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [front, searchOpen, closeStation, closeTrain, closeNotice, closeChanges, escapeTrip])
+  }, [front, searchOpen, closeStation, closeTrain, closeNotice, closeChanges, escapeTrip, clearsPick, clearChangePick])
 }

@@ -52,11 +52,11 @@ interface CameraRigProps {
   frame: PriorityFrame | null
   /** The trip panel is open: a framed interior goes on reframing onto its priority frame (useInteriorReframe). */
   tripOpen: boolean
-  /** The selected journey's ride legs as the lines draw them (useTripRoute): the route frame covers them. */
-  tripRoute: TripRouteDraw | null
+  /** The route view as the lines draw it (a picked change, else the trip): the route frame covers it. */
+  route: TripRouteDraw | null
 }
 
-export function CameraRig({ network, insets, interior, index, panel, anchor, frame, tripOpen, tripRoute }: CameraRigProps) {
+export function CameraRig({ network, insets, interior, index, panel, anchor, frame, tripOpen, route }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -134,7 +134,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     [camera],
   )
   const follow = useTrainFollow({ controls, camera, flight, startFlight, anchor, free, viewport: size })
-  const routeLanded = useRouteFlight({ controls, camera, flight, layout: latest, network, flyRequest, startFlight, following: follow.active, gesture, tookOver, tripRoute, panel, size, insets })
+  const routeLanded = useRouteFlight({ controls, camera, flight, layout: latest, network, flyRequest, startFlight, following: follow.active, gesture, tookOver, route, panel, size, insets })
   // While following, the follow owns the target: the orbit neither pivots nor clamps the pan.
   const flying = useCallback(() => flight.current !== null || follow.active(), [follow.active])
   const busy = useCallback(() => flight.current !== null || hold.current !== null || follow.active(), [follow.active])

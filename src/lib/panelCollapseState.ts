@@ -12,9 +12,19 @@ export interface CollapseState {
   readonly changesOpen: boolean
   /** Counts user collapses and expands only. */
   readonly seq: number
+  /** The list row whose change the map draws (08r.6); cleared when the list closes. */
+  readonly changePick: ChangePick | null
+  /** Counts change picks, so picking a row again after clearing it frames it again. */
+  readonly picks: number
 }
 
-export const INITIAL_COLLAPSE: CollapseState = { station: false, trip: false, changes: false, changesOpen: false, seq: 0 }
+/** A picked service change: its alert id, and which pick it was (a new pick, even of the same row after a clear, frames anew). */
+export interface ChangePick {
+  readonly alertId: string
+  readonly seq: number
+}
+
+export const INITIAL_COLLAPSE: CollapseState = { station: false, trip: false, changes: false, changesOpen: false, seq: 0, changePick: null, picks: 0 }
 
 export type CollapseAction =
   | { type: 'set'; panel: CollapsiblePanel; collapsed: boolean; front: FrontPanel }
@@ -25,6 +35,10 @@ export type CollapseAction =
   | { type: 'changesOpened' }
   /** The list closes (its Close, Esc, the chip, a directions pick) and forgets its collapse. No `seq`. */
   | { type: 'changesClosed' }
+  /** A press on a drawable row: draws that change, or clears it when it is the one drawn. Not a toggle, so no `seq`. */
+  | { type: 'changePicked'; alertId: string }
+  /** Esc with a change drawn: the list stays, the drawing goes. No `seq`. */
+  | { type: 'changePickCleared' }
   /** An explicit station pick (search, tap, "Go to", a link): the station panel opens expanded. Not a toggle, so no `seq`. */
   | { type: 'picked' }
 
@@ -57,7 +71,12 @@ export function collapseReducer(state: CollapseState, action: CollapseAction): C
   if (action.type === 'tripClosed' || action.type === 'tripRequested') return state.trip ? { ...state, trip: false } : state
   if (action.type === 'picked') return state.station ? { ...state, station: false } : state
   if (action.type === 'changesOpened') return state.changesOpen && !state.changes ? state : { ...state, changesOpen: true, changes: false }
-  if (action.type === 'changesClosed') return !state.changesOpen && !state.changes ? state : { ...state, changesOpen: false, changes: false }
+  if (action.type === 'changesClosed') return !state.changesOpen && !state.changes && !state.changePick ? state : { ...state, changesOpen: false, changes: false, changePick: null }
+  if (action.type === 'changePickCleared') return state.changePick ? { ...state, changePick: null } : state
+  if (action.type === 'changePicked') {
+    if (state.changePick?.alertId === action.alertId) return { ...state, changePick: null }
+    return { ...state, changePick: { alertId: action.alertId, seq: state.picks + 1 }, picks: state.picks + 1 }
+  }
   if (action.front !== action.panel || state[action.panel] === action.collapsed) return state
   return { ...state, [action.panel]: action.collapsed, seq: state.seq + 1 }
 }

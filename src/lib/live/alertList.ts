@@ -1,3 +1,4 @@
+import type { ServiceAlert } from '../../data/realtime'
 import type { RouteId } from '../../data/schema'
 import { addDays, nyDate } from '../realtime/serviceDate'
 import { alertsStatus, relevantPeriod, type AlertsInput } from './alertJoin'
@@ -15,6 +16,8 @@ export interface AlertListRow {
   when: string
   /** The sort key: the end of the period in effect (null: open-ended), or the start of the next. */
   atS: number | null
+  /** The map can draw it (changeDraw.ts changeDrawable): the row is a button that picks it. */
+  drawable: boolean
 }
 
 export type AlertListBody =
@@ -65,9 +68,9 @@ const byId = (a: AlertListRow, b: AlertListRow) => (a.id < b.id ? -1 : a.id > b.
 /**
  * The header's list as of `nowS`: every alert in effect (Now) or starting within the window (Later today), each once,
  * under the same freshness rule as the station panel (`alertsStatus`). An alert in effect stays under Now however many
- * later periods it has; one that isn't takes its earliest start.
+ * later periods it has; one that isn't takes its earliest start. `drawable` says which rows the map can draw.
  */
-export function alertListView(alerts: AlertsInput, routeOrder: ReadonlyMap<RouteId, number>, nowS: number): AlertListBody {
+export function alertListView(alerts: AlertsInput, routeOrder: ReadonlyMap<RouteId, number>, nowS: number, drawable: (alert: ServiceAlert) => boolean): AlertListBody {
   if (!alerts.configured) return { kind: 'off' }
   const status = alertsStatus(alerts, nowS)
   if (status === 'none') return { kind: 'connecting' }
@@ -78,7 +81,7 @@ export function alertListView(alerts: AlertsInput, routeOrder: ReadonlyMap<Route
     const period = relevantPeriod(alert, nowS)
     if (period === null) continue
     const routeIds = routesOf(alert.entities, routeOrder)
-    const base = { id: alert.id, routeIds, header: alert.header }
+    const base = { id: alert.id, routeIds, header: alert.header, drawable: drawable(alert) }
     if (period.now) {
       const when = period.end === null ? '' : `Until ${nyWhen(period.end, nowS)}`
       now.push({ ...base, when, atS: period.end })

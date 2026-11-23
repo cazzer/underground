@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { routeFrameDecision, routeIsFramed, type RouteInput, type RouteMemo, type RouteToken } from './routeFrameRule'
+import { changeToken, isChangeToken, routeFrameDecision, routeIsFramed, type RouteInput, type RouteMemo, type RouteToken } from './routeFrameRule'
 
 const A: RouteToken = { plan: 'L08>127#1', journey: 'L:a>b' }
 const A2: RouteToken = { plan: 'L08>127#1', journey: 'L:c>d' }
@@ -75,5 +75,24 @@ describe('routeIsFramed', () => {
     expect(routeIsFramed(A, B)).toBe(false)
     expect(routeIsFramed(A, null)).toBe(false)
     expect(routeIsFramed(null, A)).toBe(false)
+  })
+})
+
+describe('change tokens', () => {
+  const pick1 = changeToken('lmm:planned_work:35972#1')
+  const pick2 = changeToken('lmm:planned_work:35972#2')
+  it('are told apart from trip tokens', () => {
+    expect(isChangeToken(pick1)).toBe(true)
+    expect(isChangeToken(A)).toBe(false)
+  })
+  it('fly in front, even after a framed trip; skip while covered or followed', () => {
+    expect(routeFrameDecision({ framed: A, interrupted: false }, input({ route: pick1 }))).toBe('fly')
+    expect(routeFrameDecision(fresh, input({ route: pick1, front: false }))).toBe('skip')
+    expect(routeFrameDecision(fresh, input({ route: pick1, following: true }))).toBe('skip')
+  })
+  it('frame each pick once; a new pick of the same row is a new token', () => {
+    expect(routeFrameDecision({ framed: pick1, interrupted: false }, input({ route: pick1 }))).toBe('none')
+    expect(routeFrameDecision({ framed: pick1, interrupted: false }, input({ route: pick2 }))).toBe('fly')
+    expect(routeIsFramed(pick1, pick2)).toBe(false)
   })
 })

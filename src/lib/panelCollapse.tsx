@@ -5,6 +5,7 @@ import {
   collapsedFront,
   frontPanel,
   INITIAL_COLLAPSE,
+  type ChangePick,
   type CollapsiblePanel,
   type FrontPanel,
 } from './panelCollapseState'
@@ -17,6 +18,8 @@ export interface PanelCollapse {
   seq: number
   /** The panel in front (frontPanel): the trip's route draws while it is the trip panel, collapsed or not; the changes list in front covers it like a train panel does. */
   front: FrontPanel
+  /** The service change the map draws (a list row's pick; 08r.6), or null; App draws it only while the list is in front. */
+  changePick: ChangePick | null
 }
 
 /** What the panels read and write. */
@@ -32,6 +35,10 @@ export interface PanelCollapseControls {
   /** The header chip opens the list expanded, or closes it and forgets its collapse; neither counts as a toggle (no `seq`). */
   openChanges: () => void
   closeChanges: () => void
+  /** A drawable row's press: draws its change, or clears it when it is the one drawn (no `seq`). */
+  pickChange: (alertId: string) => void
+  /** Esc in the list with a change drawn: the drawing goes, the list stays. */
+  clearChangePick: () => void
 }
 
 const ViewContext = createContext<PanelCollapse | null>(null)
@@ -61,11 +68,13 @@ export function PanelCollapseProvider({ children }: { children: ReactNode }) {
   }, [flyRequest])
 
   const collapsed = collapsedFront(state, front)
-  const view = useMemo(() => ({ collapsed, seq: state.seq, front }), [collapsed, state.seq, front])
+  const view = useMemo(() => ({ collapsed, seq: state.seq, front, changePick: state.changePick }), [collapsed, state.seq, front, state.changePick])
   const setCollapsed = useCallback((panel: CollapsiblePanel, next: boolean) => dispatch({ type: 'set', panel, collapsed: next, front }), [front])
   const tripRequested = useCallback(() => dispatch({ type: 'tripRequested' }), [])
   const openChanges = useCallback(() => dispatch({ type: 'changesOpened' }), [])
   const closeChanges = useCallback(() => dispatch({ type: 'changesClosed' }), [])
+  const pickChange = useCallback((alertId: string) => dispatch({ type: 'changePicked', alertId }), [])
+  const clearChangePick = useCallback(() => dispatch({ type: 'changePickCleared' }), [])
   const controls = useMemo(
     () => ({
       stationCollapsed: state.station,
@@ -76,8 +85,10 @@ export function PanelCollapseProvider({ children }: { children: ReactNode }) {
       tripRequested,
       openChanges,
       closeChanges,
+      pickChange,
+      clearChangePick,
     }),
-    [state.station, state.trip, state.changes, state.changesOpen, setCollapsed, tripRequested, openChanges, closeChanges],
+    [state.station, state.trip, state.changes, state.changesOpen, setCollapsed, tripRequested, openChanges, closeChanges, pickChange, clearChangePick],
   )
   return (
     <ViewContext value={view}>
