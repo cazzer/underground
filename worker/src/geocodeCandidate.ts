@@ -1,6 +1,6 @@
 import { insideNyc } from './geocodeQuery'
 import { nameKey } from './geocodeText'
-import type { GeocodeKind, GeocodeResult, GeocodeSource } from './schema'
+import type { GeocodeKind, GeocodeResult, UpstreamSource } from './schema'
 
 /** One upstream row after the trim: the result, plus what the merge compares. */
 export interface Candidate {
@@ -48,7 +48,7 @@ function pointOf(geometry: unknown): [number, number] | null {
  * The shared half of both trims. Throws a `TypeError` with a fixed message (no content) when `json` is not
  * a GeoJSON-like object with a `features` array, so the caller counts the source as failed.
  */
-export function trimFeatures(json: unknown, source: GeocodeSource, read: RowReader): SourceResults {
+export function trimFeatures(json: unknown, source: UpstreamSource, read: RowReader): SourceResults {
   if (!isRecord(json) || !Array.isArray(json.features)) throw new TypeError('not a feature collection')
   const out: SourceResults = { candidates: [], dropped: 0, outside: 0 }
   for (const feature of json.features as unknown[]) {

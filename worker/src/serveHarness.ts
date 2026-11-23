@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, vi, type Mock } from 'vitest'
 import type { EdgeCache } from './edgeCache'
 import { geoSearchCandidates, photonCandidates } from './geocodeFixture'
-import type { SourceOutcome } from './geocodeOutcome'
+import { noStreetRows, type SourceOutcome, type StreetRows } from './geocodeOutcome'
 import type { GeocodeQuery } from './geocodeQuery'
 import type { GeocodeResponse } from './schema'
 import { createGeocodeState, serveGeocode, type GeocodeDeps } from './serveGeocode'
@@ -43,12 +43,14 @@ type Fetcher = Mock<(q: GeocodeQuery) => Promise<SourceOutcome>>
 export interface Harness extends GeocodeDeps {
   fetchGeoSearch: Fetcher
   fetchPhoton: Fetcher
+  searchStreets: Mock<(q: GeocodeQuery) => StreetRows>
 }
 
-export function harness(gs: SourceOutcome = GS_PLACE, ph: SourceOutcome = PH_KATZ): Harness {
+export function harness(gs: SourceOutcome = GS_PLACE, ph: SourceOutcome = PH_KATZ, streets: StreetRows = noStreetRows()): Harness {
   return {
     fetchGeoSearch: vi.fn(async () => gs),
     fetchPhoton: vi.fn(async () => ph),
+    searchStreets: vi.fn(() => streets),
     state: createGeocodeState(Date.now()),
   }
 }

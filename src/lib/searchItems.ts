@@ -7,9 +7,9 @@ export type SearchItem<S extends SearchableStation> =
   | { kind: 'station'; key: string; station: S }
   | { kind: 'address' | 'place'; key: string; result: GeocodeResult; text: PlaceText }
 
-/** Streets are the on-device search's (2q7.14), so the Worker's street rows have no kind here; an area is a place. */
+/** Street and intersection rows (the Worker's street index) have no kind here until the client shows them (2q7.14); an area is a place. */
 export function placeKind(kind: GeocodeKind): 'address' | 'place' | null {
-  if (kind === 'street') return null
+  if (kind === 'street' || kind === 'intersection') return null
   return kind === 'address' ? 'address' : 'place'
 }
 

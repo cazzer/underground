@@ -2,8 +2,10 @@ import { focusParam } from '../lib/geocodeFocus'
 import type { GeocodeAnswer } from '../lib/geocodeSearch'
 import type { LatLon } from '../lib/projection'
 import {
+  GEOCODE_KINDS,
   GEOCODE_MAX_RESULTS,
   GEOCODE_SCHEMA_VERSION,
+  GEOCODE_SOURCES,
   NYC_BBOX,
   type GeocodeKind,
   type GeocodeResponse,
@@ -15,9 +17,6 @@ import { SchemaMismatchError } from './realtimeFetch'
 /** The Worker's sequential worst case (both sources, each with its own timeout) is about 6 s. */
 export const GEOCODE_TIMEOUT_MS = 8000
 const LABEL_MAX = 200
-
-const KINDS: readonly GeocodeKind[] = ['address', 'place', 'street', 'area']
-const SOURCES: readonly GeocodeSource[] = ['geosearch', 'photon']
 
 /** The request: the query and, when there is one, the rounded focus. The user's location is never an input here. */
 export function geocodeRequestUrl(base: string, query: string, focus: LatLon | null): string {
@@ -37,8 +36,8 @@ function parseResult(raw: unknown, index: number): GeocodeResult {
   const r = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>
   const { label, kind, source, lat, lon } = r
   if (typeof label !== 'string' || label === '' || label.length > LABEL_MAX) throw new GeocodeParseError(`place ${index} has a bad label`)
-  if (!KINDS.includes(kind as GeocodeKind)) throw new GeocodeParseError(`place ${index} has a bad kind`)
-  if (!SOURCES.includes(source as GeocodeSource)) throw new GeocodeParseError(`place ${index} has a bad source`)
+  if (!GEOCODE_KINDS.includes(kind as GeocodeKind)) throw new GeocodeParseError(`place ${index} has a bad kind`)
+  if (!GEOCODE_SOURCES.includes(source as GeocodeSource)) throw new GeocodeParseError(`place ${index} has a bad source`)
   const [minLon, minLat, maxLon, maxLat] = NYC_BBOX
   if (!isNumber(lat) || lat < minLat || lat > maxLat) throw new GeocodeParseError(`place ${index} has a bad lat`)
   if (!isNumber(lon) || lon < minLon || lon > maxLon) throw new GeocodeParseError(`place ${index} has a bad lon`)

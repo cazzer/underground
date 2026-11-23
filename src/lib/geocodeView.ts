@@ -17,11 +17,11 @@ export type GeocodeView =
 
 export const GEOCODE_ERROR_TEXT = "Address search isn't available right now."
 
-const SOURCE_ORDER: readonly GeocodeSource[] = ['geosearch', 'photon']
+const SOURCE_ORDER: readonly GeocodeSource[] = ['geosearch', 'photon', 'osm']
 
-/** Streets are the on-device search's (2q7.14); the Worker's other rows show. */
+/** The Worker's street index rows (source osm: streets and intersections) are hidden until the UI for them lands (2q7.14, client). */
 function shownPlaces(results: readonly GeocodeResult[]): { places: GeocodeResult[]; sources: GeocodeSource[] } {
-  const places = results.filter((r) => r.kind !== 'street')
+  const places = results.filter((r) => r.source !== 'osm')
   return { places, sources: SOURCE_ORDER.filter((s) => places.some((r) => r.source === s)) }
 }
 

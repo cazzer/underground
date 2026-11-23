@@ -13,7 +13,6 @@ const COUNTRY = 'US'
 
 function kindOf(p: Record<string, unknown>, named: boolean): GeocodeKind {
   const type = str(p.type)
-  if (type === 'street') return 'street'
   if (type !== null && AREA_TYPES.has(type)) return 'area'
   if (!named) return 'address'
   return p.osm_key === 'place' && p.osm_value === 'house' ? 'address' : 'place'
@@ -25,16 +24,18 @@ const readRow: RowReader = (p) => {
   if (typeof p.osm_key === 'string' && TRANSIT_KEYS.has(p.osm_key)) return null
   if (isBusStop(p)) return null
   if (p.type === 'country' || p.type === 'state') return null
+  // Streets come from the Worker's own index (2q7.14): the upstream's would double them with another label.
+  if (p.type === 'street') return null
 
   const housenumber = str(p.housenumber)
   const street = str(p.street)
   const address = housenumber !== null && street !== null ? `${housenumber} ${street}` : null
   const given = cleanLabel(str(p.name) ?? '')
   // An unnamed row is an address, and needs both parts.
-  const name = given ?? (p.type === 'street' ? null : address)
+  const name = given ?? address
   if (name === null) return null
   const parts = [name]
-  if (given !== null && address !== null && p.type !== 'street') parts.push(address)
+  if (given !== null && address !== null) parts.push(address)
   const area = str(p.district) ?? str(p.city)
   if (area !== null) parts.push(area)
   const label = cleanLabel(parts.join(', '))

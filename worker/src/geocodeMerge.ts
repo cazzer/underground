@@ -2,6 +2,11 @@ import type { Candidate } from './geocodeCandidate'
 import { isAddressLike } from './geocodeQuery'
 import { GEOCODE_MAX_RESULTS, type GeocodeResult } from './schema'
 
+/** Street index rows that spell the query's name whole lead; at most this many (the rest wait with the partial ones). */
+export const WHOLE_MAX = 5
+/** Half-typed street rows keep at least this many places, upstream rows or not, when there are that many. */
+export const PARTIAL_RESERVE = 2
+
 /** PAD aliases of one building share its point. */
 const SAME_POINT_M = 2
 /** A cross-source twin, or Photon's duplicate nodes, sit this close. */
@@ -73,4 +78,21 @@ export function mergeCandidates(
 export function hasSatisfyingHit(candidates: Candidate[], text: string): boolean {
   const wantsAddress = isAddressLike(text)
   return candidates.some(({ result }) => result.kind === 'place' || result.kind === 'area' || (wantsAddress && result.kind === 'address'))
+}
+
+/**
+ * The answer's rows: the street index's whole-name rows (at most WHOLE_MAX), then the upstream rows (as `mergeCandidates`
+ * ordered them), then the index's partial-name rows, which keep PARTIAL_RESERVE places of the limit. A whole row beyond
+ * WHOLE_MAX goes in front of the partial ones.
+ */
+export function combineRows(
+  streets: { whole: Candidate[]; partial: Candidate[] },
+  upstream: GeocodeResult[],
+  limit: number = GEOCODE_MAX_RESULTS,
+): GeocodeResult[] {
+  const whole = streets.whole.slice(0, WHOLE_MAX).map((c) => c.result)
+  const partial = [...streets.whole.slice(WHOLE_MAX), ...streets.partial].map((c) => c.result)
+  const room = Math.max(0, limit - whole.length)
+  const kept = upstream.slice(0, Math.max(0, room - Math.min(partial.length, PARTIAL_RESERVE)))
+  return [...whole, ...kept, ...partial.slice(0, room - kept.length)]
 }

@@ -4,7 +4,7 @@ import { INITIAL_GEOCODE, type GeocodeMachine } from './geocodeSearch'
 import { announcementFor, GEOCODE_ERROR_TEXT, geocodeAnnouncement, geocodeView, nextErrorSpoken, searchEmptyText } from './geocodeView'
 
 const row = (label: string, kind: GeocodeResult['kind'], source: GeocodeResult['source']): GeocodeResult => ({ label, kind, source, lat: 40.7, lon: -74 })
-const shown = (results: GeocodeResult[]) => ({ query: 'q', response: { version: 1 as const, results, attribution: {}, incomplete: false } })
+const shown = (results: GeocodeResult[]) => ({ query: 'q', response: { version: 2 as const, results, attribution: {}, incomplete: false } })
 const machine = (m: Partial<GeocodeMachine>): GeocodeMachine => ({ ...INITIAL_GEOCODE, query: 'q', ...m })
 
 describe('geocodeView', () => {
@@ -13,8 +13,8 @@ describe('geocodeView', () => {
     expect(geocodeView(INITIAL_GEOCODE, true, 0)).toEqual({ status: 'short' })
   })
 
-  it('drops street rows and lists only the sources of the rows kept', () => {
-    const results = [row('A', 'street', 'geosearch'), row('B', 'place', 'photon'), row('C', 'area', 'photon')]
+  it('hides the street index\'s rows (source osm) for now and lists only the sources of the rows kept', () => {
+    const results = [row('A', 'street', 'osm'), row('X', 'intersection', 'osm'), row('B', 'place', 'photon'), row('C', 'area', 'photon')]
     const v = geocodeView(machine({ phase: 'settled', shown: shown(results) }), true, 0)
     expect(v).toMatchObject({ status: 'ready', sources: ['photon'] })
     expect(v.status === 'ready' && v.places.map((p) => p.label)).toEqual(['B', 'C'])

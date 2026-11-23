@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { Station } from '../../src/data/schema.ts'
-import type { IntersectionEntry, StreetEntry } from '../../src/data/searchSchema.ts'
+import type { IntersectionEntry, StreetEntry } from './streetIndexTypes.ts'
 import { toGround, toLatLon } from '../../src/lib/projection.ts'
-import { bucketOf, entryBucketKeys, STREET_BUCKETS } from '../../src/lib/searchBucket.ts'
+import { STREET_INDEX_FORMAT } from '../../worker/src/streetIndexSchema.ts'
+import { entryKeys } from '../../worker/src/streetKeys.ts'
 import { buildStreetIndex, displayStreetName, INTERSECTION_MERGE_M } from './streetIndex.ts'
-import { bucketStreetShards } from './streetIndexShards.ts'
+import { packStreetIndex, STREET_ATTRIBUTION } from './streetIndexPack.ts'
 import { toStableJson } from './stableJson.ts'
 import { pinOf, STATION, way, type NodeMeters } from './streetsFixture.ts'
 
@@ -163,30 +164,36 @@ describe('buildStreetIndex', () => {
   })
 })
 
-describe('bucketStreetShards', () => {
+describe('packStreetIndex', () => {
   const nodes: NodeMeters = { 1: [0, -100], 2: [0, 0], 3: [0, 100], 4: [-100, 0], 5: [100, 0] }
   const pin = pinOf(nodes, [way(1, { highway: 'secondary', name: 'Bedford Avenue' }, [1, 2, 3]), way(2, { highway: 'residential', name: 'North 7th Street' }, [4, 2, 5])])
   const { entries } = buildStreetIndex(pin, [STATION])
-  const shards = bucketStreetShards(entries, '2026-01-01T00:00:00Z')
+  const file = packStreetIndex(entries, '2026-01-01T00:00:00Z')
 
-  it('makes exactly one shard per bucket with the envelope', () => {
-    expect(shards).toHaveLength(STREET_BUCKETS)
-    shards.forEach((s, i) => {
-      expect([s.format, s.family, s.bucket, s.buckets, s.license, s.osmTimestamp]).toEqual([1, 'streets', i, STREET_BUCKETS, 'ODbL-1.0', '2026-01-01T00:00:00Z'])
-      expect(s.attribution).toEqual(['© OpenStreetMap contributors'])
-    })
+  it('writes the envelope, the streets without their station ids, and the crossing by street index', () => {
+    expect([file.format, file.license, file.attribution, file.osmTimestamp]).toEqual([STREET_INDEX_FORMAT, 'ODbL-1.0', STREET_ATTRIBUTION, '2026-01-01T00:00:00Z'])
+    expect(file.streets.map((s) => [s[0], s[1], s[2], s[3].length])).toEqual([['Bedford Av', 'M', 3, 1], ['N 7 St', 'M', 1, 1]])
+    expect(file.streets.every((s) => s[3].every((site) => site.length === 2))).toBe(true)
+    expect(file.intersections).toHaveLength(1)
+    expect(file.intersections[0]!.slice(0, 2)).toEqual([0, 1])
+    expect(file.intersections[0]![2]).toHaveLength(2)
   })
 
-  it('files each entry in exactly the buckets of its keys, in entry order', () => {
-    for (const e of entries) {
-      const names = e.kind === 'street' ? [e.name] : e.names
-      const want = [...new Set(entryBucketKeys(names).map((k) => bucketOf(k, STREET_BUCKETS)))].sort((a, b) => a - b)
-      expect(shards.filter((s) => s.entries.includes(e)).map((s) => s.bucket)).toEqual(want)
-    }
-    for (const s of shards) expect(s.entries).toEqual(entries.filter((e) => s.entries.includes(e)))
+  it('files each street under its keys only, sorted, each street once per key', () => {
+    const want = new Map<string, number[]>()
+    file.streets.forEach(([name], i) => entryKeys([name]).forEach((k) => want.set(k, [...(want.get(k) ?? []), i])))
+    expect(file.keys).toEqual([...want].sort((a, b) => (a[0] < b[0] ? -1 : 1)))
+  })
+
+  it('drops a repeated site, and refuses a name with ", " or an intersection naming no street', () => {
+    const street = entries.find((e): e is StreetEntry => e.kind === 'street')!
+    const twice = packStreetIndex([{ ...street, sites: [street.sites[0]!, street.sites[0]!] }], 't')
+    expect(twice.streets[0]![3]).toHaveLength(1)
+    expect(() => packStreetIndex([{ ...street, name: 'A, B' }], 't')).toThrow(/contains ", "/)
+    expect(() => packStreetIndex(entries.filter((e) => e.kind === 'intersection'), 't')).toThrow(/names a street with no row/)
   })
 
   it('renders the same JSON twice', () => {
-    expect(shards.map((s) => toStableJson(s, 2))).toEqual(bucketStreetShards(entries, '2026-01-01T00:00:00Z').map((s) => toStableJson(s, 2)))
+    expect(toStableJson(file, 2)).toBe(toStableJson(packStreetIndex(entries, '2026-01-01T00:00:00Z'), 2))
   })
 })

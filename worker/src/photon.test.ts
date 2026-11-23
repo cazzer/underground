@@ -48,12 +48,12 @@ describe('trimPhoton on synthetic rows', () => {
     )
     expect(got.dropped).toBe(5)
     expect(got.candidates.map((c) => c.result.label)).toEqual(['Open Cafe, Queens', 'No State Cafe, New York'])
-    // Other highway rows are wanted.
-    const street = at({ name: 'Main St', type: 'street', osm_key: 'highway', osm_value: 'residential' })
-    expect(trimPhoton(collection(street)).candidates).toHaveLength(1)
+    // Other highway rows (a path) are wanted.
+    const path = at({ name: 'High Line', osm_key: 'highway', osm_value: 'footway' })
+    expect(trimPhoton(collection(path)).candidates).toHaveLength(1)
   })
 
-  it('reads streets and areas, and needs both parts of an unnamed address', () => {
+  it('drops street rows (the Worker\'s own index has them), reads areas, and needs both parts of an unnamed address', () => {
     const got = trimPhoton(
       collection(
         at({ type: 'street', name: 'Broadway', district: 'Manhattan' }),
@@ -63,11 +63,8 @@ describe('trimPhoton on synthetic rows', () => {
         at({ type: 'street' }),
       ),
     )
-    expect(got.candidates.map((c) => [c.result.label, c.result.kind])).toEqual([
-      ['Broadway, Manhattan', 'street'],
-      ['Chelsea, New York', 'area'],
-    ])
-    expect(got.dropped).toBe(3)
+    expect(got.candidates.map((c) => [c.result.label, c.result.kind])).toEqual([['Chelsea, New York', 'area']])
+    expect(got.dropped).toBe(4)
   })
 
   it('counts a point outside the bbox and throws a fixed TypeError on a bad shape', () => {

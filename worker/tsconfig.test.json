@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "types": ["node", "@cloudflare/workers-types"] },
-  "include": ["src/**/*.test.ts", "src/geocodeFixture.ts", "src/serveHarness.ts", "vitest.config.ts"],
+  "include": ["src/**/*.test.ts", "src/geocodeFixture.ts", "src/serveHarness.ts", "src/streetFixture.ts", "vitest.config.ts"],
   "exclude": []
 }

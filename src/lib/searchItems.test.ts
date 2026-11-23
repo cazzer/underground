@@ -6,8 +6,8 @@ const station = (id: string) => ({ id, name: id, routeIds: [] })
 const place = (label: string, kind: GeocodeResult['kind'], lat = 40.7, lon = -74): GeocodeResult => ({ label, kind, lat, lon, source: 'photon' })
 
 describe('searchItems', () => {
-  it('lists stations unchanged, then places, dropping streets and treating an area as a place', () => {
-    const items = searchItems([station('B'), station('A')], [place('S', 'street'), place('Home', 'address'), place('Soho', 'area')])
+  it('lists stations unchanged, then places, dropping streets and intersections for now and treating an area as a place', () => {
+    const items = searchItems([station('B'), station('A')], [place('S', 'street'), place('X', 'intersection'), place('Home', 'address'), place('Soho', 'area')])
     expect(items.map((i) => i.kind)).toEqual(['station', 'station', 'address', 'place'])
     expect(items.map((i) => (i.kind === 'station' ? i.station.id : i.text.name))).toEqual(['B', 'A', 'Home', 'Soho'])
   })
@@ -21,6 +21,7 @@ describe('searchItems', () => {
 
   it('maps kinds', () => {
     expect(placeKind('street')).toBeNull()
+    expect(placeKind('intersection')).toBeNull()
     expect(placeKind('area')).toBe('place')
     expect(placeKind('address')).toBe('address')
   })

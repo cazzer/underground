@@ -4,7 +4,7 @@ import { geocodeUrlFrom } from './realtime'
 import { SchemaMismatchError } from './realtimeFetch'
 
 const row = { label: '120 BROADWAY, Manhattan', kind: 'address', lat: 40.7075, lon: -74.0113, source: 'geosearch' }
-const valid = () => ({ version: 1, results: [row], attribution: { geosearch: 'NYC GeoSearch' }, incomplete: false })
+const valid = () => ({ version: 2, results: [row], attribution: { geosearch: 'NYC GeoSearch' }, incomplete: false })
 
 describe('geocodeRequestUrl', () => {
   it('encodes the query and puts the focus at two decimals', () => {
@@ -24,8 +24,18 @@ describe('parseGeocodeResponse', () => {
     expect(parseGeocodeResponse(valid()).results[0]).toEqual(row)
   })
 
-  it('throws SchemaMismatchError for another version', () => {
-    expect(() => parseGeocodeResponse({ ...valid(), version: 2 })).toThrow(SchemaMismatchError)
+  it('accepts the street index\'s rows: kinds street and intersection, source osm', () => {
+    const rows = [
+      { label: 'Bedford Av & N 7 St, Brooklyn', kind: 'intersection', lat: 40.71784, lon: -73.95773, source: 'osm' },
+      { label: 'Broadway, Manhattan', kind: 'street', lat: 40.7589, lon: -73.9851, source: 'osm' },
+    ]
+    const body = { ...valid(), results: rows, attribution: { osm: '© OpenStreetMap contributors' } }
+    expect(parseGeocodeResponse(body).results).toEqual(rows)
+  })
+
+  it('throws SchemaMismatchError for another version, the old one included', () => {
+    expect(() => parseGeocodeResponse({ ...valid(), version: 3 })).toThrow(SchemaMismatchError)
+    expect(() => parseGeocodeResponse({ ...valid(), version: 1 })).toThrow(SchemaMismatchError)
   })
 
   it.each([
@@ -85,7 +95,7 @@ describe('fetchGeocode', () => {
     expect(await fetchGeocode('http://w/g', signal())).toMatchObject({ ok: false, error: 'bad-response' })
     stub(() => new Response(JSON.stringify({ ...valid(), results: 'no' })))
     expect(await fetchGeocode('http://w/g', signal())).toMatchObject({ ok: false, error: 'bad-response' })
-    stub(() => new Response(JSON.stringify({ ...valid(), version: 2 })))
+    stub(() => new Response(JSON.stringify({ ...valid(), version: 3 })))
     expect(await fetchGeocode('http://w/g', signal())).toMatchObject({ ok: false, error: 'schema' })
     vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new DOMException('slow', 'TimeoutError'))))
     expect(await fetchGeocode('http://w/g', signal())).toMatchObject({ ok: false, error: 'timeout' })

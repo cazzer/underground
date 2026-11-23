@@ -2,12 +2,12 @@ import { CLIENT_PERIOD_S, clientAllowed, createClientLimitWarned, type ClientLim
 import { GEOCODE_SOURCE_BACKOFF_MS, GEOCODE_TTL_MS, type Memo } from './cache'
 import { corsHeaders, isAllowedOrigin } from './cors'
 import { readEdge, writeEdge, type EdgeCache } from './edgeCache'
-import { geocodeAnswer, logLine, shouldBackOff, type SourceOutcome } from './geocodeOutcome'
+import { geocodeAnswer, logLine, shouldBackOff, type SourceOutcome, type StreetRows } from './geocodeOutcome'
 import { hasSatisfyingHit } from './geocodeMerge'
 import { cacheKeyPath, looksLikeBusiness, parseGeocodeRequest, type GeocodeQuery } from './geocodeQuery'
 import { TtlLru } from './lru'
 import { createBucket, msUntilToken, tryTake, type TokenBucket } from './rateLimit'
-import type { GeocodeErrorCode, GeocodeSource } from './schema'
+import type { GeocodeErrorCode, UpstreamSource } from './schema'
 
 const LRU_ENTRIES = 500
 /** All upstream calls (per isolate): a burst of 20, then 2 a second. GeoSearch publishes no limit. */
@@ -19,7 +19,7 @@ export interface GeocodeState {
   lru: TtlLru
   upstream: TokenBucket
   photon: TokenBucket
-  failedUntil: Record<GeocodeSource, number | null>
+  failedUntil: Record<UpstreamSource, number | null>
   clientLimitWarned: ClientLimitWarned
 }
 
@@ -36,6 +36,8 @@ export function createGeocodeState(now: number): GeocodeState {
 export interface GeocodeDeps {
   fetchGeoSearch(q: GeocodeQuery): Promise<SourceOutcome>
   fetchPhoton(q: GeocodeQuery): Promise<SourceOutcome>
+  /** The Worker's own street and intersection index (2q7.14); local and synchronous, so it takes no upstream budget. */
+  searchStreets(q: GeocodeQuery): StreetRows
   state: GeocodeState
   /** The Workers Rate Limiting binding (`env.GEOCODE_CLIENT_LIMIT`); absent means no per-client limit (`clientAllowed`). */
   clientLimit?: RateLimit
@@ -63,13 +65,13 @@ function answer(body: string, origin: string | null): Response {
 }
 
 /** Whether `source` may be called now; takes its tokens if so. Taken before any await, so concurrent calls see them. */
-function gate(source: GeocodeSource, state: GeocodeState, now: number): 'go' | 'limited' | 'backoff' {
+function gate(source: UpstreamSource, state: GeocodeState, now: number): 'go' | 'limited' | 'backoff' {
   const until = state.failedUntil[source]
   if (until !== null && until > now) return 'backoff'
   return tryTake(source === 'photon' ? [state.upstream, state.photon] : [state.upstream], now) ? 'go' : 'limited'
 }
 
-async function callSource(source: GeocodeSource, q: GeocodeQuery, deps: GeocodeDeps): Promise<SourceOutcome> {
+async function callSource(source: UpstreamSource, q: GeocodeQuery, deps: GeocodeDeps): Promise<SourceOutcome> {
   const { state } = deps
   const verdict = gate(source, state, Date.now())
   if (verdict !== 'go') return { status: verdict }
@@ -100,20 +102,29 @@ async function readEdgeOrNull(edge: EdgeCache, key: Request): Promise<Memo | nul
   }
 }
 
-/** Business names are OSM's: ask both at once. Otherwise GeoSearch, and Photon only if it had no hit of the kind asked for. */
-async function gather(q: GeocodeQuery, deps: GeocodeDeps): Promise<{ outcomes: Record<GeocodeSource, SourceOutcome>; photonFirst: boolean }> {
+type Outcomes = Record<UpstreamSource, SourceOutcome>
+
+const unneeded: Outcomes = { geosearch: { status: 'unneeded' }, photon: { status: 'unneeded' } }
+
+/**
+ * An intersection hit needs no upstream at all. A business name is OSM's: ask both sources at once. Otherwise GeoSearch,
+ * and Photon only if the index and GeoSearch had no hit of the kind asked for (a street row counts).
+ */
+async function gather(q: GeocodeQuery, deps: GeocodeDeps, streets: StreetRows): Promise<{ outcomes: Outcomes; photonFirst: boolean }> {
+  const found = streets.whole.length + streets.partial.length
+  if ([...streets.whole, ...streets.partial].some((c) => c.result.kind === 'intersection')) return { outcomes: unneeded, photonFirst: false }
   if (looksLikeBusiness(q.text)) {
     const [geosearch, photon] = await Promise.all([callSource('geosearch', q, deps), callSource('photon', q, deps)])
     return { outcomes: { geosearch, photon }, photonFirst: true }
   }
   const geosearch = await callSource('geosearch', q, deps)
-  const satisfied = geosearch.status === 'ok' && hasSatisfyingHit(geosearch.results.candidates, q.text)
+  const satisfied = found > 0 || (geosearch.status === 'ok' && hasSatisfyingHit(geosearch.results.candidates, q.text))
   const photon: SourceOutcome = satisfied ? { status: 'unneeded' } : await callSource('photon', q, deps)
   return { outcomes: { geosearch, photon }, photonFirst: false }
 }
 
 /** Seconds until a skipped source could be called, the soonest of them; at least 1. */
-function retryAfterS(outcomes: Record<GeocodeSource, SourceOutcome>, state: GeocodeState): number {
+function retryAfterS(outcomes: Outcomes, state: GeocodeState): number {
   const now = Date.now()
   const waits = (['geosearch', 'photon'] as const).flatMap((s) => {
     const status = outcomes[s].status
@@ -136,10 +147,13 @@ interface Miss {
 }
 
 async function serveMiss(m: Miss): Promise<Response> {
-  const { outcomes, photonFirst } = await gather(m.query, m.deps)
-  const result = geocodeAnswer(m.query, outcomes, photonFirst)
+  const streets = m.deps.searchStreets(m.query)
+  const { outcomes, photonFirst } = await gather(m.query, m.deps, streets)
+  const result = geocodeAnswer(m.query, outcomes, photonFirst, streets)
   const colo = m.request.cf?.colo
-  console.log(logLine(typeof colo === 'string' ? colo : undefined, outcomes, result.status === 200 ? result.results : 0))
+  console.log(
+    logLine(typeof colo === 'string' ? colo : undefined, outcomes, result.status === 200 ? result.results : 0, result.status === 200 ? result.osm : 0),
+  )
   if (result.status === 503) {
     return failure(503, 'busy', m.origin, {
       'retry-after': String(retryAfterS(outcomes, m.deps.state)),

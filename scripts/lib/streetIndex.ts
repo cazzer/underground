@@ -1,10 +1,10 @@
 /** The citywide street and intersection search entries (2q7.13), from the street pin and the stations. Pure:
- *  build-street-index.ts reads the files and writes the shards (streetIndexShards.ts). The contract and the rules
- *  kept are in src/data/searchSchema.ts. A street is one record per (borough, street key) with a site per nearby
+ *  build-street-index.ts reads the files and writes the Worker's index (streetIndexPack.ts). The contract and the rules
+ *  kept are in worker/src/streetIndexSchema.ts. A street is one record per (borough, street key) with a site per nearby
  *  station; an intersection is a node two differently named streets share, nodes within INTERSECTION_MERGE_M of each
  *  other (the two carriageways of one crossing) taken as one, sited at the one nearest their mean. The borough is the nearest station's. */
 import type { Borough, Station } from '../../src/data/schema.ts'
-import type { IntersectionEntry, SearchSite, StreetEntry, StreetRank, StreetSearchEntry } from '../../src/data/searchSchema.ts'
+import type { IntersectionEntry, SearchSite, StreetEntry, StreetRank, StreetSearchEntry } from './streetIndexTypes.ts'
 import { toGround, toLatLon, type Ground } from '../../src/lib/projection.ts'
 import { isClosedRing, isStreet } from '../../src/lib/streetClass.ts'
 import { streetKey } from './entranceStreet.ts'
