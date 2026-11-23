@@ -17,6 +17,7 @@ With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
 With the Worker configured the search dialog also finds streets, intersections ("Bedford Av & N 7 St"), addresses and places through `/geocode` (2q7.16, 2q7.14; none of it without `VITE_RT_URL`).
+Trip planning is behind `FEATURES.navigation` (`src/config.ts`), off by default.
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -145,6 +146,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 
 ## Directory map
 - `src/main.tsx`, `src/App.tsx`, `src/index.css`: entry, root layout, Tailwind + theme CSS vars
+- `src/config.ts`: build-time feature switches, plain constants (no remote flag service). `FEATURES.navigation` (default
+  false, 2q7.51): off, the HUD offers no directions (no From/To on search rows, no "Directions from/to here", no trip panel or
+  `TripAnnouncer`), so the trip never opens and nothing trip-only draws or loads (the router chunk, timetables, transfers,
+  `tripPatterns()`, the trip's interiors and street files); search, its flights and the location row are unchanged. True restores navigation.
 - `src/theme.ts`: all colors, line widths, fonts. Blueprint is the only theme (the user's pick): don't add
   other presets, and don't make evidence or cards in other themes. Route colors are
   GTFS data drawn through `theme.routeLineMix` (mixed toward a theme color; amount 1 = mono), then
@@ -830,7 +835,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   schedule answers, `overlay` null; `planTrip` is the scheduled-only form); `NoServiceError`
   when the calendar has no service on that date; User Timing measures `trip:fetch`, `trip:build`, `trip:overlay` and `trip:route`).
   Nothing here loads at startup; the trip panel opening is the first caller
-- Navigation UI (2q7.9): `src/lib/trip.tsx` `TripProvider` (wraps `MapView` in `App.tsx`)
+- Navigation UI (2q7.9): Behind `FEATURES.navigation` (`src/config.ts`, default false): `Hud.tsx` passes `openTrip` to the search dialog and the station panel (`ArrivalsPanel`'s `onDirections` is optional) and mounts `TripAnnouncer` only while it is true; every hook and scene input below keys on `useTrip().open`, which only `openTrip` sets, so with it false none of them fetches or draws. `src/lib/trip.tsx` `TripProvider` (wraps `MapView` in `App.tsx`)
   and `useTrip` hold open, From and To in memory for the session (no URL, history or storage). `src/data/useTripPlan.ts` plans when
   both ends are set and differ, leaving now (live clock once a snapshot has set it, else the device's), drops stale replies by request
   id, replans every 30 s, and on each snapshot newer than the one planned on (trigger `poll`, never announced), while open and not covered by a train panel or notice (silent; once more when the cover goes), on the schedule with the next 30 minutes from the latest snapshot (`overlay` counts ride the ready plan; `?debug` prints them), warms the
