@@ -14,7 +14,9 @@ import { useFocus } from '../lib/focus'
 import type { Network, ShapePath } from '../lib/network'
 import type { StationSpans } from '../lib/platformSpan'
 import { depthFactor, depthScaleY } from '../lib/tilt'
+import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
+import { writeLineDim } from './bandLineMaterial'
 import { cameraDistance } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
 import { routeLineBuffers, useLineLayer } from './useLineLayer'
@@ -26,10 +28,12 @@ interface LayerProps {
   paths: readonly ShapePath[]
   /** Its platform tracks fade out with the interior, as SubwayLines' do. */
   interiorSpans: StationSpans | null
+  /** SubwayLines' trip emphasis: it dims with the network under the trip's route. */
+  levels: EmphasisLevels
 }
 
 /** Option A: the focused station's routes, redrawn in route colors over the mono network. */
-export function LineHighlight({ network, paths, interiorSpans }: LayerProps) {
+export function LineHighlight({ network, paths, interiorSpans, levels }: LayerProps) {
   const { focusedId } = useFocus()
   const buffers = useMemo(() => {
     const station = focusedId ? network.stationById.get(focusedId) : undefined
@@ -41,7 +45,9 @@ export function LineHighlight({ network, paths, interiorSpans }: LayerProps) {
   usePlatformFade(lines, buffers, paths, interiorSpans)
   // Depth computed here, not read from SubwayLines' band view: a child's frame runs before its parent writes it.
   useFrame((state) => {
-    if (lines) lines.scale.y = depthScaleY(depthFactor(cameraDistance(state)))
+    if (!lines) return
+    lines.scale.y = depthScaleY(depthFactor(cameraDistance(state)))
+    writeLineDim(lines.material, levels.networkDim)
   })
   return lines && <primitive object={lines} />
 }
@@ -50,7 +56,7 @@ export function LineHighlight({ network, paths, interiorSpans }: LayerProps) {
 const FADE_FAR = 8_000
 const FADE_NEAR = 3_000
 
-export function LineFade({ network, paths, interiorSpans }: LayerProps) {
+export function LineFade({ network, paths, interiorSpans, levels }: LayerProps) {
   // Translucent while it fades in, so every variant segment stays drawn: one under its primary would show through.
   const buffers = useMemo(() => routeLineBuffers(network, paths, theme.routeLineMix, false), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lineFocus)
@@ -63,6 +69,7 @@ export function LineFade({ network, paths, interiorSpans }: LayerProps) {
     lines.material.opacity = opacity
     lines.visible = opacity > 0
     lines.scale.y = depthScaleY(depthFactor(d))
+    writeLineDim(lines.material, levels.networkDim)
   })
   return lines && <primitive object={lines} />
 }

@@ -6,6 +6,7 @@ import {
   frontPanel,
   INITIAL_COLLAPSE,
   type CollapsiblePanel,
+  type FrontPanel,
 } from './panelCollapseState'
 import { useTrainSelection } from './trainSelection'
 import { useTrip } from './trip'
@@ -14,6 +15,8 @@ import { useTrip } from './trip'
 export interface PanelCollapse {
   collapsed: boolean
   seq: number
+  /** The panel in front (frontPanel): the trip's route draws while it is the trip panel, collapsed or not. */
+  front: FrontPanel
 }
 
 /** What the panels read and write. */
@@ -51,7 +54,7 @@ export function PanelCollapseProvider({ children }: { children: ReactNode }) {
   }, [flyRequest])
 
   const collapsed = collapsedFront(state, front)
-  const view = useMemo(() => ({ collapsed, seq: state.seq }), [collapsed, state.seq])
+  const view = useMemo(() => ({ collapsed, seq: state.seq, front }), [collapsed, state.seq, front])
   const setCollapsed = useCallback((panel: CollapsiblePanel, next: boolean) => dispatch({ type: 'set', panel, collapsed: next, front }), [front])
   const tripRequested = useCallback(() => dispatch({ type: 'tripRequested' }), [])
   const controls = useMemo(

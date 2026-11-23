@@ -19,6 +19,7 @@ import type { Network } from '../lib/network'
 import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
+import type { TripRouteDraw } from '../lib/tripLineBuffers'
 import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { Basemap } from './Basemap'
@@ -73,9 +74,13 @@ interface SceneProps {
   exitLabel: ExitLabel | null
   /** The trip panel is open: a landing there goes on framing the trip's path above the panel as it changes. */
   tripOpen: boolean
+  /** The selected journey's ride legs (useTripRoute); null with none. */
+  tripRoute: TripRouteDraw | null
+  /** The trip panel is in front: its route draws over the dimmed network. */
+  tripShown: boolean
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, exitLabel, tripOpen }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, exitLabel, tripOpen, tripRoute, tripShown }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -119,7 +124,14 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       aria-label="Subway map"
     >
       <color attach="background" args={[theme.background]} />
-      <SubwayLines network={network} paths={banded?.shapes ?? network.shapes} interiorSpans={interiorSpans} view={bandView} />
+      <SubwayLines
+        network={network}
+        paths={banded?.shapes ?? network.shapes}
+        interiorSpans={interiorSpans}
+        view={bandView}
+        tripRoute={tripRoute}
+        tripShown={tripShown}
+      />
       <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
       <Stations stations={network.stations} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
       <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />

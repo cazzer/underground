@@ -173,6 +173,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   way out.
   Place pin tokens `placePin` (lemon, 3:1, held apart from the location, focus and exit colors, the selected-train rim and every route color, also under simulated red-green
   color blindness; theme.test.ts) and `placePinWidth` (2 px) draw the pin on a searched place.
+  Trip route tokens (TripLines.tsx, 2q7.45.3): `tripNetworkDim` (0.7) mixes every other route line toward the background
+  while the trip panel is in front, `tripLineWidth` (2.5 px) is an opened journey's ride legs, `tripFaintDim` (0.35) the list
+  view's first journey at the base width; `themeTrip.test.ts` holds the floors (dimmed at least 1.3:1, faint at least 1.45x its
+  route's dimmed contrast, every full route at least 1.4x the brightest dimmed one).
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
@@ -229,7 +233,23 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     it) and the band uniforms per frame at priority -0.25); `usePlatformFade.ts` (given `interiorSpans`, `memberSpans` of the loaded interior: a complex's members unioned) writes the loaded interior's
     per-segment platform fade for every band layer (the `?lines=` overlays too); `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
-    if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`; `StationTies.tsx` a thin vertical tie
+    if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`.
+    Each BandLineMaterial also has its own `lineDim` uniform (not in `BAND_UNIFORMS`): `DIM_GLSL`'s `dimLine` mixes the
+    fragment's color toward `lineDimColor` (theme.background, sRGB) in sRGB, exactly as `mixHex` does, never by opacity
+    (`src/lib/lineDim.ts` `dimLineRgb` is its JS twin; `lineDim.test.ts` pins the GLSL and checks both against mixHex); with
+    `{ windowed: true }` (the `TRIP_WINDOW` define; buffers carrying `windows`) it discards each segment's fragments outside its
+    `WINDOW_ATTRIBUTE` (t0, t1), t being 0 at the segment's start and 1 at its end (caps keep their end's t). While the trip
+    panel is in front with a route (`usePanelCollapse().front === 'trip'`, collapsed or not; a train panel or notice in front
+    ends it), SubwayLines eases one `TripEmphasis` at -0.25 (`src/lib/tripEmphasis.ts`, 0.25 s, reduced motion snaps) and
+    writes `lineDim` = `tripNetworkDim` on the main layer; the `?lines=` overlays write the same in their frames. `TripLines.tsx`
+    (render order 2.1, a child of SubwayLines in a null-fallback ErrorBoundary): the selected journey's ride legs (`useTripRoute`)
+    as `tripLineBuffers` (`src/lib/tripLineBuffers.ts`, pure: each ride span's overlapping shape segments copied with the same
+    positions, heights and band inputs as `buildLineBuffers`, cover ignored, plus `segmentWindow`'s (t0, t1); no new
+    vertices, `lineBreaks` untouched), in route colors under `theme.routeLineMix` whatever `?lines=` says, with
+    `usePlatformFade` (a stretch two rides share fades on the first copy only); per frame at 0 its `scale.y`, width (base to
+    `tripLineWidth` as a journey is opened) and own dim (`tripFaintDim` in the list view, 0 opened); it keeps the last route,
+    so closing or covering the panel eases it out. Station markers, ties and trains don't dim. `straight` spans and walk legs
+    draw nothing yet (2q7.45.4); `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
     LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, and so are its complex siblings' (`hiddenSiblings`, `compactTies` in `lib/stationTie.ts`), kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
@@ -539,7 +559,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     like "14 stre" and "14t" keep matching). `stationHash.ts` parses and builds `#station=<id>`
   - `panelCollapse.tsx` `PanelCollapseProvider` (in `App.tsx`, inside `TripProvider`) and the collapse flags of the station and trip panels
     (`panelCollapseState.ts`, pure: `frontPanel` mirrors Hud's bottom slot order, `collapseReducer`, `collapsedFront`).
-    `usePanelCollapse(): { collapsed, seq }` is the scene's read-only view (memoised): `collapsed` is true only while the panel in front is a
+    `usePanelCollapse(): { collapsed, seq, front }` is the scene's read-only view (memoised; `front` is `frontPanel`'s, which the trip route reads): `collapsed` is true only while the panel in front is a
     collapsed station or trip panel (false with none, and with a train panel or notice in front), and `seq` increments only on a user collapse or expand of
     the panel in front (never on a size change, a station change, a panel closing or a cover; `collapsed` can change without it, so key on `seq`;
     `useCollapseReframe` does);
@@ -636,6 +656,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`live/feedHealth.ts`). `planLive.ts` runs it for the trip panel; `overlayFixture.ts` is the tests' scheduled evening and snapshots
   - Times are integer seconds since the service day's start (`serviceDayStart`: noon minus 12 h, an hour off midnight on DST days; may be negative or past 86400, |t| < 2^29); a loader shifts other
     service days itself and keeps their patterns separate
+- `src/data/useTripRoute.ts` (2q7.45.3): the selected journey's ride spans for TripLines (`TripRouteDraw`: key, `ride` spans,
+  `faint` in the list view), while the trip panel is open with a ready plan and a journey selected; `journeySpans` on the drawn
+  paths (banded once they arrive) with `tripPatterns()` as the hint, loaded through `import('./loadTimetable')` (the planner's
+  chunk and its one fetch, so nothing at startup); nothing draws until the patterns settle; a failed load logs once and spans go
+  by geometry; a journey that can't be mapped logs and draws nothing. Memoised on each ride's route and stop run.
 - `src/lib/tripSpans.ts` (pure, 2q7.45.2): a trip's legs on the drawn map. `rideSpan` maps a ride leg to `{ shapeId, d0, d1, maxOffsetM, matched }` on a `network.shapes` or banded path of the stop suffix's direction (each stop's own station point, `projectForward`, offsets over `MAX_STOP_OFFSET_M` 150 m rejected, d1 > d0), by tier: a route shape whose trip-index pattern holds the leg's stops (`SpanContext.patterns`, optional hint), the route's shapes, any route's shape whose pattern holds them, any shape of the direction, else a `straight` line through the stop points; within a route primary first, then smallest offset (ties under `OFFSET_TIE_M` 0.01 m), then id (across routes offset first); `walkSpan` the two station points (none for `sameStation`; `sameComplex` marks a change inside a complex), `journeySpans` all legs, `spanPoints` a span's ground points; `stopStations` stop to station. `tripSpans.data.test.ts` plans L08 to 127 and checks banded and unbanded pick the same shapes (ends within a metre, so recompute on the banded paths)
 - `src/lib/realtime/`: pure realtime-to-position library (no fetch, React or three.js); tests colocated,
   `fixture.ts` is the mini static world they share
@@ -740,7 +765,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/useStationHash.ts` keeps `#station=<id>` and the focused station in step with `history.replaceState`
   (no history entries): reads on mount and `hashchange`, writes on every focus change; an unknown id clears the
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
-- `src/data/loadTimetable.ts` (`expectTimetable`, `expectDatedIndex`, `expectServiceCalendar`; one lazy cached promise per file via
+- `src/data/loadTimetable.ts` (`expectTimetable`, `expectDatedIndex`, `expectTripIndexForTrips`: the calendar, its exceptions and
+  each pattern's stop run, from one `trip-index.json` fetch that `serviceCalendar()` and `tripPatterns()` share; one lazy cached promise per file via
   `interiorCache.ts`: `timetable/<service>.json`, `timetable/dated/<date>.json` and its `index.json` (built by each deploy, never in git; a 404 on the index is
   an empty one with one console warning, any other failure rejects), `route/transfers.json`, and the calendar from `trip-index.json`) and
   `planTrip.ts` (`planTripLive(stations, from, to, atS, live)`: reads the calendar and the dated index (fetched together; a failed
@@ -1078,7 +1104,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: focused station's streets 0.35 (7.5 above the veil
   while the interior is loaded under look A; TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
-  0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2,
+  0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`),
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,

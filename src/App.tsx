@@ -10,6 +10,7 @@ import { useStationHash } from './data/useStationHash'
 import { NO_SIBLINGS } from './data/interiorLoad'
 import { useStationInterior } from './data/useStationInterior'
 import { useTripExit } from './data/useTripExit'
+import { useTripRoute } from './data/useTripRoute'
 import { useTripTransfers } from './data/useTripTransfers'
 import { usePlaceLine } from './ui/usePlaceLine'
 import { FocusProvider, useFocus } from './lib/focus'
@@ -23,7 +24,7 @@ import type { ScreenRect } from './lib/interiorCamera'
 import type { StationPathDraw } from './lib/interiorPath'
 import type { Network } from './lib/network'
 import type { BandedShapes } from './lib/networkBands'
-import { PanelCollapseProvider } from './lib/panelCollapse'
+import { PanelCollapseProvider, usePanelCollapse } from './lib/panelCollapse'
 import { TrainSelectionProvider, useTrainSelection } from './lib/trainSelection'
 import { TripProvider, useTrip } from './lib/trip'
 import { tripNamesOf } from './lib/tripView'
@@ -81,6 +82,16 @@ function MapView({ network, bands, live }: MapViewProps) {
     () => ({ exits: tripExit?.lines ?? null, transfers: tripTransfers.lines, index: interior.index }),
     [tripExit?.lines, tripTransfers.lines, interior.index],
   )
+  // The selected journey's ride legs on the drawn lines; drawn (and the network dimmed) while the trip panel is in front.
+  const tripRoute = useTripRoute({
+    network,
+    paths: banded?.shapes ?? network.shapes,
+    open: trip.open,
+    plan: trip.plan,
+    selection: trip.selection,
+    journey: trip.selectedJourney,
+  })
+  const tripShown = usePanelCollapse().front === 'trip'
   const exitDraw = tripExit?.drawn ?? null
   const exitInterior = tripExit?.interiorId ?? null
   // The exit first: where an interior has both (a trip can't change at its To station), the exit wins.
@@ -124,6 +135,8 @@ function MapView({ network, bands, live }: MapViewProps) {
             stationPaths={stationPaths}
             exitLabel={tripExit?.drawn ? tripExit.mapLabel : null}
             tripOpen={trip.open}
+            tripRoute={tripRoute}
+            tripShown={tripShown}
           />
         )}
       </ErrorBoundary>
