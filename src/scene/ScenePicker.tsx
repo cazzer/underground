@@ -17,7 +17,8 @@ interface ScenePickerProps {
   stations: readonly Station[]
   /** The live layer's slots, while it is mounted. */
   trainPick: RefObject<TrainPickSource | null>
-  /** The focused station's complex siblings whose interior is loaded: no marker is drawn for them either. */
+  /** Stations a drawn interior stands in for (the focused one's covered siblings, every other drawn interior's stations,
+   *  o3r.4): like the open station, a train in reach beats them, and a direct tap with none still picks them. */
   hiddenSiblings: readonly string[]
 }
 

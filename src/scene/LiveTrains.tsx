@@ -15,13 +15,14 @@ import { trainRouteId } from '../lib/live/trainRoute'
 import { interiorOpacity, veilWeight } from '../lib/interiorReveal'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Network } from '../lib/network'
-import type { StationSpans } from '../lib/platformSpan'
+import type { SpanSet } from '../lib/platformSpan'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { routeLineColor } from '../lib/routeColor'
 import { tiltT } from '../lib/tilt'
 import { theme } from '../theme'
 import { cameraDistance, getControls, screenScale } from './cameraDistance'
 import { RENDER_ORDER } from './renderOrder'
+import type { PresenceStore } from './InteriorPresence'
 import { SpanCars } from './SpanCars'
 import { TrainCars } from './TrainCars'
 import { trainRadiusPx } from './trainSize'
@@ -44,10 +45,12 @@ interface LiveTrainsProps extends LiveLayer {
   /** Filled while mounted, so a click can be tested against the trains as drawn. */
   trainPick: RefObject<TrainPickSource | null>
   /**
-   * The loaded interior's platform spans by deck (deckSpans: every member of a complex unioned, then split by the deck
-   * each track rides; [null] for none): trains on them draw above the veil as it reveals, each deck in its own layer.
+   * The drawn interiors' platform spans by deck (deckSpanSets: deck k holds deck k of every drawn interior, each complex's
+   * members unioned; [null] for none): trains on them draw above the veil as it reveals, each deck in its own layer.
    */
-  deckSpans: readonly (StationSpans | null)[]
+  deckSpans: readonly (SpanSet | null)[]
+  /** The interiors' presences: a lifted car's tint follows the veil's drawn share (`veilShare`), as the veil does. */
+  presence: PresenceStore
   /** This frame's band view, written by SubwayLines before this frame runs: dots, cars and picks sit on the drawn bands. */
   view: BandView
   /** Filled at priority -3 with the selected train's drawn point, for the camera follow. */
@@ -60,7 +63,7 @@ interface LiveTrainsProps extends LiveLayer {
  * poll's hop plan at the live clock and writes matrices without allocating. Zoomed in, each dot
  * unfolds into its train's cars (carMix): the dot shrinks by 1 - mix as the train lengthens by mix.
  */
-export function LiveTrains({ trips, offsetS, patterns, network, trainPick, deckSpans, view, anchor }: LiveTrainsProps) {
+export function LiveTrains({ trips, offsetS, patterns, network, trainPick, deckSpans, presence, view, anchor }: LiveTrainsProps) {
   const dots = useRef<InstancedMesh>(null)
   const halo = useRef<InstancedMesh>(null)
   // The selected train's dot is drawn on its own, above every other dot: rim, background gap, then the dot.
@@ -237,7 +240,7 @@ export function LiveTrains({ trips, offsetS, patterns, network, trainPick, deckS
     d.count = h.count = mix >= 1 ? 0 : table.high
     cars.commit(table.high, carsOn, mix < 1)
     const reveal = interiorOpacity(camera)
-    const veil = veilWeight(reveal, view.depth)
+    const veil = veilWeight(reveal, view.depth) * presence.veilShare
     for (let k = 0; k < deckSpans.length; k++) {
       spanLayers[k]!.write(table, deckSpans[k] ?? null, reveal, veil, mix, localS, sel, slotColors, cars.consistOf)
     }

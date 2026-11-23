@@ -2,7 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import type { Group, Mesh, MeshBasicMaterial } from 'three'
 import { interiorStationIds } from '../data/interiorLoad'
+import type { LevelLabel } from '../lib/interiorFraming'
 import type { LabelBlockers } from '../lib/labelBlockers'
+import type { Presence } from '../lib/presence'
 import type { Network } from '../lib/network'
 import { stationPathKey, type StationPathChoice } from '../lib/interiorPath'
 import { interiorOpacity, labelOpacity, veilWeight } from '../lib/interiorReveal'
@@ -30,18 +32,25 @@ interface StationInteriorProps {
   /** The trip's way out or transfer here (ExitPath.tsx), drawn inside the group (its anchor, depth factor and
    *  visibility); the level labels keep clear of its markers. Null for none. */
   path: StationPathChoice | null
+  /** Its presence (presence.ts, stepped by PresenceDriver): multiplied into every opacity, so it eases in and out of the view set. */
+  presence: Presence
+  /** Draw its level labels (the focused interior only, until labels of several interiors are decluttered against each other). */
+  labels: boolean
 }
+
+const NO_LABELS: LevelLabel[] = []
 
 const NO_KEEP_OUT = new Float32Array(0)
 
 /**
- * The focused station's interior as merged line layers in a group at its anchor: fine, then strong, for each stroke
- * band (interiorDecks.ts): the deepest deck and below, the bands between decks (Union Sq has one), and the levels above
- * the shallowest deck, each band drawn after the lifted trains of the deck below it. Plus the street
- * veil and DOM level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
+ * A drawn station's interior (the focused one, or one in view: Scene's useSceneInteriors) as merged line layers in a
+ * group at its anchor: fine, then strong, for each stroke band (interiorDecks.ts): the deepest deck and below, the
+ * bands between decks (Union Sq has one), and the levels above the shallowest deck, each band drawn after the lifted
+ * trains of the deck below it. Plus look B's footprint veil (look A's one screen veil is Scene's ScreenVeil) and DOM
+ * level labels. Everything fades in with the tilt; the levels' depth, the veil and the labels come in
  * with the depth factor (tilt.ts), so a flat view shows the interior as a plan.
  */
-export function StationInterior({ model, network, outOfService, labelBlockers, path }: StationInteriorProps) {
+export function StationInterior({ model, network, outOfService, labelBlockers, path, presence, labels }: StationInteriorProps) {
   // Every station the interior covers must be on the map: its spans, markers and camera all look them up.
   for (const id of interiorStationIds(model)) {
     if (!network.stationById.has(id)) throw new Error(`Interior ${model.stationId} covers unknown station "${id}"`)
@@ -88,7 +97,7 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
     const g = group.current
     if (!g) return
     const distance = cameraDistance(state)
-    const o = interiorOpacity(distance)
+    const o = interiorOpacity(distance) * presence.value
     // The levels separate with the tilt (y only: dashes are object-space, so x/z never rescale).
     const depth = depthFactor(distance)
     if (o === shown.current && depth === shownDepth.current && layers === shownLayers.current) return
@@ -111,12 +120,12 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
 
   /** Written by ExitPath: the path's start, which the level labels keep clear of. */
   const keepOut = useRef<Float32Array>(NO_KEEP_OUT)
-  useLevelLabels(model.labels, group, labelShown, labelBlockers, keepOut)
+  useLevelLabels(labels ? model.labels : NO_LABELS, group, labelShown, labelBlockers, keepOut)
 
   return (
     <>
       <group ref={group} position={[model.origin.x, 0, model.origin.z]} visible={false}>
-      {interiorLook.veil !== 'none' && <InteriorVeil ref={veil} hull={model.hull} />}
+      {model.hull && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
       {strong && <primitive object={strong} />}
       {mid0Fine && <primitive object={mid0Fine} />}

@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef, type RefObject } from 'react'
 import { Vector3, type Group } from 'three'
 import type { LevelLabel } from '../lib/interiorFraming'
-import type { LabelBlockers } from '../lib/labelBlockers'
+import { claimBlockerSlot, MAX_LEVEL_BLOCKERS, releaseBlockerSlot, type LabelBlockers } from '../lib/labelBlockers'
 import { RECT } from '../lib/labelGeometry'
 import { clearLabelTop } from '../lib/labelKeepOut'
 
@@ -26,8 +26,9 @@ const lookDir = new Vector3()
  * label and unmounts it inside a layout-effect cleanup, which React 19 reports as "unmount a root while already
  * rendering" whenever the scene commits inside a DOM render (StrictMode's mount cycle at a hash load).
  * `opacity` is read every frame; a label at 0 is hidden, as is one behind the camera. Register it after the frame
- * that scales `group`, so a label never trails its levels by a frame. Each shown label's canvas rect goes to
- * `blockers` (its version bumped on any change), so the street labels keep clear of it; the sizes are measured after
+ * that scales `group`, so a label never trails its levels by a frame. Each shown label's canvas rect goes to the
+ * `blockers` slot this interior claims while mounted (the version bumped on any change; with every slot held, none),
+ * so the street labels keep clear of it; the sizes are measured after
  * mount, after the fonts load and on resize. A label drops just below any `keepOut` point (group-local x, y, z
  * triples: the exit path's start) it would cover on screen.
  */
@@ -40,13 +41,31 @@ export function useLevelLabels(
 ): void {
   const host = useThree((s) => s.gl.domElement.parentElement)
   const els = useRef<HTMLDivElement[]>([])
+  /** The labels `els` were made for: a frame between a render with new labels and its effect still places the old divs. */
+  const placed = useRef<LevelLabel[]>([])
   const last = useRef<{ x: number; y: number; opacity: number; behind: boolean; w: number; h: number }[]>([])
+  /** The blocker slot this interior holds, null when none was free. */
+  const slot = useRef<number | null>(null)
+
+  // Only an interior with labels holds a slot (the focused one: o3r.4's view interiors draw none).
+  const any = labels.length > 0
+  useEffect(() => {
+    if (!any) return
+    const held = claimBlockerSlot(blockers)
+    slot.current = held
+    return () => {
+      slot.current = null
+      if (held !== null) releaseBlockerSlot(blockers, held)
+    }
+  }, [blockers, any])
 
   useEffect(() => {
     if (!host) return
     const made = labels.map((label) => {
       const el = document.createElement('div')
       el.className = CLASS
+      // Decoration: the station panel names the station, and the levels mean nothing read out of place.
+      el.setAttribute('aria-hidden', 'true')
       el.style.zIndex = '0'
       el.style.visibility = 'hidden'
       el.textContent = label.text
@@ -64,6 +83,7 @@ export function useLevelLabels(
     }
     measure()
     els.current = made
+    placed.current = labels
     last.current = state
     let live = true
     document.fonts.ready.then(
@@ -78,8 +98,9 @@ export function useLevelLabels(
       window.removeEventListener('resize', measure)
       for (const el of made) el.remove()
       els.current = []
+      placed.current = []
       last.current = []
-      blockers.count = 0
+      if (slot.current !== null) blockers.counts[slot.current] = 0
       blockers.version++
     }
   }, [host, labels, blockers])
@@ -92,7 +113,9 @@ export function useLevelLabels(
     g.updateWorldMatrix(true, false)
     camera.getWorldDirection(lookDir)
     const o = opacity.current
-    const room = blockers.rects.length / RECT
+    const held = slot.current
+    const base = held === null ? 0 : held * MAX_LEVEL_BLOCKERS
+    const room = held === null ? 0 : MAX_LEVEL_BLOCKERS
     let count = 0
     let changed = false
     const pts = keepOut.current
@@ -106,7 +129,7 @@ export function useLevelLabels(
     for (let i = 0; i < list.length; i++) {
       const el = list[i]!
       const prev = last.current[i]!
-      const p = labels[i]!.position
+      const p = placed.current[i]!.position
       world.set(p[0], p[1], p[2]).applyMatrix4(g.matrixWorld)
       toCamera.copy(world).sub(camera.position)
       const behind = toCamera.angleTo(lookDir) > Math.PI / 2
@@ -129,10 +152,10 @@ export function useLevelLabels(
         prev.y = y
       }
       // -translate-x-1/2: the label's top edge is centered on (x, y).
-      if (count < room) changed = writeBlocker(blockers.rects, count++, x - prev.w / 2, y, x + prev.w / 2, y + prev.h) || changed
+      if (count < room) changed = writeBlocker(blockers.rects, base + count++, x - prev.w / 2, y, x + prev.w / 2, y + prev.h) || changed
     }
-    if (changed || count !== blockers.count) {
-      blockers.count = count
+    if (held !== null && (changed || count !== blockers.counts[held])) {
+      blockers.counts[held] = count
       blockers.version++
     }
   })

@@ -97,6 +97,73 @@ export function deckSpans(spans: StationSpans | null, deckOf: ReadonlyMap<StopId
   return out
 }
 
+/** What scales a span's lifted-train weight: its drawn interior's presence (presence.ts), read per frame. */
+export interface SpanPresence {
+  readonly value: number
+}
+
+/** A drawn interior's platform span with that interior's presence. */
+export interface ShownSpan {
+  span: PlatformSpan
+  presence: SpanPresence
+}
+
+/** One drawn interior's spans (a complex already unioned by `memberSpans`) and its presence. */
+export interface InteriorSpans {
+  spans: StationSpans | null
+  presence: SpanPresence
+}
+
+/**
+ * Several drawn interiors' platform spans by shape (o3r.4): one entry per interior that has a span on the shape. Never
+ * unioned across interiors, so the track between two stations stays drawn and a train there stays under the veil.
+ */
+export type SpanSet = ReadonlyMap<ShapeId, readonly ShownSpan[]>
+
+/** The drawn interiors' spans as one set, in order (nulls skipped; the span objects are shared, never changed); null when none has any. */
+export function spanSet(perInterior: readonly InteriorSpans[]): SpanSet | null {
+  let out: Map<ShapeId, ShownSpan[]> | null = null
+  for (const { spans, presence } of perInterior) {
+    if (!spans) continue
+    out ??= new Map()
+    for (const [shapeId, span] of spans) {
+      const list = out.get(shapeId)
+      if (list) list.push({ span, presence })
+      else out.set(shapeId, [{ span, presence }])
+    }
+  }
+  return out
+}
+
+/** One drawn interior's spans by deck (its `deckSpans`, deepest first) and its presence. */
+export interface InteriorDeckSpans {
+  decks: readonly (StationSpans | null)[]
+  presence: SpanPresence
+}
+
+/**
+ * The drawn interiors' spans by deck: deck k holds deck k of every interior, so one lifted layer per deck serves them
+ * all. As long as the interior with the most decks, at least one; [null] for none.
+ */
+export function deckSpanSets(perInterior: readonly InteriorDeckSpans[]): (SpanSet | null)[] {
+  const decks = Math.max(1, ...perInterior.map((d) => d.decks.length))
+  return Array.from({ length: decks }, (_, k) => spanSet(perInterior.map((d) => ({ spans: d.decks[k] ?? null, presence: d.presence }))))
+}
+
+/** The highest of `maskSpanWeight` times its interior's presence over the spans (0 for none), so the map track returns as an interior eases out. No allocation. */
+export function maskWeightIn(d: number, spans: readonly ShownSpan[]): number {
+  let w = 0
+  for (let i = 0; i < spans.length; i++) w = Math.max(w, maskSpanWeight(d, spans[i]!.span) * spans[i]!.presence.value)
+  return w
+}
+
+/** The highest of `trainSpanWeight` times its interior's presence over the spans (0 for none). No allocation. */
+export function trainWeightIn(d: number, spans: readonly ShownSpan[]): number {
+  let w = 0
+  for (let i = 0; i < spans.length; i++) w = Math.max(w, trainSpanWeight(d, spans[i]!.span) * spans[i]!.presence.value)
+  return w
+}
+
 /**
  * 1 on [start, end], easing (smoothstep) to 0 at `rampM` outside it. With start > end (a span shorter than two
  * insets) the peak, midway, stays below 1. Continuous in d; rampM must be positive.

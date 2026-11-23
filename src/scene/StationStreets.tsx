@@ -24,7 +24,6 @@ import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
 import { writeLineDim } from './bandLineMaterial'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
-import { interiorLook } from './interiorLook'
 import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
 import { RENDER_ORDER } from './renderOrder'
 import { streetsLook } from './streetsLook'
@@ -42,6 +41,8 @@ interface StationStreetsProps {
   interior: InteriorModel | null
   /** The focused station has an interior still loading: no marks yet, so none flash before it lands. */
   interiorPending: boolean
+  /** Look A's screen veil is up (any interior drawn, the focused one's or one in view): the streets rest above it, faint. */
+  veiled: boolean
   insets: Insets
   panel: ScreenRect | null
   /** The level labels' screen rects, which the street labels keep clear of. */
@@ -88,20 +89,20 @@ function nearbyStations(network: Network, layer: StreetLayer, interior: Interior
 }
 
 /**
- * How the streets draw: above the interior veil at the veiled stroke (about 1.9:1, streetVeil.ts) with the station's
- * interior loaded under look A (the screen veil), so they rest faint behind the interior instead of vanishing under
- * it; otherwise under the route lines at full color. `?streets=` forces either order, at full color.
+ * How the streets draw: above the interior veil at the veiled stroke (about 1.9:1, streetVeil.ts) while look A's
+ * screen veil is up (any interior drawn), so they rest faint behind it instead of vanishing under it; otherwise under
+ * the route lines at full color. `?streets=` forces either order, at full color.
  */
-function streetMode(interior: InteriorModel | null): 'under' | 'over' | 'veiled' {
+function streetMode(veiled: boolean): 'under' | 'over' | 'veiled' {
   if (streetsLook !== 'auto') return streetsLook
-  return interior !== null && interiorLook.veil === 'screen' ? 'veiled' : 'under'
+  return veiled ? 'veiled' : 'under'
 }
 
 /**
  * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
  * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
  */
-function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask, pathLabels, tripLevels }: StreetLinesProps) {
+function StreetLines({ layer, interior, interiorPending, veiled, insets, panel, labelBlockers, network, mask, pathLabels, tripLevels }: StreetLinesProps) {
   const group = useRef<Group>(null)
   const shown = useRef(-1)
   const labelShown = useRef(0)
@@ -128,7 +129,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     () => (clipped ? buildRouteClip(localTracks(network.shapes, layer.anchor, layer.file.radiusM + CLIP_TRACK_REACH_M)) : null),
     [clipped, network, layer],
   )
-  const mode = streetMode(interior)
+  const mode = streetMode(veiled)
   const buffers = useMemo(() => {
     const base = mode === 'veiled' ? layer.veiledBuffers : layer.buffers
     return clip ? clipLineBuffers(base, clip) : base
