@@ -19,6 +19,8 @@ export const RENDER_ORDER = {
   // From a station marker down to its sunken platform tracks, under the marker disc.
   stationTie: 1.5,
   lineFocus: 2,
+  // The trip's ride legs (TripLines.tsx) over every route line and the ties, under the station markers and trains.
+  tripLine: 2.1,
   stationFill: 3,
   stationRing: 4,
   trainHalo: 5,

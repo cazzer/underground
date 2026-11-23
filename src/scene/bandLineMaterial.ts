@@ -3,9 +3,10 @@
  * sideways along its miter normal by `band` pitches of screen pixels, and back toward the centerline while the two
  * direction tracks are too close on screen for both bundles. BAND_GLSL is bandShift's twin; change both together.
  */
-import type { IUniform } from 'three'
+import { Vector3, type IUniform } from 'three'
 import { LineMaterial, type LineMaterialParameters } from 'three/examples/jsm/lines/LineMaterial.js'
 import { MIN_FORESHORTEN, TRACK_MERGE_PX, TRACK_SPLIT_PX } from '../lib/bandOffset'
+import { srgb01 } from '../lib/lineDim'
 
 /** Shared by every band material, so one per-frame write (SubwayLines) moves them all. */
 export const BAND_UNIFORMS = {
@@ -21,6 +22,21 @@ export const BAND_START = 'instanceBandStart'
 export const BAND_END = 'instanceBandEnd'
 /** Per-segment platform fade weight at the start and the end (vec2); a layer without it never fades. */
 export const FADE_ATTRIBUTE = 'instanceFade'
+/** Per-segment (t0, t1) of a windowed layer (TripLines): the fragments outside that stretch of the segment are cut. */
+export const WINDOW_ATTRIBUTE = 'instanceWindow'
+
+// A windowed layer's segment parameter: 0 at the start, 1 at the end, so it runs linearly along the segment in the
+// world (perspective-correct, as trackPointInto places trains). Each end cap keeps its end's value. LineMaterial's
+// near-plane trim moves a clipped segment's end, which biases t there (only with an end behind the camera; not at map zoom).
+const WINDOW_VERTEX_DECLARE = `#ifdef TRIP_WINDOW
+attribute vec2 ${WINDOW_ATTRIBUTE};
+varying vec2 vWindow;
+varying float vSegT;
+#endif`
+const WINDOW_VERTEX_MAIN = `#ifdef TRIP_WINDOW
+vWindow = ${WINDOW_ATTRIBUTE};
+vSegT = position.y < 0.5 ? 0.0 : 1.0;
+#endif`
 
 const DECLARE_ANCHOR = 'attribute vec3 instanceEnd;'
 const START_ANCHOR = 'vec4 start = modelViewMatrix * vec4( instanceStart, 1.0 );'
@@ -83,31 +99,104 @@ export function replaceOnce(src: string, anchor: string, by: string, owner: Patc
  * if three changed the anchors.
  */
 export function patchBandShader(src: string): string {
-  let out = replaceOnce(src, DECLARE_ANCHOR, `${DECLARE_ANCHOR}\n${BAND_GLSL}`)
+  let out = replaceOnce(src, DECLARE_ANCHOR, `${DECLARE_ANCHOR}\n${BAND_GLSL}\n${WINDOW_VERTEX_DECLARE}`)
   out = replaceOnce(out, START_ANCHOR, `vec4 start = modelViewMatrix * vec4( bandShift( instanceStart, ${BAND_START} ), 1.0 );`)
   return replaceOnce(
     out,
     END_ANCHOR,
     `vec4 end = modelViewMatrix * vec4( bandShift( instanceEnd, ${BAND_END} ), 1.0 );\n` +
-      `vBandFade = 1.0 - platformFade * ( position.y < 0.5 ? ${FADE_ATTRIBUTE}.x : ${FADE_ATTRIBUTE}.y );`,
+      `vBandFade = 1.0 - platformFade * ( position.y < 0.5 ? ${FADE_ATTRIBUTE}.x : ${FADE_ATTRIBUTE}.y );\n` +
+      WINDOW_VERTEX_MAIN,
   )
 }
 
 const FRAG_DECLARE_ANCHOR = 'uniform float opacity;'
 const FRAG_COLOR_ANCHOR = 'gl_FragColor = vec4( diffuseColor.rgb, alpha );'
 
-/** LineMaterial's fragment shader with the platform fade on its alpha. Throws if three changed the anchors. */
+/**
+ * The dim: a mix toward `lineDimColor` (the background, sRGB 0..1) by `lineDim`, in sRGB as mixHex does, so a dimmed
+ * line is the color the theme tests measure. Never opacity. `dimLineRgb` (lineDim.ts) is its twin; change both.
+ */
+export const DIM_GLSL = /* glsl */ `
+uniform float lineDim;
+uniform vec3 lineDimColor;
+
+vec3 dimLine( vec3 c ) {
+	if ( lineDim <= 0.0 ) return c;
+	vec3 s = mix( 1.055 * pow( c, vec3( 1.0 / 2.4 ) ) - 0.055, c * 12.92, vec3( lessThanEqual( c, vec3( 0.0031308 ) ) ) );
+	s = mix( s, lineDimColor, lineDim );
+	return mix( pow( ( s + 0.055 ) / 1.055, vec3( 2.4 ) ), s / 12.92, vec3( lessThanEqual( s, vec3( 0.04045 ) ) ) );
+}
+`
+
+const WINDOW_FRAGMENT_DECLARE = `#ifdef TRIP_WINDOW
+varying vec2 vWindow;
+varying float vSegT;
+#endif`
+
+/**
+ * LineMaterial's fragment shader with the platform fade on its alpha, the dim on its color, and on a windowed layer
+ * the cut outside each segment's window. Throws if three changed the anchors.
+ */
 export function patchBandFragment(src: string): string {
-  const out = replaceOnce(src, FRAG_DECLARE_ANCHOR, `${FRAG_DECLARE_ANCHOR}\nvarying float vBandFade;`)
-  return replaceOnce(out, FRAG_COLOR_ANCHOR, 'gl_FragColor = vec4( diffuseColor.rgb, alpha * vBandFade );')
+  const out = replaceOnce(src, FRAG_DECLARE_ANCHOR, `${FRAG_DECLARE_ANCHOR}\nvarying float vBandFade;\n${DIM_GLSL}\n${WINDOW_FRAGMENT_DECLARE}`)
+  return replaceOnce(
+    out,
+    FRAG_COLOR_ANCHOR,
+    '\n#ifdef TRIP_WINDOW\nif ( vSegT < vWindow.x || vSegT > vWindow.y ) discard;\n#endif\n' +
+      'gl_FragColor = vec4( dimLine( diffuseColor.rgb ), alpha * vBandFade );',
+  )
 }
 
-/** Needs the two band attributes on its geometry (useLineLayer adds them). */
+/** A plain LineMaterial's fragment shader with the dim on its color (DimLineMaterial). Throws if three changed the anchors. */
+export function patchDimFragment(src: string): string {
+  const out = replaceOnce(src, FRAG_DECLARE_ANCHOR, `${FRAG_DECLARE_ANCHOR}\n${DIM_GLSL}`, DIM_PATCH)
+  return replaceOnce(out, FRAG_COLOR_ANCHOR, 'gl_FragColor = vec4( dimLine( diffuseColor.rgb ), alpha );', DIM_PATCH)
+}
+
+const DIM_PATCH: PatchOwner = { label: 'Dim shader', file: 'bandLineMaterial.ts' }
+
+/** The material's own `lineDim` (0 until written) and `lineDimColor` (`toward`, sRGB 0..1; black when left out). */
+function addLineDim(material: LineMaterial, toward: string | undefined): void {
+  const [r, g, b] = toward ? srgb01(toward) : [0, 0, 0]
+  // A Vector3, not a Color: a Color uniform would be taken as linear, and the mix runs in sRGB.
+  material.uniforms.lineDim = { value: 0 }
+  material.uniforms.lineDimColor = { value: new Vector3(r, g, b) }
+}
+
+/** Sets a layer's dim (0..1); a LineMaterial without one is left alone. Per frame: never allocates or throws. */
+export function writeLineDim(material: LineMaterial, dim: number): void {
+  const u = material.uniforms.lineDim
+  if (u) u.value = dim
+}
+
+export interface BandLineOptions {
+  /** Draw only each segment's (t0, t1) window (WINDOW_ATTRIBUTE, which the geometry must then carry). */
+  windowed?: boolean
+  /** '#rrggbb' the dim mixes toward (useLineLayer passes theme.background); black when left out. */
+  dimToward?: string
+}
+
+/**
+ * Needs the two band attributes on its geometry (useLineLayer adds them). Its `lineDim` (0..1) and `lineDimColor`
+ * uniforms are its own, not BAND_UNIFORMS: each layer dims by its own amount.
+ */
 export class BandLineMaterial extends LineMaterial {
-  constructor(parameters?: LineMaterialParameters) {
+  constructor(parameters?: LineMaterialParameters, options: BandLineOptions = {}) {
     super(parameters)
     this.vertexShader = patchBandShader(this.vertexShader)
     this.fragmentShader = patchBandFragment(this.fragmentShader)
+    if (options.windowed) this.defines = { ...this.defines, TRIP_WINDOW: '' }
     Object.assign(this.uniforms, BAND_UNIFORMS)
+    addLineDim(this, options.dimToward)
+  }
+}
+
+/** A plain (unbanded) LineMaterial with the same dim: the focused station's streets dim with the network under a trip. */
+export class DimLineMaterial extends LineMaterial {
+  constructor(parameters: LineMaterialParameters | undefined, dimToward: string) {
+    super(parameters)
+    this.fragmentShader = patchDimFragment(this.fragmentShader)
+    addLineDim(this, dimToward)
   }
 }

@@ -1,16 +1,20 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { writeBandView, type BandView } from '../lib/bandOffset'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { Network, ShapePath } from '../lib/network'
 import type { StationSpans } from '../lib/platformSpan'
+import { createEmphasis, emphasisLevels, stepEmphasis, type EmphasisLevels, type EmphasisTarget } from '../lib/tripEmphasis'
+import type { TripRouteDraw } from '../lib/tripLineBuffers'
 import { baseLineMix, linesMode, theme } from '../theme'
-import { BAND_UNIFORMS } from './bandLineMaterial'
+import { ErrorBoundary } from '../ui/ErrorBoundary'
+import { BAND_UNIFORMS, writeLineDim } from './bandLineMaterial'
 import { cameraDistance } from './cameraDistance'
 import { LineFade, LineHighlight } from './LineHighlight'
 import { RENDER_ORDER } from './renderOrder'
+import { TripLines } from './TripLines'
 import { routeLineBuffers, useLineLayer } from './useLineLayer'
 import { usePlatformFade } from './usePlatformFade'
 
@@ -25,23 +29,39 @@ interface SubwayLinesProps {
   interiorSpans: StationSpans | null
   /** This frame's band view (incl. its depth factor), written here for every band layer and for the trains (LiveTrains reads it). */
   view: BandView
+  /** The selected journey's ride legs (useTripRoute); null with none. */
+  tripRoute: TripRouteDraw | null
+  /** The trip panel is in front (collapsed or not): its route draws and the rest of the network dims. */
+  tripShown: boolean
+  /** The trip emphasis' look, written here each frame (Scene owns it): every line layer, the basemap and the streets read it. */
+  levels: EmphasisLevels
 }
 
 /**
  * Every shape of every route, merged into one draw call, with shared corridors drawn as side-by-side bands. Along
  * the loaded interior's platforms the map track fades out as the interior reveals (platformMask.ts), since the
- * interior draws its own track there.
+ * interior draws its own track there. While the trip panel is in front with a route, the network dims toward the
+ * background by color (every layer's own `lineDim`) and TripLines draws the route over it, eased over EMPHASIS_S.
  */
-export function SubwayLines({ network, paths, interiorSpans, view }: SubwayLinesProps) {
+export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tripShown, levels }: SubwayLinesProps) {
   const buffers = useMemo(() => routeLineBuffers(network, paths, baseLineMix(theme, linesMode), true), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lines)
   usePlatformFade(lines, buffers, paths, interiorSpans)
   /** When `paths` last changed: new bands ease in from 0 (BandView.ease), which draws exactly as no bands. */
   const swapped = useRef<{ paths: readonly ShapePath[]; atMs: number } | null>(null)
+  const emphasis = useMemo(createEmphasis, [])
+  const target = useMemo<EmphasisTarget>(() => ({ shown: false, full: false }), [])
+  // The last route's key: a new route remounts TripLines' error boundary, a closed one (null) keeps it to ease out.
+  const [tripKey, setTripKey] = useState<string | null>(null)
+  if (tripRoute !== null && tripRoute.key !== tripKey) setTripKey(tripRoute.key)
+  // The boundary key TripLines last crashed under: a crash un-dims the map until a new route remounts it.
+  const [crashedKey, setCrashedKey] = useState<string | null>(null)
+  const boundaryKey = tripKey ?? ''
+  const tripCrashed = crashedKey === boundaryKey
 
   // Priority -0.25: after CameraRig and the orbit (-2), drei's controls.update() (-1) and the orbit pivot (-0.5),
   // so the view is this frame's camera; before LiveTrains (0), which places the trains on it.
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const { camera } = state
     camera.updateMatrixWorld()
     const now = performance.now()
@@ -58,13 +78,22 @@ export function SubwayLines({ network, paths, interiorSpans, view }: SubwayLines
     BAND_UNIFORMS.bandEase.value = view.ease
     BAND_UNIFORMS.trackOffsetM.value = view.trackOffsetM
     BAND_UNIFORMS.platformFade.value = interiorSpans === null ? 0 : interiorOpacity(distance)
+    target.shown = tripShown && tripRoute !== null && !tripCrashed
+    target.full = tripRoute?.faint === false
+    stepEmphasis(emphasis, target, delta, prefersReducedMotion())
+    emphasisLevels(emphasis, theme, levels)
+    if (lines) writeLineDim(lines.material, levels.networkDim)
   }, -0.25)
 
   return (
     <>
       {lines && <primitive object={lines} />}
-      {linesMode === 'a' && <LineHighlight network={network} paths={paths} interiorSpans={interiorSpans} />}
-      {linesMode === 'c' && <LineFade network={network} paths={paths} interiorSpans={interiorSpans} />}
+      {linesMode === 'a' && <LineHighlight network={network} paths={paths} interiorSpans={interiorSpans} levels={levels} />}
+      {linesMode === 'c' && <LineFade network={network} paths={paths} interiorSpans={interiorSpans} levels={levels} />}
+      {/* Decoration: a crash here (logged by the boundary) draws no trip route instead of blanking the scene. */}
+      <ErrorBoundary key={boundaryKey} fallback={null} onError={() => setCrashedKey(boundaryKey)}>
+        <TripLines network={network} paths={paths} route={tripRoute} levels={levels} interiorSpans={interiorSpans} />
+      </ErrorBoundary>
     </>
   )
 }

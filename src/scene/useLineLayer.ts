@@ -8,7 +8,28 @@ import { buildLineBuffers, type LineBuffers, type Rgb } from '../lib/lineBuffers
 import type { Network, ShapePath } from '../lib/network'
 import { routeLineColor, type RouteLineMix } from '../lib/routeColor'
 import { theme } from '../theme'
-import { BAND_END, BAND_START, BandLineMaterial, FADE_ATTRIBUTE } from './bandLineMaterial'
+import { BAND_END, BAND_START, BandLineMaterial, DimLineMaterial, FADE_ATTRIBUTE, WINDOW_ATTRIBUTE } from './bandLineMaterial'
+
+/** Each route's GTFS color under `mix` as drawn (3:1 on the background), in linear RGB for vertex colors. */
+export function routeColorMap(network: Network, mix: RouteLineMix): ReadonlyMap<RouteId, Rgb> {
+  const colors = new Map<RouteId, Rgb>()
+  for (const r of network.routes) {
+    // Color(hex) converts sRGB to linear, which is what vertex colors must be.
+    const c = new Color(routeLineColor(r.color, mix, theme.background))
+    colors.set(r.id, [c.r, c.g, c.b])
+  }
+  return colors
+}
+
+/** routeColorMap as a lookup that throws for an unknown route (the map's own shapes all have one). */
+function routeColors(network: Network, mix: RouteLineMix): (routeId: RouteId) => Rgb {
+  const colors = routeColorMap(network, mix)
+  return (id) => {
+    const c = colors.get(id)
+    if (!c) throw new Error(`No color for route "${id}"`)
+    return c
+  }
+}
 
 /**
  * Line buffers for `paths`, each colored by its route's GTFS color under `mix`, with their band inputs. An opaque
@@ -16,17 +37,7 @@ import { BAND_END, BAND_START, BandLineMaterial, FADE_ATTRIBUTE } from './bandLi
  */
 export function routeLineBuffers(network: Network, paths: readonly ShapePath[], mix: RouteLineMix, skipCovered: boolean): LineBuffers {
   const order = new Map(network.routes.map((r, i) => [r.id, i]))
-  const colors = new Map<RouteId, Rgb>()
-  for (const r of network.routes) {
-    // Color(hex) converts sRGB to linear, which is what vertex colors must be.
-    const c = new Color(routeLineColor(r.color, mix, theme.background))
-    colors.set(r.id, [c.r, c.g, c.b])
-  }
-  return buildLineBuffers(paths, order, (id) => {
-    const c = colors.get(id)
-    if (!c) throw new Error(`No color for route "${id}"`)
-    return c
-  }, skipCovered)
+  return buildLineBuffers(paths, order, routeColors(network, mix), skipCovered)
 }
 
 /** Dash pattern in world meters (a generated interior's outlines). */
@@ -35,9 +46,18 @@ export interface LineDash {
   gap: number
 }
 
-/** Line buffers plus, for a dashed layer, two dash distances per segment (start, end; 0, 0 stays solid). */
+export interface LineLayerOptions {
+  /** A plain layer that dims with the network under a trip (DimLineMaterial); banded layers always can. */
+  dimmable?: boolean
+}
+
+/**
+ * Line buffers plus, for a dashed layer, two dash distances per segment (start, end; 0, 0 stays solid), and for a
+ * windowed band layer (TripLines) each segment's drawn window (t0, t1), two floats per segment.
+ */
 export interface DashableLineBuffers extends LineBuffers {
   distances?: Float32Array
+  windows?: Float32Array
 }
 
 /**
@@ -45,16 +65,18 @@ export interface DashableLineBuffers extends LineBuffers {
  * draw. Rebuilt when `buffers` changes, disposed on change and unmount. LineSegments2 sets its
  * material's resolution from the viewport (CSS pixels) before each render, so linewidth is in
  * CSS pixels at any dpr. Buffers with `bands` (route lines) draw with BandLineMaterial, which shifts each
- * segment end by its band offset on the GPU (and fades it by its FADE_ATTRIBUTE weight); the band uniforms are
- * written per frame in SubwayLines. With `dash`, the material is dashed in world meters along `buffers.distances`
+ * segment end by its band offset on the GPU (and fades it by its FADE_ATTRIBUTE weight, and with `windows` draws
+ * only each segment's window); the band uniforms are written per frame in SubwayLines, each layer's `lineDim` by its owner. With `dash`, the material is dashed in world meters along `buffers.distances`
  * (written as-is, not by computeLineDistances); a dashed material drops every segment's round end caps. No layer
- * is both: a banded layer with a dash throws.
+ * is both: a banded layer with a dash throws. A banded layer always has a `lineDim` (writeLineDim); a plain one only with
+ * `dimmable` (DimLineMaterial).
  */
 export function useLineLayer(
   buffers: DashableLineBuffers | null,
   renderOrder: number,
   linewidth = theme.lineWidth,
   dash?: LineDash,
+  { dimmable = false }: LineLayerOptions = {},
 ): LineSegments2 | null {
   const dashSize = dash?.size
   const gapSize = dash?.gap
@@ -72,9 +94,15 @@ export function useLineLayer(
       // Zero until a platform fade is written (usePlatformFade); always present, so the shader never reads a stale
       // default attribute value.
       geometry.setAttribute(FADE_ATTRIBUTE, new InstancedBufferAttribute(new Float32Array(buffers.bands.length / 4), 2))
-      material = new BandLineMaterial(params)
+      const { windows } = buffers
+      if (windows) {
+        if (windows.length !== buffers.positions.length / 3) throw new Error('A windowed line layer needs two window ends per segment')
+        geometry.setAttribute(WINDOW_ATTRIBUTE, new InstancedBufferAttribute(windows, 2))
+      }
+      material = new BandLineMaterial(params, { windowed: windows !== undefined, dimToward: theme.background })
     } else {
-      material = new LineMaterial(params)
+      if (buffers.windows) throw new Error('Only a banded line layer can be windowed')
+      material = dimmable ? new DimLineMaterial(params, theme.background) : new LineMaterial(params)
     }
     if (dashed) {
       if (buffers.distances?.length !== buffers.positions.length / 3) throw new Error('A dashed line layer needs two distances per segment')
@@ -88,7 +116,7 @@ export function useLineLayer(
     const l = new LineSegments2(geometry, material)
     l.renderOrder = renderOrder
     return l
-  }, [buffers, renderOrder, linewidth, dashSize, gapSize])
+  }, [buffers, renderOrder, linewidth, dashSize, gapSize, dimmable])
 
   useEffect(
     () => () => {

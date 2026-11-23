@@ -19,6 +19,8 @@ import type { Network } from '../lib/network'
 import { deckSpans, memberSpans } from '../lib/platformSpan'
 import type { BandedShapes } from '../lib/networkBands'
 import type { Ground } from '../lib/projection'
+import { createLevels } from '../lib/tripEmphasis'
+import type { TripRouteDraw } from '../lib/tripLineBuffers'
 import { theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { Basemap } from './Basemap'
@@ -73,14 +75,20 @@ interface SceneProps {
   exitLabel: ExitLabel | null
   /** The trip panel is open: a landing there goes on framing the trip's path above the panel as it changes. */
   tripOpen: boolean
+  /** The selected journey's ride legs (useTripRoute); null with none. */
+  tripRoute: TripRouteDraw | null
+  /** The trip panel is in front: its route draws over the dimmed network. */
+  tripShown: boolean
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, exitLabel, tripOpen }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, exitLabel, tripOpen, tripRoute, tripShown }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
   /** Written by LiveTrains at -3, read by CameraRig: the selected train the camera follows. */
   const anchor = useMemo(createFollowAnchor, [])
+  /** Written by SubwayLines at -0.25, read at 0: how far the network (lines, basemap, streets) dims under the trip's route. */
+  const tripLevels = useMemo(() => createLevels(theme), [])
   /** Written by StationStreets, read by Basemap: the basemap's roads give way to the focused station's streets. */
   const streetMask = useMemo(createStreetMask, [])
   /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
@@ -119,7 +127,15 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       aria-label="Subway map"
     >
       <color attach="background" args={[theme.background]} />
-      <SubwayLines network={network} paths={banded?.shapes ?? network.shapes} interiorSpans={interiorSpans} view={bandView} />
+      <SubwayLines
+        network={network}
+        paths={banded?.shapes ?? network.shapes}
+        interiorSpans={interiorSpans}
+        view={bandView}
+        tripRoute={tripRoute}
+        tripShown={tripShown}
+        levels={tripLevels}
+      />
       <StationTies network={network} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
       <Stations stations={network.stations} focusedMarker={focusedMarker} hiddenSiblings={hiddenSiblings} />
       <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
@@ -139,6 +155,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         network={network}
         mask={streetMask}
         exitLabel={exitLabel}
+        tripLevels={tripLevels}
       />
       {interior && (
         <StationInterior
@@ -164,7 +181,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
-          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} />
+          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} tripLevels={tripLevels} />
         </ErrorBoundary>
       )}
     </Canvas>

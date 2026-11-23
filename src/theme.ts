@@ -116,6 +116,15 @@ export interface Theme {
   /** Dash and gap of the exit path on an estimated layout (and of an estimated walk outside), world meters. */
   exitPathDash: number
   exitPathGap: number
+  /**
+   * The trip's route (TripLines.tsx) while the trip panel is in front: the rest of the network mixes this far toward
+   * the background (in sRGB, by color, never opacity; at least 1.2:1 left, themeTrip.test.ts), the opened journey's
+   * ride legs draw at full color `tripLineWidth` CSS px wide, and in the list view (no journey opened) the first
+   * journey's draw at the base width, mixed `tripFaintDim` toward the background, still clearly above the network.
+   */
+  tripNetworkDim: number
+  tripFaintDim: number
+  tripLineWidth: number
 }
 
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
@@ -181,6 +190,9 @@ export const THEMES = {
     exitPathWidth: 3,
     exitPathDash: 3,
     exitPathGap: 2,
+    tripNetworkDim: 0.7,
+    tripFaintDim: 0.35,
+    tripLineWidth: 2.5,
   },
 } as const satisfies Record<string, Theme>
 

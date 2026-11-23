@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { index } from '../lib/realtime/fixture'
-import { expectDatedIndex, expectServiceCalendar, expectTimetable } from './loadTimetable'
+import { expectDatedIndex, expectServiceCalendar, expectTimetable, expectTripPatterns } from './loadTimetable'
 import { EMPTY_DATED_INDEX } from './timetableSchema'
 
 const URL = 'x/Sunday.json'
@@ -77,8 +77,9 @@ describe('expectDatedIndex', () => {
 })
 
 describe('expectServiceCalendar', () => {
-  it('keeps the calendar and its exceptions', () => {
-    expect(expectServiceCalendar(index, 'x/trip-index.json')).toEqual({
+  it('keeps the calendar and its exceptions, whatever the patterns hold', () => {
+    const [id] = Object.keys(index.patterns)
+    expect(expectServiceCalendar({ ...index, patterns: { [id!]: null } }, 'x/trip-index.json')).toEqual({
       calendar: index.calendar,
       calendarExceptions: index.calendarExceptions,
     })
@@ -87,5 +88,21 @@ describe('expectServiceCalendar', () => {
   it('rejects a file without calendarExceptions or calendar', () => {
     expect(() => expectServiceCalendar({ ...index, calendarExceptions: undefined }, 'x')).toThrow('x: not a calendar file')
     expect(() => expectServiceCalendar({ ...index, calendar: undefined }, 'x')).toThrow('x: not a calendar file')
+  })
+})
+
+describe('expectTripPatterns', () => {
+  it('keeps the patterns', () => {
+    expect(expectTripPatterns(index, 'x')).toBe(index.patterns)
+  })
+
+  it('rejects a file without patterns, or a pattern without a stop run', () => {
+    expect(() => expectTripPatterns({ ...index, patterns: undefined }, 'x')).toThrow('x: not a patterns file')
+    expect(() => expectTripPatterns({ ...index, patterns: [] }, 'x')).toThrow('x: not a patterns file')
+    const [id, first] = Object.entries(index.patterns)[0]!
+    const withPattern = (p: unknown) => ({ ...index, patterns: { ...index.patterns, [id]: p } })
+    expect(() => expectTripPatterns(withPattern({ ...first, stops: undefined }), 'x')).toThrow(`x: pattern ${id} has no stops`)
+    expect(() => expectTripPatterns(withPattern({ ...first, stops: [1] }), 'x')).toThrow('has no stops')
+    expect(() => expectTripPatterns(withPattern(null), 'x')).toThrow('has no stops')
   })
 })

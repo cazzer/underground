@@ -20,7 +20,9 @@ import { buildRouteClip, CLIP_TRACK_REACH_M } from '../lib/routeClip'
 import { localTracks } from '../lib/routeTracks'
 import type { Ground } from '../lib/projection'
 import { depthFactor, depthScaleY } from '../lib/tilt'
+import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
+import { writeLineDim } from './bandLineMaterial'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
 import { interiorLook } from './interiorLook'
 import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
@@ -50,6 +52,8 @@ interface StationStreetsProps {
   mask: StreetMask
   /** The trip's exit entrance (useTripExit): its label in this layer is placed first and tinted; null for none. */
   exitLabel: ExitLabel | null
+  /** The trip emphasis (SubwayLines, -0.25): the street lines dim with the route lines by its `networkDim`. */
+  tripLevels: EmphasisLevels
 }
 
 /**
@@ -96,7 +100,7 @@ function streetMode(interior: InteriorModel | null): 'under' | 'over' | 'veiled'
  * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
  * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
  */
-function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask, exitLabel }: StreetLinesProps) {
+function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask, exitLabel, tripLevels }: StreetLinesProps) {
   const group = useRef<Group>(null)
   const shown = useRef(-1)
   const labelShown = useRef(0)
@@ -132,6 +136,8 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     buffers,
     mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,
     theme.streetWidth,
+    undefined,
+    { dimmable: true },
   )
   const markBuffers = useMemo(() => {
     if (interiorPending) return null
@@ -171,6 +177,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     ctx.markerRadiusM = screenScale(distance, markerRadiusPx(distance), MARKER_MIN_METERS)
     ctx.ringRadiusM = ctx.markerRadiusM * focusScaleFactor(distance, ctx.markerRadiusM)
     if (marks && marks.material.opacity !== o) marks.material.opacity = o
+    if (lines) writeLineDim(lines.material, tripLevels.networkDim)
     if (o === shown.current) return
     shown.current = o
     if (lines) lines.material.opacity = o

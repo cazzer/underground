@@ -19,6 +19,7 @@ import { planPool } from '../lib/basemap/tilePool'
 import type { ShapePath, Station } from '../lib/network'
 import { interiorOpacity } from '../lib/interiorReveal'
 import { packTracks } from '../lib/routeTracks'
+import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
 import { createExtentUniforms, createMaskUniforms } from './basemapLineMaterial'
 import { createClassLayer, type ClassLayer } from './basemapLayer'
@@ -47,6 +48,8 @@ interface Drawn {
   version: number
   order: number[]
   distance: number
+  /** The trip emphasis' network dim the strokes were last mixed at. */
+  dim: number
 }
 
 interface BasemapProps {
@@ -57,9 +60,11 @@ interface BasemapProps {
   mask: StreetMask
   /** The network's shapes, unbanded (the band shader shifts these): roads running under them are left out. */
   shapes: readonly ShapePath[]
+  /** The trip emphasis (SubwayLines, -0.25): every class dims with the route lines by its `networkDim`. */
+  tripLevels: EmphasisLevels
 }
 
-export function Basemap({ config, stations, mask, shapes }: BasemapProps) {
+export function Basemap({ config, stations, mask, shapes, tripLevels }: BasemapProps) {
   // Packed here, so with the basemap off nothing is.
   const tracks = useMemo(() => packTracks(shapes), [shapes])
   const store = useBasemapTiles(config, tracks)
@@ -82,7 +87,7 @@ export function Basemap({ config, stations, mask, shapes }: BasemapProps) {
       }),
       stroke: new Color(theme.basemap[cls].stroke),
     }))
-    const drawn: Drawn = { version: -1, order: [], distance: -1 }
+    const drawn: Drawn = { version: -1, order: [], distance: -1, dim: -1 }
     return { entries, extent, drawn }
   }, [maskUniforms, config, stations])
 
@@ -115,9 +120,12 @@ export function Basemap({ config, stations, mask, shapes }: BasemapProps) {
     const now = state.clock.elapsedTime
     for (const e of entries) e.layer.tick(now)
     const d = cameraDistance(state)
-    if (d !== drawn.distance) {
+    const dim = tripLevels.networkDim
+    if (d !== drawn.distance || dim !== drawn.dim) {
       drawn.distance = d
-      for (const e of entries) e.layer.setVisibility(classVisibility(e.cls, d), e.stroke, background)
+      drawn.dim = dim
+      // Under the trip's route the roads, water and parks mix toward the background with the lines, so none outshines them.
+      for (const e of entries) e.layer.setVisibility(classVisibility(e.cls, d), e.stroke, background, dim)
       extent.edgeFadeM.value = edgeFadeFor(d)
     }
     if (mask.present) {
