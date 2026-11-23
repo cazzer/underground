@@ -16,7 +16,7 @@ about 250 more stations have generated ones (labelled "Estimated layout"), shown
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
-With the Worker configured the search dialog also finds addresses and places through `/geocode` (2q7.16; none of it without `VITE_RT_URL`).
+With the Worker configured the search dialog also finds streets, intersections ("Bedford Av & N 7 St"), addresses and places through `/geocode` (2q7.16, 2q7.14; none of it without `VITE_RT_URL`).
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -369,13 +369,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and `rememberAnswer`: a session memory cache of complete answers only, 50 entries), `data/geocodeFetch.ts` (`geocodeRequestUrl`,
   `parseGeocodeResponse` checking every row at the boundary, `fetchGeocode`: `cache: 'no-store'`, `credentials: 'omit'`, 8 s timeout,
   failures as `GeocodeAnswer` kinds, never an error's message), `lib/geocodeView.ts` (what shows and what the polite region says: one
-  sentence per settled query, "Still searching" only after 2 s, the unavailable sentence once per dialog session (`nextErrorSpoken`); rows whose source is `osm` (the Worker's street index: `street` and `intersection`) are hidden for now, the UI for them comes next, 2q7.14),
-  `lib/searchItems.ts` (stations then places as one keyed list),
+  sentence per settled query, "Still searching streets, addresses and places" only after 2 s, the unavailable sentence once per dialog session (`nextErrorSpoken`); `creditSources` drops the bare OSM credit when Photon's, which names OpenStreetMap contributors too, is listed),
+  `lib/searchItems.ts` (stations, then the Worker's rows in its order as one keyed list: kinds `address`, `place` (an area too), `street`, `intersection`),
   `lib/placeLabel.ts` (`displayCase`: GeoSearch names are UPPERCASE, so an all-caps segment is re-cased; `placeText`, `distanceText`,
-  `placePick`: the place's ground point and nearest station). `SearchResults.tsx` renders them: a "Stations" list and, with places, an "Addresses and places" heading over a second list of `PlaceResult.tsx` rows, each primary button named
-  by one spoken sentence "120 Broadway, Manhattan, address", the "Searching" and error notes (aria-hidden; the two status
-  regions speak them), and the credit for the sources of the rows shown ("Address and place data: " and the contract's `GEOCODE_ATTRIBUTION` strings). A 503 or 429 answer reads as unavailable and is never retried (the next keystroke's request is the only retry). The dialog says "Addresses and places are looked up
-  through our server; your location is never sent." (the input's description). Picking a place in the HUD's search is a point
+  `placePick`: the place's ground point, nearest station and kind; the kind words are Address, Place, Street, Intersection). `SearchResults.tsx` renders them: a "Stations" list and, with places, a "Streets, addresses and places" heading over a second list of `PlaceResult.tsx` rows (the name, then a dim "Brooklyn · Intersection" line that fits at 375 px), each primary button named
+  by one spoken sentence "120 Broadway, Manhattan, address" or "Bedford Av & N 7 St, Brooklyn, intersection", the "Searching" and error notes (aria-hidden; the two status
+  regions speak them), and the credit for the sources of the rows shown ("Search data: " and the contract's `GEOCODE_ATTRIBUTION` strings; `OsmCredit` links the OpenStreetMap contributors name in the street index's and Photon's). A 503 or 429 answer reads as unavailable and is never retried (the next keystroke's request is the only retry). The dialog says "Streets, addresses and places are looked up
+  through our server; your location is never sent." (the input's description) and, before typing, "Try 14 st, bedford av & n 7, 120 broadway or empire state." Picking a street, an intersection or a place in the HUD's search is a point
   flight, not a station pick (`flyToPoint(…, 'place')`, 250 m radius, which lands at the 1450 m floor, top-down; it neither expands
   a collapsed station panel nor bumps the collapse seq, and like any point flight it ends a train follow) and shows `PlaceStatus.tsx`
   (`usePlaceLine.ts`): the place's label and "Go to <nearest station> · about 250 m", focus moved onto the sentence, gone with
@@ -944,7 +944,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     the format and every index, throws a fixed message so a bad index fails startup loudly; builds the key map and per-street
     crossings), `streetSearch.ts` (`searchStreets` -> `{ whole, partial }` candidates, source `osm`, label "Name, Borough", an
     intersection "A & B, Borough" in the index's order whatever the typed order; the query's key picks at most about 110 streets to
-    score, under 0.5 ms; a query with "&", "/", "@", "+" or the words "and" / "at" looks for intersections first, the side before the
+    score, under 0.5 ms; a query with "&", "/", "@", "+" or the words "and" / "at" looks for intersections first (a separator with nothing after it yet is cut off, so "bedford av &" still finds Bedford Av), the side before the
     separator a finished word, then streets on the whole text; ranked by score, nearness to the focus, street class, label; one
     row per label; a street answers with its site nearest the focus, else its middle one, `streetQuery.ts`), `streetIndexSchema.ts`
     (the file contract and `BOROUGH_NAMES`; types only, safe for the client), `streetKeys.ts`, `nameMatch.ts`, `searchText.ts`;
@@ -1298,8 +1298,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   centre or a chosen station, never the location fix; the Worker rounds it to 2 decimals and drops it outside the NYC bbox.
   Answers carry `attribution`; the search dialog shows each source's credit under the results that use it (2q7.16). Upstreams see the Worker, never the
   client's IP or headers. `/geocode` refuses a request with no allowed Origin (403).
-- **Address search (2q7.16).** Only `/geocode` carries what the user types in a search dialog, and only with `VITE_RT_URL` set
-  (without it the dialog finds stations only, shows no disclosure and sends nothing). A request goes 250 ms after the last keystroke,
+- **Address search (2q7.16).** Only `/geocode` carries what the user types in a search dialog (a street or an intersection too, which the Worker answers from its own index, so the text reaches NYC Planning and Photon only for what the index doesn't answer), and only with `VITE_RT_URL` set
+  (without it the dialog finds stations only, shows no street search, no disclosure and sends nothing). A request goes 250 ms after the last keystroke,
   for 3 to 100 code points of normalized text, the stale one aborted, with `cache: 'no-store'` and `credentials: 'omit'`; complete
   answers are remembered in memory for the session (no storage, URL or history). The query is never in the page URL, history, storage
   or a console line (failures log a fixed kind and status). `focus` is the focused station, else the camera target, rounded to
@@ -1310,7 +1310,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Street and intersection search runs in the Worker, on a bundled index (2q7.14).** `worker/data/streetIndex.json` (OSM
   streets within 300 m of a station, ODbL; the file, its pin `data/streets/` and the scripts that build it are in the public repo,
   which is how the derivative database is offered) is a module of the Worker, not a client file: the client downloads nothing of
-  it, and a typed street goes to `/geocode` like any address (so it falls under the Address search rules below, no query logged).
+  it, and a typed street goes to `/geocode` like any address (so it falls under the Address search rules above, no query logged).
   `/geocode` rows from it carry source `osm` and the credit "© OpenStreetMap contributors" in `attribution`. It is refreshed by
   `refresh-data.yml` with the rest of the data and deployed by merging to `main`; a malformed committed index fails the Worker's
   startup (and so `/rt`), which `streetIndexOutputs.test.ts`, the Worker's `streetIndexData.test.ts` and the PR review catch first.
@@ -1381,4 +1381,4 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Attribution.** Credit MTA and show "© OpenStreetMap contributors". Include a
   "may not be real time" notice. Don't use the MTA logo, route bullets, or the map. A `/geocode` answer's `attribution`
   ("NYC GeoSearch, NYC Department of City Planning" for address results; "© OpenStreetMap contributors, via komoot Photon"
-  for Photon rows) is shown under the results that use them, in the search dialog.
+  for Photon rows, "© OpenStreetMap contributors" for the street index's `osm` rows) is shown under the results that use them, in the search dialog.

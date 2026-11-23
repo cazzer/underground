@@ -53,16 +53,24 @@ export function displayCase(segment: string): string {
 export interface PlaceText {
   name: string
   detail: string | null
-  kindWord: 'Address' | 'Place'
-  /** "120 Broadway, Manhattan, address": the option's accessible name. */
+  kindWord: 'Address' | 'Place' | 'Street' | 'Intersection'
+  /** "120 Broadway, Manhattan, address": the option's accessible name; "Bedford Av & N 7 St, Brooklyn, intersection". */
   spoken: string
+}
+
+const KIND_WORDS: Readonly<Record<GeocodeResult['kind'], PlaceText['kindWord']>> = {
+  address: 'Address',
+  place: 'Place',
+  area: 'Place',
+  street: 'Street',
+  intersection: 'Intersection',
 }
 
 export function placeText(result: GeocodeResult): PlaceText {
   const [first = '', ...rest] = result.label.split(', ')
   const name = displayCase(first)
   const detail = rest.length > 0 ? rest.map(displayCase).join(', ') : null
-  const kindWord = result.kind === 'address' ? 'Address' : 'Place'
+  const kindWord = KIND_WORDS[result.kind]
   return { name, detail, kindWord, spoken: `${detail ? `${name}, ${detail}` : name}, ${kindWord.toLowerCase()}` }
 }
 
@@ -79,8 +87,12 @@ export interface PlacePick {
   /** The name with its detail: "120 Broadway, Manhattan". */
   label: string
   ground: Ground
-  kind: 'address' | 'place'
+  kind: 'address' | 'place' | 'street' | 'intersection'
   nearest: NearestStation
+}
+
+function pickKind(word: PlaceText['kindWord']): PlacePick['kind'] {
+  return word === 'Address' ? 'address' : word === 'Street' ? 'street' : word === 'Intersection' ? 'intersection' : 'place'
 }
 
 /** Null for an empty network. */
@@ -97,7 +109,7 @@ export function placePick(
     name: text.name,
     label: text.detail ? `${text.name}, ${text.detail}` : text.name,
     ground,
-    kind: text.kindWord === 'Address' ? 'address' : 'place',
+    kind: pickKind(text.kindWord),
     nearest,
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { siteFor, splitCrossing } from './streetQuery'
+import { siteFor, splitCrossing, withoutTrailingSeparator } from './streetQuery'
 
 describe('splitCrossing', () => {
   it.each([
@@ -28,6 +28,23 @@ describe('splitCrossing', () => {
     expect(splitCrossing('bedford av &')).toBeNull()
     expect(splitCrossing('& n 7 st')).toBeNull()
     expect(splitCrossing('bedford and')).toBeNull()
+  })
+})
+
+describe('withoutTrailingSeparator', () => {
+  it.each([
+    ['bedford av at', 'bedford av'],
+    ['bedford av and', 'bedford av'],
+    ['bedford av &', 'bedford av'],
+    ['bedford av /', 'bedford av'],
+    ['bedford av @', 'bedford av'],
+    ['bedford av+', 'bedford av'],
+  ])('cuts the separator off %j', (text, want) => {
+    expect(withoutTrailingSeparator(text)).toBe(want)
+  })
+
+  it('leaves a query with a right side, or a name that ends in the letters, alone', () => {
+    for (const text of ['bedford av & n 7', 'bedford av', 'bedford bat', 'grand', 'g & h av']) expect(withoutTrailingSeparator(text)).toBe(text)
   })
 })
 

@@ -1,6 +1,6 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react'
 import { GEOCODE_ATTRIBUTION, type GeocodeSource } from '../data/realtime'
-import { GEOCODE_ERROR_TEXT, type GeocodeView } from '../lib/geocodeView'
+import { creditSources, GEOCODE_ERROR_TEXT, type GeocodeView } from '../lib/geocodeView'
 import type { Network } from '../lib/network'
 import type { StationGroup } from '../lib/stationGroups'
 import type { SearchItem } from '../lib/searchItems'
@@ -35,10 +35,10 @@ function sourcesOf(view: GeocodeView): readonly GeocodeSource[] {
 
 const OSM_NAME = 'OpenStreetMap contributors'
 
-/** The Photon credit as the Worker words it, with the OpenStreetMap name linked (plain text if the wording ever lacks it). */
-function PhotonCredit() {
-  const [before, after] = GEOCODE_ATTRIBUTION.photon.split(OSM_NAME)
-  if (before === undefined || after === undefined) return <>{GEOCODE_ATTRIBUTION.photon}</>
+/** An OpenStreetMap credit as the Worker words it (Photon's or the street index's), with the OpenStreetMap name linked (plain text if the wording ever lacks it). */
+function OsmCredit({ text }: { text: string }) {
+  const [before, after] = text.split(OSM_NAME)
+  if (before === undefined || after === undefined) return <>{text}</>
   return (
     <>
       {before}
@@ -51,20 +51,25 @@ function PhotonCredit() {
   )
 }
 
-/** Credit for the sources whose rows are listed, each in the Worker contract's words. */
+/** Credit for the sources whose rows are listed, each in the Worker contract's words, separated by semicolons. */
 function SourceCredit({ sources }: { sources: readonly GeocodeSource[] }) {
-  if (sources.length === 0) return null
+  const shown = creditSources(sources)
+  if (shown.length === 0) return null
   return (
     <p className="px-3 py-2 text-xs text-ink-dim">
-      Address and place data: {sources.includes('geosearch') && GEOCODE_ATTRIBUTION.geosearch}
-      {sources.length === 2 && '; '}
-      {sources.includes('photon') && <PhotonCredit />}
+      Search data:{' '}
+      {shown.map((s, i) => (
+        <span key={s}>
+          {i > 0 && '; '}
+          {s === 'geosearch' ? GEOCODE_ATTRIBUTION.geosearch : <OsmCredit text={GEOCODE_ATTRIBUTION[s]} />}
+        </span>
+      ))}
     </p>
   )
 }
 
 /**
- * The dialog's scroll area: a "Stations" list and, once places have rows, an "Addresses and places" heading over a
+ * The dialog's scroll area: a "Stations" list and, once places have rows, a "Streets, addresses and places" heading over a
  * second list, the notes a status region already speaks, and the credit. The lists are plain lists of buttons, not
  * a listbox, because a row holds more than one button; `role="list"` is explicit because Safari drops list
  * semantics from an unstyled list.
@@ -92,7 +97,7 @@ export function SearchResults({ network, items, highlightFirst, actions, multiBo
       {placeRows.length > 0 && (
         <>
           <h2 id={headingId} className="px-3 pt-3 pb-1 text-xs text-ink-dim uppercase">
-            Addresses and places
+            Streets, addresses and places
           </h2>
           <ul role="list" aria-labelledby={headingId}>
             {placeRows}
@@ -106,7 +111,7 @@ export function SearchResults({ network, items, highlightFirst, actions, multiBo
       )}
       {searching && (
         <p className="p-3 text-sm text-ink-dim" aria-hidden="true">
-          Searching addresses and places…
+          Searching streets, addresses and places…
         </p>
       )}
       {view.status === 'error' && (

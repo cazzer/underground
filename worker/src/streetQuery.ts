@@ -12,6 +12,16 @@ export function splitCrossing(text: string): [string, string] | null {
   return left === '' || right === '' ? null : [left, right]
 }
 
+const TRAILING_SEPARATOR = /\s*(?:[&/@+]|\s(?:and|at))\s*$/
+
+/**
+ * The text with a separator that has no right side yet cut off ("bedford av at" is "bedford av"), so the results do not vanish
+ * while the user types the separator. Text with a right side, or no separator, comes back as it is.
+ */
+export function withoutTrailingSeparator(text: string): string {
+  return text.replace(TRAILING_SEPARATOR, '')
+}
+
 /** Equirectangular meters; fine at city scale. */
 export function approxM(a: { lat: number; lon: number }, lat: number, lon: number): number {
   const dy = (lat - a.lat) * 110_540

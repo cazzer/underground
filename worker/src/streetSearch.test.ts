@@ -85,6 +85,14 @@ describe('searchStreets: intersections', () => {
     expect(found('broadway & n 7 st')).toEqual({ whole: [], partial: [] })
   })
 
+  it('searches the left side alone while the separator has no right side yet', () => {
+    for (const text of ['bedford av at', 'bedford av &', 'bedford av /', 'bedford av and', 'bedford av @']) {
+      expect(found(text), text).toEqual(found('bedford av'))
+    }
+    expect(found('bedford av &').whole).toEqual(['Bedford Av, Brooklyn'])
+    expect(found('bedford &').partial).toEqual(['Bedford Av, Brooklyn'])
+  })
+
   it('still finds a street whose own name holds the separator, through the whole text', () => {
     expect(found('g & h av').whole).toEqual(['G & H Av, Brooklyn'])
   })

@@ -6,7 +6,7 @@ import type { GeocodeKind } from './schema'
 import type { StreetIndex } from './streetIndex'
 import { BOROUGH_NAMES } from './streetIndexSchema.ts'
 import { queryKey } from './streetKeys.ts'
-import { approxM, siteFor, splitCrossing } from './streetQuery'
+import { approxM, siteFor, splitCrossing, withoutTrailingSeparator } from './streetQuery'
 
 /** At most this many rows of each list (whole, partial) leave the search; the merge keeps fewer. */
 const LIST_MAX = 8
@@ -102,15 +102,16 @@ function compare(a: Ranked, b: Ranked): number {
 
 /**
  * The street and intersection rows for a query, as candidates: those whose name the query spells out whole ("bedford av"),
- * and those that have more words (a half-typed name). A query with a separator ("bedford av & n 7", "a and b", "a at b")
+ * and those that have more words (a half-typed name). A separator with nothing after it yet ("bedford av &") is ignored. A query with a separator ("bedford av & n 7", "a and b", "a at b")
  * looks for intersections first, then, on the whole text, for streets, so a street whose own name holds the separator still
  * comes up. Each list is ranked and cut to LIST_MAX.
  */
 export function searchStreets(index: StreetIndex, query: GeocodeQuery): { whole: Candidate[]; partial: Candidate[] } {
-  const split = splitCrossing(query.text)
+  const text = withoutTrailingSeparator(query.text)
+  const split = splitCrossing(text)
   const lists = [
     split === null ? [] : intersectionRows(index, split, query.focus),
-    streetRows(index, query.text, query.focus),
+    streetRows(index, text, query.focus),
   ].map((rows) => rows.sort(compare))
   const pick = (whole: boolean): Candidate[] =>
     lists.flatMap((rows) => rows.filter((r) => r.whole === whole).slice(0, LIST_MAX)).map((r) => r.candidate)

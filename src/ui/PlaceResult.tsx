@@ -15,8 +15,8 @@ interface PlaceResultProps {
 }
 
 /**
- * One row for a searched address or place: the name, then the rest of the label and what it is. The visible text is
- * aria-hidden; the button's name is the one spoken sentence ("120 Broadway, Manhattan, address").
+ * One row for a searched address, place, street or intersection: the name, then the rest of the label and what it is. The visible text is
+ * aria-hidden; the button's name is the one spoken sentence ("120 Broadway, Manhattan, address"; "Bedford Av & N 7 St, Brooklyn, intersection").
  */
 export function PlaceResult({ row, highlighted, actions, text, name, onChoose, onDirections }: PlaceResultProps) {
   return (

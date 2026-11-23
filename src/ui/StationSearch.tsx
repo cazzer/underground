@@ -122,7 +122,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
   }))
   const close = () => dialog.current?.close()
   // A pick sets the caller's state before `close()`: the dialog hands focus back to the opener, then the caller's own focus move lands.
-  const placeOf = (item: Extract<SearchItem<StationGroup>, { kind: 'address' | 'place' }>) => {
+  const placeOf = (item: Exclude<SearchItem<StationGroup>, { kind: 'station' }>) => {
     const pick = placePick(item.result, item.text, network.stations, network.groupById)
     if (!pick || !onChoosePlace) throw new Error('A place was picked with no station to name or nobody to tell')
     return pick
@@ -232,7 +232,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
         </p>
         {placesOn && (
           <p id={disclosureId} className="px-3 pt-2 text-xs text-ink-dim">
-            Addresses and places are looked up through our server; your location is never sent.
+            Streets, addresses and places are looked up through our server; your location is never sent.
           </p>
         )}
         <p role="status" className="sr-only">
@@ -243,7 +243,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
         </p>
         {!typed && (
           <p id={hintId} className="p-3 text-sm text-ink-dim">
-            {placesOn ? 'Try 14 st, 120 broadway or empire state.' : 'Try a name like 14 st, bedford or times sq.'}
+            {placesOn ? 'Try 14 st, bedford av & n 7, 120 broadway or empire state.' : 'Try a name like 14 st, bedford or times sq.'}
             {onDirections && ' From or To on a result plans a trip.'}
           </p>
         )}
