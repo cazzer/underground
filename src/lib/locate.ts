@@ -37,6 +37,8 @@ interface Marked {
   nearest: NearestStation
   viewCenter: Ground
   viewRadiusM: number
+  /** The camera has flown to this fix (the header's press, or the search dialog's "My location"); absent for one only found. */
+  viewed?: boolean
 }
 
 export type Placement =
@@ -74,6 +76,19 @@ export type MarkedPlacement = Extract<Placement, { kind: 'near' | 'far' }>
 export function markedPlacement(state: LocateState): MarkedPlacement | null {
   const p = lastPlacement(state)
   return p && p.kind !== 'outside' ? p : null
+}
+
+/** The same state with its shown fix marked as flown to (a marked one only: an outside fix has no marker to view). */
+export function markViewed(state: LocateState): LocateState {
+  const mark = (p: Placement): Placement => (p.kind === 'outside' ? p : { ...p, viewed: true })
+  switch (state.status) {
+    case 'idle':
+      return state
+    case 'located':
+      return { status: 'located', placement: mark(state.placement) }
+    default:
+      return { ...state, previous: state.previous && mark(state.previous) }
+  }
 }
 
 export function startLocating(state: LocateState): LocateState {

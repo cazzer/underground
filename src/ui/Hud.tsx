@@ -108,7 +108,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   // Cancel and Esc leave focus to the dialog, which hands it back to the button that was focused when it
   // opened. A station choice instead moves it to the new station's panel heading, a place choice to the place
   // line, once the dialog has closed; a directions pick hands focus to the trip panel (its own request), not this close event.
-  const focusOnClose = useRef<'station' | 'place' | null>(null)
+  const focusOnClose = useRef<'station' | 'place' | 'locate' | null>(null)
   const openSearch = () => {
     // A tap doesn't focus a button on iOS; the dialog restores focus to whatever had it when it opened.
     searchButton.current?.focus()
@@ -119,7 +119,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     setSearchOpen(false)
     const target = focusOnClose.current
     focusOnClose.current = null
-    if (target) (target === 'place' ? place.lineRef : stationHeading).current?.focus()
+    if (target) (target === 'place' ? place.lineRef : target === 'locate' ? locateButton : stationHeading).current?.focus()
   }
   const onSearchChoose = (stationId: string) => {
     focusOnClose.current = 'station'
@@ -128,6 +128,11 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const onSearchChoosePlace = (pick: PlacePick) => {
     focusOnClose.current = 'place'
     place.show(pick)
+  }
+  // The dialog's "My location" row flies where the header button does; focus ends on that button.
+  const onSearchChooseHere = () => {
+    focusOnClose.current = 'locate'
+    locate.showFix()
   }
   // Clearing removes the × the user just pressed; focus goes back to the button that started it.
   const { clear } = locate
@@ -280,7 +285,16 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
           />
         )}
       </div>
-      <StationSearch ref={search} network={network} fix={markedPlacement(locate.state)} onChoose={onSearchChoose} onChoosePlace={onSearchChoosePlace} onDirections={openTrip} onClose={onSearchClosed} />
+      <StationSearch
+        ref={search}
+        network={network}
+        locate={locate}
+        onChoose={onSearchChoose}
+        onChoosePlace={onSearchChoosePlace}
+        onChooseHere={onSearchChooseHere}
+        onDirections={openTrip}
+        onClose={onSearchClosed}
+      />
     </div>
   )
 }

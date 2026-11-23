@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dismissLocate, failLocating, failureFromCode, placeFix, startLocating, toFix, type LocateFailure, type LocateState } from '../lib/locate'
+import { dismissLocate, failLocating, failureFromCode, markedPlacement, markViewed, placeFix, startLocating, toFix, type LocateFailure, type LocateState, type MarkedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
-import { rememberLocate } from '../lib/locateMemory'
+import { rememberLocate, rememberUnviewedFix, type LocateMemory } from '../lib/locateMemory'
 import type { Ground } from '../lib/projection'
 
 /**
@@ -14,10 +14,29 @@ const OPTIONS: PositionOptions = { enableHighAccuracy: true, timeout: 15_000, ma
 
 export interface LocateControls {
   state: LocateState
-  /** Asks the browser for one position. Call only from a user press. */
+  /** Asks the browser for one position and flies to it. Call only from a user press (the header button). */
   locate: () => void
+  /**
+   * The same one position, no flight (the search dialog's press: a flight behind a modal would drop focus and end a
+   * follow). A request the header already has pending still flies. Call only from a user press.
+   */
+  find: () => void
+  /** Flies to the shown fix as the header press does; nothing when none is shown. Call only from a user press. */
+  showFix: () => void
   /** Clears a shown location, cancels a pending request, or dismisses a failure (keeping the last good fix). */
   clear: () => void
+}
+
+const memoryOf = (placement: MarkedPlacement): LocateMemory => ({
+  center: placement.viewCenter,
+  radiusM: placement.viewRadiusM,
+  nearestId: placement.nearest.id,
+})
+
+/** The view now sits over the fix: the address search must keep its bias away from here (lib/geocodeFocus.ts). */
+function flyTo(placement: MarkedPlacement, flyToPoint: (center: Ground, radiusM: number, source: 'locate') => unknown): void {
+  rememberLocate(memoryOf(placement))
+  flyToPoint(placement.viewCenter, placement.viewRadiusM, 'locate')
 }
 
 /**
@@ -27,13 +46,15 @@ export interface LocateControls {
 export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM: number, source: 'locate') => unknown): LocateControls {
   const [state, setState] = useState<LocateState>({ status: 'idle' })
   // Read at callback time so `locate` and `clear` keep one identity.
-  const latest = useRef({ network, flyToPoint })
+  const latest = useRef({ network, flyToPoint, state })
   useEffect(() => {
-    latest.current = { network, flyToPoint }
-  }, [network, flyToPoint])
+    latest.current = { network, flyToPoint, state }
+  }, [network, flyToPoint, state])
   // Bumped by every press, clear and unmount; a callback from an older request does nothing.
   const requestId = useRef(0)
   const busy = useRef(false)
+  // Whether the pending request ends in a flight: the header's press does, the dialog's does not.
+  const fly = useRef(true)
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const stopWatchdog = useCallback(() => {
@@ -51,7 +72,7 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
     [stopWatchdog],
   )
 
-  const locate = useCallback(() => {
+  const request = useCallback(() => {
     if (busy.current) return
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setState((prev) => failLocating(prev, 'unsupported'))
@@ -72,11 +93,11 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
           fail('unavailable')
           return
         }
-        settle(id, () => ({ status: 'located', placement }))
+        const flying = fly.current
+        settle(id, () => ({ status: 'located', placement: placement.kind === 'outside' ? placement : { ...placement, viewed: flying } }))
         if (placement.kind !== 'outside') {
-          // The view now sits over the fix: the address search must keep its bias away from here (lib/geocodeFocus.ts).
-          rememberLocate({ center: placement.viewCenter, radiusM: placement.viewRadiusM, nearestId: placement.nearest.id })
-          latest.current.flyToPoint(placement.viewCenter, placement.viewRadiusM, 'locate')
+          if (flying) flyTo(placement, latest.current.flyToPoint)
+          else rememberUnviewedFix(memoryOf(placement))
         }
       },
       (err) => {
@@ -87,6 +108,23 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
       OPTIONS,
     )
   }, [settle])
+
+  const locate = useCallback(() => {
+    fly.current = true
+    request()
+  }, [request])
+
+  const find = useCallback(() => {
+    if (!busy.current) fly.current = false
+    request()
+  }, [request])
+
+  const showFix = useCallback(() => {
+    const placement = markedPlacement(latest.current.state)
+    if (!placement) return
+    flyTo(placement, latest.current.flyToPoint)
+    setState(markViewed)
+  }, [])
 
   const clear = useCallback(() => {
     requestId.current++
@@ -104,5 +142,5 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
     [stopWatchdog],
   )
 
-  return { state, locate, clear }
+  return { state, locate, find, showFix, clear }
 }

@@ -2,6 +2,7 @@ import type { Ref, RefObject } from 'react'
 import type { TripEnd, TripPlaces } from '../lib/trip'
 import type { TripEnds as Ends } from '../lib/tripView'
 import type { Network } from '../lib/network'
+import { HERE_NOTE } from '../lib/searchHere'
 import { isTripEnd } from '../lib/tripEnds'
 
 interface TripEndsProps {
@@ -19,7 +20,7 @@ interface TripEndsProps {
   rows: { from: RefObject<HTMLButtonElement | null>; to: RefObject<HTMLButtonElement | null> }
   /** Opens that end's search. The row has already taken focus, so the dialog hands it back there. */
   onPick: (end: TripEnd) => void
-  onSet: (end: TripEnd, stationId: string) => void
+  onSet: (end: TripEnd, stationId: string, place?: string | null) => void
   onSwap: () => void
 }
 
@@ -74,8 +75,8 @@ export function TripEnds({ network, ends, places, focusedId, focusSiblings, near
     button.focus({ preventScroll: true })
     onPick(end)
   }
-  const set = (end: TripEnd, stationId: string) => {
-    onSet(end, stationId)
+  const set = (end: TripEnd, stationId: string, place: string | null = null) => {
+    onSet(end, stationId, place)
     requestAnimationFrame(() => rows[end].current?.focus({ preventScroll: true }))
   }
   // Never offers a From that is the To, nor one already chosen.
@@ -100,7 +101,7 @@ export function TripEnds({ network, ends, places, focusedId, focusSiblings, near
         </button>
       </div>
       {nearest !== null && nearestId !== null && (
-        <button type="button" onClick={() => set('from', nearestId)} className={`${LINK} -ml-2`}>
+        <button type="button" onClick={() => set('from', nearestId, HERE_NOTE)} className={`${LINK} -ml-2`}>
           Nearest to you: {nearest}
         </button>
       )}

@@ -37,22 +37,32 @@ export function buildSearchIndex<S extends SearchableStation>(stations: readonly
   }
 }
 
-/** Best matches first, at most `limit`. Ties: more routes, then name, then id. Empty for a blank query. */
-export function searchStations<S extends SearchableStation>(index: SearchIndex<S>, query: string, limit = SEARCH_LIMIT): S[] {
+/**
+ * Best matches first, at most `limit`. Ties: nearer `distanceOf` (given while a location fix is known: meters from it,
+ * computed here once per match), then more routes, then name, then id. Empty for a blank query. Without `distanceOf`
+ * the order is exactly the same as before it existed.
+ */
+export function searchStations<S extends SearchableStation>(
+  index: SearchIndex<S>,
+  query: string,
+  limit = SEARCH_LIMIT,
+  distanceOf?: (station: S) => number,
+): S[] {
   const q = typedTokens(query)
   if (q.length === 0) return []
-  const scored: { station: S; score: number }[] = []
+  const scored: { station: S; score: number; d: number }[] = []
   for (const entry of index.entries) {
     let score = matchName(q, entry.tokens).score
     for (const alias of entry.aliases) {
       const aliasScore = matchName(q, alias).score
       if (aliasScore > 0) score = Math.max(score, aliasScore - ALIAS_PENALTY)
     }
-    if (score > 0) scored.push({ station: entry.station, score })
+    if (score > 0) scored.push({ station: entry.station, score, d: distanceOf ? distanceOf(entry.station) : 0 })
   }
   scored.sort(
     (a, b) =>
       b.score - a.score ||
+      a.d - b.d ||
       b.station.routeIds.length - a.station.routeIds.length ||
       a.station.name.localeCompare(b.station.name) ||
       a.station.id.localeCompare(b.station.id),

@@ -45,11 +45,11 @@ export function locateMessage(state: LocateState): LocateMessage | null {
       if (p.kind === 'far') {
         return { tone: 'info', text: `You're ${formatDistance(p.nearest.distanceM)} from the nearest station.`, action: goTo }
       }
+      // A fix only found (the search dialog's press) has not been flown to: the map is not showing where you are.
+      const lead = p.viewed ? 'Showing where you are' : 'Found your location'
       return {
         tone: 'info',
-        text: p.approximate
-          ? `Showing where you are (approximate, within ${formatDistance(p.accuracyM)}).`
-          : 'Showing where you are.',
+        text: p.approximate ? `${lead} (approximate, within ${formatDistance(p.accuracyM)}).` : `${lead}.`,
         srOnly: true,
       }
     }

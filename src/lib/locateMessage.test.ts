@@ -40,17 +40,25 @@ describe('locateMessage', () => {
     expect(locateMessage({ status: 'located', placement: far })?.text).toBe("You're about 2.6 mi from the nearest station.")
   })
 
+  const near = (approximate: boolean, viewed = true): LocateState => ({
+    status: 'located',
+    placement: { kind: 'near', ...marked, accuracyM: 500, approximate, viewed },
+  })
+
   it('flags an approximate fix and offers no action when near', () => {
-    const near = (approximate: boolean): LocateState => ({
-      status: 'located',
-      placement: { kind: 'near', ...marked, accuracyM: 500, approximate },
-    })
     expect(locateMessage(near(false))?.text).toBe('Showing where you are.')
     expect(locateMessage(near(false))?.srOnly).toBe(true)
     const approx = locateMessage(near(true))
     expect(approx?.text).toContain('approximate')
     expect(approx?.text).toContain('about 0.3 mi')
     expect(approx?.action).toBeUndefined()
+  })
+
+  it('does not claim the map shows the fix until the camera has flown to it', () => {
+    expect(locateMessage(near(false, false))?.text).toBe('Found your location.')
+    expect(locateMessage(near(true, false))?.text).toMatch(/^Found your location \(approximate, within about 0.3 mi\)\.$/)
+    expect(locateMessage(near(true, true))?.text).toMatch(/^Showing where you are \(approximate/)
+    expect(locateMessage({ status: 'located', placement: { kind: 'near', ...marked } })?.text).toBe('Found your location.')
   })
 
   it('says so while locating, even when a previous fix is kept', () => {

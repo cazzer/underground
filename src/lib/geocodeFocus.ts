@@ -5,7 +5,7 @@
  */
 import { NYC_BBOX } from '../data/realtime'
 import type { MarkedPlacement } from './locate'
-import { excludedByLocate, type LocateMemory } from './locateMemory'
+import { excludedByLocate, locateMemoryFor, type LocateMemory } from './locateMemory'
 import { toLatLon, type Ground, type LatLon } from './projection'
 
 /** A candidate this close to a shown fix is dropped (a fix's own framing radius may make this wider). */
@@ -20,8 +20,8 @@ export interface GeocodeFocusInput {
   view: Ground | null
   /** The marked fix: only to exclude, never sent. */
   fix: MarkedPlacement | null
-  /** Where the last location flight put the view (`locateMemoryFor`): kept through later flights and a cleared fix. */
-  locate: LocateMemory | null
+  /** Where the location flight and the search dialog's unviewed fix put the view (`locateMemoryFor`): kept through later flights and a cleared fix. */
+  locate: readonly LocateMemory[]
 }
 
 const distance = (a: Ground, b: Ground) => Math.hypot(a.x - b.x, a.z - b.z)
@@ -38,6 +38,26 @@ export function geocodeFocus({ station, stationId = null, view, fix, locate }: G
   const [minLon, minLat, maxLon, maxLat] = NYC_BBOX
   const inside = rounded.lon >= minLon && rounded.lon <= maxLon && rounded.lat >= minLat && rounded.lat <= maxLat
   return inside ? rounded : null
+}
+
+export interface SearchFocusInput {
+  focusedId: string | null
+  stationById: ReadonlyMap<string, { pos: Ground }>
+  /** The camera target; null before the scene mounts. */
+  view: Ground | null
+  /** The marked fix: only to exclude, never sent. */
+  fix: MarkedPlacement | null
+}
+
+/** The `focus` an address search sends: the focused station, else the view, away from the fix and the remembered location circles. */
+export function searchFocus({ focusedId, stationById, view, fix }: SearchFocusInput): LatLon | null {
+  return geocodeFocus({
+    station: stationById.get(focusedId ?? '')?.pos ?? null,
+    stationId: focusedId,
+    view,
+    fix,
+    locate: locateMemoryFor(view),
+  })
 }
 
 /** The query-string form the Worker accepts: two decimals each. */
