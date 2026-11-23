@@ -179,7 +179,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             />
             {/* Decoration: a crash here shows the map at once. */}
             <ErrorBoundary fallback={null}>
-              <MapReveal insets={insets} />
+              <MapReveal insets={insets} panel={panel} />
             </ErrorBoundary>
           </>
         )}

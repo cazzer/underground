@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { interiorFreeRect } from './interiorCamera'
 import {
   REVEAL_FEATHER_SHARE,
+  REVEAL_MAX_STEP_MS,
+  advanceClock,
   easeOutCubic,
   fadeOpacity,
   revealFront,
@@ -21,15 +24,32 @@ function farthestCorner(w: number, h: number, cx: number, cy: number): number {
   return best
 }
 
+const free = (w: number, h: number, top: number, bottom: number) =>
+  interiorFreeRect({ width: w, height: h }, { top, bottom }, null)
+
 describe('revealGeometry', () => {
-  it('centres on the free area between the insets', () => {
-    const g = revealGeometry(390, 844, { top: 120, bottom: 40 })
+  it('centres on the free area between the insets when there is no panel', () => {
+    const g = revealGeometry(390, 844, free(390, 844, 120, 40))
     expect(g.cx).toBe(195)
     expect(g.cy).toBe(462)
   })
 
-  it('clamps insets that exceed the height to the top inset', () => {
-    const g = revealGeometry(390, 300, { top: 200, bottom: 200 })
+  it('centres above a phone panel', () => {
+    const panel = { left: 0, top: 500, right: 390, bottom: 804 }
+    const g = revealGeometry(390, 844, interiorFreeRect({ width: 390, height: 844 }, { top: 120, bottom: 40 }, panel))
+    expect(g.cx).toBe(195)
+    expect(g.cy).toBe((120 + 484) / 2)
+  })
+
+  it('centres left of a desktop side panel', () => {
+    const panel = { left: 1040, top: 100, right: 1424, bottom: 860 }
+    const g = revealGeometry(1440, 900, interiorFreeRect({ width: 1440, height: 900 }, { top: 60, bottom: 20 }, panel))
+    expect(g.cx).toBe((1040 - 16) / 2)
+    expect(g.cy).toBe(60 + (880 - 60) / 2)
+  })
+
+  it('clamps a free area with no height to its top', () => {
+    const g = revealGeometry(390, 300, free(390, 300, 200, 200))
     expect(g.cy).toBe(200)
   })
 
@@ -41,15 +61,26 @@ describe('revealGeometry', () => {
       [320, 480, 500, 500],
     ]
     for (const [w, h, top, bottom] of cases) {
-      const g = revealGeometry(w, h, { top, bottom })
+      const g = revealGeometry(w, h, free(w, h, top, bottom))
       expect(g.radius).toBeCloseTo(farthestCorner(w, h, g.cx, g.cy), 9)
       expect(g.feather).toBeCloseTo(REVEAL_FEATHER_SHARE * g.radius, 9)
     }
   })
 })
 
+describe('advanceClock', () => {
+  it('adds the frame gap, capped at the step limit', () => {
+    expect(advanceClock(100, 1000, 1016)).toBe(116)
+    expect(advanceClock(100, 1000, 1500)).toBe(100 + REVEAL_MAX_STEP_MS)
+  })
+
+  it('never runs backward', () => {
+    expect(advanceClock(100, 1000, 990)).toBe(100)
+  })
+})
+
 describe('revealFront', () => {
-  const g = revealGeometry(390, 844, { top: 120, bottom: 40 })
+  const g = revealGeometry(390, 844, free(390, 844, 120, 40))
 
   it('starts closed and ends clear of every corner', () => {
     expect(revealFront(g, 0)).toEqual({ inner: 0, outer: 0 })
@@ -103,7 +134,7 @@ describe('fadeOpacity', () => {
 
 describe('revealGradient', () => {
   it('names the centre and orders the stops inner then outer', () => {
-    const g = revealGeometry(390, 844, { top: 120, bottom: 40 })
+    const g = revealGeometry(390, 844, free(390, 844, 120, 40))
     const css = revealGradient(g, { inner: 10, outer: 50 }, '#123456')
     expect(css).toContain('circle at 195px 462px')
     expect(css.indexOf('transparent 10px')).toBeGreaterThan(-1)
