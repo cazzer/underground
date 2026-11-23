@@ -41,6 +41,9 @@ export interface LabelPlacement {
   segEnd: Int32Array
   segMark0: Int32Array
   segMarkEnd: Int32Array
+  /** Per station: 1 while its layer leaves (presence target 0): it places its labels but claims no street keys, so a
+   *  remaining station may name its streets at once. Written per frame by useStreetLabels. */
+  leaving: Uint8Array
   /** The first marker rect (the nearby markers, then the focus ring) and the first level label rect. */
   markerRect: number
   levelRect: number

@@ -69,6 +69,7 @@ export function createLabelPlacement(stations: readonly PlacementStation[], near
   })
   const minus = (len: number) => new Int16Array(len).fill(-1)
   const exemptWords = Math.max(1, Math.ceil(n / 32))
+  // Only marks and markers (rects below the level labels) are ever exempt.
   return {
     stations,
     nearby,
@@ -77,6 +78,7 @@ export function createLabelPlacement(stations: readonly PlacementStation[], near
     segEnd,
     segMark0,
     segMarkEnd,
+    leaving: new Uint8Array(count),
     markerRect,
     levelRect,
     stationOf,
@@ -97,7 +99,7 @@ export function createLabelPlacement(stations: readonly PlacementStation[], near
       viewport: { left: 0, top: 0, right: 0, bottom: 0 },
       rects: new Float32Array(rects * RECT),
       count: 0,
-      exempt: new Uint32Array(rects * exemptWords),
+      exempt: new Uint32Array(levelRect * exemptWords),
       exemptWords,
       groups: new Float32Array(groupCapacity(count) * GROUP),
       groupCount: 0,

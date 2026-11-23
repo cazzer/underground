@@ -21,9 +21,9 @@ const a = new Vector3()
 const b = new Vector3()
 
 /** A drawn station for the labels: its layer, its streets' subway bundles, and its layer's presence (its labels fade
- *  with it; null for always present). */
+ *  with it, and while it leaves, target 0, it claims no street names; null for always present). */
 export interface LabelStation extends PlacementStation {
-  presence: { readonly value: number } | null
+  presence: { readonly value: number; readonly target: 0 | 1 } | null
 }
 
 /** What the street layers know that the labels need, written by StreetLabels' frame: every drawn interior, the
@@ -35,7 +35,7 @@ export interface LabelContext {
   depthScale: number
   markerRadiusM: number
   ringRadiusM: number
-  /** The first station is the focused one (unbudgeted, its entrances in full ink, the trip's exit its own). */
+  /** The first station is the focused one (unbudgeted, the trip's exit its own; the others' entrances dim). */
   focusedFirst: boolean
   /** The focused station's street-file entrance index of the trip's exit (its label ranks first, tinted the path's
    *  color); -1 for none. */
@@ -82,9 +82,9 @@ function remeasure(st: LabelState): void {
 function writeTones(st: LabelState): void {
   const v = st.view
   for (let s = 0; s < st.segs.length; s++) {
-    const focused = s === 0 && v.focusedFirst
-    setFocusedTone(st.segs[s]!, focused)
-    tintExit(st.segs[s]!, focused ? v.priorityEntrance : -1)
+    // Dim entrances only beside a focused station; with none focused every station is in full ink.
+    setFocusedTone(st.segs[s]!, s === 0 || !v.focusedFirst)
+    tintExit(st.segs[s]!, s === 0 && v.focusedFirst ? v.priorityEntrance : -1)
   }
   st.tones = false
 }
@@ -134,7 +134,7 @@ function viewChanged(st: LabelState, camera: PlacementView['camera'], size: { wi
   v.markerRadiusM = ctx.markerRadiusM
   v.ringRadiusM = ctx.ringRadiusM
   v.radiusM = streetLabelRadiusM(size)
-  const budget = neighbourLabelBudget(size)
+  const budget = neighbourLabelBudget(size, v.focusedFirst)
   v.budgetEntrances = budget.entrances
   v.budgetStreets = budget.streets
   return true
@@ -241,7 +241,13 @@ export function useStreetLabels(
     const o = opacity.current
     let shown = false
     for (let s = 0; s < st.segs.length; s++) {
-      const v = o * (st.stations[s]!.presence?.value ?? 1)
+      const presence = st.stations[s]!.presence
+      const leaving = presence?.target === 0 ? 1 : 0
+      if (leaving !== st.place.leaving[s]) {
+        st.place.leaving[s] = leaving
+        st.dirty = true
+      }
+      const v = o * (presence?.value ?? 1)
       setStationOpacity(st.segs[s]!, v)
       if (v > 0) shown = true
     }

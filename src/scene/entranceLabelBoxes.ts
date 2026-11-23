@@ -72,7 +72,9 @@ export function entranceBoxes(
 /**
  * Orders station `s`'s entrances (order positions segItem0 to segStreet0 - 1): the trip's exit first (the focused
  * station's only), then elevators, then labels no other entrance shares; within those, the best of each head house
- * before any second, then nearest the free area's middle on screen, last placement's winners STICKY_PX nearer.
+ * before any second, then nearest on screen to the free area's middle (the focused station) or to the station's own
+ * point (a budgeted one, `view.stationX/Y`: its few labels gather at its marker and hold through a pan), last
+ * placement's winners STICKY_PX nearer.
  * Entrances off screen have no candidates, so their rank doesn't matter. Insertion sort over a few items; no
  * allocation.
  */
@@ -80,11 +82,14 @@ export function rankEntrances(p: LabelPlacement, view: PlacementView, s: number)
   const first = p.segItem0[s]!
   const end = p.segStreet0[s]!
   const order = p.cand.order
-  const exit = s === 0 && view.focusedFirst ? view.priorityEntrance : -1
+  const focused = s === 0 && view.focusedFirst
+  const exit = focused ? view.priorityEntrance : -1
+  const toX = focused ? view.focusX : view.stationX
+  const toY = focused ? view.focusY : view.stationY
   p.houseBest.fill(Infinity, first, end)
   for (let i = first; i < end; i++) {
     const e = entranceOf(p, i)
-    const near = p.cand.size[i]! > 0 ? Math.hypot(p.markX[i]! - view.focusX, p.markY[i]! - view.focusY) : 1e8
+    const near = p.cand.size[i]! > 0 ? Math.hypot(p.markX[i]! - toX, p.markY[i]! - toY) : 1e8
     p.score[i] = (exit >= 0 && e.members.includes(exit) ? 0 : EXIT_TIER) + (e.elevator ? 0 : ELEVATOR_TIER) + (e.unique ? 0 : UNIQUE_TIER) + near - (p.lastSrc[i]! >= 0 ? STICKY_PX : 0)
     if (p.score[i]! < p.houseBest[first + e.headHouse]!) p.houseBest[first + e.headHouse] = p.score[i]!
     order[i] = i

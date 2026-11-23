@@ -31,13 +31,15 @@ export interface LabelBudget {
   streets: number
 }
 
-/** How many entrance and street labels each station but the focused one may place (o3r.6): the focused station is
- *  never budgeted; with none focused, every station is. */
-export const NEIGHBOUR_LABEL_BUDGET: { phone: LabelBudget; desktop: LabelBudget } = {
-  phone: { entrances: 2, streets: 1 },
-  desktop: { entrances: 4, streets: 3 },
+/** How many entrance and street labels each station but the focused one may place (o3r.6): `beside` a focused
+ *  station (which is never budgeted), or `alone` when none is focused (every station is). A phone holds one entrance
+ *  label beside the focused station's, two with none focused. */
+export const NEIGHBOUR_LABEL_BUDGET: Record<'phone' | 'desktop', { beside: LabelBudget; alone: LabelBudget }> = {
+  phone: { beside: { entrances: 1, streets: 1 }, alone: { entrances: 2, streets: 1 } },
+  desktop: { beside: { entrances: 4, streets: 3 }, alone: { entrances: 4, streets: 3 } },
 }
 
-export function neighbourLabelBudget(viewport: Viewport): LabelBudget {
-  return isPhoneViewport(viewport) ? NEIGHBOUR_LABEL_BUDGET.phone : NEIGHBOUR_LABEL_BUDGET.desktop
+export function neighbourLabelBudget(viewport: Viewport, focused: boolean): LabelBudget {
+  const sized = NEIGHBOUR_LABEL_BUDGET[isPhoneViewport(viewport) ? 'phone' : 'desktop']
+  return focused ? sized.beside : sized.alone
 }

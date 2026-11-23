@@ -8,7 +8,7 @@ import { LABEL_HALO } from './useLevelLabels'
 const WRAPPER_CLASS = 'pointer-events-none absolute inset-0'
 const BASE = 'absolute top-0 left-0 font-mono text-[10px]'
 // Streets uppercase and dim but not letter-spaced (that is the level labels' look); the focused station's entrances
-// in normal case and full ink, as places to walk to, on two lines on a phone; another station's entrances dim.
+// in normal case and full ink, as places to walk to, on two lines on a phone; a station beside it dims its own.
 const STREET_CLASS = `${BASE} whitespace-nowrap text-ink-dim uppercase ${LABEL_HALO}`
 const ENTRANCE_CLASS = `${BASE} whitespace-pre text-ink ${LABEL_HALO}`
 const NEIGHBOUR_ENTRANCE_CLASS = `${BASE} whitespace-pre text-ink-dim ${LABEL_HALO}`
@@ -30,7 +30,7 @@ export interface StationLabelDom {
   turn: Float32Array
   shown: Uint8Array
   opacity: number
-  /** The entrances take the focused station's full ink. */
+  /** The entrances are in full ink (the focused station's, or any with none focused); else dim. */
   focused: boolean
   /** The entrance label element tinted as the trip's exit, or null. */
   tinted: HTMLDivElement | null
@@ -100,7 +100,7 @@ export function copySizes(p: LabelPlacement, d: StationLabelDom, s: number): voi
   p.lines.set(d.lines, at)
 }
 
-/** The entrances in the focused station's full ink, or another station's dim. */
+/** The entrances in full ink, or dim (a station beside the focused one). */
 export function setFocusedTone(d: StationLabelDom, focused: boolean): void {
   if (d.focused === focused) return
   d.focused = focused

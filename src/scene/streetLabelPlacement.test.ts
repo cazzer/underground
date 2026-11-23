@@ -133,6 +133,41 @@ describe('placeLabels: two stations', () => {
     expect(outOf(p, 1).map((k) => k >= 0)).toEqual(before)
   })
 
+  it('ranks a neighbour’s entrances by its own point, so its picks hold through a large pan', () => {
+    const B = crowdedStation('B', { x: -40, z: 60 })
+    const picks = (x: number) => {
+      // A fresh placement each time: no stickiness from the last pass.
+      const p = place(fixturePlacement([lone('A', { x: 120, z: -120 }), B]), view(x, { budgetEntrances: 2, budgetStreets: 1 }))
+      return outOf(p, 1).slice(0, B.entrances.length).map((k) => k >= 0)
+    }
+    const before = picks(0)
+    expect(before.filter(Boolean).length).toBe(2)
+    // 40 m, about 100 px.
+    expect(picks(40)).toEqual(before)
+    expect(picks(-40)).toEqual(before)
+  })
+
+  it('names a budgeted station’s streets its placed entrance labels don’t name first', () => {
+    const B = fixtureStation('B', { x: -40, z: 40 }, {
+      entrances: [{ x: 0, z: 0, w: 60, streets: [0] }],
+      streets: [
+        { key: 'grand st', w: 50, runs: [run(-60, -30, 1, 0, 4)] },
+        { key: 'kent av', w: 50, runs: [run(-60, 30, 1, 0, 4)] },
+      ],
+    })
+    const p = place(fixturePlacement([lone('A', { x: 120, z: -120 }), B]), view(0, { budgetEntrances: 1, budgetStreets: 1 }))
+    expect(outOf(p, 1).map((k) => k >= 0)).toEqual([true, false, true])
+  })
+
+  it('lets a leaving station keep its street label without claiming the street', () => {
+    const broadway = (ax: number) => fixtureStation(ax < 0 ? 'A' : 'B', { x: ax, z: 0 }, { entrances: [], streets: [{ key: 'broadway', w: 64, runs: [run(-60, -40, 1, 0, 4)] }] })
+    const p = fixturePlacement([broadway(-60), broadway(60)])
+    p.leaving[0] = 1
+    place(p, view(0, { radiusM: 100, focusedFirst: false }))
+    expect(p.out[0]).toBeGreaterThanOrEqual(0)
+    expect(p.out[1]).toBeGreaterThanOrEqual(0)
+  })
+
   it('leaves the others’ labels alone when a later station joins or one leaves', () => {
     const B = crowdedStation('B', { x: -60, z: 60 })
     const C = lone('C', { x: 150, z: 150 })

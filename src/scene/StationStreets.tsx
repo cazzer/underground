@@ -156,7 +156,8 @@ export function StationStreets(props: StationStreetsProps) {
         layers={shown}
         presences={presences}
         focusedLayer={labelledFocus}
-        interior={own}
+        focusedId={focusedId}
+        interior={focusedId && interiorCovers(interior, focusedId) ? interior : null}
         interiorPending={interiorPending}
         interiors={shownInteriors}
         insets={insets}

@@ -22,7 +22,8 @@ keep full contrast.
 Streets and entrance marks of up to `MAX_VIEW_STREETS` (4) stations in view draw the same way with no tap inside 1250 m, focused
 first (o3r.5), each easing in and out over 250 ms; where two 300 m files overlap each street draws once; a neighbour's
 entrance marks draw a tier dimmer. Their street and entrance labels place in one declutter pass, focused first (o3r.6), a
-neighbour's budgeted (phone 2 entrances and 1 street, desktop 4 and 3) with its entrances dim.
+neighbour's budgeted (beside a focused station a phone's 1 entrance and 1 street, with none focused 2 and 1; a desktop's 4
+and 3) and its entrances dim beside a focused station (full ink with none focused).
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
@@ -420,19 +421,25 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     first, then the others in the order they joined, new ones in view order, so a joining station never outranks one
     already labelled), each station's entrances then its streets, each around every label placed before it; the focused
     station places unbudgeted (alone it places exactly as before, `streetLabelPlacement.alone.test.ts`), every other
-    one (all of them with nothing focused) at most `NEIGHBOUR_LABEL_BUDGET` (`streetLabelReveal.ts`: phone 2 entrances
-    and 1 street, desktop 4 and 3; `declutter`'s `limit`), and a street an earlier station placed (same `streetKey`)
-    gets no second label, so a street two files hold is named once. A set change rebuilds the arrays and carries each
+    one (all of them with nothing focused) at most `NEIGHBOUR_LABEL_BUDGET` (`streetLabelReveal.ts`,
+    `neighbourLabelBudget(viewport, focused)`: a phone 1 entrance and 1 street beside a focused station, 2 and 1 with
+    none focused; a desktop 4 and 3 either way; `declutter`'s `limit`), and a street an earlier station placed (same
+    `streetKey`) gets no second label, so a street two files hold is named once; a leaving layer (presence target 0)
+    keeps placing its own labels as they fade but claims no street (`LabelPlacement.leaving`), so a remaining station
+    names it at once. A set change rebuilds the arrays and carries each
     kept layer's last picks over by layer object (`carryPlacement`), so the others' labels hold. It runs only on a
     frame where the camera, canvas, insets, panel, level labels, interiors, focus, focus ring, drawn station markers or
     opacity changed, last placement's spot tried first, and once more after 10 still frames for the labels that weren't
     on their first spot. Dev only: `__underground.streetLabels(reset?)` (per station placed/total entrances and
-    streets; the pass's last, max and p95 ms). Entrances first (`text-ink`, normal case, a neighbour's `text-ink-dim`;
+    streets; the pass's last, max and p95 ms). Entrances first (`text-ink`, normal case; `text-ink-dim` for a station
+    beside a focused one, every station full ink with none focused;
     on a phone, shorter side under 600 px, on two lines, street part then the rest), ranked elevators, then
     labels no other entrance shares, then each head house's best (entrances within 25 m) before any second, then
-    nearest the free area's middle, last placement's winners 48 px nearer; six spots: right or left of the mark (its
+    nearest the free area's middle (a budgeted station: nearest its own station point on screen, so its few labels
+    gather at its marker and hold through a pan), last placement's winners 48 px nearer; six spots: right or left of the mark (its
     first line level with the mark), or a label corner at a mark corner. Then streets (`text-ink-dim`, uppercase, not
-    letter-spaced), those a placed entrance label names first, last placement's winners first, then longest; turned
+    letter-spaced), those a placed entrance label names first (a budgeted station: those none of its placed entrance
+    labels name first, so its few labels name more streets), last placement's winners first, then longest; turned
     along the street and kept reading the same way until 15° past vertical; offset off the centerline (half the label
     height + 3 px) away from the station, then the other side, then centered; where subway lines run along the street
     (`src/lib/routeBundles.ts`, once per station: routes within 12 m and near-parallel, and their tracks' lateral

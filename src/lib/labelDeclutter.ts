@@ -22,7 +22,8 @@ export interface LabelCandidates {
 /**
  * What a label must keep clear of: the first `count` packed rects of `rects` (labelGeometry's RECT floats each), and
  * anything outside `viewport`. `exempt` lets an item ignore a rect (a marker its own mark sits in): bit `item & 31` of
- * word `rect * exemptWords + (item >>> 5)` (setExempt). With `groups` (`groupCount` of them, GROUP floats each, every
+ * word `rect * exemptWords + (item >>> 5)` (setExempt); it may cover only the first rects, those past it are never
+ * exempt. With `groups` (`groupCount` of them, GROUP floats each, every
  * rect below `count` in one), a box whose bounds miss a group's skips its rects; without, every rect is tested.
  */
 export interface LabelBounds {
@@ -39,6 +40,7 @@ export interface LabelBounds {
 export function setExempt(b: LabelBounds, rect: number, item: number): void {
   const exempt = b.exempt!
   const o = rect * (b.exemptWords ?? 1) + (item >>> 5)
+  if (o >= exempt.length) throw new Error(`Label exemption for rect ${rect} past the ${exempt.length} words held`)
   exempt[o] = exempt[o]! | (1 << (item & 31))
 }
 
@@ -46,8 +48,9 @@ export function isExempt(b: LabelBounds, rect: number, item: number): boolean {
   const exempt = b.exempt
   if (!exempt) return false
   const words = b.exemptWords ?? 1
-  if (item >>> 5 >= words) return false
-  return ((exempt[rect * words + (item >>> 5)]! >>> (item & 31)) & 1) === 1
+  const o = rect * words + (item >>> 5)
+  if (item >>> 5 >= words || o >= exempt.length) return false
+  return ((exempt[o]! >>> (item & 31)) & 1) === 1
 }
 
 function hitsRects(c: LabelCandidates, bounds: LabelBounds, item: number, box: number, first: number, end: number): boolean {

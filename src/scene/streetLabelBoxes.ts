@@ -135,14 +135,15 @@ export function markNamedStreets(p: LabelPlacement, s: number): void {
   }
 }
 
-/** Orders station `s`'s streets (order positions segStreet0 to segEnd - 1): those a placed entrance label names
- *  first, then the rest; within each, last placement's winners first, then by length (their index order). */
-export function rankStreets(p: LabelPlacement, s: number): void {
+/** Orders station `s`'s streets (order positions segStreet0 to segEnd - 1): for the focused station those a placed
+ *  entrance label names first, for a budgeted one those it doesn't (its few labels name more streets), then the
+ *  rest; within each, last placement's winners first, then by length (their index order). */
+export function rankStreets(p: LabelPlacement, s: number, budgeted: boolean): void {
   const first = p.segStreet0[s]!
   const end = p.segEnd[s]!
   let r = first
   for (let tier = 0; tier < 4; tier++) {
-    const named = tier < 2 ? 1 : 0
+    const named = (tier < 2) !== budgeted ? 1 : 0
     const placed = tier % 2 === 0
     for (let i = first; i < end; i++) {
       if (p.named[i] === named && (p.lastSrc[i]! >= 0) === placed) p.cand.order[r++] = i
@@ -150,7 +151,9 @@ export function rankStreets(p: LabelPlacement, s: number): void {
   }
 }
 
-/** Records the street keys station `s`'s placed street labels name, so later stations' copies get no candidates. */
+/** Records the street keys station `s`'s placed street labels name, so later stations' copies get no candidates; a
+ *  leaving station claims none. */
 export function markPlacedKeys(p: LabelPlacement, s: number): void {
+  if (p.leaving[s] === 1) return
   for (let i = p.segStreet0[s]!; i < p.segEnd[s]!; i++) if (p.out[i]! >= 0) p.keyPlaced[p.keyId[i]!] = 1
 }

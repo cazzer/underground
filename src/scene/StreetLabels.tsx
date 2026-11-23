@@ -29,7 +29,9 @@ export interface StreetLabelsProps {
   presences: ReadonlyMap<string, Presence>
   /** The focused station's layer while it is drawn, else null: its labels place first and unbudgeted. */
   focusedLayer: StreetLayer | null
-  /** The focused station's own interior, once loaded. */
+  /** The focused station (useFocus), whether or not its layer is drawn yet: it draws no marker (or a focus ring). */
+  focusedId: string | null
+  /** The focused station's own interior, once loaded: the members it covers draw no marker either. */
   interior: InteriorModel | null
   /** Its interior is still loading: no focus ring yet. */
   interiorPending: boolean
@@ -66,7 +68,7 @@ function EntranceProbe(props: { layer: StreetLayer; station: Ground | null; inse
  * entrance probe.
  */
 export function StreetLabels(props: StreetLabelsProps) {
-  const { layers, presences, focusedLayer, interior, interiorPending, interiors, insets, panel, labelBlockers, network, pathLabels, covered } = props
+  const { layers, presences, focusedLayer, focusedId, interior, interiorPending, interiors, insets, panel, labelBlockers, network, pathLabels, covered } = props
   const labelShown = useRef(0)
   const labelContext = useRef<LabelContext>({
     interiors: [],
@@ -79,11 +81,11 @@ export function StreetLabels(props: StreetLabelsProps) {
     markerHidden: null,
     markersVersion: 0,
   })
-  const focusedId = focusedLayer?.stationId ?? null
+  const leadId = focusedLayer?.stationId ?? null
   // The label order: adjusted during render, so a new set never places one frame in the wrong order.
   const ids = useMemo(() => layers.map((l) => l.stationId), [layers])
   const [order, setOrder] = useState<readonly string[]>([])
-  const nextOrder = labelStationOrder(order, ids, focusedId)
+  const nextOrder = labelStationOrder(order, ids, leadId)
   if (nextOrder !== order) setOrder(nextOrder)
   // Which street candidates a subway line runs along, so their labels step clear of its bundle; once per layer.
   const bundleCache = useRef<{ network: Network; byLayer: WeakMap<StreetLayer, Float32Array[][]> } | null>(null)
@@ -102,7 +104,8 @@ export function StreetLabels(props: StreetLabelsProps) {
       return [{ layer, bundles, presence: presences.get(id) ?? null }]
     })
   }, [nextOrder, layers, presences, network])
-  // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring.
+  // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring (by the
+  // focus itself, not its layer: a focused station whose streets still load draws no marker either).
   const near = useMemo(() => {
     const excluded = new Set<string>(focusedId ? [focusedId, ...(interior ? interiorStationIds(interior) : [])] : [])
     return nearbyMarkers(network.stations, layers.map((l) => l.anchor), excluded, STATION_REACH_M)
@@ -144,7 +147,7 @@ export function StreetLabels(props: StreetLabelsProps) {
     labelShown.current = streetLabelOpacity(o, depth)
     const ctx = labelContext.current
     ctx.interiors = interiors
-    ctx.focusRing = !focusedLayer || interior || interiorPending ? null : focused
+    ctx.focusRing = interior || interiorPending ? null : focused
     ctx.depthScale = depthScaleY(depth)
     ctx.focusedFirst = focusedLayer !== null
     ctx.priorityEntrance = priorityEntrance

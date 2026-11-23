@@ -48,7 +48,7 @@ export function placeLabels(p: LabelPlacement, view: PlacementView, levels: Labe
     declutter(p.cand, p.bounds, p.prefer, p.out, e0, s0, focused ? Infinity : view.budgetEntrances)
     markNamedStreets(p, s)
     for (let i = s0; i < end; i++) box = streetBoxes(p, i, view, a, b, box)
-    rankStreets(p, s)
+    rankStreets(p, s, !focused)
     p.bounds.count = withOutlines
     declutter(p.cand, p.bounds, p.prefer, p.out, s0, end, focused ? Infinity : view.budgetStreets)
     markPlacedKeys(p, s)

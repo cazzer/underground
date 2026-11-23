@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_OUTLINE_SAMPLES } from '../lib/interiorOutline'
 import { BLOCKER_SLOTS, MAX_LEVEL_BLOCKERS } from '../lib/labelBlockers'
-import { GROUP } from '../lib/labelDeclutter'
+import { GROUP, isExempt, setExempt } from '../lib/labelDeclutter'
 import { BOX, RECT } from '../lib/labelGeometry'
 import { crowdedStation, fixtureStation, run } from './labelFixture'
 import { carryPlacement, createLabelPlacement, groupCapacity } from './labelPlacementLayout'
@@ -47,6 +47,10 @@ describe('createLabelPlacement', () => {
     const rects = p.levelRect + BLOCKER_SLOTS * MAX_LEVEL_BLOCKERS + MAX_LABEL_INTERIORS * MAX_OUTLINE_SAMPLES
     expect(p.bounds.rects.length).toBe(rects * RECT)
     expect(p.bounds.exemptWords).toBe(1)
+    // Only marks and markers are ever exempt: the words stop at the level labels.
+    expect(p.bounds.exempt!.length).toBe(p.levelRect)
+    expect(isExempt(p.bounds, p.levelRect + 5, 0)).toBe(false)
+    expect(() => setExempt(p.bounds, p.levelRect, 0)).toThrow()
     expect(p.bounds.groups!.length).toBe(groupCapacity(2) * GROUP)
     expect(createLabelPlacement(stationsOf(A, A, A, A, A), []).bounds.exemptWords).toBe(3)
   })
