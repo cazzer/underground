@@ -5,15 +5,13 @@ import type { FlyRequest } from '../lib/focus'
 import type { Insets, Viewport } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
-import type { Ground } from '../lib/projection'
-import type { TripJourney } from '../lib/route/plan'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { legStationPoints, routeFramePoints } from '../lib/routeFrame'
 import { routeFrameDecision, routeIsFramed, type RouteMemo, type RouteToken } from '../lib/routeFrameRule'
-import { useTrainSelection } from '../lib/trainSelection'
+import { usePanelCollapse } from '../lib/panelCollapse'
 import { useTrip } from '../lib/trip'
-import { journeyKey } from '../lib/tripSelection'
-import { journeySpans, stopStations } from '../lib/tripSpans'
+import type { TripRouteDraw } from '../lib/tripLineBuffers'
+import { stopStations } from '../lib/tripSpans'
 import { rebaseFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
 import { freeBottom, landingOf, routeDestination, type RouteFlight } from './routeFlightState'
 import { useRouteReframe } from './useRouteReframe'
@@ -35,39 +33,27 @@ interface RouteFlightOptions {
   gesture: RefObject<boolean>
   /** A gesture began since the last landing. */
   tookOver: RefObject<boolean>
+  /** What TripLines draws (useTripRoute): the ride spans the frame covers; null while it has none to draw. */
+  tripRoute: TripRouteDraw | null
   panel: ScreenRect | null
   size: Viewport
   insets: Insets
 }
 
 /**
- * The points a journey draws: its spans on the map's shapes and its stations. A span that can't be drawn (a stop the
- * shapes don't reach) falls back to the stations alone, so both ends still show; a journey with no station throws.
- */
-function journeyPoints(journey: TripJourney, network: Network, stops: ReturnType<typeof stopStations>): Ground[] {
-  const stations = legStationPoints(journey.legs, stops)
-  try {
-    return routeFramePoints(journeySpans(journey.legs, { shapes: network.shapes, stopStations: stops }), network.shapeById, stations)
-  } catch (e) {
-    console.error('Trip route spans failed; framing its stations', e)
-    return stations
-  }
-}
-
-/**
  * Frames the whole selected trip route (2q7.45.5) when the trip panel is in front: top-down, north-up, at the smallest
- * distance (just past EXIT_DISTANCE or more) that fits every point of the journey the map draws in the free rect, once
+ * distance (just past EXIT_DISTANCE or more) that fits every ride the map draws (TripLines' spans, `tripRoute`) and the journey's stations in the free rect, once
  * per settled plan and again when the visitor opens or leaves a journey or its list (routeFrameRule.ts). A silent
  * refresh, a train panel or notice in front, a follow, a gesture, another flight, or the visitor moving the view (a drag
  * past the click slop, a pinch, a wheel step, a station pick) while the plan loaded never move it. Not a fly request:
  * focus drops after landing by the usual rules, and the basemap's location cap is left as it is. A panel or viewport
  * change retargets its flight, and useRouteReframe reframes after its landing. Returns the landing call CameraRig makes
- * (stable): any other flight's landing forgets this one.
+ * (stable): any other flight's landing forgets this one. With no route drawn (`tripRoute` null: its patterns still
+ * loading, its spans unmappable or every leg straight) nothing frames.
  */
-export function useRouteFlight({ controls, camera, flight, layout, network, flyRequest, startFlight, following, gesture, tookOver, panel, size, insets }: RouteFlightOptions): (landed: Flight) => void {
+export function useRouteFlight({ controls, camera, flight, layout, network, flyRequest, startFlight, following, gesture, tookOver, tripRoute, panel, size, insets }: RouteFlightOptions): (landed: Flight) => void {
   const { open, ends, plan, selection, selectedJourney } = useTrip()
-  const { selectedSummary, notice } = useTrainSelection()
-  const front = open && selectedSummary === null && notice === null
+  const front = usePanelCollapse().front === 'trip'
   const stops = useMemo(() => stopStations(network.stations), [network])
   const memo = useRef<RouteMemo>({ framed: null, interrupted: false })
   const seenPlan = useRef(plan)
@@ -121,11 +107,11 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
 
   useRouteReframe({ controls, camera, flight, mine, current, layout, tookOver, following, front, startFlight, panel, size, insets })
 
-  const journey = selectedJourney === null ? null : `${selection.view}:${journeyKey(selectedJourney)}`
+  const journey = tripRoute === null ? null : `${selection.view}:${tripRoute.key}`
   useEffect(() => {
     const silent = plan !== seenPlan.current && plan.status === 'ready' && (plan.trigger === 'tick' || plan.trigger === 'poll')
     seenPlan.current = plan
-    const route: RouteToken | null = plan.status === 'ready' && selectedJourney !== null && journey !== null ? { plan: `${plan.key}#${plan.attempt}`, journey } : null
+    const route: RouteToken | null = plan.status === 'ready' && tripRoute !== null && selectedJourney !== null && journey !== null ? { plan: `${plan.key}#${plan.attempt}`, journey } : null
     current.current = route
     const f = flight.current
     const flying = f === null ? null : f === mine.current?.flight ? 'mine' : 'other'
@@ -134,9 +120,9 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
     if (decision !== 'fly' && mine.current && !routeIsFramed(mine.current.token, route)) mine.current = null
     if (decision === 'none') return
     memo.current.framed = route
-    if (decision === 'skip' || selectedJourney === null) return
+    if (decision === 'skip' || selectedJourney === null || tripRoute === null) return
     try {
-      const points = journeyPoints(selectedJourney, network, stops)
+      const points = routeFramePoints(tripRoute.rides, network.shapeById, legStationPoints(selectedJourney.legs, stops))
       const l = layout.current
       const dest = routeDestination(points, l, camera.fov)
       startFlight(dest)

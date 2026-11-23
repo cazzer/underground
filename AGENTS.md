@@ -1100,7 +1100,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - The trip route frame (`useRouteFlight.ts`, 2q7.45.5): with the trip panel in front, a settled plan (its ends and attempt, never a
   silent tick or poll) or a journey or list the visitor opens or leaves (the token is the view plus the journey key, so the first
   journey reframes too) flies the camera top-down and north-up to the whole selected journey, every point of its spans and stations
-  (`routeFramePoints`; if its spans can't be drawn, its stations alone, logged) inside the free rect less 32 px (`frameTopDown`: the
+  (`routeFramePoints` over `useTripRoute`'s ride spans, the same ones TripLines draws, which App passes down through Scene as CameraRig's `tripRoute`, plus the journey's stations; with no route to draw, its patterns still loading, its spans unmappable or every leg straight, nothing frames; `front` is `usePanelCollapse().front === 'trip'`) inside the free rect less 32 px (`frameTopDown`: the
   smallest distance at or above `ROUTE_MIN_DISTANCE`, EXIT_DISTANCE plus 0.1%, so the fit is exact and focus drops, the focus machine's
   test being strict; clamped to the zoom-out limit). It is not a `FlyRequest`: it starts through CameraRig's `startFlight` (clearing
   the hold and the pending reframes), never sets or lifts the basemap's location cap, and records its flight only if one started. It
