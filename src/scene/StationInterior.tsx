@@ -100,7 +100,8 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
     const o = interiorOpacity(distance) * presence.value
     // The levels separate with the tilt (y only: dashes are object-space, so x/z never rescale).
     const depth = depthFactor(distance)
-    if (o === shown.current && depth === shownDepth.current && layers === shownLayers.current) return
+    // g.visible is checked too: a keyed reorder (a focus change) can reset it behind the cache.
+    if (o === shown.current && depth === shownDepth.current && layers === shownLayers.current && g.visible === o > 0) return
     shown.current = o
     shownDepth.current = depth
     shownLayers.current = layers
@@ -124,7 +125,7 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
 
   return (
     <>
-      <group ref={group} position={[model.origin.x, 0, model.origin.z]} visible={false}>
+      <group ref={group} position={[model.origin.x, 0, model.origin.z]}>
       {model.hull && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
       {strong && <primitive object={strong} />}

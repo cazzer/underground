@@ -145,7 +145,8 @@ export function StreetLines(props: StreetLinesProps) {
     if (full) writeLineDim(full.material, tripLevels.networkDim)
     if (veiled) writeLineDim(veiled.material, tripLevels.networkDim)
     const last = shown.current
-    if (o === last.o && share === last.share && own === last.own) return
+    // g.visible is checked too: a keyed reorder (a focus change) can reset it behind the cache.
+    if (o === last.o && share === last.share && own === last.own && g.visible === o > 0) return
     last.o = o
     last.share = share
     last.own = own
@@ -169,7 +170,7 @@ export function StreetLines(props: StreetLinesProps) {
   })
 
   return (
-    <group ref={group} position={[layer.anchor.x, 0, layer.anchor.z]} visible={false}>
+    <group ref={group} position={[layer.anchor.x, 0, layer.anchor.z]}>
       {full && <primitive object={full} />}
       {veiled && <primitive object={veiled} />}
       {marksAll && <primitive object={marksAll} />}
