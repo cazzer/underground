@@ -21,7 +21,8 @@ bare station focused (no interior of its own drawn) its neighbours' interiors dr
 keep full contrast.
 Streets and entrance marks of up to `MAX_VIEW_STREETS` (4) stations in view draw the same way with no tap inside 1250 m, focused
 first (o3r.5), each easing in and out over 250 ms; where two 300 m files overlap each street draws once; a neighbour's
-entrance marks draw a tier dimmer; labels stay the focused station's.
+entrance marks draw a tier dimmer. Their street and entrance labels place in one declutter pass, focused first (o3r.6), a
+neighbour's budgeted (phone 2 entrances and 1 street, desktop 4 and 3) with its entrances dim.
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
@@ -375,7 +376,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     twin merged into it) is the exit label: `rankEntrances` (entranceLabelBoxes.ts) ranks it above every other entrance
     (an 8e9 tier over the elevators' 4e9), `exemptExitFromMarks` (streetLabelPlacement.ts) lets it cover other entrances'
     marks (only those; panel, header, footer, station markers, focus ring and level labels still block), and
-    `useStreetLabels` tints it `theme.exitPath`
+    `useStreetLabels` tints it `theme.exitPath` (all three the focused station's only, the first segment: a neighbour's entrance
+    with the same file index is neither ranked nor tinted)
   - `StationStreets.tsx` the streets of the focused station (interior or not) and of up to `MAX_VIEW_STREETS` - 1 more
     station leads from o3r.2's view set (`viewStreetIds` in `lib/viewStations.ts`, loaded by `useStreetLayers`), focused
     first (o3r.5); each a `StreetLines.tsx` keyed by station. Where layers' discs overlap each draws only its power-diagram
@@ -395,9 +397,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     draws every mark and whole streets; route clip only with no interior file); for every layer, the focused one too, the
     interior's own entrances stand in for the matching marks only while its presence is past one half (both mark sets
     are built once and switched per frame), so marks neither double while it fades out nor vanish before it fades in.
-    A neighbour's marks draw at `interiorEntranceNeighbourMix`. Labels and `useEntranceProbe` only on the focused layer
-    (`StreetLabels.tsx`, fading with its presence). Dev only: `__underground.streetLayers()` (the station ids drawn,
-    focused first). Each layer: a plain LineMaterial layer at y = 0 in a
+    A neighbour's marks draw at `interiorEntranceNeighbourMix`. One `StreetLabels.tsx` labels every mounted layer in one
+    pass (o3r.6, below); `useEntranceProbe` only on the focused one. Dev only: `__underground.streetLayers()` (the station
+    ids drawn, focused first). Each layer: a plain LineMaterial layer at y = 0 in a
     group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` x its presence
     (so it fades in with the reveal and goes with the focus or the view). Street pieces running under a route line are left out
     (the route clip, see `src/lib/routeClip.ts` below, over `localTracks`: the runs within the file's radius + its reach),
@@ -409,13 +411,24 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     stroke never changes ahead of the veil. Both are cut once per layer, so the cross-fade re-cuts nothing; `streetsLook.ts` TEMPORARY override (one stroke only). It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
     street-file entrance the interior doesn't draw itself (`src/lib/entranceMarks.ts`: no interior entrance within
     1.5 m on the scene ground with the same type; none while an interior is still loading;
-    `entranceMarks.data.test.ts` checks L08 adds none), and calls `useStreetLabels.ts`: one aria-hidden wrapper div
-    in the canvas container (z-index 0, its opacity the labels' fade) holding a div per label, with the level labels'
-    halo `LABEL_HALO`. Placement (`streetLabelPlacement.ts` over `labelPlacementState.ts`, `entranceLabelBoxes.ts`,
-    `streetLabelBoxes.ts`, then `labelDeclutter.ts` in two passes) runs only on a frame where the camera, canvas,
-    insets, panel, level labels, interior, focus ring, drawn station markers, neighbour marks or opacity changed, last placement's spot tried first, and once
-    more after 10 still frames for the labels that weren't on their first spot. Entrances first (`text-ink`, normal
-    case; on a phone, shorter side under 600 px, on two lines, street part then the rest), ranked elevators, then
+    `entranceMarks.data.test.ts` checks L08 adds none). The labels of every mounted layer (o3r.6): `StreetLabels.tsx`
+    calls `useStreetLabels.ts`: per layer one aria-hidden wrapper div in the canvas container (z-index 0, opacity the
+    labels' fade x the layer's presence; `streetLabelDom.ts`; a new layer creates and measures only its own divs) holding
+    a div per label, with the level labels' halo `LABEL_HALO`. One placement (`streetLabelPlacement.ts` over
+    `labelPlacementState.ts`, `labelPlacementLayout.ts`, `labelRects.ts`, `entranceLabelBoxes.ts`, `streetLabelBoxes.ts`,
+    then `labelDeclutter.ts`) takes the stations in label order (`src/lib/labelStationOrder.ts`: the focused station
+    first, then the others in the order they joined, new ones in view order, so a joining station never outranks one
+    already labelled), each station's entrances then its streets, each around every label placed before it; the focused
+    station places unbudgeted (alone it places exactly as before, `streetLabelPlacement.alone.test.ts`), every other
+    one (all of them with nothing focused) at most `NEIGHBOUR_LABEL_BUDGET` (`streetLabelReveal.ts`: phone 2 entrances
+    and 1 street, desktop 4 and 3; `declutter`'s `limit`), and a street an earlier station placed (same `streetKey`)
+    gets no second label, so a street two files hold is named once. A set change rebuilds the arrays and carries each
+    kept layer's last picks over by layer object (`carryPlacement`), so the others' labels hold. It runs only on a
+    frame where the camera, canvas, insets, panel, level labels, interiors, focus, focus ring, drawn station markers or
+    opacity changed, last placement's spot tried first, and once more after 10 still frames for the labels that weren't
+    on their first spot. Dev only: `__underground.streetLabels(reset?)` (per station placed/total entrances and
+    streets; the pass's last, max and p95 ms). Entrances first (`text-ink`, normal case, a neighbour's `text-ink-dim`;
+    on a phone, shorter side under 600 px, on two lines, street part then the rest), ranked elevators, then
     labels no other entrance shares, then each head house's best (entrances within 25 m) before any second, then
     nearest the free area's middle, last placement's winners 48 px nearer; six spots: right or left of the mark (its
     first line level with the mark), or a label corner at a mark corner. Then streets (`text-ink-dim`, uppercase, not
@@ -426,16 +439,20 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     extent) the offsets clear that extent plus half a band pitch per route and the centered spot is unused; on the
     run with the most on-screen points within 150 m on a phone / 250 m on a desktop (250 m on a phone too for a
     street an entrance label names; last placement's run while it has at most one fewer), nearest the station first,
-    falling back to the other runs. Every label keeps clear of the header, footer, panel (+8 px), every entrance
-    mark (its own layer's, and every other drawn layer's, `LabelContext.neighbourMarks`, scene ground x, z pairs, the
-    placement's rects grown by `ensureNeighbourRoom` only when they outnumber its room), the other stations' markers
-    within 300 m that are still drawn (a covered station whose marker its view interior has faded out, `interiorOpacity`
+    falling back to the other runs. Each station's street labels offset away from its own station point. Every label
+    keeps clear of the header, footer, panel (+8 px), every mounted layer's entrance marks, the station markers within
+    300 m of any layer's anchor (`src/lib/labelNearby.ts`; not the focused station's nor those its interior covers)
+    that are still drawn (a covered station whose marker its view interior has faded out, `interiorOpacity`
     x presence at 1 as Stations.tsx collapses it, blocks nothing: a per-frame `LabelContext.markerHidden` flag; a change
-    to it or to the neighbour marks bumps `markersVersion`, which places the labels again without rebuilding the DOM)
+    to it bumps `markersVersion`, which places the labels again without rebuilding the DOM)
     and the focus ring (sized as Stations.tsx and FocusRing.tsx draw
     them now; an entrance ignores a marker its own mark sits in), and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, a slot claimed by each interior that has labels, today the focused one alone (`claimBlockerSlot` / `releaseBlockerSlot`, `BLOCKER_SLOTS` 3, `MAX_LEVEL_BLOCKERS` 16 each; the street labels read every slot; the label divs are `aria-hidden`),
-    at priority 0 each frame; read a frame late); street names also keep clear of the interior's outlines
-    (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing). Sized after mount,
+    at priority 0 each frame; read a frame late); street names also keep clear of every drawn interior's outlines
+    (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing; the first
+    `MAX_LABEL_INTERIORS`). Each run of blocked rects (the fixed ones, each layer's marks, the markers and ring, each
+    level label slot, each interior's outline) is a rect group (`labelDeclutter.ts` `GROUP`, `src/lib/labelRectGroups.ts`)
+    whose bounds a candidate must touch before its rects are tested. The marker exemption is one bit per label in as
+    many 32-bit words per rect as the labels need (`setExempt`), so no label count caps it. Sized after mount,
     after `document.fonts.ready` and when a resize flips phone and desktop sizes; opacity `streetLabelOpacity` (the level labels' depth gate)
     While mounted each `StreetLines` claims one slot of Scene's `StreetMask` (`claimMaskSlot`, `writeMaskSlot` with anchor
     and file radius, `writeMaskStrength` per frame with its presence, `releaseMaskSlot`; `MASK_N` 4 slots, at most 4
@@ -1012,8 +1029,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   otherwise is warned about once (id and reason) and left out, the lead's layer showing without it, retried once that
   layer is 5 s old when a hook asks for it (mount or key change; a lead's failure fails the layer, retried on the next focus). Raw files and layers
   are cached separately (one fetch per file per page load). The merge adds Times Sq 10 entrances, WTC 9, 6 Av 7, Grand
-  Central 2, Borough Hall 1, Bryant Pk 1 (`streetMerge.data.test.ts`; WTC's 35 labels are over the 32 marker-exemption
-  cap, so its farthest lose that exemption). `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways
+  Central 2, Borough Hall 1, Bryant Pk 1 (`streetMerge.data.test.ts`). `src/lib/streetBuffers.ts` (pure) keeps the `isStreet` ways
   (`src/lib/streetClass.ts`, which also holds `streetKey`, shared with the entrance join), decimeters to meters,
   mixing to the background over the last 70 m of `radiusM` (`edgeFade`; segments are split at the ramp's ends), plus
   the label sources: `src/lib/streetRuns.ts` (`streetLabelSources`: street ways grouped by `streetKey`, chained into
