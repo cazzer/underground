@@ -30,7 +30,7 @@ interface TripAnnouncerProps {
  * changing.
  */
 export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: TripAnnouncerProps) {
-  const { open, ends, plan, dropped, activeStep, activeStepLead } = useTrip()
+  const { open, ends, plan, dropped, activeStep, activeStepLead, stepEnds } = useTrip()
   const { focusedId } = useFocus()
   const [text, setText] = useState('')
   const lastId = useRef<string | null>(null)
@@ -125,6 +125,13 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
     return () => window.clearTimeout(timer)
     // The pressed step is what triggers it; the station follows from it.
   }, [activeStep])
+
+  // Esc ending a step changes nothing on screen a listener can find, so it says so once. A step that lapsed (the visitor
+  // focused another station) is not counted by `stepEnds`.
+  useEffect(() => {
+    if (stepEnds > 0 && open) say('Back to the trip')
+    // The Esc press is what triggers it.
+  }, [stepEnds])
 
   useEffect(() => () => window.clearTimeout(refill.current), [])
 

@@ -49,6 +49,8 @@ interface TripValue {
   activeStepLead: string | null
   /** A step was pressed: makes it the active step and flies to its station (`select`). */
   stepTo: (key: string, stationId: string) => void
+  /** Counts the times the visitor ended the active step (Esc); a step that merely stopped holding does not count. */
+  stepEnds: number
   /** Ends the active step only: its station stays focused, with its interior and path, and the camera stays where it is. */
   endStep: () => void
 }
@@ -84,6 +86,7 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   const [opened, setOpened] = useState<OpenedJourney | null>(null)
   const [dropped, setDropped] = useState({ seq: 0, remaining: 0 })
   const [step, setStep] = useState<StoredStep | null>(null)
+  const [stepEnds, setStepEnds] = useState(0)
   const { focusedId, select, membersOf } = useFocus()
   const [dropNoteFor, setDropNoteFor] = useState<string | null>(null)
   const dropPlan = useRef<TripPlanState | null>(null)
@@ -171,7 +174,10 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
     },
     [openedKey, membersOf, select],
   )
-  const endStep = useCallback(() => setStep(null), [])
+  const endStep = useCallback(() => {
+    setStep(null)
+    setStepEnds((n) => n + 1)
+  }, [])
   const start = useCallback((next: TripEnds, notes: TripPlaces) => {
     setEnds((e) => (e.from === next.from && e.to === next.to ? e : next))
     setPlaces((p) => (p.from === notes.from && p.to === notes.to ? p : notes))
@@ -207,9 +213,10 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
       activeStep,
       activeStepLead,
       stepTo,
+      stepEnds,
       endStep,
     }),
-    [activeStep, activeStepLead, stepTo, endStep, open, ends, places, plan, showLoading, setOpen, start, setEnd, swap, retry, selection, selectedJourney, openJourney, backToList, dropped, dropNoteFor, planKey],
+    [stepEnds, activeStep, activeStepLead, stepTo, endStep, open, ends, places, plan, showLoading, setOpen, start, setEnd, swap, retry, selection, selectedJourney, openJourney, backToList, dropped, dropNoteFor, planKey],
   )
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>
 }

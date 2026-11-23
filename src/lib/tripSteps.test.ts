@@ -43,7 +43,7 @@ describe('journeyItinerary', () => {
   it('steps Board, ride, Change, ride, Exit with "of 3" sentences', () => {
     const rows = journeyItinerary(withChange, ctx({ layouts: { L08: 'authored', '635': 'authored', '127': 'none' }, hasTransferPath: (k) => k === 'L>4' }))
     expect(shape(rows)).toEqual(['board:0', 'leg:0', 'change:1', 'leg:2', 'exit:2'])
-    expect(steps(rows).map((s) => s.text)).toEqual(['Board 8:04 at Bedford Av', 'Change at 14 St-Union Sq · 4 min walk · 4 at 8:16', 'Exit 8:31 at Times Sq-42 St'])
+    expect(steps(rows).map((s) => s.text)).toEqual(['Board 8:04 at Bedford Av', 'Change at 14 St-Union Sq · 4 min walk · 4 train at 8:16', 'Exit 8:31 at Times Sq-42 St'])
     expect(steps(rows).map((s) => s.spoken)).toEqual([
       'Step 1 of 3: board the L at Bedford Av, 8:04.',
       'Step 2 of 3: change at 14 St-Union Sq to the 4 train at 8:16, a 4-minute walk.',
@@ -89,7 +89,7 @@ describe('journeyItinerary', () => {
   it('omits the minutes of a same-platform change', () => {
     const rows = journeyItinerary([ride('L', BEDFORD, UNION_OFF), change('635', '14 St-Union Sq', null), ride('4', UNION_ON, TIMES)], ctx())
     const step = steps(rows)[1]!
-    expect(step.text).toBe('Change at 14 St-Union Sq · 4 at 8:16')
+    expect(step.text).toBe('Change at 14 St-Union Sq · 4 train at 8:16')
     expect(step.spoken).toBe('Step 2 of 3: change at 14 St-Union Sq to the 4 train at 8:16. No path shown for this change.')
   })
 

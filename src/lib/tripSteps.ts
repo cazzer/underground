@@ -111,7 +111,7 @@ function exitDraft(ride: RideLegView, index: number, last: boolean, ctx: StepCon
 
 function changeDraft(leg: ChangeLegView, index: number, next: RideLegView | undefined, ctx: StepContext): Draft {
   const { minutes } = leg
-  const to = next ? { visible: ` · ${ctx.routeName(next.routeId)} at ${next.board.clock}`, spoken: ` to the ${ctx.routeSpoken(next.routeId)} train at ${next.board.clock}` } : null
+  const to = next ? { visible: ` · ${ctx.routeName(next.routeId)} train at ${next.board.clock}`, spoken: ` to the ${ctx.routeSpoken(next.routeId)} train at ${next.board.clock}` } : null
   return {
     kind: 'change',
     legIndex: index,
