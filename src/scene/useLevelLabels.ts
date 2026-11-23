@@ -41,6 +41,8 @@ export function useLevelLabels(
 ): void {
   const host = useThree((s) => s.gl.domElement.parentElement)
   const els = useRef<HTMLDivElement[]>([])
+  /** The labels `els` were made for: a frame between a render with new labels and its effect still places the old divs. */
+  const placed = useRef<LevelLabel[]>([])
   const last = useRef<{ x: number; y: number; opacity: number; behind: boolean; w: number; h: number }[]>([])
   /** The blocker slot this interior holds, null when none was free. */
   const slot = useRef<number | null>(null)
@@ -81,6 +83,7 @@ export function useLevelLabels(
     }
     measure()
     els.current = made
+    placed.current = labels
     last.current = state
     let live = true
     document.fonts.ready.then(
@@ -95,6 +98,7 @@ export function useLevelLabels(
       window.removeEventListener('resize', measure)
       for (const el of made) el.remove()
       els.current = []
+      placed.current = []
       last.current = []
       if (slot.current !== null) blockers.counts[slot.current] = 0
       blockers.version++
@@ -125,7 +129,7 @@ export function useLevelLabels(
     for (let i = 0; i < list.length; i++) {
       const el = list[i]!
       const prev = last.current[i]!
-      const p = labels[i]!.position
+      const p = placed.current[i]!.position
       world.set(p[0], p[1], p[2]).applyMatrix4(g.matrixWorld)
       toCamera.copy(world).sub(camera.position)
       const behind = toCamera.angleTo(lookDir) > Math.PI / 2

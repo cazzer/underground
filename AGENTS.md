@@ -14,8 +14,11 @@ pure realtime library. The station panel shows real arrivals. Bedford Av (L08) h
 (`data/stations/635.authored.json`, members 635, L03, R20) an authored approximate one from OSM stairs and elevators, and
 about 250 more stations have generated ones (labelled "Estimated layout"), shown to everyone since 9wc.5.
 Interiors draw by view, not only by focus (o3r.4): inside 1250 m the interiors of up to `MAX_VIEW_INTERIORS` (3, in
-`lib/viewStations.ts`; the cap is for a phone's frame rate) stations in view reveal with no tap or dwell, the focused one first and
-counted; only the focused one has a panel, the trip's path, outages and the camera framing.
+`lib/viewStations.ts`; 2, `PHONE_VIEW_INTERIORS`, when the window's shorter side is under 600 px: `viewInteriorCap`; the cap is for a
+phone's frame rate) stations in view reveal with no tap or dwell, the focused one first and counted, each easing in and out over
+250 ms (`lib/presence.ts`); only the focused one has a panel, level labels, the trip's path, outages and the camera framing. With a
+bare station focused (no interior of its own drawn) its neighbours' interiors draw with no veil, so its marker, trains and streets
+keep full contrast.
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
@@ -167,7 +170,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `src/scene/interiorLook.ts`
   Street tokens `streetStroke` (faint by color, not alpha) and `streetWidth` draw the focused station's streets.
   Default (auto): under the route lines at 0.35 at full color, but above the veil at 7.5, drawn at a fainter stroke
-  (1.9:1, `veiledStreetHex` in `src/lib/streetVeil.ts`), while any interior draws under look A (the focused station's or one in view).
+  (1.9:1, `veiledStreetHex` in `src/lib/streetVeil.ts`), while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused).
   TEMPORARY: `?streets=under|over` forces one order until the ost.7 card is decided; the removal list is in
   `src/scene/streetsLook.ts`
   `basemap` holds one `{ stroke, width }` per basemap class (highway, major, minor, path, water, park), faint by color;
@@ -271,7 +274,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     held by SubwayLines (`useHeld.ts`, the last non-null route), so closing or covering the panel eases it out. Beside it in the
     same boundary (a crash un-dims the map), 2q7.45.4: `TripDashes.tsx`, two plain dashed `DimLineMaterial` layers at y 0: the
     walks at 4.45 (over the marks' halo discs and under their rings, so a short walk between touching marks still shows; 7.55,
-    above the veil, while any interior draws under look A (SubwayLines' `veiled`) and `interiorOpacity` is above 0, like the way out's walk
+    above the veil, while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused) and `interiorOpacity` is above 0, like the way out's walk
     outside) and the straight rides at 2.2 (over the ride legs, under the station markers)
     (`tripDashBuffers`, `src/lib/tripDashBuffers.ts`, pure: each walk between stations a segment in `exitPath`, each `straight`
     ride its stop polyline in its route color, a route routes.json lacks warned once and left out; dash distances in meters
@@ -296,9 +299,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     or the set changes) and every `StationTies.tsx` tie dims by it (`DimLineMaterial`); the fills and the trains don't dim;
     `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
-    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, and so are its complex siblings' and every other drawn interior's stations' (`hiddenStations`, `compactTies` in `lib/stationTie.ts`), kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
+    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, and so are its complex siblings' (`hiddenStations`, `compactTies` in `lib/stationTie.ts`); every other drawn interior's stations' ties move to `useCoveredTies.ts`' own layer, per-vertex colors mixed toward the background by `interiorOpacity` × that interior's presence (rewritten only on a change), kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
-    instance, and its complex siblings' once the interior covering them is loaded (`hiddenSiblingIds` in `interiorLoad.ts`: the index's siblings intersected with the model's members) and every other drawn interior's stations (both `hiddenStations`), are scaled to 0 (`writeMarkerMatrices`' `hidden` list) when it has an interior (ready or loading), so it has no marker, and drawn when it has none or its load failed, with a `theme.stationFocus` `FocusRing.tsx` over the trains (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); `markerShape.ts` the marker constants);
+    instance, and its complex siblings' once the interior covering them is loaded (`hiddenSiblingIds` in `interiorLoad.ts`: the index's siblings intersected with the model's members) are scaled to 0 (`writeMarkerMatrices`' `hidden` list) when it has an interior (ready or loading), so it has no marker, and drawn when it has none or its load failed, with a `theme.stationFocus` `FocusRing.tsx` over the trains (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); every other drawn interior's stations (`covered`, o3r.4) keep their marker, the ring color mixed toward the background by `interiorOpacity` × that interior's presence (the fill is the background already), so the 1250 m gate and a swap leave no gap; `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, `theme.train` if `routeLineMix.amount` is 1 (mono lines); stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
@@ -318,16 +321,26 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `cameraDistance.ts` helpers; `renderOrder.ts` (also `strokeOrders` and `spanCarOrders`, the per-band and per-deck orders)
   - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms, one layer
     per platform deck (LiveTrains keeps three, splitting the spans with `deckSpans`; deck k's layer holds deck k of every
-    drawn interior, `deckSpanSets`; 24 trains each, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
+    drawn interior that lifts (not a bare focused station's neighbours), `deckSpanSets`, each car's weight times its interior's presence; 24 trains each, most on the platforms first; only cars with a weight above 0; the selected rim with them; overflow
     in `?debug`); `veilTint.ts` (its pure shader patch in `veilTintShader.ts`, tested against three's ShaderLib; a missing anchor logs once, never throws) their material, mixing each instance toward the background after shading, as the
     veil blends, so a copy at weight 0 renders exactly like its veiled street car. Along those platforms the map
     track fades out as the interior reveals, in the band line shader (per-segment fade weights, `platformMask.ts`)
   - `useSceneInteriors.ts` (o3r.4) the interiors Scene draws: the focused one, then `useViewInteriors` over the
-    `ViewStationSet` (read with `useSyncExternalStore`), through `drawnInteriors`; their `SpanSet`, deck sets, `hiddenStations`,
-    `markHidden` and `veiled` (look A with any drawn); dev `__underground.drawnInteriors()` the drawn file ids. Each mounts a
+    `ViewStationSet` (read with `useSyncExternalStore`), through `drawnInteriors`, capped by `viewInteriorCap` of the window;
+    `shown` is those plus any dropped one still fading out (`mergeShown` / `withoutFaded` in `lib/presence.ts`). Each has a
+    `Presence` (0 to 1, smoothstep over `PRESENCE_S` 0.25 s; reduced motion snaps), which `InteriorPresence.tsx`'s
+    `PresenceDriver` steps at -0.25 into a Scene-owned `PresenceStore` (`items`, the veil's own presence, `max`, `veilShare` =
+    veil × max) and reports a faded one so it unmounts. Presence multiplies into the interior's strokes, footprint veil and level
+    labels, its lifted cars' weight (`ShownSpan.presence`, `trainWeightIn`), its stations' marker and tie fade, and the screen veil.
+    Outputs: their `SpanSet`, deck sets, `hiddenSiblings` (the focused one's, only while its model is drawn), `covered` (every other
+    shown interior's stations with that presence), `hiddenStations` (both; ScenePicker's hidden set, so a train in reach beats a
+    neighbour's hidden point and a direct tap with none still picks it), `markHidden` and `veiled`: look A, any interior drawn, and
+    the focused station's own drawn or nothing focused. With a bare station focused (`veiled` false) its neighbours' trains don't
+    lift (no deck spans for them). Dev `__underground.drawnInteriors()` the drawn file ids. Each shown interior mounts a
     `StationInterior` in one keyed list, each in its own null-fallback `ErrorBoundary` (a crash draws nothing for it); only the
-    focused one gets the trip path and `outOfService`. `ScreenVeil.tsx` look A's one screen-wide veil at the orbit target, mounted
-    while any interior draws, so the veil darkens once however many reveal
+    focused one gets the trip path, `outOfService` and level labels (`labels`; the others claim no blocker slot).
+    `ScreenVeil.tsx` look A's one screen-wide veil at the orbit target, always mounted under look A, at `veilShare`, so the veil
+    darkens once however many reveal and eases with them
   - `StationInterior.tsx` a drawn station's interior (two line layers per stroke band, up to four bands; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx` (look B's footprint veil per interior; look A's plane, in ScreenVeil), level
     labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target; `STEP_RISE_M`); `interiorLook.ts` TEMPORARY look overrides;
@@ -355,7 +368,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     so no 1 px centerline reads as one more track in a bundle; the labels still name the street. Not while the station
     has an interior (loaded or loading): its tracks sink under it, so the streets above stay whole. Its draw order is auto: above the veil (7.5), built from
     `StreetLayer.veiledBuffers` (the 1.9:1 stroke, fading to the background like the others; material color stays
-    white), while any interior draws under look A (`veiled`); else 0.35 at full color; `streetsLook.ts` TEMPORARY
+    white), while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused); else 0.35 at full color; `streetsLook.ts` TEMPORARY
     override. It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
     street-file entrance the interior doesn't draw itself (`src/lib/entranceMarks.ts`: no interior entrance within
     1.5 m on the scene ground with the same type; none while an interior is still loading;
@@ -378,7 +391,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     street an entrance label names; last placement's run while it has at most one fewer), nearest the station first,
     falling back to the other runs. Every label keeps clear of the header, footer, panel (+8 px), every entrance
     mark, the other stations' markers within 300 m and the focus ring (sized as Stations.tsx and FocusRing.tsx draw
-    them now; an entrance ignores a marker its own mark sits in), and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, one claimed slot per drawn interior (`claimBlockerSlot` / `releaseBlockerSlot`, `BLOCKER_SLOTS` 3, `MAX_LEVEL_BLOCKERS` 16 each; the street labels read every slot),
+    them now; an entrance ignores a marker its own mark sits in), and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, a slot claimed by each interior that has labels, today the focused one alone (`claimBlockerSlot` / `releaseBlockerSlot`, `BLOCKER_SLOTS` 3, `MAX_LEVEL_BLOCKERS` 16 each; the street labels read every slot; the label divs are `aria-hidden`),
     at priority 0 each frame; read a frame late); street names also keep clear of the interior's outlines
     (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing). Sized after mount,
     after `document.fonts.ready` and when a resize flips phone and desktop sizes; opacity `streetLabelOpacity` (the level labels' depth gate)
@@ -926,13 +939,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   evicted (`useEquipmentIndex.ts` reuses it for `stations/equipment.json`); `interiorLoad.ts` the load types (interior and index) and their pure derivation, plus the complex helpers:
   `interiorCovers` (the one test for "this interior is this station's": a member, else `stationId`), `interiorStationIds`,
   `interiorIdOf` (a member id to its complex's file id, via the index), `siblingIdsOf` (the other members), and the view
-  helpers (o3r.4): `viewInteriorIds` (the file ids for the stations in view, focused file dropped but its slot counted, at most
-  `MAX_VIEW_INTERIORS`), `drawnInteriors` (focused first, each file once, capped; a model covering a station the map lacks
+  helpers (o3r.4): `viewInteriorIds` (the file ids for the stations in view, focused file dropped but its slot counted, a
+  `skip`ped file passed over without a slot, at most the cap), `drawnInteriors` (focused first, each file once, capped; a model covering a station the map lacks
   is left out with one warning), `coveredStationIds`; a ready
   model that doesn't cover the station is an error; `useStationInterior.ts` the
   focused station's interior load (the index is fetched once on mount; stations it doesn't list never fetch; it also
   returns `siblings`, the focused complex's other members, empty while the street marker shows; `useViewInteriors` the
-  loaded interiors of the stations in view other than the focused one, through `useInteriorModels`); `useLocate.ts` the location button's one-shot
+  loaded interiors of the stations in view other than the focused one, through `useInteriorModels` (its `onError`); the result
+  keeps its identity while the files and models stay the same (keyed on the ids' string), and a file that failed is passed over
+  for `VIEW_RETRY_MS` (30 s, `lib/viewStations.ts`, `failedRecently`; for o3r.5's streets too), its slot going to the next station); `useLocate.ts` the location button's one-shot
   geolocation (on press only, never watched; the fix lives in React state and nowhere else; `locate` asks and flies, `find` asks with no flight (the search dialog), `showFix` flies to the shown fix and marks it viewed: a marked placement carries `viewed`, set by a flight to it, and the header's near message reads "Found your location." until then, "Showing where you are." after, `lib/locate.ts` `markViewed`)
 - `src/data/loadStationStreets.ts` fetches `public/data/streets/<id>.json` (contract `src/data/streetSchema.ts`) and
   checks its outer shape; a 404 is null with one warning (cached for the session), other failures reject (evicted,
@@ -1187,7 +1202,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   positive `useFrame` priority (it takes over rendering). The frame order: -3 LiveTrains steps every slot and writes
   the follow anchor (with the last frame's band view); -2 CameraRig (the follow's `beforeFlight`, the flight step,
   focus, the polar lock), the touch twist's goal (`useTouchOrbit`) and the orbit's bounds; -1 drei's `update()`; -0.75 the train follow; -0.5 the orbit's pivot
-  and pan clamp; -0.25 the band view; 0 the draws (and `useBasemapTiles` reading the camera, read-only).
+  and pan clamp; -0.25 the band view and the interiors' presence (`PresenceDriver`); 0 the draws (and `useBasemapTiles` reading the camera, read-only).
 - The trip route frame (`useRouteFlight.ts`, 2q7.45.5): with the trip panel in front, a settled plan (its ends and attempt, never a
   silent tick or poll) or a journey or list the visitor opens or leaves (the token is the view plus the journey key, so the first
   journey reframes too) flies the camera top-down and north-up to the whole selected journey, every point of its spans and stations
@@ -1221,10 +1236,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: focused station's streets 0.35 (7.5 above the veil
-  while any interior draws under look A; TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
+  while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused); TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
   0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`), a straight-drawn trip ride 2.2 (`TripDashes.tsx`),
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo 4.4, trip walks 4.45
-  (`TripDashes.tsx`; 7.55 above the veil while any interior draws under look A and reveals), trip mark ring 4.5 and dot 4.55
+  (`TripDashes.tsx`; 7.55 above the veil while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused) and it reveals), trip mark ring 4.5 and dot 4.55
   (`TripMarks.tsx`), train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
@@ -1237,8 +1252,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   9.545 and 9.578 the mid bands, 9.8 the top band),
   interior levels above the lifted trains 9.6 (fine) and 9.7 (strong), focus ring 10 (`FocusRing.tsx`, `theme.stationFocus`, only for a focused station with no interior).
   The focused station (picked or auto-focused by zoom), and the other members of its complex once the interior that covers them is loaded, draw no marker and no
-  station tie: its panel and interior mark it, and it stays pickable. Every other drawn interior's stations (o3r.4) draw none
-  either and stay pickable; only the focused one and its hidden siblings are open to ScenePicker.
+  station tie: its panel and interior mark it, and it stays pickable. Every other drawn interior's stations (o3r.4) keep
+  theirs, faded toward the background by `interiorOpacity` × that interior's presence, and stay pickable; ScenePicker treats
+  them as hidden like the open station (a train in reach wins; a direct tap with none picks the station).
   The one depth-tested layer is the car bodies (depthTest and depthWrite on, still `transparent`): at iso
   tilt a far car would otherwise paint over a near one. It is safe because nothing before it writes depth and everything after it (veil, interior) has depthTest false.
   The above-veil platform car bodies (9.5) test and write depth too: they copy their street cars' matrices, so
@@ -1301,7 +1317,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   higher at an elevated station) mix toward the background (`src/lib/interiorFade.ts`). The camera aims at the
   interior's mid-height, halfway between its lowest and highest level. It fades
   in between 1250 m and 1000 m (`interiorReveal.ts`), as a flat plan while the camera is only slightly tipped. A background-colored veil (render order 7) dims every street
-  layer, live trains included, in one draw call (under look A one `ScreenVeil` for all drawn interiors, never one each), at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
+  layer, live trains included, in one draw call (under look A one `ScreenVeil` for all drawn interiors, never one each, scaled by `veilShare`: none while a bare station is focused), at `veilWeight` (opacity × depth factor, `interiorReveal.ts`);
   level labels show by `labelOpacity` (gated between depth 0.35 and 0.65); the interior draws at 8 (fine) and 9 (strong);
   look C uses -0.6 and -0.3. Trains on the revealed station's platforms
   are redrawn above the veil and the strokes of their platform level (`SpanCars.tsx`, 9.45 to 9.52; not in look C),
@@ -1484,7 +1500,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **View interiors are fetched only for the stations in view (o3r.4).** `useViewInteriors` loads interior files only for the
   ids in o3r.2's `ViewStationSet`, which is camera-driven, empty from 1250 m out and while the location cap is in force, and
   never keyed by the location fix or `nearestStation`; so no interior is fetched after a locate flight until the user moves
-  the view. Each interior file is cached for the session (unbounded; a few KB each).
+  the view. Each interior file is cached for the session (unbounded; a few KB each); one that failed is not asked for again for
+  `VIEW_RETRY_MS` (30 s).
 - **Member street files are fetched only for a focused complex lead** (and the trip's To and From complexes, through
   `useTripExit` and `useTripBoard`):
   each member is part of the station the user opened; never for a fix's nearest station.
