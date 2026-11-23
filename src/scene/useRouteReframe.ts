@@ -23,7 +23,7 @@ interface RouteReframeOptions {
   layout: RefObject<FlightLayout>
   tookOver: RefObject<boolean>
   following: () => boolean
-  /** The trip panel is in front. */
+  /** The route's own panel is in front (routePanelInFront: the changes list for a change, the trip panel for a trip). */
   front: boolean
   startFlight: (dest: Destination) => void
   panel: ScreenRect | null

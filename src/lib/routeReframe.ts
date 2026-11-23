@@ -1,5 +1,6 @@
 /**
- * The route frame's reframes after its landing (2q7.45.5). The trip panel in front, the route flight the last landing
+ * The route frame's reframes after its landing (2q7.45.5; a picked service change too, 08r.6). The route's own panel in
+ * front (routePanelInFront), the route flight the last landing
  * and no gesture since: a user collapse or expand of the panel (panelCollapse.tsx's `seq`), or one measured panel
  * move that shifts the free rect's bottom inside RESIZE_WINDOW_MS of the landing (a phone panel growing a line), waits
  * for the panel's measurement to settle (collapseDueIn) and reframes once onto the route in the new free rect. These
@@ -7,6 +8,7 @@
  * Pure; useRouteReframe applies it.
  */
 import type { CollapseAction, CollapsePending } from './collapseReframe'
+import type { FrontPanel } from './panelCollapseState'
 import { panelMoveArms, RESIZE_WINDOW_MS, type PanelMoveInput, type ResizeWindow } from './resizeReframe'
 
 /** Stands in for the station id the shared rules key on. */
@@ -30,6 +32,14 @@ export function routeMoveArms(landed: RouteLanded, open: boolean, s: Omit<PanelM
   return panelMoveArms(w, { ...s, focusedId: ROUTE_ID, lateArrival: false })
 }
 
+/**
+ * Whether the route view's own panel is in front, the one rule its frame and reframes read: a picked service change's
+ * is the changes list, a trip's the trip panel (so a trip under the list, a train panel or a notice is covered).
+ */
+export function routePanelInFront(kind: 'trip' | 'change', front: FrontPanel): boolean {
+  return front === (kind === 'change' ? 'changes' : 'trip')
+}
+
 export interface RouteReframeInput {
   flying: boolean
   following: boolean
@@ -37,7 +47,7 @@ export interface RouteReframeInput {
   tookOver: boolean
   /** The route flight was the last landing. */
   landed: boolean
-  /** The trip panel is in front. */
+  /** The route's own panel is in front (routePanelInFront). */
   front: boolean
   /** The route the flight framed is still the one the map draws. */
   sameRoute: boolean

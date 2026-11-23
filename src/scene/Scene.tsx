@@ -84,13 +84,15 @@ interface SceneProps {
   pathLabels: readonly ExitLabel[]
   /** The trip panel is open: a landing there goes on framing the trip's path above the panel as it changes. */
   tripOpen: boolean
-  /** The selected journey's ride legs (useTripRoute); null with none. */
+  /** The route view: a picked service change's (useChangeRoute), else the trip's selected journey (useTripRoute); null with none. The camera frames it. */
+  route: TripRouteDraw | null
+  /** Its panel is in front (the changes list for a change, the trip panel for a trip): it draws over the dimmed network. */
+  routeShown: boolean
+  /** The trip's own route (useTripRoute), for the camera: its frame decisions go on under a change. */
   tripRoute: TripRouteDraw | null
-  /** The trip panel is in front: its route draws over the dimmed network. */
-  tripShown: boolean
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, pathLabels, tripOpen, tripRoute, tripShown }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, pathLabels, tripOpen, route, routeShown, tripRoute }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -120,6 +122,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
     const anchors = interiorStationIds(interior).flatMap((id) => network.stationById.get(id)?.pos ?? [])
     return priorityFrameOf(interior, path, outages, anchors, { stepRise: STEP_RISE_M, railDrop: RAIL_DROP_M, boardHalfM: BOARD_HALF_M })
   }, [interior, path, outages, network])
+  /** What the map draws of the route view: only while its panel is in front (SubwayLines holds the last one to ease it out). */
+  const drawn = routeShown ? route : null
   /** Written by the level labels each frame, read by the street labels: their screen rects. */
   const labelBlockers = useMemo(() => createLabelBlockers(), [])
   return (
@@ -139,8 +143,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         interiorSpans={spans}
         veiled={veiled}
         view={bandView}
-        tripRoute={tripRoute}
-        tripShown={tripShown}
+        route={drawn}
         levels={tripLevels}
         markHidden={markHidden}
         fix={here?.ground ?? null}
@@ -151,8 +154,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         focusedMarker={focusedMarker}
         hiddenStations={hiddenSiblings}
         covered={covered}
-        tripStations={tripRoute?.stations ?? null}
-        tripMarks={tripRoute?.marks ?? null}
+        tripStations={drawn?.stations ?? null}
+        tripMarks={drawn?.marks ?? null}
         levels={tripLevels}
         fix={here?.ground ?? null}
       />
@@ -215,6 +218,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         anchor={anchor}
         frame={priorityFrame}
         tripOpen={tripOpen}
+        route={route}
         tripRoute={tripRoute}
       />
       <ViewCenterSource />

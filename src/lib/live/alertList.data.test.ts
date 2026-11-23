@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { transformAlerts } from '../../../worker/src/alerts'
 import type { RoutesFile } from '../../data/schema'
+import { changeDrawable } from '../changeDraw'
+import { realStations } from '../realGroups.testdata'
 import { alertChip, alertListView } from './alertList'
 
 const FEED = JSON.parse(readFileSync('worker/fixtures/alerts.json', 'utf8')) as unknown
@@ -12,7 +14,8 @@ const routes = (JSON.parse(readFileSync('public/data/routes.json', 'utf8')) as R
 const routeOrder = new Map(routes.map((r, i) => [r.id, i]))
 const snapshot = transformAlerts(FEED, FEED_AT).snapshot
 const input = { configured: true, snapshot, failures: 0, schemaMismatch: false }
-const body = alertListView(input, routeOrder, FEED_AT)
+const stationById = new Map(realStations.map((s) => [s.id, s]))
+const body = alertListView(input, routeOrder, FEED_AT, (a) => changeDrawable(a, stationById))
 if (body.kind !== 'list') throw new Error('expected a list')
 const short =(id: string) => id.replace('lmm:planned_work:', '')
 
@@ -43,5 +46,15 @@ describe('alertListView on the recorded feed', () => {
   it('counts the changes in effect in the chip (5 now, 4 later in the recording)', () => {
     expect([body.now.length, body.later.length]).toEqual([5, 4])
     expect(alertChip(body, false)).toEqual({ text: '5 service changes', mark: true })
+  })
+})
+
+describe('drawable rows on the recorded feed', () => {
+  const all = [...body.now, ...body.later]
+  const drawable = (id: string) => all.find((r) => short(r.id) === id)?.drawable
+  it('marks the skips and suspensions drawable, never a delay, a notice or an express-to-local change', () => {
+    for (const id of ['35124', '31498', '35972', '35976', '35962', '35952']) expect(drawable(id), id).toBe(true)
+    for (const id of ['33366', '31871']) expect(drawable(id), id).toBe(false)
+    expect(all.find((r) => r.id.startsWith('lmm:alert:'))?.drawable).toBe(false)
   })
 })

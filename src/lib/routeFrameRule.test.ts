@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { routeFrameDecision, routeIsFramed, type RouteInput, type RouteMemo, type RouteToken } from './routeFrameRule'
+import { changeToken, isChangeToken, routeFrameDecision, routeIsFramed, type RouteInput, type RouteMemo, type RouteToken } from './routeFrameRule'
 
 const A: RouteToken = { plan: 'L08>127#1', journey: 'L:a>b' }
 const A2: RouteToken = { plan: 'L08>127#1', journey: 'L:c>d' }
@@ -75,5 +75,48 @@ describe('routeIsFramed', () => {
     expect(routeIsFramed(A, B)).toBe(false)
     expect(routeIsFramed(A, null)).toBe(false)
     expect(routeIsFramed(null, A)).toBe(false)
+  })
+})
+
+describe('change tokens', () => {
+  const pick1 = changeToken('lmm:planned_work:35972#1')
+  const pick2 = changeToken('lmm:planned_work:35972#2')
+  it('are told apart from trip tokens', () => {
+    expect(isChangeToken(pick1)).toBe(true)
+    expect(isChangeToken(A)).toBe(false)
+  })
+  it('fly in front, even after a framed trip; skip while covered or followed', () => {
+    expect(routeFrameDecision({ framed: A, interrupted: false }, input({ route: pick1 }))).toBe('fly')
+    expect(routeFrameDecision(fresh, input({ route: pick1, front: false }))).toBe('skip')
+    expect(routeFrameDecision(fresh, input({ route: pick1, following: true }))).toBe('skip')
+  })
+  it('frame each pick once; a new pick of the same row is a new token', () => {
+    expect(routeFrameDecision({ framed: pick1, interrupted: false }, input({ route: pick1 }))).toBe('none')
+    expect(routeFrameDecision({ framed: pick1, interrupted: false }, input({ route: pick2 }))).toBe('fly')
+    expect(routeIsFramed(pick1, pick2)).toBe(false)
+  })
+})
+
+/** Applies one decision as useRouteFlight does: anything but none records the route. */
+function step(memo: RouteMemo, over: Partial<RouteInput>): ReturnType<typeof routeFrameDecision> {
+  const d = routeFrameDecision(memo, input(over))
+  if (d !== 'none') memo.framed = over.route === undefined ? A : over.route
+  return d
+}
+
+describe('the trip under a picked change (the list in front: the trip decides with front false)', () => {
+  it('a silent journey swap under the list is recorded, so closing the list frames nothing', () => {
+    const memo: RouteMemo = { framed: A, interrupted: false }
+    expect(step(memo, { route: A, front: false })).toBe('none')
+    expect(step(memo, { route: A2, silent: true, front: false })).toBe('skip')
+    expect(step(memo, { route: A2, front: true })).toBe('none')
+  })
+  it('a plan that first settles under the list never fires later', () => {
+    const memo: RouteMemo = { framed: A, interrupted: false }
+    expect(step(memo, { route: B, front: false })).toBe('skip')
+    expect(step(memo, { route: B, front: true })).toBe('none')
+    const fresh2: RouteMemo = { framed: null, interrupted: false }
+    expect(step(fresh2, { route: A, front: false })).toBe('skip')
+    expect(step(fresh2, { route: A, front: true })).toBe('none')
   })
 })

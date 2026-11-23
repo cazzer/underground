@@ -1,6 +1,8 @@
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useMemo } from 'react'
+import type { PerspectiveCamera } from 'three'
 import type { RouteId } from '../data/schema'
+import { metersPerPx } from '../lib/follow'
 import type { Rgb } from '../lib/lineBuffers'
 import type { Network, ShapePath } from '../lib/network'
 import type { SpanSet } from '../lib/platformSpan'
@@ -17,6 +19,8 @@ import { usePlatformFade } from './usePlatformFade'
 
 /** Route ids a ride named that routes.json lacks, warned about once per session. */
 const unknownRoutes = new Set<RouteId>()
+
+const SUSPENDED_DASH = { size: theme.changeSuspendedDashPx, gap: theme.changeSuspendedGapPx }
 
 /**
  * A ride's color: its own route's, so a leg found on another route's track still reads as its line; for a route
@@ -40,7 +44,7 @@ interface TripLinesProps {
   network: Network
   /** The shapes SubwayLines draws (banded once the bands arrive); `route`'s spans are found on them. */
   paths: readonly ShapePath[]
-  /** The selected journey's ride legs, held by SubwayLines while they ease out; null with none. */
+  /** The route view's rides and suspended stretches, held by SubwayLines while they ease out; null with none. */
   route: TripRouteDraw | null
   /** This frame's look, written by SubwayLines at -0.25. */
   levels: EmphasisLevels
@@ -49,26 +53,50 @@ interface TripLinesProps {
 }
 
 /**
- * The trip's ride legs over the dimmed network: the same segments, heights and band inputs as the map's line, so the
- * trains ride it, cut exactly at the stops by each segment's window (tripLineBuffers.ts). In route colors under
- * theme.routeLineMix whatever ?lines= draws, wider and full once a journey is opened, faint in the list view.
+ * The route view's rides over the dimmed network (a trip's ride legs, a service change's stretch): the same segments,
+ * heights and band inputs as the map's line, so the trains ride it, cut exactly at the stops by each segment's window
+ * (tripLineBuffers.ts). In route colors under theme.routeLineMix whatever ?lines= draws, wider and full once a journey
+ * is opened (a change always is), faint in the list view. A change's suspended stretch is a second such layer, dashed
+ * (theme.changeSuspendedDashPx / GapPx on screen at the view's target, as TripDashes does) in its route color mixed
+ * theme.changeSuspendedDim toward the background, faded in by opacity, so the dimmed network line shows through its gaps.
  */
 export function TripLines({ network, paths, route, levels, interiorSpans }: TripLinesProps) {
+  const camera = useThree((s) => s.camera) as PerspectiveCamera
   const rides = route?.rides
-  const buffers = useMemo(
-    () => (rides ? tripLineBuffers(paths, rides, rideColor(routeColorMap(network, theme.routeLineMix))) : null),
-    [network, paths, rides],
-  )
+  const suspended = route?.suspended
+  const colors = useMemo(() => rideColor(routeColorMap(network, theme.routeLineMix)), [network])
+  const buffers = useMemo(() => (rides ? tripLineBuffers(paths, rides, colors) : null), [paths, rides, colors])
+  const suspendedBuffers = useMemo(() => (suspended && suspended.length > 0 ? tripLineBuffers(paths, suspended, colors) : null), [paths, suspended, colors])
   // The width is written per frame, never rebuilt: the base width here.
   const lines = useLineLayer(buffers, RENDER_ORDER.tripLine)
+  const dashed = useLineLayer(suspendedBuffers, RENDER_ORDER.changeSuspended, theme.lineWidth, SUSPENDED_DASH)
   usePlatformFade(lines, buffers, paths, interiorSpans)
+  usePlatformFade(dashed, suspendedBuffers, paths, interiorSpans)
   useFrame((state) => {
-    if (!lines) return
-    lines.visible = levels.tripVisible
-    if (!levels.tripVisible) return
-    lines.scale.y = depthScaleY(depthFactor(cameraDistance(state)))
-    lines.material.linewidth = levels.tripWidthPx
-    writeLineDim(lines.material, levels.tripDim)
+    const shown = levels.tripVisible
+    if (lines) lines.visible = shown
+    if (dashed) dashed.visible = shown
+    if (!shown) return
+    const distance = cameraDistance(state)
+    const scaleY = depthScaleY(depthFactor(distance))
+    if (lines) {
+      lines.scale.y = scaleY
+      lines.material.linewidth = levels.tripWidthPx
+      writeLineDim(lines.material, levels.tripDim)
+    }
+    if (dashed) {
+      const m = dashed.material
+      dashed.scale.y = scaleY
+      m.linewidth = levels.tripWidthPx
+      m.dashScale = 1 / metersPerPx(distance, camera.fov, state.size.height)
+      m.opacity = levels.tripOpacity
+      writeLineDim(m, theme.changeSuspendedDim + (1 - theme.changeSuspendedDim) * levels.tripDim)
+    }
   })
-  return lines && <primitive object={lines} />
+  return (
+    <>
+      {lines && <primitive object={lines} />}
+      {dashed && <primitive object={dashed} />}
+    </>
+  )
 }

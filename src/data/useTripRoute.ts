@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { TripIndexFile } from './schema'
 import type { Network, ShapePath } from '../lib/network'
 import type { TripJourney } from '../lib/route/plan'
+import { legStationPoints } from '../lib/routeFrame'
 import type { TripRouteDraw } from '../lib/tripLineBuffers'
 import { tripMarks, tripStationIds } from '../lib/tripMarks'
 import { journeyKey, type TripSelection } from '../lib/tripSelection'
@@ -60,7 +61,7 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
   const stops = useMemo(() => stopStations(network.stations), [network])
   const legsKey = enabled && journey ? legsKeyOf(journey) : null
   const key = enabled && journey ? journeyKey(journey) : null
-  const drawn = useMemo((): Omit<TripRouteDraw, 'key' | 'faint'> | null => {
+  const drawn = useMemo((): Omit<TripRouteDraw, 'kind' | 'key' | 'faint'> | null => {
     if (legsKey === null || journey === null || patterns === null) return null
     try {
       const spans = journeySpans(journey.legs, { shapes: paths, stopStations: stops, patterns: patterns === NO_PATTERNS ? undefined : patterns })
@@ -69,8 +70,10 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
         straights: spans.filter((s): s is RideStraightSpan => s.kind === 'straight'),
         // A walk between a complex's members is a change inside one station as the UI shows it: its marks say so.
         walks: spans.filter((s): s is WalkSpan => s.kind === 'walk' && !s.sameComplex),
+        suspended: [],
         marks: tripMarks(journey.legs, stops),
         stations: tripStationIds(journey.legs, stops),
+        frameStations: legStationPoints(journey.legs, stops),
       }
     } catch (err) {
       console.error(`Trip route: ${err instanceof Error ? err.message : String(err)}; not drawn`)
@@ -81,5 +84,5 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
   const faint = selection.view === 'list'
   // Nothing to draw (no leg mapped and no walk between stations): nothing shows, so the network isn't dimmed either.
   const any = drawn !== null && (drawn.rides.length > 0 || drawn.straights.length > 0 || drawn.walks.length > 0)
-  return useMemo(() => (any && drawn && key !== null ? { key, ...drawn, faint } : null), [any, drawn, key, faint])
+  return useMemo(() => (any && drawn && key !== null ? { kind: 'trip' as const, key, ...drawn, faint } : null), [any, drawn, key, faint])
 }

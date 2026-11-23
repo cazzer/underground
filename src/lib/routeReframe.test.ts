@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { collapseDueIn, COLLAPSE_MAX_WAIT_MS, COLLAPSE_QUIET_MS } from './collapseReframe'
 import { RESIZE_WINDOW_MS } from './resizeReframe'
-import { routeMoveArms, routePending, routeReframeAction, type RouteReframeInput } from './routeReframe'
+import { routeMoveArms, routePanelInFront, routePending, routeReframeAction, type RouteReframeInput } from './routeReframe'
 
 const landed = { landedAt: 1000, width: 390, height: 844 }
 const move = (over: Partial<Parameters<typeof routeMoveArms>[2]> = {}) => ({
@@ -49,5 +49,23 @@ describe('routeReframeAction', () => {
   })
   it.each([{ flying: true }, { following: true }, { tookOver: true }, { landed: false }, { front: false }, { sameRoute: false }])('drops for %j', (over) => {
     expect(routeReframeAction({ ...ok, ...over })).toBe('drop')
+  })
+})
+
+describe('a picked service change (08r.6)', () => {
+  it('reads the changes list as its panel, the trip panel as the trip\'s', () => {
+    expect(routePanelInFront('change', 'changes')).toBe(true)
+    expect(routePanelInFront('change', 'trip')).toBe(false)
+    expect(routePanelInFront('change', 'train')).toBe(false)
+    expect(routePanelInFront('trip', 'trip')).toBe(true)
+    expect(routePanelInFront('trip', 'changes')).toBe(false)
+  })
+  it('reframes once its landed flight sees a collapse or expand of the list in front, and not under a train panel', () => {
+    const base: RouteReframeInput = { flying: false, following: false, tookOver: false, landed: true, front: routePanelInFront('change', 'changes'), sameRoute: true, reduced: false }
+    expect(routeReframeAction(base)).toBe('reframe')
+    expect(routeReframeAction({ ...base, reduced: true })).toBe('snap')
+    expect(routeReframeAction({ ...base, front: routePanelInFront('change', 'train') })).toBe('drop')
+    expect(routeReframeAction({ ...base, sameRoute: false })).toBe('drop')
+    expect(routeReframeAction({ ...base, tookOver: true })).toBe('drop')
   })
 })

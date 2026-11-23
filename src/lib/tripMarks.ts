@@ -6,8 +6,8 @@ import type { StationId, StopId } from '../data/schema'
 import type { Station } from './network'
 import type { Ground } from './projection'
 
-/** `start` and `end` draw filled, `change` hollow. */
-export type TripMarkRole = 'start' | 'change' | 'end'
+/** `start` and `end` draw filled, `change` hollow; `skip` (a service change's skipped station, changeDraw.ts) hollow with a cross. 08r.8 adds `added`. */
+export type TripMarkRole = 'start' | 'change' | 'end' | 'skip'
 
 export interface TripMark {
   stationId: StationId

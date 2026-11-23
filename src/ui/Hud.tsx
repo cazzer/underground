@@ -13,7 +13,6 @@ import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { markedPlacement } from '../lib/locate'
 import { usePanelCollapse } from '../lib/panelCollapse'
 import type { Network } from '../lib/network'
-import type { PlacePick } from '../lib/placeLabel'
 import { useTrainSelection } from '../lib/trainSelection'
 import type { LocateControls } from '../data/useLocate'
 import { ArrivalsPanel } from './ArrivalsPanel'
@@ -30,11 +29,12 @@ import { ServiceChangesChip } from './ServiceChangesChip'
 import { SERVICE_CHANGES_PANEL_ID, ServiceChangesPanel } from './ServiceChangesPanel'
 import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
-import { StationSearch, type StationSearchHandle } from './StationSearch'
+import { StationSearch } from './StationSearch'
 import { TripAnnouncer } from './TripAnnouncer'
 import { TripPanel, type TripLines } from './TripPanel'
 import type { PlaceLine } from './usePlaceLine'
 import { useHudInsets } from './useHudInsets'
+import { useHudSearch } from './useHudSearch'
 import { useChangesPanel } from './useChangesPanel'
 import { useLineFilter } from './useLineFilter'
 import { usePanelEscape } from './usePanelEscape'
@@ -59,6 +59,8 @@ interface HudProps {
   skips: AlertSkips | null
   /** Every service change in effect or coming within a day: the header chip and its list panel. */
   changeList: AlertListBody
+  /** The picked row's note (changeDrawNote: the drawing is ours, or nothing drew); null with no pick. */
+  changeNote: string | null
   /** Reports where the station panel sits (viewport px), or null when it closes. */
   onPanel: (rect: ScreenRect | null) => void
   /** The location button's state and actions. */
@@ -75,7 +77,7 @@ interface HudProps {
   siblingsOf: (stationId: string) => readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, changes, skips, changeList, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, changes, skips, changeList, changeNote, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const lineFilter = useLineFilter(focusedId)
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
@@ -119,40 +121,16 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
     dismiss()
     if (hadFocus) searchButton.current?.focus({ preventScroll: true })
   }, [dismiss])
-  const search = useRef<StationSearchHandle>(null)
-  // Mirrors the dialog's native open state (set on open and on its close event); the Esc guard reads it.
-  const [searchOpen, setSearchOpen] = useState(false)
-  // Cancel and Esc leave focus to the dialog, which hands it back to the button that was focused when it
-  // opened. A station choice instead moves it to the new station's panel heading, a place choice to the place
-  // line, once the dialog has closed; a directions pick hands focus to the trip panel (its own request), not this close event.
-  const focusOnClose = useRef<'station' | 'place' | 'locate' | null>(null)
-  const openSearch = () => {
-    // A tap doesn't focus a button on iOS; the dialog restores focus to whatever had it when it opened.
-    searchButton.current?.focus()
-    search.current?.open()
-    setSearchOpen(true)
-  }
-  const onSearchClosed = () => {
-    setSearchOpen(false)
-    const target = focusOnClose.current
-    focusOnClose.current = null
-    if (target) (target === 'place' ? place.lineRef : target === 'locate' ? locateButton : stationHeading).current?.focus()
-  }
-  const onSearchChoose = (stationId: string) => {
-    focusOnClose.current = 'station'
-    // A search pick asks for that station, so the list doesn't hide its panel (a map tap keeps the list open).
-    if (changesOpen) closeChanges()
-    select(stationId)
-  }
-  const onSearchChoosePlace = (pick: PlacePick) => {
-    focusOnClose.current = 'place'
-    place.show(pick)
-  }
-  // The dialog's "My location" row flies where the header button does; focus ends on that button.
-  const onSearchChooseHere = () => {
-    focusOnClose.current = 'locate'
-    locate.showFix()
-  }
+  const { search, searchOpen, openSearch, onSearchClosed, onSearchChoose, onSearchChoosePlace, onSearchChooseHere } = useHudSearch({
+    searchButton,
+    locateButton,
+    stationHeading,
+    place,
+    locate,
+    changesOpen,
+    closeChanges,
+    select,
+  })
   // Clearing removes the × the user just pressed; focus goes back to the button that started it.
   const { clear } = locate
   const onClearLocation = useCallback(() => {
@@ -241,6 +219,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
         {changesOpen && (
           <ServiceChangesPanel
             body={changeList}
+            note={changeNote}
             chip={chip}
             routeById={network.routeById}
             covered={front !== 'changes'}

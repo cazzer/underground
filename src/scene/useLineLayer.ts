@@ -67,8 +67,9 @@ export interface DashableLineBuffers extends LineBuffers {
  * CSS pixels at any dpr. Buffers with `bands` (route lines) draw with BandLineMaterial, which shifts each
  * segment end by its band offset on the GPU (and fades it by its FADE_ATTRIBUTE weight, and with `windows` draws
  * only each segment's window); the band uniforms are written per frame in SubwayLines, each layer's `lineDim` by its owner. With `dash`, the material is dashed in world meters along `buffers.distances`
- * (written as-is, not by computeLineDistances); a dashed material drops every segment's round end caps. No layer
- * is both: a banded layer with a dash throws. A banded layer always has a `lineDim` (writeLineDim); a plain one only with
+ * (written as-is, not by computeLineDistances); a dashed material drops every segment's round end caps. A banded layer
+ * may be dashed too (a service change's suspended stretch, TripLines): the band shift moves positions only, and the dash
+ * runs along the unshifted distances. A banded layer always has a `lineDim` (writeLineDim); a plain one only with
  * `dimmable` (DimLineMaterial).
  */
 export function useLineLayer(
@@ -87,7 +88,6 @@ export function useLineLayer(
     const dashed = dashSize !== undefined && gapSize !== undefined
     let material: LineMaterial
     if (buffers.bands) {
-      if (dashed) throw new Error('A banded line layer cannot be dashed')
       const band = new InstancedInterleavedBuffer(buffers.bands, 8, 1)
       geometry.setAttribute(BAND_START, new InterleavedBufferAttribute(band, 4, 0))
       geometry.setAttribute(BAND_END, new InterleavedBufferAttribute(band, 4, 4))
