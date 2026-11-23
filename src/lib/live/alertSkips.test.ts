@@ -73,9 +73,12 @@ describe('skipAt', () => {
     expect(skipAt(skipsOf([alert()]), '1', null, ['b'], NOW)).toBeNull()
   })
 
-  it('treats a mixed-direction alert as both directions', () => {
+  it('treats a mixed-direction alert as a guess for both directions, never a named skip', () => {
     const skips = skipsOf([alert({ entities: [stop('1', 'a', 'N'), stop('1', 'b', 'S'), stop('1', 'c', 'S')] })])
-    expect(skipAt(skips, '1', 'N', ['b'], NOW)).toBe('skips')
+    expect(skipAt(skips, '1', 'N', ['b'], NOW)).toBe('probably')
+    expect(skipAt(skips, '1', 'S', ['b'], NOW)).toBe('probably')
+    const partlyNull = skipsOf([alert({ entities: [stop('1', 'a'), stop('1', 'b', 'S'), stop('1', 'c', 'S')] })])
+    expect(skipAt(partlyNull, '1', 'N', ['b'], NOW)).toBe('probably')
   })
 
   it("covers an express by its line's alert, not the line by the express's", () => {
@@ -162,7 +165,7 @@ describe('markSkips', () => {
 describe('texts', () => {
   it('words a skipped stop for the eye and the ear', () => {
     expect(skipStopText('125 St', 'skips')).toEqual({ note: 'skips · per MTA notice', spoken: 'skips 125 St, per MTA notice' })
-    expect(skipStopText('125 St', 'probably')).toEqual({ note: 'probably skips · per MTA notice', spoken: 'probably skips 125 St, per MTA notice' })
+    expect(skipStopText('125 St', 'probably')).toEqual({ note: 'probably skips · per MTA notice', spoken: 'probably skipped, per MTA notice' })
   })
   it('words the arrivals note without the source', () => {
     expect(arrivalSkipNote('skips')).toBe('skips this station')

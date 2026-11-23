@@ -27,7 +27,11 @@ export function alertSkipsOf(snapshot: AlertsSnapshot | null, schemaMismatch: bo
   if (snapshot === null || schemaMismatch) return null
   const byRoute = new Map<RouteId, RouteSkipSet[]>()
   for (const alert of snapshot.alerts) {
-    for (const set of skipSetsOf(alert, stationById)) byRoute.set(set.route, [...(byRoute.get(set.route) ?? []), set])
+    for (const set of skipSetsOf(alert, stationById)) {
+      // A null direction is both directions only when no stop entity of the route names one; N and S mixed is our guess.
+      const mixed = set.direction === null && alert.entities.some((e) => e.route === set.route && e.stop !== null && e.direction !== null)
+      byRoute.set(set.route, [...(byRoute.get(set.route) ?? []), mixed ? { ...set, probable: true } : set])
+    }
   }
   return { generatedAt: snapshot.generatedAt, byRoute }
 }
@@ -96,8 +100,9 @@ export function markSkips(stops: readonly TrainStop[], markOf: (stationId: Stati
 
 /** A skipped stop's row text: the dim visible line and the one sentence a screen reader gets in place of the name and times. */
 export function skipStopText(name: string, mark: SkipMark): { note: string; spoken: string } {
-  const lead = mark === 'probably' ? 'probably skips' : 'skips'
-  return { note: `${lead} · per MTA notice`, spoken: `${lead} ${name}, per MTA notice` }
+  // A guessed skip keeps its row, whose name is already read: the sentence doesn't repeat it.
+  if (mark === 'probably') return { note: 'probably skips · per MTA notice', spoken: 'probably skipped, per MTA notice' }
+  return { note: 'skips · per MTA notice', spoken: `skips ${name}, per MTA notice` }
 }
 
 /** The arrivals row's dim note for a route and direction that skips the station. */

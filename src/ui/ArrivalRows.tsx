@@ -57,14 +57,13 @@ export function ArrivalRow({ group, network, nowS, drawnKeys, skip, onSelect, on
   if (!route) throw new Error(`Arrival for unknown route "${group.routeId}"`)
   const target = selectableArrival(group, drawnKeys)
   const note = skip === null ? null : arrivalSkipNote(skip)
-  const description = [note, target === null ? null : shownTrainText(formatArrivalTimes([target.time], nowS))].filter((t) => t !== null).join('. ')
   return (
     <li data-group={arrivalGroupKey(group)}>
       <button
         ref={button}
         type="button"
         aria-disabled={target === null ? true : undefined}
-        aria-description={description === '' ? undefined : description}
+        aria-description={target === null ? undefined : shownTrainText(formatArrivalTimes([target.time], nowS))}
         onClick={target === null ? undefined : () => onSelect(target.tripKey)}
         className={`${ROW_BOX} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
           target === null ? 'cursor-default' : 'cursor-pointer hover:bg-edge/20'
@@ -81,9 +80,12 @@ export function ArrivalRow({ group, network, nowS, drawnKeys, skip, onSelect, on
           </span>
           <span className={TIMES}>{formatArrivalTimes(group.times, nowS)}</span>
           {note !== null && (
-            <span aria-hidden="true" className={NOTE}>
-              {note}
-            </span>
+            <>
+              <span className="sr-only">, {note}</span>
+              <span aria-hidden="true" className={NOTE}>
+                {note}
+              </span>
+            </>
           )}
         </span>
       </button>

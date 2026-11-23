@@ -164,9 +164,9 @@ export function TrainStops({ network, trip, source, status, skips }: TrainStopsP
         Next stops
       </h3>
       <div role="status" aria-live="polite">
-        {stateLines.map((line) => (
-          <p key={line} className="mt-1 text-xs text-ink-dim">
-            {line}
+        {stateLines.map((text) => (
+          <p key={text} className="mt-1 text-xs text-ink-dim">
+            {text}
           </p>
         ))}
       </div>
