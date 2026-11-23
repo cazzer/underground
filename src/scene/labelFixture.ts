@@ -5,6 +5,8 @@ import type { EntranceLabelSource, StreetLayer } from '../data/useStationStreets
 import { BUNDLE_STRIDE } from '../lib/routeBundles'
 import type { Ground } from '../lib/projection'
 import type { LabelCandidate, StreetLabelSource } from '../lib/streetRuns'
+import { createLabelPlacement } from './labelPlacementLayout'
+import type { LabelPlacement } from './labelPlacementState'
 
 /** Top-down, north up, `height` m above (x, 0, z): about 2.54 px a meter at 500 m on an 800 px canvas. */
 export function topDownCamera(x = 0, z = 0, height = 500): PerspectiveCamera {
@@ -96,12 +98,10 @@ export function fixtureStation(
     }),
   )
   const marks = [...spec.entrances.map((e) => ({ x: e.x, z: e.z })), ...(spec.extraMarks ?? [])]
-  // The labels never read a layer's buffers or file.
-  const layer = { stationId: id, anchor, entrances, streets, marks } as unknown as StreetLayer
   return {
     id,
     anchor,
-    layer,
+    layer: labelLayer(id, entrances, streets, marks, anchor),
     entrances,
     streets,
     marks,
@@ -137,6 +137,25 @@ export function crowdedStation(id = 'A', anchor: Ground = { x: 10, z: -5 }): Fix
     ],
     extraMarks: [{ x: 60, z: -60 }],
   })
+}
+
+/** A street layer holding just `entrances` (and optional streets and marks), for the ranking tests. */
+export function labelLayer(id: string, entrances: EntranceLabelSource[], streets: StreetLabelSource[] = [], marks: Ground[] = [], anchor: Ground = { x: 0, z: 0 }): StreetLayer {
+  // The labels never read a layer's buffers or file.
+  return { stationId: id, anchor, entrances, streets, marks } as unknown as StreetLayer
+}
+
+/** The placement of `stations` (in label order) with the fixture sizes copied in. */
+export function fixturePlacement(stations: readonly FixtureStation[], nearby: readonly Ground[] = []): LabelPlacement {
+  const p = createLabelPlacement(
+    stations.map((s) => ({ layer: s.layer, bundles: s.bundles })),
+    nearby,
+  )
+  stations.forEach((s, k) => {
+    p.w.set(s.w, p.segItem0[k]!)
+    p.h.set(s.h, p.segItem0[k]!)
+  })
+  return p
 }
 
 /** What one placement chose: per item its candidate (-1 for none) and that box's centre, rounded to 0.01 px. */

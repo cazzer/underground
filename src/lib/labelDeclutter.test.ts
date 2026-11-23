@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { declutter, type LabelBounds, type LabelCandidates } from './labelDeclutter'
+import { declutter, GROUP, isExempt, setExempt, type LabelBounds, type LabelCandidates } from './labelDeclutter'
 import { BOX, RECT, writeBox, writeRect } from './labelGeometry'
+import { closeGroup } from './labelRectGroups'
 
 const viewport = { left: 0, top: 0, right: 400, bottom: 300 }
 
@@ -67,6 +68,68 @@ describe('declutter', () => {
     const out = new Int16Array(2)
     declutter(c, { viewport, rects, count: 2, exempt: new Uint32Array([0b01, 0]) }, new Int16Array([-1, -1]), out)
     expect([...out]).toEqual([0, -1])
+  })
+
+  it('reads exemptions past the 32nd item from the rect’s later words', () => {
+    // 42 items all wanting the same spot, apart: item 40 exempt from the rect over it, item 41 not.
+    const items: [number, number][][] = Array.from({ length: 42 }, (_, i) => [[20 + (i % 6) * 60, 20 + Math.floor(i / 6) * 30]])
+    const c = candidates(items)
+    const rects = new Float32Array(2 * RECT)
+    writeRect(rects, 0, 250, 198, 270, 202)
+    writeRect(rects, 1, 310, 198, 330, 202)
+    const b: LabelBounds = { viewport, rects, count: 2, exempt: new Uint32Array(2 * 2), exemptWords: 2 }
+    setExempt(b, 0, 40)
+    expect(isExempt(b, 0, 40)).toBe(true)
+    expect(isExempt(b, 0, 41)).toBe(false)
+    expect(isExempt(b, 0, 8)).toBe(false)
+    const out = new Int16Array(42)
+    declutter(c, b, new Int16Array(42).fill(-1), out)
+    // Item 40 sits at (260, 200) over rect 0, item 41 at (320, 200) over rect 1.
+    expect([out[40], out[41]]).toEqual([0, -1])
+  })
+
+  it('stops at `limit` placed items and leaves the rest unplaced', () => {
+    const c = candidates([[[50, 50]], [[150, 50]], [[250, 50]], [[350, 50]]])
+    const out = new Int16Array(4)
+    const placed = declutter(c, { viewport, rects: new Float32Array(0), count: 0 }, new Int16Array(4).fill(-1), out, 0, 4, 2)
+    expect(placed).toBe(2)
+    expect([...out]).toEqual([0, 0, -1, -1])
+  })
+
+  it('places the same with rect groups as without, and an empty group never blocks', () => {
+    let seed = 7
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    const items: [number, number][][] = Array.from({ length: 200 }, () => Array.from({ length: 3 }, (): [number, number] => [random() * 400, random() * 300]))
+    const c = candidates(items)
+    const n = 120
+    const rects = new Float32Array(n * RECT)
+    for (let k = 0; k < n; k++) {
+      const x = random() * 400
+      const y = random() * 300
+      // Every fifth rect empty, as a hidden marker's.
+      if (k % 5 === 0) writeRect(rects, k, 0, 0, 0, 0)
+      else writeRect(rects, k, x, y, x + 4 + random() * 10, y + 4 + random() * 10)
+    }
+    // Twelve rects a group.
+    const groups = new Float32Array(10 * GROUP)
+    for (let g = 0; g < 10; g++) closeGroup(groups, g, rects, g * 12, (g + 1) * 12)
+    const none = new Int16Array(200).fill(-1)
+    const plain = new Int16Array(200)
+    const grouped = new Int16Array(200)
+    declutter(c, { viewport, rects, count: n }, none, plain)
+    declutter(c, { viewport, rects, count: n, groups, groupCount: 10 }, none, grouped)
+    expect([...grouped]).toEqual([...plain])
+    expect(plain.some((k) => k < 0)).toBe(true)
+    expect(plain.some((k) => k >= 0)).toBe(true)
+    // A group of only empty rects has bounds no box touches, so it is never tested.
+    const empty = new Float32Array(2 * RECT)
+    writeRect(empty, 1, 200, 100, 200, 140)
+    closeGroup(groups, 0, empty, 0, 2)
+    expect(Array.from(groups.subarray(0, GROUP))).toEqual([0, 2, Infinity, Infinity, -Infinity, -Infinity])
+    const one = candidates([[[200, 120]]])
+    const out = new Int16Array(1)
+    declutter(one, { viewport, rects: empty, count: 2, groups, groupCount: 1 }, new Int16Array([-1]), out)
+    expect(out[0]).toBe(0)
   })
 
   it('places nothing for an item with no candidates', () => {
