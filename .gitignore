@@ -22,6 +22,9 @@ data/stations/catalog/*.tmp
 # Half-written street pin files from an interrupted data:streets:fetch
 data/streets/*.tmp
 
+# Dated planned-work timetables are built by each Pages deploy (npm run data:dated), never committed
+public/data/timetable/dated/
+
 # The NYC basemap is built by basemap.yml and fetched by npm run basemap:fetch, never committed
 public/basemap/
 *.pmtiles

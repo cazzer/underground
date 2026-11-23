@@ -27,7 +27,7 @@ Route colors come from `routes.txt`. MTA's IP status for those colors is UNVERIF
   medians, regrouped by stop pattern in 30 s units: a lossless re-encoding of `stop_times.txt` minus trip ids,
   stop_sequence, shapes and headsigns; plus the same-station `transfers.txt` rows; loaded on demand, outside the
   startup budget)
-- `timetable/dated/<YYYYMMDD>.json` and `timetable/dated/index.json` (derived the same way from the MTA's supplemented
+- `timetable/dated/<YYYYMMDD>.json` and `timetable/dated/index.json` (built at each deploy, not committed; derived the same way from the MTA's supplemented
   GTFS feed: each date's scheduled service with the next days' planned work applied; the dates planned work changes, at most 14,
   loaded on demand, outside the startup budget; the data may not be real time)
 

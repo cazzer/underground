@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '23 9 * * *' # daily, 09:23 UTC: rebuilds the dated timetables and redeploys Pages and the (unchanged) Worker
 
 permissions:
   contents: read
@@ -24,6 +26,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # The dated timetables are built by each deploy (scripts/build-dated.ts); a committed copy would go stale and,
+      # in a refresh PR, bring back the daily churn this removed.
+      - name: No committed dated timetables
+        run: |
+          if [ -n "$(git ls-files public/data/timetable/dated)" ]; then
+            echo "::error::public/data/timetable/dated/ is built by each Pages deploy (npm run data:dated) and must not be committed; git rm it."
+            exit 1
+          fi
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
@@ -50,7 +60,7 @@ jobs:
           git diff --exit-code -- src/gen
           test -z "$(git status --porcelain -- src/gen)"
 
-  # Deploys the realtime Worker on every push to main (wrangler deploy is idempotent).
+  # Deploys the realtime Worker on every push to main (wrangler deploy is idempotent); the daily schedule redeploys it too.
   # Needs repo secrets CLOUDFLARE_API_TOKEN ("Edit Cloudflare Workers" template) and CLOUDFLARE_ACCOUNT_ID.
   worker-deploy:
     if: github.event_name != 'pull_request'
@@ -96,8 +106,13 @@ jobs:
       basemap_probe: ${{ steps.basemap.outputs.probe }}
       # `gzip` or `plain`: how the tiles are stored, from the tree check; verify-basemap requires gzip on the wire for `gzip`.
       basemap_encoding: ${{ steps.basemap.outputs.encoding }}
+      # The dated index this build shipped (digits and commas, and the feed version), for verify-dated to compare with the live site.
+      dated_dates: ${{ steps.dated.outputs.dates }}
+      dated_version: ${{ steps.dated.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -109,6 +124,54 @@ jobs:
         env:
           # Repo variable: the deployed Worker's /rt URL. Unset builds the "Live trains off" site.
           VITE_RT_URL: ${{ vars.VITE_RT_URL }}
+      # The dated (planned-work) timetables are never in git: scripts/build-dated.ts downloads the regular and supplemented
+      # GTFS zips and writes dated/<date>.json plus index.json into the artifact (see data/README.md, "Dated timetables").
+      # It fails loudly; this step then ships an empty index instead (fail open), so a bad day at the MTA never blocks a
+      # deploy and the planner falls back to the regular schedule. Exit 3 (a failed download), 124 (timeout) and 137 (killed)
+      # are warnings; any other failure is an error annotation, since the code, not the MTA, broke. The node run sits between
+      # stop-commands markers, so nothing the downloaded feeds make it print can act as a workflow command, and no log text
+      # reaches the summary. It gets no secrets and no VITE_RT_URL.
+      - name: Add the dated timetables
+        id: dated
+        timeout-minutes: 20
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          set -o pipefail
+          out=dist/data/timetable/dated
+          log="$RUNNER_TEMP/dated.log"
+          token=$(openssl rand -hex 16)
+          echo "::stop-commands::$token"
+          status=0
+          timeout 900 node scripts/build-dated.ts --out "$out" 2>&1 | tee "$log" || status=$?
+          # A build that exits 0 must also have left a usable index.
+          if [ "$status" -eq 0 ]; then
+            jq -e '.format == 1 and (.dates | type == "array")' "$out/index.json" > /dev/null 2>&1 || status=1
+          fi
+          if [ "$status" -ne 0 ]; then
+            timeout 60 node scripts/build-dated.ts --empty --out "$out" 2>&1 | tee -a "$log"
+          fi
+          echo "::$token::"
+          if [ "$status" -eq 0 ]; then
+            count=$(jq '.dates | length' "$out/index.json" | tr -cd '0-9')
+            range=$(jq -r 'if (.dates | length) > 0 then "\(.dates[0])..\(.dates[-1])" else "none" end' "$out/index.json" | tr -cd '0-9.a-z')
+            warnings=$(grep -c '^WARNING:' "$log" || true)
+            if [ "$warnings" -gt 0 ]; then echo "::warning::The dated timetables built with $warnings WARNING lines; see the step log."; fi
+            summary="Built $count dated timetable files ($range); $warnings WARNING lines in the step log."
+          else
+            case "$status" in
+              3 | 124 | 137)
+                echo "::warning::The dated timetables could not be built (the download failed, timed out or was killed; exit $status); deploying an empty dated/index.json, so trips plan on the regular schedule."
+                summary="**Not built** (the download failed, timed out or was killed; exit $status): deployed an empty index, so trips plan on the regular schedule. See this step's log." ;;
+              *)
+                echo "::error::The dated build failed, not a download (exit $status); deploying an empty dated/index.json, so trips plan on the regular schedule. Fix the build."
+                summary="**Not built: the build itself failed, not a download** (exit $status): deployed an empty index, so trips plan on the regular schedule. See this step's log." ;;
+            esac
+          fi
+          { echo "### Dated timetables"; echo "$summary"; } >> "$GITHUB_STEP_SUMMARY"
+          jq -e '.format == 1 and (.dates | type == "array")' "$out/index.json" > /dev/null
+          echo "dates=$(jq -r '.dates | join(",")' "$out/index.json" | tr -cd '0-9,')" >> "$GITHUB_OUTPUT"
+          echo "version=$(jq -r '.feedVersion' "$out/index.json" | tr -cd '[:alnum:]._-')" >> "$GITHUB_OUTPUT"
       # The NYC basemap is never in git: basemap.yml publishes a tarball of tiles as a release asset, and the pin in
       # data/basemap/basemap.json names it. fetch-basemap.ts downloads it after the build (vite empties dist), checks its
       # size and sha256, and unpacks it into dist/basemap/tiles/<z>/<x>/<y>.mvt, refusing any entry that is not a tile
@@ -207,3 +270,35 @@ jobs:
           flags=()
           if [ "$ENCODING" = gzip ]; then flags+=(--gzip); fi
           node scripts/verify-basemap.ts "${PAGE_URL%/}/basemap/tiles" "$PROBE" "${flags[@]}"
+
+  # The live site must serve the index this build shipped (empty is fine: the build fell back) and every file it lists. The
+  # planner reads it on every trip plan, and a 404 there only logs a warning, so this is where a missing or stale one
+  # shows. The CDN may lag a deploy, so the index is retried.
+  verify-dated:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          DATES: ${{ needs.build.outputs.dated_dates }}
+          VERSION: ${{ needs.build.outputs.dated_version }}
+        run: |
+          base="${PAGE_URL%/}/data/timetable/dated"
+          ok=false
+          for try in 1 2 3 4 5; do
+            body=$(curl -fsS --max-time 30 "$base/index.json" || true)
+            served_dates=$(printf '%s' "$body" | jq -r '.dates | join(",")' 2> /dev/null | tr -cd '0-9,' || true)
+            served_version=$(printf '%s' "$body" | jq -r '.feedVersion' 2> /dev/null | tr -cd '[:alnum:]._-' || true)
+            if [ -n "$body" ] && [ "$served_dates" = "$DATES" ] && [ "$served_version" = "$VERSION" ]; then ok=true; break; fi
+            echo "Try $try: the live index does not match this build's yet."
+            sleep 20
+          done
+          if [ "$ok" != true ]; then
+            echo "::error::The live dated/index.json does not match the one this build shipped."
+            exit 1
+          fi
+          for date in ${DATES//,/ }; do
+            curl -fsS --retry 3 --retry-delay 10 --max-time 30 "$base/$date.json" | jq -e --arg date "$date" '.format == 1 and .date == $date' > /dev/null
+          done

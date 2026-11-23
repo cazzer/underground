@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { index } from '../lib/realtime/fixture'
 import { expectDatedIndex, expectServiceCalendar, expectTimetable } from './loadTimetable'
+import { EMPTY_DATED_INDEX } from './timetableSchema'
 
 const URL = 'x/Sunday.json'
 const sunday = JSON.parse(readFileSync('public/data/timetable/Sunday.json', 'utf8')) as Record<string, unknown>
@@ -55,6 +56,10 @@ describe('expectDatedIndex', () => {
   it('accepts sorted unique YYYYMMDD dates, or none', () => {
     expect(expectDatedIndex(ok, 'x')).toBe(ok)
     expect(expectDatedIndex({ ...ok, dates: [] }, 'x').dates).toEqual([])
+  })
+
+  it('accepts the empty index a deploy without planned work ships', () => {
+    expect(expectDatedIndex(JSON.parse(JSON.stringify(EMPTY_DATED_INDEX)), 'x')).toEqual(EMPTY_DATED_INDEX)
   })
 
   it.each([

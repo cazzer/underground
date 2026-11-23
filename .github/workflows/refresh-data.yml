@@ -1,10 +1,9 @@
 name: Refresh GTFS data
 
-# Regenerates public/data from the MTA static GTFS zip (and public/data/timetable/dated/ from the
-# supplemented zip, the next days with planned work applied; `npm run data` downloads both, and a failed
-# supplemented download fails the run, so no PR opens that day) and opens (or updates) one PR
-# when the output changed. Needs Settings > Actions > General > "Allow GitHub Actions
-# to create and approve pull requests".
+# Regenerates public/data from the MTA static GTFS zip and opens (or updates) one PR
+# when the output changed. The supplemented zip (planned work) is not read here: its dated
+# timetables are built by every Pages deploy and never committed (deploy.yml, scripts/build-dated.ts).
+# Needs Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests".
 #
 # Two jobs so the write token never sits next to npm:
 #   generate  read-only; runs npm (data, data:stations, data:streets, data:walk, data:search:streets, typecheck, test, build); uploads public/data
@@ -31,7 +30,6 @@ concurrency:
 
 env:
   FEED_URL: https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip
-  SUPPLEMENTED_URL: https://rrgtfsfeeds.s3.amazonaws.com/gtfs_supplemented.zip
   BRANCH: chore/data-refresh
   BOT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
 
@@ -47,8 +45,6 @@ jobs:
       changed: ${{ steps.diff.outputs.changed }}
       old_version: ${{ steps.state.outputs.old_version }}
       new_version: ${{ steps.diff.outputs.new_version }}
-      old_dates: ${{ steps.state.outputs.old_dates }}
-      new_dates: ${{ steps.diff.outputs.new_dates }}
       last_modified: ${{ steps.state.outputs.last_modified }}
     steps:
       - uses: actions/checkout@v7
@@ -67,16 +63,10 @@ jobs:
           old=$(node -p "require('./public/data/stations.json').feedVersion" | head -n1 | tr -cd '[:alnum:]._-')
           # Informational only; the diff below decides whether anything changed.
           lm=$({ curl -sIf "$FEED_URL" || true; } | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified: *//p' | head -n1 | tr -cd '[:alnum:] ,:-')
-          # The dated files as first..last(count), or none (no file yet on main, or no dated date).
-          old_dates=$({ node -p "const d = require('./public/data/timetable/dated/index.json').dates; d.length ? d[0] + '..' + d[d.length - 1] + '(' + d.length + ')' : 'none'" 2>/dev/null || echo none; } | head -n1 | tr -cd '[:alnum:]._()-')
           echo "old_version=$old" >> "$GITHUB_OUTPUT"
-          echo "old_dates=$old_dates" >> "$GITHUB_OUTPUT"
           echo "last_modified=$lm" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate public/data
-        # Both zips are in memory at once (about 2 GB peak): leave V8 room above its default heap limit.
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run data 2>&1 | tee "$RUNNER_TEMP/data.log"
 
       # Generated station interiors are built from the shapes and stations just written; without this a
@@ -109,8 +99,6 @@ jobs:
         run: |
           new=$(node -p "require('./public/data/stations.json').feedVersion" | head -n1 | tr -cd '[:alnum:]._-')
           echo "new_version=$new" >> "$GITHUB_OUTPUT"
-          new_dates=$({ node -p "const d = require('./public/data/timetable/dated/index.json').dates; d.length ? d[0] + '..' + d[d.length - 1] + '(' + d.length + ')' : 'none'" 2>/dev/null || echo none; } | head -n1 | tr -cd '[:alnum:]._()-')
-          echo "new_dates=$new_dates" >> "$GITHUB_OUTPUT"
           changed=$({ git diff --name-only; git ls-files --others --exclude-standard; })
           if [ -z "$changed" ]; then
             echo "No change (feed $new)."
@@ -164,8 +152,6 @@ jobs:
       BASE: ${{ github.event.repository.default_branch || 'main' }}
       OLD_VERSION: ${{ needs.generate.outputs.old_version }}
       NEW_VERSION: ${{ needs.generate.outputs.new_version }}
-      OLD_DATES: ${{ needs.generate.outputs.old_dates }}
-      NEW_DATES: ${{ needs.generate.outputs.new_dates }}
       LAST_MODIFIED: ${{ needs.generate.outputs.last_modified }}
     steps:
       - uses: actions/checkout@v7
@@ -241,7 +227,7 @@ jobs:
             echo "$BRANCH does not exist yet."
           fi
 
-          git commit -m "chore(data): refresh GTFS data ($OLD_VERSION -> $NEW_VERSION, dated $NEW_DATES)"
+          git commit -m "chore(data): refresh GTFS data ($OLD_VERSION -> $NEW_VERSION)"
           git push --force-with-lease="$BRANCH:$lease" origin "$BRANCH"
           echo "pushed=true" >> "$GITHUB_OUTPUT"
 
@@ -253,7 +239,6 @@ jobs:
             echo
             echo "- feedVersion: \`$OLD_VERSION\` -> \`$NEW_VERSION\`"
             echo "- Last-Modified: ${LAST_MODIFIED:-unknown}"
-            echo "- Dated timetables (\`$SUPPLEMENTED_URL\`): \`$OLD_DATES\` -> \`$NEW_DATES\`"
             echo
             echo "Typecheck, tests, and build passed on this data before the branch was pushed."
             echo "The PR check workflow won't run on it (a PR opened with \`GITHUB_TOKEN\` doesn't"
@@ -267,7 +252,7 @@ jobs:
           } > "$RUNNER_TEMP/body.md"
 
           BASE=${BASE:-main}
-          title="Refresh GTFS data ($NEW_VERSION, dated $NEW_DATES)"
+          title="Refresh GTFS data ($NEW_VERSION)"
           if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
             gh pr edit "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
           else

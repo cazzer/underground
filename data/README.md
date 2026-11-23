@@ -207,11 +207,13 @@ checks the committed files against the rest of the data.
 
 ### Dated timetables
 
-`public/data/timetable/dated/<YYYYMMDD>.json` plus `dated/index.json` come from the MTA's supplemented GTFS
+`timetable/dated/<YYYYMMDD>.json` plus `dated/index.json` come from the MTA's supplemented GTFS
 (`https://rrgtfsfeeds.s3.amazonaws.com/gtfs_supplemented.zip`, rebuilt hourly, the next seven days with planned
-work applied). `npm run data -- --zip <regular> --supplemented-zip <supplemented>` (or `$GTFS_ZIP` and
-`$GTFS_SUPPLEMENTED_ZIP`; both are downloaded when absent) writes them; the regular zip still builds everything
-else, because about 7,000 supplemented trips have no `shape_id` (the supplemented shapes.txt isn't read). A dated file has the same layout as a service
+work applied). They are never committed (`public/data/timetable/dated/` is gitignored): `npm run data:dated` writes them
+(`-- --out dir --zip <regular> --supplemented-zip <supplemented>`, or `$GTFS_ZIP` and `$GTFS_SUPPLEMENTED_ZIP`; both are
+downloaded when absent, each capped in size), and every Pages deploy runs it into `dist/data/timetable/dated/`
+(`.github/workflows/deploy.yml`, also on a daily schedule, so the window rolls forward). `npm run data` does not read the
+supplemented feed. A dated file has the same layout as a service
 file plus `date` (equal to its name); its `services` lists that day's active supplemented service ids (the base
 calendars split into chunks, minus chunks removed for work, plus date-only services). It replaces the day's
 service files in the client's router; `index.json` (`{ format, feedVersion, dates }`) lists the dates that have one.
@@ -223,15 +225,29 @@ service files in the client's router; `index.json` (`{ format, feedVersion, date
   not be contiguous. Nothing reads the clock to choose it. More than 14 dates (`DATED_MAX_DAYS`) fails the build,
   naming them; none writes an empty index. Each date must be a real YYYYMMDD, since it becomes a file name.
 - On any other date the two feeds run the same trips, so the client falls back to the per-service files, which are
-  exact there. Dated files that lapse between refreshes are therefore harmless.
+  exact there.
+- Baseline: the regular feed's service days and same-station changes come from the regular zip downloaded by the same run
+  (so the dated set matches the feeds of that moment); the stops a pattern may call at come from the committed
+  `public/data/stations.json`. A regular `feed_version` that differs from the committed `stations.json`'s is a `WARNING:`
+  line (the files are built against newer service days than the rest of the site until the refresh PR merges). A dated
+  file's `changes` are the downloaded regular feed's and may differ from the service files'; the router takes the minimum.
 - Caps: each file under `TIMETABLE_FILE_GZIP_CAP_BYTES` (the largest, a heavy weekday, is about 40.6 KB of 48 KB), the
-  directory under `TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES` (400 KB; the nine measured days total about 238 KB).
-- Fails the whole run, writing nothing (the refresh opens no PR that day): the supplemented download or parse, the
-  set over 14 dates, a bad date, a pattern calling at a stop `stations.json` lacks (the error names the stop and dates), and the
-  checks above. A differing `feed_version` between the two zips, no dated date at all and a last dated file already past are only
-  `WARNING:` lines.
-- Churn: the files change daily, so each merged refresh adds about 5.7 MB raw (a few hundred KB packed) to git history.
-- `scripts/lib/datedTimetableOutputs.test.ts` and `src/data/datedTimetable.data.test.ts` check the committed files.
+  directory under `TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES` (400 KB; the nine measured days total about 238 KB). Each
+  download is also capped (`REGULAR_MAX_BYTES` 32 MB, `SUPPLEMENTED_MAX_BYTES` 64 MB, by Content-Length and by counting the stream).
+- Fails the run, writing nothing: the download or parse, the set over 14 dates, a bad date, a pattern calling at a stop
+  `stations.json` lacks (the error names the stop and dates), and the checks above. A differing `feed_version` between
+  the zips, no dated date at all and a last dated file already past are only `WARNING:` lines.
+- Checked before writing (`scripts/lib/datedCheck.ts`, with tests): the index and its files agree (dates, feed version), each file
+  passes the client's `expectTimetable` and decodes, service ids are plain, every route is in `routes.json`, every stop and station
+  change is in `stations.json` (what `buildRouterTimetable` would skip with its stale-deploy warning), and no trip overtakes
+  another. A zip entry that inflates past 512 MB (1 GB together) is refused. Exit code 3 means a download failed, 1 anything else.
+- Fail open in the deploy: when the script fails for any reason (an unreachable feed, a timeout, a cap), the deploy step
+  runs `npm run data:dated -- --empty` (a warning for exit 3, a timeout or a kill; an error annotation for any other failure, since
+  the code broke), which writes only an empty `index.json` (`EMPTY_DATED_INDEX`) and removes every other
+  `*.json` in the folder, and says so in a workflow warning and the job summary. The site still ships; trips plan on the
+  regular schedule. The client also reads a 404 on the index (a local build, or an older deploy) as an empty one, with one
+  console warning. `--out` must end in a folder named `dated`, since writing removes the other `*.json` there.
+- `verify-dated` (deploy.yml) compares the live `dated/index.json` with the one the build shipped (retrying for CDN lag) and fetches each file it lists.
 
 The build throws, and writes nothing, when a timetable can't be built safely: a time that isn't a multiple of
 30 s, a departure before its arrival, an arrival before the previous departure, a stop that isn't a child stop

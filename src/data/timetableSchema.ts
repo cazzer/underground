@@ -1,5 +1,6 @@
-/** Contract for public/data/timetable/<serviceId>.json and public/data/timetable/dated/<YYYYMMDD>.json, written by
- *  scripts/build-data.ts (scripts/lib/timetable.ts, scripts/lib/datedTimetable.ts). Change both sides together.
+/** Contract for public/data/timetable/<serviceId>.json (written by scripts/build-data.ts, scripts/lib/timetable.ts) and
+ *  timetable/dated/<YYYYMMDD>.json (built by every Pages deploy, never committed: scripts/build-dated.ts,
+ *  scripts/lib/datedTimetable.ts). Change both sides together.
  *  Types and consts only; `timetableCodec.ts` decodes it.
  *
  *  Rules the builder keeps and a client may rely on:
@@ -24,7 +25,10 @@
  *    work applied) and replaces the day's service files for the router; `date` equals the file name and `services`
  *    lists that day's active supplemented service ids (informational). dated/index.json (DatedTimetableIndex) lists
  *    the dates that have a file: those on which planned work changes the trips that run (additions or removals), at
- *    most 14, not necessarily contiguous. Any other date uses the service files.
+ *    most 14, not necessarily contiguous. Any other date uses the service files. A deploy that could not build them
+ *    ships an empty index (EMPTY_DATED_INDEX), and a site with no index file at all (404) reads as that too.
+ *  - A dated file's `changes` come from the regular feed read at that deploy and may differ from the service files'
+ *    (committed with the last refresh); the router takes the minimum per station (lib/route/timetable.ts).
  *  - Key order: format, feedVersion, [date,] services, changes, patterns. The file is rendered one trip per line.
  *  - No trip identity: a trip is found by its first departure.
  */
@@ -66,8 +70,14 @@ export interface TimetableFile {
 /** public/data/timetable/dated/index.json: the dates that have a dated file. */
 export interface DatedTimetableIndex {
   format: 1
-  /** feed_info feed_version of the supplemented zip the files were built from. */
+  /** feed_info feed_version of the supplemented zip the files were built from; '' when the deploy built none. */
   feedVersion: string
   /** YYYYMMDD, sorted, unique, at most DATED_MAX_DAYS; not necessarily contiguous. */
   dates: string[]
 }
+
+/** A dated index nothing may change: what the client caches (a shared empty one must not be mutated). */
+export type FrozenDatedIndex = Readonly<Omit<DatedTimetableIndex, 'dates'>> & { readonly dates: readonly string[] }
+
+/** The index of a deploy that built no dated files (or whose index is missing): every date uses the service files. */
+export const EMPTY_DATED_INDEX: FrozenDatedIndex = Object.freeze({ format: 1, feedVersion: '', dates: Object.freeze<string[]>([]) })
