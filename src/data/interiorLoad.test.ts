@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InteriorModel } from '../scene/interiorModel'
-import { authoredInteriorIds, deriveInteriorLoad, focusedMarkerShown, interiorIdOf, modelsToLoad, type IndexLoad, type InteriorLoad } from './interiorLoad'
+import { authoredInteriorIds, deriveInteriorLoad, focusedMarkerShown, interiorIdOf, layoutOf, modelsToLoad, type IndexLoad, type InteriorLoad } from './interiorLoad'
 
 const model = { stationId: 'L08' } as InteriorModel
 const empty = () => undefined
@@ -19,6 +19,26 @@ describe('interiorIdOf', () => {
   it('ignores inherited object keys', () => {
     expect(interiorIdOf('toString', ready)).toBeNull()
     expect(interiorIdOf('__proto__', ready)).toBeNull()
+  })
+})
+
+describe('layoutOf', () => {
+  const index: IndexLoad = {
+    status: 'ready',
+    index: { stations: { '635': { provenance: 'authored' }, L03: { provenance: 'authored', file: '635' }, A02: { provenance: 'generated' } } },
+  }
+  it("is the provenance of the station's interior file, a complex member through its file", () => {
+    expect(layoutOf('635', index)).toBe('authored')
+    expect(layoutOf('L03', index)).toBe('authored')
+    expect(layoutOf('A02', index)).toBe('generated')
+  })
+  it('is none for a station the ready index does not list', () => {
+    expect(layoutOf('127', index)).toBe('none')
+    expect(layoutOf('toString', index)).toBe('none')
+  })
+  it('is null while the index is loading or failed', () => {
+    expect(layoutOf('635', { status: 'loading' })).toBeNull()
+    expect(layoutOf('635', { status: 'error', message: 'x' })).toBeNull()
   })
 })
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type Ref, type RefObject } from 'react'
+import { layoutOf, type IndexLoad } from '../data/interiorLoad'
 import { GEOCODE_URL } from '../data/realtime'
 import type { LocateControls } from '../data/useLocate'
 import { useFocus } from '../lib/focus'
@@ -23,6 +24,18 @@ import type { TripFocusRequest } from './useTripPanel'
 const PANEL =
   'pointer-events-auto min-h-0 w-full max-w-full max-h-[55dvh] overflow-auto border border-edge bg-panel text-ink backdrop-blur-sm sm:max-h-full sm:w-80 sm:shrink-0'
 
+/** What the trip panel draws beside the steps of the opened journey: the way out, the changes' ways, the station index and the way to the first platform. */
+export interface TripLines {
+  /** The exit line of each journey ending on a train, by its last ride's trip id. */
+  exits: ReadonlyMap<string, ExitLineView> | null
+  /** The transfer line of each change through a hand-authored complex, by its `transferKey`. */
+  transfers: ReadonlyMap<string, TransferLineView> | null
+  /** Which stations have an interior: a step at one without says "No station layout". */
+  index: IndexLoad
+  /** The way to the first platform at the From station (2q7.45.7); absent or null: none. */
+  board?: { text: string } | null
+}
+
 interface TripPanelProps {
   network: Network
   arrivals: ArrivalsSource | null
@@ -35,10 +48,7 @@ interface TripPanelProps {
   focusRequest: TripFocusRequest | null
   /** "Close trip". */
   onClose: () => void
-  /** The exit line of each journey ending on a train, by its last ride's trip id. */
-  exits: ReadonlyMap<string, ExitLineView> | null
-  /** The transfer line of each change through a hand-authored complex, by its `transferKey`. */
-  transfers: ReadonlyMap<string, TransferLineView> | null
+  lines: TripLines
   /** The focused station's complex siblings (its group's other members), for the "On the map" row. */
   focusSiblings: readonly string[]
   ref: Ref<HTMLElement>
@@ -50,9 +60,9 @@ interface TripPanelProps {
  * station panel does, in front of it and behind a train panel or notice. What a screen reader hears is the HUD's
  * `TripAnnouncer`; the visible message under the ends is hidden from assistive tech to match.
  */
-export function TripPanel({ network, arrivals, locate, covered, headingRef, focusRequest, onClose, exits, transfers, focusSiblings, ref }: TripPanelProps) {
-  const { ends, places, plan, showLoading, setEnd, swap, retry, selection, openJourney, backToList, dropNoteShown } = useTrip()
-  const { focusedId, select } = useFocus()
+export function TripPanel({ network, arrivals, locate, covered, headingRef, focusRequest, onClose, lines, focusSiblings, ref }: TripPanelProps) {
+  const { ends, places, plan, showLoading, setEnd, swap, retry, selection, openJourney, backToList, dropNoteShown, activeStep, stepTo } = useTrip()
+  const { focusedId } = useFocus()
   const { selectTrain } = useTrainSelection()
   const fromSearch = useRef<StationSearchHandle>(null)
   const toSearch = useRef<StationSearchHandle>(null)
@@ -175,11 +185,16 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
             onOpen={openJourney}
             onBack={backToList}
             panelHeading={headingRef}
-            onStation={select}
-            drawnKeys={arrivals?.drawnKeys ?? null}
-            onShowTrain={selectTrain}
-            exits={exits}
-            transfers={transfers}
+            legs={{
+              drawnKeys: arrivals?.drawnKeys ?? null,
+              onShowTrain: selectTrain,
+              exits: lines.exits,
+              transfers: lines.transfers,
+              layoutOf: (id) => layoutOf(id, lines.index),
+              board: lines.board,
+              activeStep,
+              onStep: stepTo,
+            }}
           />
         </div>
       </div>

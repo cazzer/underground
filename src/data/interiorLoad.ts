@@ -1,4 +1,5 @@
 import type { InteriorModel } from '../scene/interiorModel'
+import type { StationLayout } from '../lib/tripSteps'
 import type { StationIndex } from './stationSchema'
 
 export type InteriorLoad =
@@ -52,6 +53,18 @@ export function interiorIdOf(stationId: string | null, index: IndexLoad): string
   if (!stationId || index.status !== 'ready') return null
   if (!Object.hasOwn(index.index.stations, stationId)) return null
   return index.index.stations[stationId]!.file ?? stationId
+}
+
+/**
+ * What the station's interior is, for the trip steps: its file's provenance, `'none'` when the ready index doesn't list
+ * it, null while the index is loading or failed (nothing is known, so nothing is said).
+ */
+export function layoutOf(stationId: string, index: IndexLoad): StationLayout {
+  if (index.status !== 'ready') return null
+  const file = interiorIdOf(stationId, index)
+  if (file === null) return 'none'
+  const entry = Object.hasOwn(index.index.stations, file) ? index.index.stations[file]! : index.index.stations[stationId]!
+  return entry.provenance
 }
 
 /** The distinct interior file ids of the hand-authored stations in the index, sorted; none until it is ready. */

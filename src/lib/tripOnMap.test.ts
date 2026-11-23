@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ON_MAP_QUIET_MS, shouldAnnounceOnMap } from './tripOnMap'
 
 describe('shouldAnnounceOnMap', () => {
-  const base = { focusedId: 'X', previousId: 'Y', shown: true, isEnd: false, planLoading: false, sinceSettledMs: null }
+  const base = { focusedId: 'X', previousId: 'Y', shown: true, isEnd: false, planLoading: false, stepped: false, sinceSettledMs: null }
   it('says a station that newly took focus while the panel is in front', () => {
     expect(shouldAnnounceOnMap(base)).toBe(true)
     expect(shouldAnnounceOnMap({ ...base, previousId: null })).toBe(true)
@@ -14,6 +14,7 @@ describe('shouldAnnounceOnMap', () => {
     expect(shouldAnnounceOnMap({ ...base, focusedId: null })).toBe(false)
     expect(shouldAnnounceOnMap({ ...base, shown: false })).toBe(false)
     expect(shouldAnnounceOnMap({ ...base, isEnd: true })).toBe(false)
+    expect(shouldAnnounceOnMap({ ...base, stepped: true })).toBe(false)
   })
   it('never talks over a loading or just-settled result', () => {
     expect(shouldAnnounceOnMap({ ...base, planLoading: true })).toBe(false)

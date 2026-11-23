@@ -760,21 +760,32 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   announce rules (`shouldAnnounceTrip`: a settled plan once, not a refresh). `TripAnnouncer.tsx` is the one polite live region for it,
   mounted in the HUD header (so it outlasts the panel being covered): it speaks a settled plan, the message for ends that can't be planned
   and "On the map: X" only when the focused station really changes while the panel is in front (`shouldAnnounceOnMap`: never on
-  open, a swap, an end pick or an uncover, and not while a result loads or in the 1.5 s after one settles); it is emptied whenever its text could be stale and refilled after a gap so a
+  open, a swap, an end pick or an uncover, for the station the visitor just stepped to (`stepped`: `TripProvider`'s `activeStepLead`), and not while a result loads or in the 1.5 s after one settles); it is emptied whenever its text could be stale and refilled after a gap so a
   repeated sentence is spoken again. `TripPanel.tsx` (`aside` "Trip"; the directions pick's focus target (heading or the empty end's row) takes focus; a down chevron instead of × collapses it to a bar, `tripBarText`'s From → To, in the same aside, body hidden and kept; tapping the bar expands it; a "Close trip" text button beside the chevron closes it (no ×, 2q7.34; the collapsed bar has none) and a directions pick reopens or expands it; closing keeps the ends; `useScrollHint.ts` a "more below" fade
   while the capped panel scrolls) with `TripEnds.tsx` (From/To rows take focus, then open their own `StationSearch`; a shortcut that fills an
   end returns focus to that row; "Nearest to you" never offers a From equal to To; "On the map" is not offered, nor announced, for
   a station sharing a complex with an end, `isTripEnd` in `lib/tripEnds.ts` over the App's `siblingsOf`, the group's other members) and `TripJourneys.tsx` (2q7.45.1, 2q7.47: the journeys as a
   list of collapsed rows, soonest arrival first, none open; a row opens that journey as its own detail view, `TripJourneyDetail.tsx` (Back "All trips", an h3 heading, the
-  summary chips and `TripLegs.tsx`' legs and exit line); a plan with one journey opens it directly, with no Back. The opened journey is state in `TripProvider`
+  summary chips and `TripLegs.tsx`' itinerary); a plan with one journey opens it directly, with no Back. The opened journey is state in `TripProvider`
   (`opened: { planKey, key }`, reset when the panel closes; `selection`, `selectedJourney` = opened, else the first, `openJourney`, `backToList`, `dropped`, `dropNoteShown`), and the view
   is derived from it by the pure rules in `lib/tripSelection.ts` (`journeyKey`, `journeyKeys`, `tripSelection`, `reconcileOpened`, `droppedNote`, `focusAfterViewChange`,
   `selectedFirst`), so a refresh never flashes a dropped journey: a poll or tick that drops the opened journey returns to the list (or opens the one left) with a dim "The trip you opened is no longer offered." (cleared by the next settled refresh or after 6 s; not for a journey the panel opened itself, `OpenedJourney.auto`)
   line and one polite `TripAnnouncer` sentence (`droppedNote`). Focus: opening moves it to the detail heading, Back (the button, or Esc while the trip panel is expanded, `escapeTrip` in `useTripPanel`) to that row, and a view that unmounts
-  holding focus (`useJourneyFocusLost`) hands it on one frame later, to the panel heading when the row is gone; a collapsed bar's Esc closes the trip. A
-  station name calls `select`, the only camera move; a journey ending on a train ends with `TripExitLine.tsx`, its way out: the
-  visible text and note aria-hidden, one sr-only sentence, never a live region; a change through a hand-authored complex has
-  `TripTransferLine.tsx` under its "Change at …" row, the same way). A directions pick closes a train panel or notice in front of it first. No control carries the
+  holding focus (`useJourneyFocusLost`) hands it on one frame later, to the panel heading when the row is gone; a collapsed bar's Esc closes the trip.
+  The detail is an itinerary of steps (2q7.45.6, `lib/tripSteps.ts`, pure: `journeyItinerary`, `stepStatus`, `activeStepKey`; `TripStepButton.tsx`): a Board step before
+  the first ride (and before a ride that follows a plain walk between two stations, the walk its own row), a Change step in place of each change leg, an Exit step after
+  the last ride, then a trailing walk; a walk-only journey has none. A step is a button (`data-step`, "Show on map", `aria-current="step"` while active) whose visible
+  text and dim status are aria-hidden and whose one sr-only sentence is its name ("Step 2 of 3: change at 14 St-Union Sq to the 4, 4 minutes."), with its status appended. Pressing
+  one calls `TripProvider`'s `stepTo(key, stationId)`: `select(stationId)`, the only camera move, so the existing station flight with the trip panel open frames that
+  station's priority path (no camera code of its own), and it stores the step with the lead of its station; it keeps focus and announces nothing (`TripAnnouncer`'s `stepped`).
+  The step is active (`activeStep`, `activeStepLead`) only while the opened journey and the focused station are still the ones it was pressed on, so panning away or tapping
+  another station ends it, and it is cleared on open, Back and close. The way through the station sits beside the button, never inside it: the Exit step has
+  `TripExitLine.tsx` (its way out: the visible text and note aria-hidden, one sr-only sentence, never a live region), a Change step through a hand-authored complex
+  `TripTransferLine.tsx`, the first Board step the `board` text (`TripLines.board`, optional: 2q7.45.7 fills it). A step whose station has no path says so in a dim status
+  (`stepStatus` over `layoutOf(stationId, index)` in `interiorLoad.ts`: the index's provenance, `'none'` when unlisted, null while it loads, which says nothing): "No station
+  layout" where there is no interior, "No station layout for this change" for a change at a generated one (they never connect two tracks); Board and Exit at a generated or
+  authored station say nothing (the path may still be loading). `TripPanel` takes one `lines: TripLines` prop (exits, transfers, the station index, board) from App. Esc in
+  the detail, one level a press (`escapeTrip`): end the active step (`endStep`: dismiss the station, the camera stays, focus to the step's button), then Back, then close; a collapsed bar closes. A directions pick closes a train panel or notice in front of it first. No control carries the
   panel's aria-expanded: the picks are actions that move focus in, and Close returns it. Esc moves focus only from inside the
   panel. The trip panel stays mounted (hidden, inert) under a train panel or notice, so its journeys, scroll and focus survive and a
   notice's auto-dismiss never moves focus; only a directions pick or a deliberate train/notice close focuses its heading.

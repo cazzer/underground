@@ -36,7 +36,7 @@ export interface TripPanelControls {
   openTrip: (end: TripEnd, target: DirectionsTarget) => void
   /** "Close trip". */
   closeTrip: () => void
-  /** Esc: back from an opened journey to the list when there is one (and the panel is not a bar), else `closeTrip`. */
+  /** Esc: end the active step, else back from an opened journey to the list when there is one (a bar skips both), else `closeTrip`. */
   escapeTrip: () => void
   focusRequest: TripFocusRequest | null
 }
@@ -47,7 +47,7 @@ export interface TripPanelControls {
  * one frame later (a station panel underneath has mounted by then) it goes to the station heading, else to Search.
  */
 export function useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf }: TripPanelArgs): TripPanelControls {
-  const { open, ends, places, setOpen, start, selection, backToList } = useTrip()
+  const { open, ends, places, setOpen, start, selection, backToList, activeStep, endStep } = useTrip()
   const { focusedId } = useFocus()
   const { selectedSummary, notice, clearTrain, dismissNotice } = useTrainSelection()
   const { tripRequested, tripCollapsed } = usePanelCollapseControls()
@@ -69,10 +69,19 @@ export function useTripPanel({ locate, panel, stationHeading, searchButton, sibl
     setOpen(false)
     if (hadFocus) requestAnimationFrame(() => (stationHeading.current ?? searchButton.current)?.focus({ preventScroll: true }))
   }, [setOpen, panel, stationHeading, searchButton])
-  // A collapsed panel is a bar with its body hidden: Esc closes it, not an unseen Back.
+  // A collapsed panel is a bar with its body hidden: Esc closes it, not an unseen step or Back. Otherwise one level per
+  // press: the active step ends (its station is dismissed, the camera stays, focus goes to the step's button), then Back
+  // from the opened journey, then close.
   const escapeTrip = useCallback(() => {
-    if (selection.canGoBack && !tripCollapsed) backToList()
+    if (tripCollapsed) closeTrip()
+    else if (activeStep !== null) {
+      const hadFocus = panel.current?.contains(document.activeElement) ?? false
+      endStep()
+      if (hadFocus) {
+        requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>(`[data-step="${activeStep}"]`)?.focus({ preventScroll: true }))
+      }
+    } else if (selection.canGoBack) backToList()
     else closeTrip()
-  }, [selection.canGoBack, tripCollapsed, backToList, closeTrip])
+  }, [selection.canGoBack, tripCollapsed, activeStep, endStep, panel, backToList, closeTrip])
   return { tripOpen: open, openTrip, closeTrip, escapeTrip, focusRequest }
 }

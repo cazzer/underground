@@ -1,10 +1,9 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react'
-import type { ExitLineView } from '../lib/exitView'
 import type { Network } from '../lib/network'
-import type { TransferLineView } from '../lib/transferView'
 import { focusAfterViewChange, type TripSelection } from '../lib/tripSelection'
 import type { JourneyView } from '../lib/tripView'
 import { JourneyChips, TripJourneyDetail } from './TripJourneyDetail'
+import type { JourneyLegsProps } from './TripLegs'
 import { useJourneyFocusLost } from './useJourneyFocusLost'
 
 interface TripJourneysProps {
@@ -18,16 +17,12 @@ interface TripJourneysProps {
   onBack: () => void
   /** The panel's heading: where focus goes when the view that held it is gone and its replacement has no target. */
   panelHeading: RefObject<HTMLElement | null>
-  /** A station name was pressed: the one place the trip panel moves the camera. */
-  onStation: (stationId: string) => void
-  /** The trips the map draws as trains (keyed as a live ride leg's `tripId`); only those can be shown. */
-  drawnKeys: ReadonlySet<string> | null
-  /** "Show train" was pressed on a live ride leg: selects that train (its panel then covers the trip). */
-  onShowTrain: (tripId: string) => void
-  /** The way out at the To station, by the trip id of a journey's last ride. */
-  exits: ReadonlyMap<string, ExitLineView> | null
-  /** The way through a complex at a change, by the change leg's `transferKey`. */
-  transfers: ReadonlyMap<string, TransferLineView> | null
+  /**
+   * What the opened journey's detail needs, as `JourneyLegsProps` says: a step press is the one place the trip panel
+   * moves the camera, `drawnKeys` the trips the map draws as trains (only those can be shown), `exits` the way out at
+   * the To station by the trip id of a journey's last ride and `transfers` the way through a complex at a change.
+   */
+  legs: Omit<JourneyLegsProps, 'network' | 'view'>
 }
 
 interface TripListProps {
@@ -78,7 +73,7 @@ function TripList({ network, views, onOpen, onFocusLost }: TripListProps) {
  * focuses the detail's heading, Back its row, and a view that goes while it holds focus (a refresh dropped the journey) hands
  * it to the panel heading.
  */
-export function TripJourneys({ network, views, selection, onOpen, onBack, panelHeading, onStation, drawnKeys, onShowTrain, exits, transfers }: TripJourneysProps) {
+export function TripJourneys({ network, views, selection, onOpen, onBack, panelHeading, legs }: TripJourneysProps) {
   const root = useRef<HTMLDivElement>(null)
   const latest = useRef({ view: selection.view, keys: views.map((v) => v.key) })
   useLayoutEffect(() => {
@@ -131,11 +126,7 @@ export function TripJourneys({ network, views, selection, onOpen, onBack, panelH
           canGoBack={selection.canGoBack}
           onBack={back}
           onFocusLost={moveFocus}
-          onStation={onStation}
-          drawnKeys={drawnKeys}
-          onShowTrain={onShowTrain}
-          exits={exits}
-          transfers={transfers}
+          {...legs}
         />
       )}
     </div>

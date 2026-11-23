@@ -30,7 +30,7 @@ interface TripAnnouncerProps {
  * changing.
  */
 export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: TripAnnouncerProps) {
-  const { open, ends, plan, dropped } = useTrip()
+  const { open, ends, plan, dropped, activeStepLead } = useTrip()
   const { focusedId } = useFocus()
   const [text, setText] = useState('')
   const lastId = useRef<string | null>(null)
@@ -39,8 +39,8 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
   const refill = useRef(0)
   const lastFocused = useRef<string | null>(focusedId)
   const settledAt = useRef<number | null>(null)
-  const latest = useRef({ ends, plan, focusSiblings })
-  latest.current = { ends, plan, focusSiblings }
+  const latest = useRef({ ends, plan, focusSiblings, activeStepLead })
+  latest.current = { ends, plan, focusSiblings, activeStepLead }
 
   const say = (next: string | null) => {
     window.clearTimeout(refill.current)
@@ -93,7 +93,7 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
     const station = focusedId !== null ? network.groupById.get(focusedId) : undefined
     if (!station) return
     const timer = window.setTimeout(() => {
-      const { ends: now, plan: current, focusSiblings: siblings } = latest.current
+      const { ends: now, plan: current, focusSiblings: siblings, activeStepLead: stepLead } = latest.current
       const settled = settledAt.current
       if (
         shouldAnnounceOnMap({
@@ -102,6 +102,8 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
           shown,
           isEnd: isTripEnd(station.id, siblings, now),
           planLoading: current.status === 'loading',
+          // A step press focuses its station on purpose: the button and the map say it, so this region stays silent.
+          stepped: stepLead === focusedId,
           sinceSettledMs: settled === null ? null : performance.now() - settled,
         })
       ) {
