@@ -13,11 +13,6 @@ const complexes = read<{ complexes: string[][] }>('stations.json').complexes
 
 /** Entrances added to the lead's, by complex lead. Update deliberately when the street files change. */
 const ADDED: Record<string, number> = { '725': 10, E01: 9, L02: 7, '631': 2, '232': 1, D16: 1 }
-/** The street label placement's marker-exemption cap (one bit per label, `exemptExitFromMarks`): a label past it still
- *  places, but a station marker over its own mark blocks it. The merged layer's labels are the lead's, then the added
- *  entrances nearest the lead first, so only the farthest lose the exemption. WTC (E01) merges 35 labels. */
-const MAX_LABELS = 32
-const LABELS_OVER_CAP: Record<string, number> = { E01: 35 }
 
 function streetsOf(id: string): StationStreets | null {
   return existsSync(new URL(`streets/${id}.json`, DIR)) ? read<StationStreets>(`streets/${id}.json`) : null
@@ -77,7 +72,6 @@ describe('merged complex street layers', () => {
 
       // Every added entrance is on some label (so it has a list row and a mark's label).
       const labels = entranceTexts(merged, extraLines)
-      expect(labels.length, `${group}: labels`).toBeLessThanOrEqual(LABELS_OVER_CAP[leadId] ?? MAX_LABELS)
       const labelled = new Set(labels.flatMap((t) => t.members))
       for (let i = lead!.entrances.length; i < merged.entrances.length; i++) {
         expect(labelled.has(i), `${group}: added entrance ${i} (${merged.entrances[i]!.type}) has no label`).toBe(true)

@@ -5,7 +5,9 @@
 /** Floats per box: its four corners (x then y, in order around it), its bounds (minX, minY, maxX, maxY), and the
  *  cosine and sine of its angle (its long axis is (cos, sin), its short one (-sin, cos)). */
 export const BOX = 14
-const AABB = 8
+/** Where a box's bounds start within its BOX floats (minX, minY, maxX, maxY). */
+export const BOX_BOUNDS = 8
+const AABB = BOX_BOUNDS
 const AXIS = 12
 /** Floats per packed rect. */
 export const RECT = 4
