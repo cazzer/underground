@@ -126,6 +126,11 @@ describe('tripLineBuffers', () => {
     expect(Array.from(out.segments.get(l.id) ?? [])).toEqual([])
   })
 
+  it("gives each copied segment its ends' distances along its own shape, for a dashed layer", () => {
+    const out = tripLineBuffers(paths, [ride(l.id, 'L', 5, 25), ride(n.id, 'N', 0, 15, 2)], rideColor)
+    expect(Array.from(out.distances)).toEqual([0, 10, 10, 20, 20, 30, 0, 10, 10, 20])
+  })
+
   it('draws nothing for no rides', () => {
     expect(tripLineBuffers(paths, [], rideColor).positions.length).toBe(0)
   })

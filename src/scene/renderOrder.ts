@@ -21,6 +21,9 @@ export const RENDER_ORDER = {
   lineFocus: 2,
   // The trip's ride legs (TripLines.tsx) over every route line and the ties, under the station markers and trains.
   tripLine: 2.1,
+  // A picked service change's suspended stretch (TripLines.tsx), dashed in its dimmed route colour over the ride
+  // legs (the dimmed network line shows through its gaps), under a straight ride and the station markers.
+  changeSuspended: 2.15,
   // A ride leg found on no drawn shape, dashed straight through its stops (TripDashes.tsx), over the ride legs and
   // under the station markers.
   tripStraight: 2.2,
@@ -34,6 +37,8 @@ export const RENDER_ORDER = {
   tripWalk: 4.45,
   tripMark: 4.5,
   tripMarkDot: 4.55,
+  // The cross inside a picked service change's skipped-station ring (TripMarks.tsx), over the ring, under the trains.
+  changeSkipCross: 4.56,
   trainHalo: 5,
   trains: 6,
   // The selected train's dot, drawn on its own above the other dots: its rim, a background gap, the dot.

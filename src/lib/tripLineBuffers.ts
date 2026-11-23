@@ -7,29 +7,41 @@
 import type { ShapeId, StationId } from '../data/schema'
 import { BAND_INPUTS, type LineBuffers, type Rgb } from './lineBuffers'
 import type { ShapePath } from './network'
+import type { Ground } from './projection'
 import type { TripMark } from './tripMarks'
 import type { RideShapeSpan, RideStraightSpan, WalkSpan } from './tripSpans'
 
-/** What the map draws of the trip: the selected journey's spans and marks; `faint` in the list view (no journey opened). */
+/**
+ * What the map's route view draws: the trip's selected journey (`kind` 'trip', useTripRoute; `faint` in the list view, no
+ * journey opened) or a picked service change ('change', changeDraw.ts: the affected stretch as rides, a suspended one
+ * dashed, skipped stations marked). The name stays the trip's for now.
+ */
 export interface TripRouteDraw {
-  /** The journey's `journeyKey`. */
+  kind: 'trip' | 'change'
+  /** The journey's `journeyKey`; a change's `<alertId>#<pick seq>`. */
   key: string
-  /** Its ride legs found on drawn shapes (TripLines, and the route frame). */
+  /** Its ride legs found on drawn shapes (TripLines, and the route frame); a change's stretch at full colour. */
   rides: readonly RideShapeSpan[]
+  /** A change's suspended stretches, dashed in their dimmed route colour (TripLines); none for a trip. */
+  suspended: readonly RideShapeSpan[]
   /** Its ride legs found on no drawn shape, drawn dashed straight through their stops (TripDashes). */
   straights: readonly RideStraightSpan[]
   /** Its walks between stations, a complex's members aside (TripDashes). */
   walks: readonly WalkSpan[]
-  /** Where it boards, changes and alights (TripMarks). */
+  /** Where it boards, changes and alights, or the stations a change skips (TripMarks). */
   marks: readonly TripMark[]
-  /** Every station it calls at: their rings stay full while the network dims. */
+  /** Every station it calls at (a change: every station the MTA lists): their rings stay full while the network dims. */
   stations: readonly StationId[]
+  /** The station points the route frame (useRouteFlight) fits besides the spans: a journey's ends and changes, a change's stations. */
+  frameStations: readonly Ground[]
   faint: boolean
 }
 
 export type TripLineBuffers = Required<LineBuffers> & {
   /** Two floats per segment: the drawn stretch (t0, t1) of the segment, 0 at its start and 1 at its end (an uncut end beyond). */
   windows: Float32Array
+  /** Two floats per segment: its ends' distances along its shape, meters (a dashed layer's; `useLineLayer`). */
+  distances: Float32Array
 }
 
 /** A window end that cuts nothing: outside the segment's 0..1, so no fragment (a cap's 0 or 1 included) sits on the cut. */
@@ -79,6 +91,7 @@ export function tripLineBuffers(
   const colors = new Float32Array(count * 6)
   const bands = new Float32Array(count * 2 * BAND_INPUTS)
   const windows = new Float32Array(count * 2)
+  const distances = new Float32Array(count * 2)
   const segments = new Map<ShapeId, Int32Array>()
   let seg = 0
   for (const { ride, path, color } of drawn) {
@@ -97,9 +110,11 @@ export function tripLineBuffers(
       colors.set([r, g, b, r, g, b], seg * 6)
       bands.set(path.bandInputs.subarray((i - 1) * BAND_INPUTS, (i + 1) * BAND_INPUTS), seg * 2 * BAND_INPUTS)
       windows.set(w, seg * 2)
+      distances[seg * 2] = path.cumulative[i - 1]!
+      distances[seg * 2 + 1] = path.cumulative[i]!
       if (of[i - 1] === -1) of[i - 1] = seg
       seg++
     }
   }
-  return { positions, colors, bands, segments, windows }
+  return { positions, colors, bands, segments, windows, distances }
 }

@@ -136,6 +136,20 @@ export interface Theme {
    */
   tripWalkDashPx: number
   tripWalkGapPx: number
+  /**
+   * A picked service change (08r.6) draws through the trip's route view: its skipped stations' marks (TripMarks.tsx, a
+   * hollow ring with a cross, so a skip reads by shape, not colour alone) in this colour, at least 3:1 on the background
+   * and over every route dimmed by `tripNetworkDim` (themeChange.test.ts).
+   */
+  changeSkipMark: string
+  /**
+   * A suspended stretch (TripLines.tsx) dashes in its route colour mixed this far toward the background (more than the
+   * network's `tripNetworkDim` leaves, so it reads above the dimmed lines; themeChange.test.ts), dash and gap in CSS px
+   * at the view's target.
+   */
+  changeSuspendedDim: number
+  changeSuspendedDashPx: number
+  changeSuspendedGapPx: number
 }
 
 /** Machines (elevators, escalators) take this share of `interiorDepthFade`, so the deepest ones stay 3:1. */
@@ -207,6 +221,10 @@ export const THEMES = {
     tripLineWidth: 2.5,
     tripWalkDashPx: 6,
     tripWalkGapPx: 4,
+    changeSkipMark: '#e6f6ff',
+    changeSuspendedDim: 0.35,
+    changeSuspendedDashPx: 5,
+    changeSuspendedGapPx: 4,
   },
 } as const satisfies Record<string, Theme>
 
