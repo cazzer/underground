@@ -1,5 +1,6 @@
 import { ENE_SCHEMA_VERSION, type EneOutage, type EneSnapshot } from './realtime'
-import { FETCH_TIMEOUT_MS, parseRetryAfter, SchemaMismatchError, type FetchResult } from './realtimeFetch'
+import { SchemaMismatchError } from './realtimeFetch'
+import { fetchWorkerJson, type WorkerFetchResult } from './workerFetch'
 
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
@@ -26,32 +27,7 @@ export function parseEneSnapshot(raw: unknown): EneSnapshot {
   return { version: ENE_SCHEMA_VERSION, generatedAt: r.generatedAt, dropped: r.dropped, outages: r.outages.map(parseOutage) }
 }
 
-export type EneFetchResult = { ok: true; snapshot: EneSnapshot } | Extract<FetchResult, { ok: false }>
+export type EneFetchResult = WorkerFetchResult<EneSnapshot>
 
-/**
- * One /ene poll, shaped like `fetchSnapshot`: failures come back as `ok: false` (never thrown); the only throw is
- * the caller's own abort. A 503 `{"error":"warming"}` is flagged `warming`.
- */
-export async function fetchEne(url: string, signal: AbortSignal): Promise<EneFetchResult> {
-  const fail = (error: string, warming = false, retryAfterS: number | null = null, schemaMismatch = false): EneFetchResult => ({
-    ok: false,
-    warming,
-    schemaMismatch,
-    error,
-    retryAfterS,
-  })
-  try {
-    const res = await fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(FETCH_TIMEOUT_MS)]), cache: 'no-store' })
-    const retryAfterS = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: unknown } | null
-      if (res.status === 503 && body?.error === 'warming') return fail('HTTP 503 warming', true, retryAfterS)
-      return fail(`HTTP ${res.status}`, false, retryAfterS)
-    }
-    return { ok: true, snapshot: parseEneSnapshot(await res.json()) }
-  } catch (err) {
-    if (signal.aborted) throw err
-    if (err instanceof DOMException && err.name === 'TimeoutError') return fail(`timeout after ${FETCH_TIMEOUT_MS / 1000} s`)
-    return fail(err instanceof Error ? err.message : String(err), false, null, err instanceof SchemaMismatchError)
-  }
-}
+/** One /ene poll (`fetchWorkerJson`: failures come back as `ok: false`, a 503 warming is flagged). */
+export const fetchEne = (url: string, signal: AbortSignal): Promise<EneFetchResult> => fetchWorkerJson(url, signal, parseEneSnapshot)
