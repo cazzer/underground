@@ -6,6 +6,7 @@ import { dimLineRgbInto, srgb01 } from '../lib/lineDim'
 import { writeMarkerMatrices } from '../lib/markerMatrices'
 import type { Station } from '../lib/network'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
+import type { TripMark } from '../lib/tripMarks'
 import { theme } from '../theme'
 import { cameraDistance, markerRadiusPx, screenScale } from './cameraDistance'
 import { FocusRing } from './FocusRing'
@@ -23,6 +24,8 @@ interface StationsProps {
   hiddenSiblings: readonly string[]
   /** Every station the trip's drawn journey calls at (TripRouteDraw.stations); null with none. */
   tripStations: readonly string[] | null
+  /** The trip's station marks (TripRouteDraw.marks); null with none: a focus ring on one draws outside it. */
+  tripMarks: readonly TripMark[] | null
   /** This frame's trip look (SubwayLines, -0.25): the other stations' rings dim with the network. */
   levels: EmphasisLevels
 }
@@ -35,7 +38,7 @@ interface StationsProps {
  * shows, the rings of stations its journey doesn't call at mix toward the background by the network's dim (as the
  * lines do, lineDim.ts), rewritten only while that dim or the journey's stations change.
  */
-export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations, levels }: StationsProps) {
+export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations, tripMarks, levels }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
   const { focusedId } = useFocus()
@@ -67,6 +70,8 @@ export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations
   const drawn = useRef<{ scale: number; hidden: readonly number[] | null }>({ scale: NaN, hidden: null })
   // The last journey's stations, so they stay full while its dim eases out.
   const heldTrip = useHeld(tripStations)
+  const heldMarks = useHeld(tripMarks)
+  const focusedRole = (focusedId && heldMarks?.find((m) => m.stationId === focusedId)?.role) || null
   const onTrip = useMemo(() => {
     const ids = new Set(heldTrip)
     return Uint8Array.from(stations, (s) => (ids.has(s.id) ? 1 : 0))
@@ -141,7 +146,7 @@ export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations
         {/* Default white material: the per-instance colors are the ring colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
-      {focusedMarker && focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} />}
+      {focusedMarker && focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} tripRole={focusedRole} levels={levels} />}
     </>
   )
 }

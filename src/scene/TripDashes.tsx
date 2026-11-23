@@ -37,16 +37,20 @@ interface TripDashesProps {
   route: TripRouteDraw | null
   /** This frame's look, written by SubwayLines at -0.25. */
   levels: EmphasisLevels
+  /** The focused interior is loaded under the screen veil: draw above it (RENDER_ORDER.tripWalkOver). */
+  overVeil: boolean
 }
 
 /**
  * The trip's walks between stations (theme.exitPath) and its rides found on no drawn shape (their route color, straight
- * through their stops), dashed, over its ride legs. One plain dashed layer at the ground: the dashes stay
+ * through their stops), dashed, over the marks' halo discs and under their rings (above the veil while the focused
+ * interior is loaded under look A). One plain dashed layer, every vertex at y 0 (the street, like the station points
+ * the walks join, so the depth factor never moves them): the dashes stay
  * theme.tripWalkDashPx / tripWalkGapPx on screen at the view's target, since the dash scale is written per frame as
  * pixels per meter there. As wide as the ride legs, dimmed with them in the list view, faded in by opacity. Takes no
  * picks (ScenePicker picks stations and trains only).
  */
-export function TripDashes({ network, route, levels }: TripDashesProps) {
+export function TripDashes({ network, route, levels, overVeil }: TripDashesProps) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const walks = route?.walks
   const straights = route?.straights
@@ -58,6 +62,7 @@ export function TripDashes({ network, route, levels }: TripDashesProps) {
   const lines = useLineLayer(buffers, RENDER_ORDER.tripWalk, theme.tripLineWidth, DASH, { dimmable: true })
   useFrame((state) => {
     if (!lines) return
+    lines.renderOrder = overVeil ? RENDER_ORDER.tripWalkOver : RENDER_ORDER.tripWalk
     lines.visible = levels.tripVisible
     if (!levels.tripVisible) return
     const m = lines.material

@@ -261,7 +261,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `usePlatformFade` (a stretch two rides share fades on the first copy only); per frame at 0 its `scale.y`, width (base to
     `tripLineWidth` as a journey is opened) and own dim (`tripFaintDim` in the list view, 0 opened); it keeps the last route,
     held by SubwayLines (`useHeld.ts`, the last non-null route), so closing or covering the panel eases it out. Beside it in the
-    same boundary (a crash un-dims the map), 2q7.45.4: `TripDashes.tsx` (2.2) one plain dashed `DimLineMaterial` layer at y 0
+    same boundary (a crash un-dims the map), 2q7.45.4: `TripDashes.tsx` (4.45, over the marks' halo discs and under their
+    rings, so a short walk between touching marks still shows; 7.55, above the veil, while the focused interior is loaded under
+    look A, like the way out's walk outside) one plain dashed `DimLineMaterial` layer at y 0
     (`tripDashBuffers`, `src/lib/tripDashBuffers.ts`, pure: each walk between stations a segment in `exitPath`, each `straight`
     ride its stop polyline in its route color, a route routes.json lacks warned once and left out; dash distances in meters
     restarting at 0 per polyline), `dashScale` = 1 / `metersPerPx` (lib/follow.ts) per frame so `tripWalkDashPx`/`GapPx` hold on
@@ -269,8 +271,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `TripMarks.tsx`, three InstancedMeshes at MARKER_Y (a `theme.background` disc 4.4 at `TRIP_MARK_HALO` 1.2, the `exitPath`
     ring 4.5 from `TRIP_MARK_INNER` 0.62 to 1, a dot 4.55 at `TRIP_MARK_DOT` 0.4 for the start and end only, so a change reads
     hollow), radius `screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS 9)` (cameraDistance.ts: 1.6x the station marker,
-    5..13 px); matrices rewritten only on a scale or hidden-set change, the color (`dimLineRgbInto`, the faint dim) only when it
-    changes; a mark hides at a station the focused, loaded interior covers (Scene's `markHidden`, `interiorStationIds`). The marks
+    5..13 px), a change at `CHANGE_MARK_SHARE` 0.7 of it, and a start with the location fix inside it grown to the reticle's
+    outer radius (`TICK_OUTER` × its scale) + 2 px (`lib/tripMarkSize.ts`; Scene passes `here.ground`, read only); matrices
+    rewritten only when the scale, the fix or the marks change, the color (`dimLineRgbInto`, the faint dim) only when it changes.
+    The marks at stations the focused, loaded interior covers (Scene's `markHidden`, `interiorStationIds`) are a second set of
+    meshes fading by 1 − `interiorOpacity(distance)`, so they go as the interior reveals, not when it loads. A focused station
+    with no interior that carries a mark draws its FocusRing just outside it (`FOCUS_OUTSIDE_INNER` 1.25 to `OUTER` 1.45 of the
+    mark's radius) while the trip shows. The marks
     are `tripMarks` (`src/lib/tripMarks.ts`, pure: the first leg's start, the last leg's end, every other leg boundary a change,
     one per station, start or end over change; a walk between complex members marks both). No handler and not in ScenePicker, so
     neither takes a pick. While the trip shows, `Stations.tsx` mixes the rings of stations the journey doesn't call at
@@ -1167,8 +1174,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   an explicit `renderOrder` from `src/scene/renderOrder.ts`: focused station's streets 0.35 (7.5 above the veil
   while the interior is loaded under look A; TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
   0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`),
-  trip walks 2.2 (`TripDashes.tsx`), you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo
-  4.4, ring 4.5 and dot 4.55 (`TripMarks.tsx`), train halo 5,
+  you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo 4.4, trip walks 4.45
+  (`TripDashes.tsx`; 7.55 above the veil while the focused interior is loaded under look A), trip mark ring 4.5 and dot 4.55
+  (`TripMarks.tsx`), train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,

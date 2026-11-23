@@ -6,12 +6,14 @@ import { depthFactor, depthScaleY } from '../lib/tilt'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { Network, ShapePath } from '../lib/network'
 import type { StationSpans } from '../lib/platformSpan'
+import type { Ground } from '../lib/projection'
 import { createEmphasis, emphasisLevels, stepEmphasis, type EmphasisLevels, type EmphasisTarget } from '../lib/tripEmphasis'
 import type { TripRouteDraw } from '../lib/tripLineBuffers'
 import { baseLineMix, linesMode, theme } from '../theme'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { BAND_UNIFORMS, writeLineDim } from './bandLineMaterial'
 import { cameraDistance } from './cameraDistance'
+import { interiorLook } from './interiorLook'
 import { LineFade, LineHighlight } from './LineHighlight'
 import { RENDER_ORDER } from './renderOrder'
 import { TripDashes } from './TripDashes'
@@ -38,8 +40,10 @@ interface SubwayLinesProps {
   tripShown: boolean
   /** The trip emphasis' look, written here each frame (Scene owns it): every line layer, the basemap and the streets read it. */
   levels: EmphasisLevels
-  /** Stations whose trip mark hides: the focused interior's (it marks them itself). */
+  /** Stations whose trip mark fades as the focused interior reveals (it marks them itself). */
   markHidden: readonly string[]
+  /** The location fix's ground point while its reticle shows (the start mark grows past it); null for none. */
+  fix: Ground | null
 }
 
 /**
@@ -49,7 +53,7 @@ interface SubwayLinesProps {
  * background by color (every layer's own `lineDim`) and TripLines draws the route over it, eased over EMPHASIS_S, with
  * TripDashes' walks and straight rides and TripMarks' station marks.
  */
-export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tripShown, levels, markHidden }: SubwayLinesProps) {
+export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tripShown, levels, markHidden, fix }: SubwayLinesProps) {
   const buffers = useMemo(() => routeLineBuffers(network, paths, baseLineMix(theme, linesMode), true), [network, paths])
   const lines = useLineLayer(buffers, RENDER_ORDER.lines)
   usePlatformFade(lines, buffers, paths, interiorSpans)
@@ -101,8 +105,8 @@ export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tr
       {/* Decoration: a crash here (logged by the boundary) draws no trip route, walk or mark and un-dims the map instead of blanking the scene. */}
       <ErrorBoundary key={boundaryKey} fallback={null} onError={() => setCrashedKey(boundaryKey)}>
         <TripLines network={network} paths={paths} route={held} levels={levels} interiorSpans={interiorSpans} />
-        <TripDashes network={network} route={held} levels={levels} />
-        <TripMarks marks={held?.marks ?? null} hidden={markHidden} levels={levels} />
+        <TripDashes network={network} route={held} levels={levels} overVeil={interiorSpans !== null && interiorLook.veil === 'screen'} />
+        <TripMarks marks={held?.marks ?? null} hidden={markHidden} fix={fix} levels={levels} />
       </ErrorBoundary>
     </>
   )

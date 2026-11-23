@@ -3,6 +3,9 @@ import type { LineBuffers } from '../lib/lineBuffers'
 
 const EDGE_SEGMENTS = 96
 const RING_SEGMENTS = 32
+/** The reticle's radius on screen, and the smallest it gets in meters when zoomed right in (YouAreHere.tsx). */
+export const RETICLE_PX = 9
+export const RETICLE_MIN_METERS = 8
 /** Reticle proportions as multiples of the ring radius (1). */
 export const TICK_OUTER = 1.7
 /** The halo is a band just around the ring, not a disc: the station under the reticle stays visible. */
