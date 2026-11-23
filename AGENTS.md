@@ -774,7 +774,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   hash and raises `linkNotice`. Called in `MapView` as a passive effect, after the HUD's inset measuring
 - `src/data/loadTimetable.ts` (`expectTimetable`, `expectDatedIndex`, `expectServiceCalendar`, `expectTripPatterns`: one
   `trip-index.json` fetch keeps the calendar and the patterns (each pattern's stop run), each checked on its own, so
-  `serviceCalendar()` never fails on a malformed pattern and `tripPatterns()` rejects alone; one lazy cached promise per file via
+  `serviceCalendar()` never fails on a malformed pattern and `tripPatterns()` rejects alone; a check's failure is cached for
+  the session, a failed fetch is evicted and retried; one lazy cached promise per file via
   `interiorCache.ts`: `timetable/<service>.json`, `timetable/dated/<date>.json` and its `index.json` (built by each deploy, never in git; a 404 on the index is
   an empty one with one console warning, any other failure rejects), `route/transfers.json`, and the calendar from `trip-index.json`) and
   `planTrip.ts` (`planTripLive(stations, from, to, atS, live)`: reads the calendar and the dated index (fetched together; a failed

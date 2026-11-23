@@ -26,11 +26,13 @@ function rideColor(colors: ReadonlyMap<RouteId, Rgb>): (ride: RideShapeSpan, pat
   return (ride, path) => {
     const own = colors.get(ride.routeId)
     if (own) return own
+    const fallback = colors.get(path.routeId) ?? null
     if (!unknownRoutes.has(ride.routeId)) {
       unknownRoutes.add(ride.routeId)
-      console.warn(`Trip route: no color for route "${ride.routeId}"; drawn in its shape's route color`)
+      const then = fallback ? `drawn in its shape's route ${path.routeId} color` : 'not drawn'
+      console.warn(`Trip route: no color for route "${ride.routeId}"; ${then}`)
     }
-    return colors.get(path.routeId) ?? null
+    return fallback
   }
 }
 

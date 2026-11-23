@@ -54,6 +54,10 @@ export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tr
   // The last route's key: a new route remounts TripLines' error boundary, a closed one (null) keeps it to ease out.
   const [tripKey, setTripKey] = useState<string | null>(null)
   if (tripRoute !== null && tripRoute.key !== tripKey) setTripKey(tripRoute.key)
+  // The boundary key TripLines last crashed under: a crash un-dims the map until a new route remounts it.
+  const [crashedKey, setCrashedKey] = useState<string | null>(null)
+  const boundaryKey = tripKey ?? ''
+  const tripCrashed = crashedKey === boundaryKey
 
   // Priority -0.25: after CameraRig and the orbit (-2), drei's controls.update() (-1) and the orbit pivot (-0.5),
   // so the view is this frame's camera; before LiveTrains (0), which places the trains on it.
@@ -74,7 +78,7 @@ export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tr
     BAND_UNIFORMS.bandEase.value = view.ease
     BAND_UNIFORMS.trackOffsetM.value = view.trackOffsetM
     BAND_UNIFORMS.platformFade.value = interiorSpans === null ? 0 : interiorOpacity(distance)
-    target.shown = tripShown && tripRoute !== null
+    target.shown = tripShown && tripRoute !== null && !tripCrashed
     target.full = tripRoute?.faint === false
     stepEmphasis(emphasis, target, delta, prefersReducedMotion())
     emphasisLevels(emphasis, theme, levels)
@@ -87,7 +91,7 @@ export function SubwayLines({ network, paths, interiorSpans, view, tripRoute, tr
       {linesMode === 'a' && <LineHighlight network={network} paths={paths} interiorSpans={interiorSpans} levels={levels} />}
       {linesMode === 'c' && <LineFade network={network} paths={paths} interiorSpans={interiorSpans} levels={levels} />}
       {/* Decoration: a crash here (logged by the boundary) draws no trip route instead of blanking the scene. */}
-      <ErrorBoundary key={tripKey ?? ''} fallback={null}>
+      <ErrorBoundary key={boundaryKey} fallback={null} onError={() => setCrashedKey(boundaryKey)}>
         <TripLines network={network} paths={paths} route={tripRoute} levels={levels} interiorSpans={interiorSpans} />
       </ErrorBoundary>
     </>

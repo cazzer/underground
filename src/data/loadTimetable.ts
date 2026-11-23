@@ -73,7 +73,8 @@ const datedIndexCache = createInteriorCache(() => {
   )
 })
 // One fetch of the big file for both readers, each checked on its own: malformed patterns never fail a plan, and only
-// the two parts are kept, not the whole file.
+// the two parts are kept, not the whole file. A check's failure is cached for the session with the fetch (the same
+// file would fail again); a failed fetch is still evicted, so the next call retries.
 const tripIndexCache = createInteriorCache(() => {
   const url = `${BASE_URL}data/trip-index.json`
   return fetchJson(url).then((raw) => ({

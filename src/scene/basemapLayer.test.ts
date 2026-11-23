@@ -1,5 +1,6 @@
 import { Color, type InterleavedBufferAttribute } from 'three'
 import { describe, expect, it } from 'vitest'
+import { mixHex } from '../lib/routeColor'
 import { networkHull } from '../lib/basemap/networkHull'
 import { planPool } from '../lib/basemap/tilePool'
 import { createClassLayer, INITIAL_SEGMENTS, SHRINK_AFTER_S, type ClassLayer } from './basemapLayer'
@@ -117,5 +118,25 @@ describe('createClassLayer', () => {
     expect(layer.line.material.color.r).toBeCloseTo(0.5, 12)
     layer.setVisibility(0, stroke, bg)
     expect(layer.line.visible).toBe(false)
+  })
+
+  it('dims the stroke toward the background in sRGB, as the route lines dim (mixHex), and not at all at 0', () => {
+    const layer = layerOf()
+    const strokeHex = '#525f78'
+    const bgHex = '#0b2147'
+    const stroke = new Color(strokeHex)
+    const bg = new Color(bgHex)
+    const got = layer.line.material.color
+    const expectNear = (want: Color, tol: number) => {
+      const [a, b] = [got.clone().convertLinearToSRGB(), want.clone().convertLinearToSRGB()]
+      for (const ch of ['r', 'g', 'b'] as const) expect(Math.abs(a[ch] - b[ch]), ch).toBeLessThanOrEqual(tol)
+    }
+    layer.setVisibility(1, stroke, bg, 0.7)
+    // mixHex rounds to whole sRGB steps; the layer doesn't.
+    expectNear(new Color(mixHex(strokeHex, bgHex, 0.7)), 0.5 / 255)
+    layer.setVisibility(1, stroke, bg, 0)
+    expectNear(stroke, 1e-9)
+    layer.setVisibility(0.5, stroke, bg, 0)
+    expectNear(new Color().lerpColors(bg, stroke, 0.5), 1e-9)
   })
 })

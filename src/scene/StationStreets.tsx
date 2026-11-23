@@ -22,12 +22,12 @@ import type { Ground } from '../lib/projection'
 import { depthFactor, depthScaleY } from '../lib/tilt'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
+import { writeLineDim } from './bandLineMaterial'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
 import { interiorLook } from './interiorLook'
 import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
 import { RENDER_ORDER } from './renderOrder'
 import { streetsLook } from './streetsLook'
-import { writeLineDim } from './bandLineMaterial'
 import { useEntranceProbe } from './useEntranceProbe'
 import { useLineLayer } from './useLineLayer'
 import { MARKER_MIN_METERS } from './markerShape'
@@ -137,7 +137,7 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,
     theme.streetWidth,
     undefined,
-    true,
+    { dimmable: true },
   )
   const markBuffers = useMemo(() => {
     if (interiorPending) return null

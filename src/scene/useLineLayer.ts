@@ -46,6 +46,11 @@ export interface LineDash {
   gap: number
 }
 
+export interface LineLayerOptions {
+  /** A plain layer that dims with the network under a trip (DimLineMaterial); banded layers always can. */
+  dimmable?: boolean
+}
+
 /**
  * Line buffers plus, for a dashed layer, two dash distances per segment (start, end; 0, 0 stays solid), and for a
  * windowed band layer (TripLines) each segment's drawn window (t0, t1), two floats per segment.
@@ -71,7 +76,7 @@ export function useLineLayer(
   renderOrder: number,
   linewidth = theme.lineWidth,
   dash?: LineDash,
-  dimmable = false,
+  { dimmable = false }: LineLayerOptions = {},
 ): LineSegments2 | null {
   const dashSize = dash?.size
   const gapSize = dash?.gap
