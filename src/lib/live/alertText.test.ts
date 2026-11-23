@@ -8,7 +8,7 @@ import type { TerminalOf } from './routeTerminals'
 // 2026-11-23 15:22 New York (Monday).
 const NOW = 1795465325
 const route = (id: string, shortName = id): [string, Route] => [id, { id, shortName, longName: id, color: '#000000' }]
-const routeById = new Map([route('1'), route('2'), route('A'), route('C'), route('E'), route('F'), route('G'), route('L'), route('7'), route('GS', 'S'), route('7X', '7X')])
+const routeById = new Map([route('1'), route('2'), route('A'), route('C'), route('E'), route('F'), route('G'), route('L'), route('7'), route('GS', 'S'), route('7X', '7X'), route('J'), route('Z')])
 const TERMINALS: Record<string, string> = {
   'L|N': '8 Av',
   'L|S': 'Canarsie',
@@ -16,6 +16,8 @@ const TERMINALS: Record<string, string> = {
   '7|S': 'Hudson Yards',
   '7X|N': 'Flushing',
   'GS|N': 'Grand Central',
+  'J|N': 'Jamaica Center',
+  'Z|S': 'Broad St',
   'F|S': 'Coney Island',
   'G|S': 'Church Av',
 }
@@ -66,6 +68,20 @@ describe('serviceChangeView rows', () => {
     expect(rows(join(change({ routes: ['GS'], direction: 'N' })))[0]!.parts[1]).toBe('Grand Central-bound only')
     expect(rows(join(change({ routes: ['1'], direction: 'S' })), 'Bk')[0]!.parts[1]).toBe('one direction only')
     expect(rows(join(change({ routes: ['F'], direction: 'S' })), 'Bk')[0]!.parts[1]).toBe('Coney Island-bound only')
+  })
+
+  it('words the J and Z by where they go even in Manhattan (Canal St), never uptown or downtown', () => {
+    expect(rows(join(change({ routes: ['J'], direction: 'N' })))[0]!.parts[1]).toBe('Jamaica Center-bound only')
+    expect(rows(join(change({ routes: ['Z'], direction: 'S' })))[0]!.parts[1]).toBe('Broad St-bound only')
+    expect(view(join(change({ routes: ['J'], direction: 'N' }))).skipSpoken).toBe('The Jamaica Center-bound J train skips this station now.')
+  })
+
+  it('asks for the terminal at the focused station\'s members', () => {
+    const asked: string[] = []
+    const spy: TerminalOf = (r, d, ids) => (asked.push(`${r}${d}:${ids.join(',')}`), null)
+    const g = { ...group('Bk'), memberIds: ['g', 'h'] }
+    serviceChangeView(join(change({ routes: ['F'], direction: 'S' })), g, routeById, NOW, spy)
+    expect(asked).toContain('FS:g,h')
   })
 
   it('says "one direction only" when the terminal is unknown, and keeps both terminals for routes that differ', () => {

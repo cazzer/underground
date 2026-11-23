@@ -117,13 +117,20 @@ describe('joinStationChanges on the recorded feed', () => {
     expect(changesAt('629', NIGHT).map(summary)).toEqual(['35962 suspended N now', '35976 otherS 46 now'])
   })
 
-  it('reads a header with no "skip" ("run express from A to B") by the probable rule: the stretch ends stay quoted, the stops between are probably skipped', () => {
-    for (const id of ['632', '640']) expect(at(id, EXPRESS_AT, '36275'), id).toEqual(['36275 otherS 46 now'])
-    for (const id of ['633', '634', '636', '637', '638', '639']) expect(at(id, EXPRESS_AT, '36275'), id).toEqual(['36275 skippedS? 46 now'])
+  it('reads a header with no "skip" ("run express from A to B") by the probable rule, with the header\'s own stretch ends', () => {
+    // Grand Central-42 St (631), where the express starts, is not informed; Brooklyn Bridge-City Hall (640) is, and stays quoted.
+    expect(at('640', EXPRESS_AT, '36275')).toEqual(['36275 otherS 46 now'])
+    for (const id of ['632', '633', '634', '636', '637', '638', '639']) expect(at(id, EXPRESS_AT, '36275'), id).toEqual(['36275 skippedS? 46 now'])
     // A probable skip is never in the heading's sentence.
     const group = realGroupById.get('637')!
     expect(serviceChangeView(joinAt('637', EXPRESS_AT), group, routeById, EXPRESS_AT, terminalOf).skipSpoken).toBe('')
     expect(group.borough).toBe('M')
+  })
+
+  it('reads "runs express from E 180 St to 3 Av-149 St": both ends quoted, 149 St-Hostos (informed, not an end) probably skipped', () => {
+    const t = 1795625000
+    for (const id of ['213', '221']) expect(at(id, t, '35957'), id).toEqual(['35957 otherN 25 now'])
+    for (const id of ['214', '215', '216', '217', '218', '219', '220', '222']) expect(at(id, t, '35957'), id).toEqual(['35957 skippedN? 25 now'])
   })
 
   it('words the direction by terminal for the 7 and the L, and by uptown/downtown for the 1', () => {

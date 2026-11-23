@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ServiceAlert } from '../../data/realtime'
 import type { Station } from '../network'
-import { alertKindOf, headerNamedStations, skipClause, skipSetsOf, stretchEnds } from './alertStations'
+import { alertKindOf, headerNamedStations, headerStretchEnds, skipClause, skipSetsOf, stretchEnds } from './alertStations'
 
 const named = (header: string, names: string[]) => [...headerNamedStations(header, names.map((name, i) => ({ id: `s${i}`, name })))].map((id) => names[Number(id.slice(1))])
 
@@ -60,6 +60,19 @@ describe('headerNamedStations', () => {
     expect(named('[F] skips 4 Av/9 St', ['4 Av-9 St'])).toEqual(['4 Av-9 St'])
   })
 
+  it('does not let a neighbour sharing words take the item: the longest matching form wins, a whole name winning a tie', () => {
+    expect(named('[2] skips 149 St-Hostos', ['3 Av-149 St', '149 St-Hostos'])).toEqual(['149 St-Hostos'])
+    expect(named('[2] skips 3 Av-149 St', ['3 Av-149 St', '149 St-Hostos'])).toEqual(['3 Av-149 St'])
+    expect(named('[E] skips Sutphin Blvd', ['Sutphin Blvd', 'Sutphin Blvd-Archer Av-JFK Airport'])).toEqual(['Sutphin Blvd'])
+    expect(named('[E] skips Sutphin Blvd-Archer Av-JFK Airport', ['Sutphin Blvd', 'Sutphin Blvd-Archer Av-JFK Airport'])).toEqual(['Sutphin Blvd-Archer Av-JFK Airport'])
+    expect(named('[N] skips 59 St', ['59 St', 'Lexington Av/59 St', '5 Av/59 St'])).toEqual(['59 St'])
+    expect(named('[F] skips Lexington Av/63 St', ['Lexington Av/53 St', 'Lexington Av/63 St'])).toEqual(['Lexington Av/63 St'])
+  })
+
+  it('names every station of one name', () => {
+    expect(named('[N] skips Canal St', ['Canal St', 'Canal St', 'Spring St'])).toEqual(['Canal St', 'Canal St'])
+  })
+
   it('reads the whole 35969 header: three names, with Smith-9 Sts among the informed stops', () => {
     const header = 'In Brooklyn, Coney Island-bound [F] and Church Av-bound [G] skip 4 Av-9 St, 15 St-Prospect Park and Fort Hamilton Pkwy'
     const names = ['Smith-9 Sts', '4 Av-9 St', '15 St-Prospect Park', 'Fort Hamilton Pkwy', 'Bergen St', 'Church Av', 'Coney Island-Stillwell Av']
@@ -68,6 +81,21 @@ describe('headerNamedStations', () => {
 
   it('names nothing from words before the skip (the direction, the line)', () => {
     expect(named('Flushing-bound [7] skips 52 St', ['Flushing-Main St', '52 St'])).toEqual(['52 St'])
+  })
+})
+
+describe('headerStretchEnds', () => {
+  const cands = ['E 180 St', '3 Av-149 St', '149 St-Hostos', 'Grand Central-42 St'].map((name, i) => ({ id: `s${i}`, name }))
+
+  it('is the stations a "from X to Y" or "express X to Y" first line names', () => {
+    expect(headerStretchEnds('In the Bronx, [2][5] runs express from E 180 St to 3 Av-149 St\nAll trains at E 180 St board', cands)).toEqual(['s0', 's1'])
+    expect(headerStretchEnds('[6] runs express 3 Av-149 St to Grand Central-42 St', cands)).toEqual(['s1', 's3'])
+  })
+
+  it('is null with no such stretch, or when an end names no candidate', () => {
+    expect(headerStretchEnds('Downtown [1] trains run express', cands)).toBeNull()
+    expect(headerStretchEnds('[6] runs express from E 180 St to Nowhere', cands)).toBeNull()
+    expect(headerStretchEnds('Trains board from the platform\nruns express from E 180 St to 3 Av-149 St', cands)).toBeNull()
   })
 })
 
@@ -108,6 +136,20 @@ const alert = (over: Partial<ServiceAlert>): ServiceAlert => ({
   periods: [[0, null]],
   entities: ['a', 'b', 'c'].map((stop) => ({ route: '1', stop, direction: 'S' as const })),
   ...over,
+})
+
+describe('skipSetsOf with a "from X to Y" header', () => {
+  it('takes X and Y as the ends of the stretch, even when X is not informed', () => {
+    const a = alert({ header: 'Downtown [1] runs express from Alpha St to Delta St', entities: ['b', 'c', 'd'].map((stop) => ({ route: '1', stop, direction: 'S' as const })) })
+    const [set] = skipSetsOf(a, stations)
+    expect([...set!.stations].sort()).toEqual(['b', 'c'])
+    expect(set!.probable).toBe(true)
+  })
+
+  it('without it takes the farthest pair, as before', () => {
+    const a = alert({ header: 'Downtown [1] runs express', entities: ['b', 'c', 'd'].map((stop) => ({ route: '1', stop, direction: 'S' as const })) })
+    expect([...skipSetsOf(a, stations)[0]!.stations]).toEqual(['c'])
+  })
 })
 
 describe('skipSetsOf', () => {

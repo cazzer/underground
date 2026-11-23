@@ -43,7 +43,7 @@ describe('transformAlerts on the recorded feed', () => {
       'lmm:planned_work:35972',
       'lmm:planned_work:35976',
     ])
-    expect(r.outsideWindow).toBe(2)
+    expect(r.outsideWindow).toBe(3)
   })
 
   it('passes every header through byte for byte, the line break of 31498 included', () => {

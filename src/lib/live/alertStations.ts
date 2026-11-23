@@ -42,20 +42,65 @@ function clauseItems(clause: string): string[][] {
 
 const startsWith = (item: readonly string[], form: readonly string[]): boolean => form.every((t, i) => item[i] === t)
 
+interface Form {
+  tokens: string[]
+  /** The whole name, not one of its parts. */
+  whole: boolean
+}
+
 /** A station name and its parts: split on "-", "/" and parentheses ("Times Sq-42 St" is also "Times Sq" and "42 St"). */
-function nameForms(name: string): string[][] {
-  return [name, ...name.split(/[-/()]/)].map(canonTokens).filter((t) => t.length > 0)
+function nameForms(name: string): Form[] {
+  const forms = [{ tokens: canonTokens(name), whole: true }, ...name.split(/[-/()]/).map((part) => ({ tokens: canonTokens(part), whole: false }))]
+  return forms.filter((f) => f.tokens.length > 0)
 }
 
 /**
- * The candidates the header names: some item of the clause is the whole name, or one of its parts, or starts with it
- * (so "81 St-Museum of Natural History in both directions" and a trailing "- Take the A" still match). Whole words,
- * from the item's start: "25 St" is not "125 St", and "4 Av-9 St" does not name Smith-9 Sts nor "3 Av-149 St"
- * 149 St-Hostos. "Av" and "Avenue", "Ft" and "Fort" are the same word.
+ * The candidates each item names. An item names a candidate when it equals the whole name or one of its parts, or
+ * starts with one (so "81 St-Museum of Natural History in both directions" and a trailing "- Take the A" still match);
+ * whole words from the item's start ("25 St" is not "125 St"; "Av" and "Avenue", "Ft" and "Fort" are the same word).
+ * Neighbours that share words don't name each other: of the candidates an item matches, only the ones whose best
+ * matching form is longest (in tokens) are named, a whole name winning a tie, so "149 St-Hostos" is not "3 Av-149 St"
+ * and "Sutphin Blvd" is not "Sutphin Blvd-Archer Av-JFK Airport". Candidates that still tie (stations of one name)
+ * are all named.
+ */
+function namedIn(items: readonly (readonly string[])[], candidates: readonly { id: StationId; name: string }[]): Set<StationId> {
+  const forms = candidates.map((c) => ({ id: c.id, forms: nameForms(c.name) }))
+  const named = new Set<StationId>()
+  for (const item of items) {
+    let best = 0
+    let winners: StationId[] = []
+    for (const c of forms) {
+      const score = Math.max(0, ...c.forms.filter((f) => startsWith(item, f.tokens)).map((f) => f.tokens.length * 2 + (f.whole ? 1 : 0)))
+      if (score === 0 || score < best) continue
+      if (score > best) winners = []
+      best = score
+      winners.push(c.id)
+    }
+    for (const id of winners) named.add(id)
+  }
+  return named
+}
+
+/**
+ * The candidates the header names, by the rules of `namedIn`, over the items of its skip clause. Pass every station
+ * of the alert's route as candidates, so a neighbour that matches better wins the item; the caller intersects the
+ * result with the informed stops.
  */
 export function headerNamedStations(header: string, candidates: readonly { id: StationId; name: string }[]): Set<StationId> {
-  const items = clauseItems(skipClause(header))
-  return new Set(candidates.filter((c) => nameForms(c.name).some((form) => items.some((item) => startsWith(item, form)))).map((c) => c.id))
+  return namedIn(clauseItems(skipClause(header)), candidates)
+}
+
+/**
+ * The two ends a header gives for "runs express from X to Y" or "express X to Y" (first line only), as the stations it
+ * names among `candidates`; null when it has no such stretch or either end names no candidate.
+ */
+export function headerStretchEnds(header: string, candidates: readonly { id: StationId; name: string }[]): StationId[] | null {
+  const line = header.split('\n')[0] ?? ''
+  const m = /\bfrom\s+(.+?)\s+to\s+(.+?)(?=\n|;|\. |,| due to | for | while |$)/i.exec(line) ?? /\bexpress\s+(.+?)\s+to\s+(.+?)(?=\n|;|\. |,| due to | for | while |$)/i.exec(line)
+  if (!m) return null
+  const from = namedIn([canonTokens(m[1]!)], candidates)
+  const to = namedIn([canonTokens(m[2]!)], candidates)
+  return from.size > 0 && to.size > 0 ? [...from, ...to] : null
 }
 
 /**
@@ -102,7 +147,7 @@ export function sharedDirection(directions: readonly (Direction | null)[]): Dire
  * stops are the MTA's list for the route, and its header says which of them are skipped; the stations the header
  * names, out of the informed ones, are the set. When it names none (a wording we can't read), the set is a guess,
  * `probable`: every informed station when there are two or fewer, else all but the two ends of the stretch (the
- * listed stops usually bracket the skipped ones). A stop `stationById` lacks is ignored; an empty set is omitted.
+ * listed stops usually bracket the skipped ones; a header's "from X to Y" gives the ends, else the farthest pair). A stop `stationById` lacks is ignored; an empty set is omitted.
  */
 export function skipSetsOf(alert: ServiceAlert, stationById: ReadonlyMap<StationId, Station>): RouteSkipSet[] {
   if (alertKindOf(alert.type) !== 'skip') return []
@@ -111,14 +156,17 @@ export function skipSetsOf(alert: ServiceAlert, stationById: ReadonlyMap<Station
   for (const route of routes) {
     const entities = alert.entities.filter((e) => e.route === route && e.stop !== null && stationById.has(e.stop))
     const informed = [...new Set(entities.map((e) => e.stop!))]
-    const named = headerNamedStations(alert.header, informed.map((id) => ({ id, name: stationById.get(id)!.name })))
+    // Every station of the route, so a neighbour with a longer matching name takes the item; then the informed ones.
+    const candidates = [...stationById.values()].filter((st) => st.routeIds.includes(route) || informed.includes(st.id)).map((st) => ({ id: st.id, name: st.name }))
+    const named = new Set([...headerNamedStations(alert.header, candidates)].filter((id) => informed.includes(id)))
     let stations: ReadonlySet<StationId>
     let probable = false
     if (named.size > 0) {
       stations = named
     } else {
       probable = true
-      const ends: StationId[] = informed.length <= 2 ? [] : stretchEnds(informed, (id) => stationById.get(id)!.pos)
+      // "runs express from X to Y" names the stretch's ends; else the farthest informed pair are the ends (none for two or fewer).
+      const ends: StationId[] = headerStretchEnds(alert.header, candidates) ?? (informed.length <= 2 ? [] : stretchEnds(informed, (id) => stationById.get(id)!.pos))
       stations = new Set(informed.filter((id) => !ends.includes(id)))
     }
     if (stations.size === 0) continue

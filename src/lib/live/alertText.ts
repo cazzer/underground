@@ -1,4 +1,4 @@
-import type { Direction, RouteId } from '../../data/schema'
+import type { Direction, RouteId, StationId } from '../../data/schema'
 import { routeSpokenName } from '../labels'
 import type { Route } from '../network'
 import type { StationGroup } from '../stationGroups'
@@ -39,19 +39,20 @@ export interface ServiceChangeView {
 export const UNKNOWN_TEXT = 'Service changes unavailable'
 
 /** Not north-south lines: the GTFS N/S of these are not uptown and downtown even in Manhattan. */
-const CROSSTOWN: ReadonlySet<RouteId> = new Set(['L', '7', '7X', 'GS', 'FS', 'H'])
+const CROSSTOWN: ReadonlySet<RouteId> = new Set(['L', '7', '7X', 'GS', 'FS', 'H', 'J', 'Z'])
 
 /** The one direction word that never changes with the station's data. */
 const ONE_DIRECTION = 'one direction'
 
 /**
  * Where trains of `route` going `direction` are headed, in words. GTFS N and S are track directions, not compass
- * ones: uptown and downtown only for a north-south line at a Manhattan station, else "<terminal>-bound" ("Flushing-bound",
- * "Canarsie-bound"), the end of the line from the startup data (`routeTerminals.ts`), else null (not found).
+ * ones: uptown and downtown only for a north-south line at a Manhattan station (not the L, 7, J, Z or the shuttles), else "<terminal>-bound" ("Flushing-bound",
+ * "Canarsie-bound"), the end of the line at this station from the startup data (`routeTerminals.ts`), else null (not found, or
+ * branches part here).
  */
-function directionWord(d: Direction, route: RouteId, manhattan: boolean, terminalOf: TerminalOf): string | null {
-  if (manhattan && !CROSSTOWN.has(route)) return d === 'N' ? 'uptown' : 'downtown'
-  const terminal = terminalOf(route, d)
+function directionWord(d: Direction, route: RouteId, ctx: Pick<Context, 'manhattan' | 'terminalOf' | 'memberIds'>): string | null {
+  if (ctx.manhattan && !CROSSTOWN.has(route)) return d === 'N' ? 'uptown' : 'downtown'
+  const terminal = ctx.terminalOf(route, d, ctx.memberIds)
   return terminal === null ? null : `${terminal}-bound`
 }
 
@@ -81,6 +82,8 @@ export function typeWord(type: string | null): string {
 
 interface Context {
   manhattan: boolean
+  /** The focused station's members: a branch's end depends on the station. */
+  memberIds: readonly StationId[]
   terminalOf: TerminalOf
   routeById: ReadonlyMap<RouteId, Route>
   nowS: number
@@ -89,7 +92,7 @@ interface Context {
 /** "downtown only", "Flushing-bound only", "Coney Island-bound and Church Av-bound only", or "one direction only". */
 function directionPart(c: StationChange, ctx: Context): string | null {
   if (c.direction === null) return null
-  const words = [...new Set(c.routes.map((r) => directionWord(c.direction!, r, ctx.manhattan, ctx.terminalOf)).filter((w) => w !== null))]
+  const words = [...new Set(c.routes.map((r) => directionWord(c.direction!, r, ctx)).filter((w) => w !== null))]
   return `${words.length === 0 ? ONE_DIRECTION : words.join(' and ')} only`
 }
 
@@ -128,7 +131,7 @@ function skipSentences(changes: readonly StationChange[], ctx: Context): string 
   for (const c of changes) {
     if (c.kind !== 'skipped' || !c.now || c.probable) continue
     for (const route of c.routes) {
-      const word = c.direction === null ? '' : (directionWord(c.direction, route, ctx.manhattan, ctx.terminalOf) ?? null)
+      const word = c.direction === null ? '' : (directionWord(c.direction, route, ctx) ?? null)
       const key = word ?? ONE_DIRECTION
       const g = groups.get(key) ?? { word, routes: [] }
       g.routes.push(route)
@@ -158,7 +161,7 @@ export function serviceChangeView(
   const { panel, known } = join
   if (panel.kind === 'none') return { known, body: { kind: 'none' }, skipSpoken: '' }
   if (panel.kind === 'unknown') return { known, body: { kind: 'unknown', text: UNKNOWN_TEXT }, skipSpoken: '' }
-  const ctx: Context = { manhattan: group.borough === 'M', terminalOf, routeById, nowS }
+  const ctx: Context = { manhattan: group.borough === 'M', memberIds: group.memberIds, terminalOf, routeById, nowS }
   const rows = panel.changes.map((c): ChangeRow => {
     const parts = rowParts(c, ctx)
     return {

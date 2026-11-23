@@ -55,7 +55,7 @@ describe('routing', () => {
       const skip = body.alerts.find((a) => a.id === 'lmm:planned_work:35124')
       expect(skip?.header).toBe('Downtown [1] skips 125 St')
       const line = JSON.parse(log.mock.calls[0]![0] as string) as Record<string, unknown>
-      expect(line).toMatchObject({ event: 'alerts-miss', alerts: 9, dropped: 0, outsideWindow: 2 })
+      expect(line).toMatchObject({ event: 'alerts-miss', alerts: 9, dropped: 0, outsideWindow: 3 })
       expect(JSON.stringify(line)).not.toContain('Downtown')
     } finally {
       log.mockRestore()
