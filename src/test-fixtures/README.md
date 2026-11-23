@@ -4,7 +4,11 @@
 
 18 consecutive `/rt` responses from the deployed Worker (about 20 s apart, 2026-11-21 around 21:56 UTC),
 each with the wall-clock time it arrived (`receivedAt`, epoch s). `src/lib/live/lagReplay.test.ts` replays
-them to time how far dots trail the feed and to check they don't leave a platform early (underground-d80).
+them (through `pollReplay.ts`) to time how far dots trail the feed and to check they don't leave a platform early
+(underground-d80), and what the station panel shows around each arrival (`panelReplay.test.ts`, underground-dk6). The
+asserted bounds lean early on purpose (`src/lib/realtime/arrivalShift.ts`): the median arrival at or before the feed's,
+the p90 within 25 s, and the panel reading "Now" by the time the train is in on most rows. The recording itself is
+about 20 s apart, so it says nothing about the client's 15 s poll; the full-hour tuning runs were done on scratch data.
 
 Trimmed from the full recording (about 180 KB a poll) to 21 trips:
 - 17 that appear in every poll and turn STOPPED_AT at least twice, most first, spread over feeds: 6 from the

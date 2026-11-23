@@ -1,5 +1,6 @@
 import { STALE_AFTER_S, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import type { StationId, StopId } from '../../data/schema'
+import { shownArrival } from '../realtime/arrivalShift'
 import { PAST_GRACE_S, minutesAway, stationOfStop } from './arrivals'
 import { DELAYED_NOTE } from './arrivalsView'
 import type { LiveStatus } from './liveStatus'
@@ -8,7 +9,7 @@ export interface TrainStop {
   stopId: StopId
   /** The station's name; the stop id when the station is not in the static data. */
   name: string
-  /** Predicted epoch seconds. */
+  /** Predicted epoch seconds less the feed's arrival shift (`shownArrival`); the raw time while `standing`, which is a departure. */
   time: number
   /** The train is stopped here now; once its predicted time has passed, the row says only "Now". */
   standing: boolean
@@ -16,10 +17,12 @@ export interface TrainStop {
 
 /**
  * The stops the train has yet to reach, in feed order. A stop whose time is up to PAST_GRACE_S past is kept (it
- * reads "Now"), and so is the first one while the train is stopped at it, however long it dwells.
+ * reads "Now"), and so is the first one while the train is stopped at it, however long it dwells. Kept by the feed's
+ * time, shown by the shifted one (the stop it stands at keeps its own).
  */
 export function nextStops(
   trip: Pick<RealtimeTrip, 'arrivals' | 'status' | 'stopId'>,
+  feed: FeedId,
   nowS: number,
   stationName: (id: StationId) => string | undefined,
 ): TrainStop[] {
@@ -28,6 +31,7 @@ export function nextStops(
   return trip.arrivals
     .map(([stopId, time], i) => ({ stopId, name: stationName(stationOfStop(stopId)) ?? stopId, time, standing: i === 0 && dwelling }))
     .filter((stop) => stop.standing || stop.time >= nowS - PAST_GRACE_S)
+    .map((stop) => (stop.standing ? stop : { ...stop, time: shownArrival(feed, stop.time) }))
 }
 
 /** Whether the feed's list ends before the trip does (the Worker cuts arrivals at its horizon). */
@@ -63,9 +67,9 @@ export interface StopEta {
   away: string
 }
 
-/** The clock time and `minutesAway` (shared with the station panel) as "Now" or "3 min". */
-export function stopEta(time: number, nowS: number): StopEta {
-  const minutes = minutesAway(time, nowS)
+/** The clock time and `minutesAway` (shared with the station panel) as "Now" or "3 min"; `nowUnderS` as `minutesAway`'s. */
+export function stopEta(time: number, nowS: number, nowUnderS?: number): StopEta {
+  const minutes = minutesAway(time, nowS, nowUnderS)
   return { clock: nyClockTime(time), away: minutes === 'Now' ? minutes : `${minutes} min` }
 }
 

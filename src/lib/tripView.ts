@@ -1,7 +1,7 @@
 /** What the trip panel shows: the ends, the plan's states, messages and journey views. Pure; no fetch, React or storage. */
 import type { RouteId, StationId } from '../data/schema'
 import { routeSpokenName } from './labels'
-import { stationOfStop } from './live/arrivals'
+import { DEPARTURE_NOW_UNDER_S, stationOfStop } from './live/arrivals'
 import { clockNow } from './live/clock'
 import { nyClockTime, stopEta, stopEtaSpoken } from './live/trainStops'
 import type { OverlayCounts } from './route/overlay'
@@ -189,7 +189,7 @@ function legViews(j: TripJourney, names: TripNames): LegView[] {
 export function journeyView(j: TripJourney, nowS: number, names: TripNames): JourneyView {
   const rides = j.legs.filter((l): l is TripRideLeg => l.kind === 'ride')
   const departAt = rides[0]?.departAt ?? j.departAt
-  const eta = stopEta(departAt, nowS)
+  const eta = stopEta(departAt, nowS, DEPARTURE_NOW_UNDER_S)
   const minutes = Math.floor(j.arriveAt / 60) - Math.floor(departAt / 60)
   const routes = rides.map((r) => r.routeId)
   const transfersText = transfersTextOf(j.transfers)

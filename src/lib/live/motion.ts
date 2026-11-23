@@ -18,7 +18,7 @@ export const HOLD_BACK_M = SMOOTHING.holdBackM
 export const GLIDE_CATCHUP_MPS = 60
 /** Shortest glide, so a gap just past the ease range doesn't dart. */
 export const GLIDE_MIN_S = 3
-/** Longest glide. Well under the 20 s poll, so a glide usually ends before the next plan. */
+/** Longest glide. Under the 15 s poll, so a glide usually ends before the next plan. */
 export const GLIDE_MAX_S = 10
 /** A forward gap beyond this cross-fades instead (it would close at more than 120 m/s on average). */
 export const GLIDE_MAX_M = 1200

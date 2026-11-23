@@ -3,7 +3,6 @@ import { hopDistance } from '../realtime/position'
 import type { LiveTrip } from '../realtime/prepareTrips'
 import type { ShapeGeometry } from '../realtime/shapeGeometry'
 import { SMOOTHING, smoothDistance, type SmoothingParams } from '../realtime/smoothing'
-import { POLL_MS } from './backoff'
 import { decideCorrection } from './motion'
 import { carryOnto, clearCarry, createCarryTable, type CarryTable } from './shapeCarry'
 
@@ -11,8 +10,8 @@ import { carryOnto, clearCarry, createCarryTable, type CarryTable } from './shap
 export const TRAIN_CAPACITY = 1024
 /** Seconds a dot takes to scale in or out (and each half of a cross-fade). */
 export const FADE_S = 0.4
-/** A trip missing from a poll is kept, moving on its old plan, this long before it fades. */
-export const GRACE_S = POLL_MS / 1000
+/** A trip missing from a poll is kept, moving on its old plan, this long before it fades: one poll (15 s) plus latency slack. */
+export const GRACE_S = 20
 
 /** Reconcile decides every correction, so the per-frame ease never snaps or holds on its own. */
 const FRAME_SMOOTHING: SmoothingParams = { ...SMOOTHING, snapM: Infinity, holdBackM: Infinity }

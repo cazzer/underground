@@ -108,7 +108,7 @@ export function TrainStops({ network, trip, source, status }: TrainStopsProps) {
     const now = clockNow(source.offsetS, performance.now())
     return {
       nowS: now,
-      stops: nextStops(trip.trip, now, (id) => network.stationById.get(id)?.name),
+      stops: nextStops(trip.trip, trip.feed, now, (id) => network.stationById.get(id)?.name),
       delayed: tripTimesDelayed(source.snapshot, trip.feed, source.failures, now),
       terminal: source.lookup.patterns[trip.shapeId]?.stops.at(-1),
     }

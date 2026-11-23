@@ -9,6 +9,7 @@ import { RouteChip } from './RouteChip'
 const ROW_BOX = '-mx-1 flex w-[calc(100%+0.5rem)] items-start gap-2 px-1 py-1.5 text-left'
 const HEADSIGN = 'block leading-tight'
 const TIMES = 'mt-0.5 block font-mono text-sm tabular-nums'
+const shownTrainText = (when: string): string => (when === 'Now' ? 'Shows the train arriving now' : `Shows the train due in ${when}`)
 export const sectionClass = (i: number) => `divide-y divide-edge/30 text-sm ${i === 0 ? 'mt-1' : 'mt-1.5 border-t border-edge pt-0.5'}`
 
 /**
@@ -57,7 +58,7 @@ export function ArrivalRow({ group, network, nowS, drawnKeys, onSelect, onFocusL
         ref={button}
         type="button"
         aria-disabled={target === null ? true : undefined}
-        aria-description={target === null ? undefined : `Shows the train due in ${formatArrivalTimes([target.time], nowS)}`}
+        aria-description={target === null ? undefined : shownTrainText(formatArrivalTimes([target.time], nowS))}
         onClick={target === null ? undefined : () => onSelect(target.tripKey)}
         className={`${ROW_BOX} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
           target === null ? 'cursor-default' : 'cursor-pointer hover:bg-edge/20'

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { STALE_AFTER_S, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
-import { formatArrivalTimes } from './arrivals'
+import { ARRIVAL_SHIFT_S } from '../realtime/arrivalShift'
+import { DEPARTURE_NOW_UNDER_S, formatArrivalTimes, NOW_UNDER_S } from './arrivals'
 import { DELAYED_NOTE } from './arrivalsView'
 import type { LiveStatus, LiveStatusKind } from './liveStatus'
 import {
@@ -28,30 +29,43 @@ const epoch = (iso: string) => Date.parse(iso) / 1000
 
 describe('nextStops', () => {
   it('drops stops already passed and keeps feed order', () => {
-    const stops = nextStops(trip([['L08N', NOW - 120], ['L06N', NOW + 60], ['L05N', NOW + 200]]), NOW, nameOf)
+    const stops = nextStops(trip([['L08N', NOW - 120], ['L06N', NOW + 60], ['L05N', NOW + 200]]), 'l', NOW, nameOf)
     expect(stops.map((s) => s.stopId)).toEqual(['L06N', 'L05N'])
     expect(stops.map((s) => s.name)).toEqual(['1 Av', '3 Av'])
   })
   it('keeps a stop up to 30 s past, where it reads Now', () => {
-    const [stop] = nextStops(trip([['L08N', NOW - 30]]), NOW, nameOf)
+    const [stop] = nextStops(trip([['L08N', NOW - 30]]), 'l', NOW, nameOf)
     expect(stop).toBeDefined()
     expect(stopEta(stop!.time, NOW).away).toBe('Now')
-    expect(nextStops(trip([['L08N', NOW - 31]]), NOW, nameOf)).toEqual([])
+    expect(nextStops(trip([['L08N', NOW - 31]]), 'l', NOW, nameOf)).toEqual([])
   })
   it('keeps the stop a train is stopped at however long it dwells, marked as standing', () => {
     const stopped = trip([['L08N', NOW - 200], ['L06N', NOW + 60]], 'STOPPED_AT')
-    const found = nextStops(stopped, NOW, nameOf)
+    const found = nextStops(stopped, 'l', NOW, nameOf)
     expect(found.map((s) => s.stopId)).toEqual(['L08N', 'L06N'])
     expect(found.map((s) => s.standing)).toEqual([true, false])
   })
   it('does not keep a past first stop unless the train is stopped there', () => {
     const moving = trip([['L08N', NOW - 200], ['L06N', NOW + 60]], 'IN_TRANSIT_TO')
-    expect(nextStops(moving, NOW, nameOf).map((s) => s.stopId)).toEqual(['L06N'])
+    expect(nextStops(moving, 'l', NOW, nameOf).map((s) => s.stopId)).toEqual(['L06N'])
     const elsewhere: Trip = { ...trip([['L08N', NOW - 200]], 'STOPPED_AT'), stopId: 'L06N' }
-    expect(nextStops(elsewhere, NOW, nameOf)).toEqual([])
+    expect(nextStops(elsewhere, 'l', NOW, nameOf)).toEqual([])
+  })
+  it('keeps a stop by the feed\'s time and shows its feed\'s shifted one', () => {
+    // Up to 30 s past by the feed is kept, though the shown time is then 30 s further past.
+    const [kept] = nextStops(trip([['L08N', NOW - 30]]), 'l', NOW, nameOf)
+    expect(kept!.time).toBe(NOW - 30 - ARRIVAL_SHIFT_S.l)
+    const [stop] = nextStops(trip([['L08N', NOW + 100]]), 'nqrw', NOW, nameOf)
+    expect(stop!.time).toBe(NOW + 100 - ARRIVAL_SHIFT_S.nqrw)
+  })
+  it('keeps the raw time of the stop the train stands at, a departure', () => {
+    const stopped = trip([['L08N', NOW + 40], ['L06N', NOW + 140]], 'STOPPED_AT')
+    const [standing, next] = nextStops(stopped, 'l', NOW, nameOf)
+    expect(standing).toMatchObject({ standing: true, time: NOW + 40 })
+    expect(next!.time).toBe(NOW + 140 - ARRIVAL_SHIFT_S.l)
   })
   it('falls back to the stop id for a station it does not know', () => {
-    expect(nextStops(trip([['X99S', NOW + 5]]), NOW, nameOf)[0]!.name).toBe('X99S')
+    expect(nextStops(trip([['X99S', NOW + 5]]), 'l', NOW, nameOf)[0]!.name).toBe('X99S')
   })
 })
 
@@ -106,16 +120,19 @@ describe('nyClockTime', () => {
   })
 })
 
+/** Between the two Now windows. */
+const MID_S = (NOW_UNDER_S + DEPARTURE_NOW_UNDER_S) / 2
+
 describe('stopEta', () => {
   // On a whole minute, so seconds-away and clock-minutes-away line up in the simple cases.
   const BASE = epoch('2026-11-21T17:40:00Z')
   const at = (s: number) => stopEta(BASE + s, BASE).away
-  it('reads Now under 30 s and when already past', () => {
-    expect(at(29)).toBe('Now')
+  it(`reads Now under ${NOW_UNDER_S} s and when already past`, () => {
+    expect(at(NOW_UNDER_S - 1)).toBe('Now')
     expect(at(-20)).toBe('Now')
   })
-  it('reads a minute at 30 s', () => {
-    expect(at(30)).toBe('1 min')
+  it(`reads a minute at ${NOW_UNDER_S} s`, () => {
+    expect(at(NOW_UNDER_S)).toBe('1 min')
   })
   it('counts clock minutes, rounding down', () => {
     expect(at(3 * 60 + 59)).toBe('3 min')
@@ -139,8 +156,12 @@ describe('stopEta', () => {
       expect(stopEta(now + offset, now).away).toBe(formatArrivalTimes([now + offset], now))
     }
   })
+  it('reads Now by the window given, as the trip panel does for a departure', () => {
+    expect(stopEta(BASE + MID_S, BASE).away).toBe('Now')
+    expect(stopEta(BASE + MID_S, BASE, DEPARTURE_NOW_UNDER_S).away).toBe('1 min')
+  })
   it('never says 0 min once past the Now window', () => {
-    expect(stopEta(epoch('2026-11-21T17:44:50Z'), epoch('2026-11-21T17:44:10Z')).away).toBe('1 min')
+    expect(stopEta(epoch('2026-11-21T17:44:50Z'), epoch('2026-11-21T17:44:04Z')).away).toBe('1 min')
   })
 })
 

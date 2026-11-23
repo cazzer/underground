@@ -1,4 +1,4 @@
-export const POLL_MS = 20_000
+export const POLL_MS = 15_000
 export const BACKOFF_BASE_MS = 2_000
 export const BACKOFF_MAX_MS = 60_000
 /** A server's Retry-After is honored up to this long. */

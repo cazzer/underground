@@ -3,6 +3,7 @@ import type { Direction, RouteId, StationId, StopId } from '../../data/schema'
 import { ghostReason } from '../realtime/filters'
 import { joinTrip } from '../realtime/joinTrip'
 import type { TripLookup } from '../realtime/tripLookup'
+import { shownArrival } from '../realtime/arrivalShift'
 import { trainRouteId } from './trainRoute'
 
 /** Arrivals further out than this are not listed. */
@@ -11,15 +12,17 @@ export const ARRIVAL_WINDOW_S = 1800
 export const MAX_TIMES_PER_GROUP = 3
 /** A train this far past its predicted time is still at the platform: "Now", not gone. */
 export const PAST_GRACE_S = 30
-/** Under this many seconds away reads "Now". */
-export const NOW_UNDER_S = 30
+/** Under this many seconds away reads "Now" on a shifted arrival time (arrivalShift.ts): the train is in a little before it. */
+export const NOW_UNDER_S = 40
+/** The same for a departure, which is never shifted (the trip panel's "Leaves in"). */
+export const DEPARTURE_NOW_UNDER_S = 30
 
 export interface ArrivalGroup {
   routeId: RouteId
   direction: Direction
   /** Name of the trip's last stop. */
   headsign: string
-  /** Predicted epoch seconds at this station, ascending; at most MAX_TIMES_PER_GROUP. */
+  /** Predicted epoch seconds at this station less the feed's arrival shift (`shownArrival`), ascending; at most MAX_TIMES_PER_GROUP. */
   times: number[]
   /** `times[i]`'s trip as the map keys it (`${feed}:${tripId}`, the same as `LiveTrip.key`); same length and order. */
   tripKeys: string[]
@@ -61,6 +64,9 @@ const directionOfStop = (stop: StopId): Direction => (stop.endsWith('N') ? 'N' :
  * For a complex, `stops` is every member's and `memberIds` lists them: a trip is listed once, at its soonest member
  * stop, and one ending at any member is skipped.
  *
+ * A trip is kept by its raw predicted time (up to PAST_GRACE_S past), but listed, sorted and selected by the shifted one,
+ * except at the stop it is standing at (STOPPED_AT there), whose time is its departure and stays raw.
+ *
  * Groups are ordered by direction (north first, so rows stay put between polls), then soonest time.
  */
 export function arrivalsAt(
@@ -95,7 +101,10 @@ export function arrivalsAt(
       const routeId = trainRouteId({ trip, shapeId }, opts.routeById, opts.lookup.patterns)
       if (headsign === undefined || routeId === null) continue
 
-      const [stop, time] = here.reduce((a, b) => (b[1] < a[1] ? b : a))
+      const [stop, predicted] = here.reduce((a, b) => (b[1] < a[1] ? b : a))
+      // A train standing at the stop shows its real (departure) time: the shift is only for arrivals.
+      const standing = trip.status === 'STOPPED_AT' && trip.stopId === stop
+      const time = standing ? predicted : shownArrival(feed, predicted)
       const direction = directionOfStop(stop)
       const key = `${routeId}|${direction}|${headsign}`
       const group = groups.get(key)
@@ -125,13 +134,13 @@ export function selectableArrival(group: ArrivalGroup, drawnKeys: ReadonlySet<st
 }
 
 /**
- * Minutes away, the one rule both panels use: "Now" under 30 seconds (or already past), else the arrival's
+ * Minutes away, the one rule both panels use, read on `shownArrival` times: "Now" under `nowUnderS` (40) seconds (or already past), else the arrival's
  * clock minute minus the current one, never less than 1. Counting on the clock face keeps "1:50 · 6 min" and
  * "1:52 · 8 min" consistent with each other, and the two panels agree for the same train (New York is a whole
  * number of minutes from UTC, so epoch minutes are clock minutes).
  */
-export function minutesAway(timeS: number, nowS: number): string {
-  if (timeS - nowS < NOW_UNDER_S) return 'Now'
+export function minutesAway(timeS: number, nowS: number, nowUnderS: number = NOW_UNDER_S): string {
+  if (timeS - nowS < nowUnderS) return 'Now'
   return String(Math.max(1, Math.floor(timeS / 60) - Math.floor(nowS / 60)))
 }
 

@@ -758,12 +758,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `clock.ts` the live clock: `now = offsetS + performance.now()/1000`, where `offsetS` is the maximum over
     polls of `generatedAt - receivedPerfMs/1000`. Monotone (a poll served from the Worker's 15 s memo
     can't move it back), never reads the device clock; `SNAPSHOT_MAX_AGE_S` (120) drops old data
-  - `backoff.ts` poll delay (20 s; jittered exponential backoff on failure; Retry-After capped at 5 min; "warming" 503s);
+  - `backoff.ts` poll delay (15 s; jittered exponential backoff on failure; Retry-After capped at 5 min; "warming" 503s);
     `pollOutcome.ts` the pure per-poll decision (state, delay, log; a too-old success is a failure; a schema
     mismatch sticks until a success) that `useRealtimeFeed` runs
   - `liveStatus.ts` `deriveLiveStatus` for the HUD (off/connecting/live/stale/error; one failed poll with
     a snapshot is not shown, two show a delay while trains stay drawn; technical text never appears)
-  - `slots.ts` stable instance slots keyed by trip (fade in/out, a grace period for a trip missing from one
+  - `slots.ts` stable instance slots keyed by trip (fade in/out, a 20 s grace period (`GRACE_S`, one poll plus slack) for a trip missing from one
     poll, `stepSlot` per frame); `motion.ts` how a dot absorbs a new plan: nothing teleports (ease, a smoothstep-eased
     glide sized from the gap at 60 m/s catch-up within 3-10 s that a new poll continues on its curve rather than
     restarts, moved along the old glide to the poll's time first so that frame keeps its speed, or cross-fade past 1200 m; reduced motion cross-fades). On a shape change (`shapeCarry.ts`) the dot's
@@ -786,9 +786,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `trainSummary.ts` route and headsign for the train panel and the notice;
     `trainStops.ts` the train's next stops (feed arrivals not yet passed, the dwell stop kept), `nyClockTime`
     (New York 12 h without AM/PM), `stopEta` (clock plus "Now"/"3 min"), `tripTimesDelayed`, `deriveTrainStopsView` (states). Minutes away
-    come from `minutesAway` in `arrivals.ts`, shared by the station and train panels: "Now" under 30 s, else
+    come from `minutesAway` in `arrivals.ts`, shared by the station and train panels: "Now" under `NOW_UNDER_S` (40 s; a departure, the trip panel's "Leaves in", keeps `DEPARTURE_NOW_UNDER_S`, 30 s), else
     the arrival's clock minute minus the current one (not floor of seconds), so adjacent rows and both
-    panels agree
+    panels agree; the station and train panels show the shifted time (`shownArrival`, below; the trip panel and router are unshifted):
+    `arrivalsAt` and `nextStops(trip, feed, ...)` keep a stop by the feed's raw time (up to `PAST_GRACE_S` past) but show the shifted
+    one, and `arrivalsAt` lists, sorts and selects by it (`nextStops` keeps feed order); a stop the train stands at (STOPPED_AT
+    there) is a departure and keeps its raw time
   - `consist.ts` cars and car length per route, `consistCenter` (the train kept on its shape), `carMix`
     (dots from 2400 m, cars by 1600 m, so a train is a flat footprint before the camera tips), `selectedCarMix` (the
     selected train: dots from 20 km, cars by 12 km) and `carsReach`; `consistLayout.ts` `writeConsist`: cars end to end along the shape
@@ -858,7 +861,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     rest at both ends; `rampShareFor` shortens the ramps so no run cruises above 25 m/s; an INCOMING_AT floor
     eases over the rest of the hop). The predicted arrival is
     capped by the schedule from the trip's last stop (`capArrival` in `stopVisit.ts`): MTA final-approach
-    predictions run about 40 s late
+    predictions run about 40 s late (the cap takes part of it and `arrivalShift.ts` the rest). `planHop` then pulls the capped
+    arrival in by the feed's `ARRIVAL_SHIFT_S` (`PositionInput.arrivalShiftS`; the dwell grows by the same amount, so the leave
+    time stays; skipped while the trip is `here` at the stop it leaves; at most half its running time (the run less the dwell), never above 25 m/s average)
+  - `arrivalShift.ts` (dk6) `ARRIVAL_SHIFT_S`: seconds every predicted arrival is shown sooner, per feed (tuned on a replay of
+    an hour of polls, numbers in its header), `shownArrival(feed, t)`
+    for the panels, `hopArrivalShift` for `planHop`. Departures are never shifted
   - `stopVisit.ts` `nextVisit`: the last stop a train was seen at (STOPPED_AT time; `here` and `leftAfter` on the
     1234567 and L feeds, whose STOPPED_AT ends on departure), carried across polls. `capArrival`: a train still
     `here` never leaves before `leftAfter`; once gone, arrival = min(prediction, schedule from the stop + 6 s),
@@ -871,7 +879,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     per-reason drop counts. Takes the trip memory `carryMemory` builds (shape for join ties, visit and origin for
     the cap), which keeps a trip missing from one poll
 - `src/test-fixtures/`: `rt-polls.json` (18 recorded `/rt` polls trimmed to 21 trips) and `rt-static.json` (their
-  static subset), which `src/lib/live/lagReplay.test.ts` replays to bound lag both ways and early departures
+  static subset), which `src/lib/live/pollReplay.ts` replays through the client's code: `lagReplay.test.ts` bounds the dots' lag
+  both ways, early departures and steps, `panelReplay.test.ts` the share of panel rows that still show a minute count after the
+  train is in
 - `src/data/loadNetwork.ts` fetches stations/routes/shapes/station-depths JSON and validates their outer shape (a
   missing depths file fails the load like the others); `depthsCodec.ts` (pure, `.ts` imports for the scripts'
   encoder) decodes the packed depths in `buildNetwork` against stations.json and the drawn lines into the per-track
