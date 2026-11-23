@@ -50,8 +50,9 @@ interface StationStreetsProps {
   network: Network
   /** Set while a layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
   mask: StreetMask
-  /** The trip's exit entrance (useTripExit): its label in this layer is placed first and tinted; null for none. */
-  exitLabel: ExitLabel | null
+  /** The entrances of the trip's way out and way in (useTripExit, useTripBoard): the first this layer's file has is
+   *  placed first and tinted; empty for none. */
+  pathLabels: readonly ExitLabel[]
   /** The trip emphasis (SubwayLines, -0.25): the street lines dim with the route lines by its `networkDim`. */
   tripLevels: EmphasisLevels
 }
@@ -100,7 +101,7 @@ function streetMode(interior: InteriorModel | null): 'under' | 'over' | 'veiled'
  * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
  * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
  */
-function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask, exitLabel, tripLevels }: StreetLinesProps) {
+function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlockers, network, mask, pathLabels, tripLevels }: StreetLinesProps) {
   const group = useRef<Group>(null)
   const shown = useRef(-1)
   const labelShown = useRef(0)
@@ -144,8 +145,15 @@ function StreetLines({ layer, interior, interiorPending, insets, panel, labelBlo
     const at = interior && { origin: interior.origin, entrances: interior.entrances }
     return entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, at), ENTRANCE_SIZE_M, MARK_RGB)
   }, [layer, interior, interiorPending])
-  // The trip exit's entrance in this layer's file (any member of a complex shows its own), placed first.
-  const priorityEntrance = useMemo(() => (exitLabel ? exitEntranceIndex(exitLabel, layer.file) : -1), [exitLabel, layer])
+  // The trip path's entrance in this layer's file (any member of a complex shows its own), placed first. A focused
+  // station is the To or the From end, never both, so at most one of the labels is in the file.
+  const priorityEntrance = useMemo(() => {
+    for (const label of pathLabels) {
+      const i = exitEntranceIndex(label, layer.file)
+      if (i >= 0) return i
+    }
+    return -1
+  }, [pathLabels, layer])
   const marks = useLineLayer(markBuffers, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
   useLayoutEffect(() => {
     mask.present = true

@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { boardLineKey, type BoardLine } from '../lib/boardView'
 import type { ExitLineView } from '../lib/exitView'
 import { routeSpokenName } from '../lib/labels'
 import type { Network } from '../lib/network'
@@ -91,8 +92,10 @@ export interface JourneyLegsProps {
   transfers: ReadonlyMap<string, TransferLineView> | null
   /** What the station's interior is (null until the station index is ready): a step says where there is none. */
   layoutOf: (stationId: string) => StationLayout
-  /** The way to the first platform at the From station (2q7.45.7): the visible line and the sentence a screen reader hears; null or absent: none. */
-  board?: { text: string; spoken: string } | null
+  /** The way in at the From station, by `boardLineKey` of a journey's first ride: shown under the first Board step. */
+  boards: ReadonlyMap<string, BoardLine> | null
+  /** The trip end filled from the location fix and not yet picked or focused: its step says to tap it. */
+  fixPending: 'from' | 'to' | null
   /** The pressed step's key while it holds. */
   activeStep: string | null
   /** A step was pressed: flies to its station and makes it the active step. */
@@ -104,14 +107,19 @@ export interface JourneyLegsProps {
  * step. A step is a button that flies to its station, with the way through it (the change's transfer line, the exit line)
  * beside the button, never inside it.
  */
-export function JourneyLegs({ network, view, drawnKeys, onShowTrain, exits, transfers, layoutOf, board = null, activeStep, onStep }: JourneyLegsProps) {
+export function JourneyLegs({ network, view, drawnKeys, onShowTrain, exits, transfers, layoutOf, boards, fixPending, activeStep, onStep }: JourneyLegsProps) {
+  // Keyed by the first ride and the station it boards at, so a journey that walks to another station first finds none.
+  const firstRide = view.legs.find((l): l is RideLegView => l.kind === 'ride')
+  const board = firstRide ? (boards?.get(boardLineKey(firstRide.tripId, firstRide.board.stationId)) ?? null) : null
   const ctx: StepContext = {
     layoutOf,
     routeName: (id) => network.routeById.get(id)?.shortName ?? id,
     routeSpoken: (id) => routeSpokenName(network.routeById.get(id)?.shortName ?? id),
-    hasBoardPath: board !== null,
+    hasBoardPath: board?.kind === 'path',
     hasExitPath: (tripId) => exits?.has(tripId) === true,
     hasTransferPath: (key) => transfers?.has(key) === true,
+    fixPending,
+    noWayIn: board?.kind === 'no-entrance',
   }
   const rows = journeyItinerary(view.legs, ctx)
   const firstBoard = rows.find((r) => r.kind === 'step' && r.step.kind === 'board')
@@ -127,12 +135,7 @@ export function JourneyLegs({ network, view, drawnKeys, onShowTrain, exits, tran
         return (
           <li key={step.key}>
             <TripStepButton step={step} active={activeStep === step.key} onPress={onStep} />
-            {row === firstBoard && board && (
-              <>
-                <p aria-hidden="true">{board.text}</p>
-                <span className="sr-only">{board.spoken}</span>
-              </>
-            )}
+            {row === firstBoard && board?.kind === 'path' && <TripExitLine view={board.view} />}
             {transfer && <TripTransferLine view={transfer} />}
             {exit && <TripExitLine view={exit} />}
           </li>

@@ -45,10 +45,18 @@ export interface StepContext {
   hasExitPath: (tripId: string) => boolean
   /** The change has a transfer line, by its `transferKey`. */
   hasTransferPath: (transferKey: string) => boolean
+  /** The trip end filled from the location fix and not yet picked or focused (`fixEnd`): its way in or out is not
+   *  looked up until the visitor taps its step. */
+  fixPending: 'from' | 'to' | null
+  /** The From station's layout has no way in to the first train's track (every entrance to it is exit-only). */
+  noWayIn: boolean
 }
 
 const NO_LAYOUT = 'No station layout'
 const NO_CHANGE_PATH = 'No path shown for this change'
+const TAP_IN = 'Tap to show the way in'
+const TAP_OUT = 'Tap to show the way out'
+const NO_WAY_IN = 'No way in on the layout'
 
 /**
  * What a step says it cannot show. Nothing while the layout is not known (null) or a path exists. A change at a
@@ -72,12 +80,16 @@ interface Draft {
   /** "board the L at Bedford Av at 8:04": the sentence's body. */
   sentence: string
   hasPath: boolean
+  /** What the step says in place of a path at a station with a layout; null for `stepStatus`'s rule. */
+  note: string | null
   transferKey: string | null
   tripId: string | null
 }
 
 function boardDraft(ride: RideLegView, index: number, ctx: StepContext, first: boolean): Draft {
   const { stationId, name, clock } = ride.board
+  // Only a journey that starts on this ride boards at the From station.
+  const atFrom = first && index === 0
   return {
     kind: 'board',
     legIndex: index,
@@ -87,6 +99,7 @@ function boardDraft(ride: RideLegView, index: number, ctx: StepContext, first: b
     text: `Board ${clock} at ${name}`,
     sentence: `board the ${ctx.routeSpoken(ride.routeId)} at ${name}, ${clock}`,
     hasPath: first && ctx.hasBoardPath,
+    note: atFrom && ctx.fixPending === 'from' ? TAP_IN : atFrom && ctx.noWayIn ? NO_WAY_IN : null,
     transferKey: null,
     tripId: null,
   }
@@ -104,6 +117,7 @@ function exitDraft(ride: RideLegView, index: number, last: boolean, ctx: StepCon
     text: `Exit ${clock} at ${name}`,
     sentence: `exit at ${name}, ${clock}`,
     hasPath: last && ctx.hasExitPath(ride.tripId),
+    note: last && ctx.fixPending === 'to' ? TAP_OUT : null,
     transferKey: null,
     tripId: last ? ride.tripId : null,
   }
@@ -121,6 +135,7 @@ function changeDraft(leg: ChangeLegView, index: number, next: RideLegView | unde
     text: `Change at ${leg.name}${minutes === null ? '' : ` · ${minutes} min walk`}${to?.visible ?? ''}`,
     sentence: `change at ${leg.name}${to?.spoken ?? ''}${minutes === null ? '' : `, a ${minutes}-minute walk`}`,
     hasPath: ctx.hasTransferPath(leg.transferKey),
+    note: null,
     transferKey: leg.transferKey,
     tripId: null,
   }
@@ -129,7 +144,8 @@ function changeDraft(leg: ChangeLegView, index: number, next: RideLegView | unde
 function finish(drafts: readonly Draft[], ctx: StepContext): Map<string, TripStep> {
   const steps = new Map<string, TripStep>()
   drafts.forEach((d, i) => {
-    const status = stepStatus(d.kind, ctx.layoutOf(d.stationId), d.hasPath)
+    const layout = ctx.layoutOf(d.stationId)
+    const status = !d.hasPath && d.note !== null && layout !== null && layout !== 'none' ? d.note : stepStatus(d.kind, layout, d.hasPath)
     const key = `${d.kind}:${d.legIndex}`
     steps.set(key, {
       key,

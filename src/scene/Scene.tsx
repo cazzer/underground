@@ -68,11 +68,12 @@ interface SceneProps {
   here: { ground: Ground; accuracyM: number } | null
   /** The searched place's ground point while its line shows (the user's search pick, never the fix); null draws no pin. */
   placePin: Ground | null
-  /** The trip's way out at its To station and its transfers through complexes, by interior file id; each draws only
-   *  while its interior is the focused one (the first for an interior wins). */
+  /** The trip's way out at its To station, its way in at its From station and its transfers through complexes, by
+   *  interior file id; each draws only while its interior is the focused one (the first for an interior wins). */
   stationPaths: readonly StationPathDraw[]
-  /** The trip's drawn exit's label, which the street labels place first; null for none. */
-  exitLabel: ExitLabel | null
+  /** The entrances of the trip's drawn way out and way in, which the street labels place first (the first the shown
+   *  file has); empty for none. */
+  pathLabels: readonly ExitLabel[]
   /** The trip panel is open: a landing there goes on framing the trip's path above the panel as it changes. */
   tripOpen: boolean
   /** The selected journey's ride legs (useTripRoute); null with none. */
@@ -81,7 +82,7 @@ interface SceneProps {
   tripShown: boolean
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, exitLabel, tripOpen, tripRoute, tripShown }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, pathLabels, tripOpen, tripRoute, tripShown }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -154,7 +155,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         labelBlockers={labelBlockers}
         network={network}
         mask={streetMask}
-        exitLabel={exitLabel}
+        pathLabels={pathLabels}
         tripLevels={tripLevels}
       />
       {interior && (

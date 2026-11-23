@@ -105,6 +105,9 @@ export interface GraphOptions {
   /** Stay inside fare control: leave out every connector with an end on the street level or in a slab marked unpaid
    *  (`paid === false`). A slab with no `paid` counts as inside. */
   transfer?: boolean
+  /** Search against travel: arcs point the way a rider came, so a search from a platform finds who can reach it (the
+   *  way in). Only one-way escalators differ; walks and two-way connectors are symmetric. */
+  reverse?: boolean
 }
 
 export interface InteriorGraph {
@@ -158,8 +161,11 @@ export function buildInteriorGraph(interior: StationInterior, opts: GraphOptions
     }) as [number, number]
     const rise = Math.abs(yUpper - yLower)
     const s = connectorSeconds(c, rise)
-    if (c.travel !== 'down') link(lo, up, s, c.id)
-    if (c.travel !== 'up') link(up, lo, s, c.id)
+    // Forward, an arc is a rider's move; reversed, it is a move made toward its start, so a down escalator (ridden upper
+    // to lower) links lower to upper.
+    const [arcUp, arcDown] = opts.reverse === true ? [c.travel !== 'up', c.travel !== 'down'] : [c.travel !== 'down', c.travel !== 'up']
+    if (arcUp) link(lo, up, s, c.id)
+    if (arcDown) link(up, lo, s, c.id)
     if (c.lower.level === street) streetEnd.set(c.id, lo)
     else if (c.upper.level === street) streetEnd.set(c.id, up)
   }
@@ -236,7 +242,7 @@ export function shortestFrom(graph: InteriorGraph, tracks: readonly StopTrack[])
 export interface GraphPath {
   /** Node indices, seed first. */
   nodes: number[]
-  /** Connectors in travel order. */
+  /** Connectors in search order, seed first: travel order, or against it over a `reverse` graph. */
   connectorIds: string[]
   /** Each area stood on, in order (consecutive repeats merged). */
   areaIds: string[]

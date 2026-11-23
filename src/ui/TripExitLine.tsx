@@ -5,7 +5,7 @@ interface TripExitLineProps {
 }
 
 /**
- * The way out under a journey's Exit step: the exit, then a dim note (its corner, "probably", a machine whose status
+ * The way out under a journey's Exit step (or the way in under its first Board step): the exit, then a dim note (its corner, "probably", a machine whose status
  * is unknown). The visible text is hidden from assistive tech, which hears one sentence with the street names in full
  * instead. Not a live region; never takes focus.
  */

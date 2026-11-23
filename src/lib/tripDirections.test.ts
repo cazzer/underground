@@ -24,13 +24,14 @@ const base: DirectionsInput = {
   focusedId: null,
   siblingsOf,
   fix: null,
+  fixStation: null,
 }
 const run = (over: Partial<DirectionsInput>) => directionsTrip({ ...base, ...over })
 
 describe('directionsTrip', () => {
   it('fills From from the marked fix before the focused station', () => {
     const t = run({ fix: fixAt('L08'), focusedId: '635' })
-    expect(t).toEqual({ ends: { from: 'L08', to: 'X' }, places: { from: null, to: null }, empty: null })
+    expect(t).toEqual({ ends: { from: 'L08', to: 'X' }, places: { from: null, to: null }, empty: null, fixStation: 'L08' })
   })
 
   it('never fills To from the fix', () => {
@@ -56,12 +57,12 @@ describe('directionsTrip', () => {
 
   it('leaves the other end empty when nothing fills it', () => {
     expect(run({}).empty).toBe('from')
-    expect(run({ end: 'from' })).toEqual({ ends: { from: 'X', to: null }, places: { from: null, to: null }, empty: 'to' })
+    expect(run({ end: 'from' })).toEqual({ ends: { from: 'X', to: null }, places: { from: null, to: null }, empty: 'to', fixStation: null })
   })
 
   it('keeps the earlier other end, and its note', () => {
     const t = run({ current: { from: 'A', to: 'B' }, currentPlaces: { from: '120 Broadway', to: null } })
-    expect(t).toEqual({ ends: { from: 'A', to: 'X' }, places: { from: '120 Broadway', to: null }, empty: null })
+    expect(t).toEqual({ ends: { from: 'A', to: 'X' }, places: { from: '120 Broadway', to: null }, empty: null, fixStation: null })
   })
 
   it('keeps an earlier end over the fix and the focused station', () => {
@@ -71,7 +72,7 @@ describe('directionsTrip', () => {
 
   it('goes the way back: directions from the old To', () => {
     const t = run({ end: 'from', target: { stationId: 'B', place: null }, current: { from: 'A', to: 'B' }, currentPlaces: { from: 'Home', to: 'Work' } })
-    expect(t).toEqual({ ends: { from: 'B', to: 'A' }, places: { from: null, to: 'Home' }, empty: null })
+    expect(t).toEqual({ ends: { from: 'B', to: 'A' }, places: { from: null, to: 'Home' }, empty: null, fixStation: null })
   })
 
   it('directions to the old From swaps likewise', () => {
@@ -86,6 +87,25 @@ describe('directionsTrip', () => {
   it('sets the target place note, and a station pick clears the end note', () => {
     expect(run({ target: { stationId: 'X', place: '120 Broadway' }, focusedId: 'F' }).places).toEqual({ from: null, to: '120 Broadway' })
     expect(run({ current: { from: 'A', to: 'X' }, currentPlaces: { from: null, to: 'Old place' } }).places.to).toBeNull()
+  })
+
+  it('flags the end station the fix filled, only when the fix candidate wins', () => {
+    expect(run({ fix: fixAt('L08') }).fixStation).toBe('L08')
+    // The focused station, an earlier end or the target itself were the visitor's.
+    expect(run({ fix: fixAt('X'), focusedId: '635' }).fixStation).toBeNull()
+    expect(run({ current: { from: 'A', to: 'B' }, fix: fixAt('L08') }).fixStation).toBeNull()
+    expect(run({ end: 'from', fix: fixAt('L08'), focusedId: '635' }).fixStation).toBeNull()
+  })
+
+  it('keeps the flag on an earlier end the fix filled, wherever it lands', () => {
+    // Directions to D on L08 (from the fix) to B: From stays L08, still never chosen.
+    const kept = run({ target: { stationId: 'D', place: null }, current: { from: 'L08', to: 'B' }, fixStation: 'L08' })
+    expect(kept).toMatchObject({ ends: { from: 'L08', to: 'D' }, fixStation: 'L08' })
+    // The way back from B moves it to To.
+    const back = run({ end: 'from', target: { stationId: 'B', place: null }, current: { from: 'L08', to: 'B' }, fixStation: 'L08' })
+    expect(back).toMatchObject({ ends: { from: 'B', to: 'L08' }, fixStation: 'L08' })
+    // Picking it as the target is choosing it.
+    expect(run({ end: 'from', target: { stationId: 'L08', place: null }, current: { from: 'L08', to: 'B' }, fixStation: 'L08' }).fixStation).toBeNull()
   })
 
   it('never makes the two ends one station or one complex, and flags exactly the unset end', () => {

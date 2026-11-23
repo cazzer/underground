@@ -1,13 +1,14 @@
 /**
  * Which exit to take: for a destination and the stop a rider gets off at, the street exit that minimizes the walk
  * inside the station (platform to street, `routesToStreet`) plus the walk outside it (the station's walk shard when
- * the destination is within its radius, else a straight-line estimate). Pure; every input is passed in.
+ * the destination is within its radius, else a straight-line estimate). And the quickest way in where a rider boards
+ * (`quickestEntry`). Pure; every input is passed in.
  */
 import type { StationId, StopId } from '../data/schema'
 import type { StationInterior } from '../data/stationSchema'
 import type { StationStreets, StreetJoin } from '../data/streetSchema'
 import type { WalkGraph } from '../data/walkSchema'
-import { routesToStreet, type InStationRoute } from './interiorGraph'
+import { routesFromStreet, routesToStreet, type InStationRoute } from './interiorGraph'
 import { toGround, type Ground } from './projection'
 import { routeWalk, snapToWalk, walkQuery, WALK_SPEED_MPS, type WalkSource } from './walkRoute'
 
@@ -57,6 +58,19 @@ export interface ExitChoice extends Omit<InStationRoute, 'seconds'> {
 }
 
 export type ExitResult = ExitChoice | { kind: 'none'; reason: 'no-track' | 'no-exit' }
+
+/**
+ * The quickest way in for a rider boarding at `stopId`: the exit's shape read the other way. `exit` is the entry the
+ * rider comes in by, `connectorIds` and `areaIds` still run platform to street (against travel), `inStationS` is the
+ * time from the street to the track, and there is no walk outside.
+ */
+export interface BoardChoice extends Omit<ExitChoice, 'kind' | 'walk' | 'destination'> {
+  kind: 'board'
+  walk: null
+  destination: null
+}
+
+export type BoardResult = BoardChoice | { kind: 'none'; reason: 'no-track' | 'no-entrance' }
 
 /** Whole minutes to show for a walk: at least 1. */
 export function walkMinutes(seconds: number): number {
@@ -207,4 +221,17 @@ export function quickestExit(input: QuickestInput): ExitResult {
   if (routes === null) return { kind: 'none', reason: 'no-track' }
   if (routes.length === 0) return { kind: 'none', reason: 'no-exit' }
   return choiceOf(input, routes[0]!, { walk: null, destination: null, totalS: routes[0]!.seconds })
+}
+
+/**
+ * The quickest way in for a rider boarding at `stopId`: the street entry with the least time inside the station to a
+ * track of the stop (`routesFromStreet`'s first), one-way escalators ridden only the way they run. `none` when no
+ * platform track serves the stop, or no entry reaches one (step-free with no elevator, or every way in closed).
+ */
+export function quickestEntry(input: QuickestInput): BoardResult {
+  const routes = routesFromStreet(input.interior, input.stopId, { stepFree: input.stepFree === true, closed: input.closed })
+  if (routes === null) return { kind: 'none', reason: 'no-track' }
+  if (routes.length === 0) return { kind: 'none', reason: 'no-entrance' }
+  const choice = choiceOf(input, routes[0]!, { walk: null, destination: null, totalS: routes[0]!.seconds })
+  return { ...choice, kind: 'board', walk: null, destination: null }
 }

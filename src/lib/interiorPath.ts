@@ -1,7 +1,8 @@
 /**
  * The station path drawn over an interior: from the platform track a rider steps off, along each connector exactly
- * where it is drawn (`planEnds`), to its street exit and along the walk outside (an `ExitChoice`), or to the next
- * train's track (a `TransferChoice`, with a second marker there). Group-local
+ * where it is drawn (`planEnds`), to its street exit and along the walk outside (an `ExitChoice`), to the entry it was
+ * reached from (a `BoardChoice`, the way in, drawn as an exit with no walk outside), or to the next train's track (a
+ * `TransferChoice`, with a second marker there). Group-local
  * buffers like the interior's (y × yScale, before the depth factor), in the interior's stroke bands and cut at each
  * deck's train roof the way its connectors are, so the part of the path a lifted train stands in front of stays under
  * it. Pure.
@@ -24,7 +25,14 @@ export interface StationPathDraw {
 
 /** A key for a path's error boundary: a new path remounts it. */
 export function stationPathKey(choice: StationPathChoice): string {
-  return choice.kind === 'exit' ? `${choice.stopId}>${choice.exit.entranceId ?? ''}` : `${choice.stopId}>${choice.toStopId}>${choice.connectorIds.join(',')}`
+  switch (choice.kind) {
+    case 'exit':
+      return `${choice.stopId}>${choice.exit.entranceId ?? ''}`
+    case 'board':
+      return `board:${choice.stopId}<${choice.exit.entranceId ?? ''}`
+    case 'transfer':
+      return `${choice.stopId}>${choice.toStopId}>${choice.connectorIds.join(',')}`
+  }
 }
 
 /** Half the length of the board marker along the track, meters: about one car either side of the platform point. */
@@ -110,7 +118,7 @@ export function stationPathPoints(
 /**
  * The station path, one layer per stroke band: the centerline (dashed when `dashInStation`), the board marker (the
  * stretch of track at rail height where the rider is assumed to stand in the train, `boardHalfM` either side of the
- * start), with `restroke` each connector taken. An exit adds its entrance square (with `restroke`) and the walk outside
+ * start), with `restroke` each connector taken. An exit or a way in adds its entrance square (with `restroke`), an exit the walk outside
  * (solid over the walk graph, a dashed straight line when estimated); a transfer adds the same marker on the next
  * train's track where the path meets it. Throws when the choice doesn't fit the interior.
  */
@@ -160,7 +168,7 @@ export function exitPathBuffers(interior: StationInterior, choice: StationPathCh
       const walkwayDashed = interior.generated !== undefined || ends.every((a) => a !== undefined && rough.has(a))
       if (restroke(ctx, piece.c, piece.lower, piece.upper, sinks, walkwayDashed)) dashed = true
     }
-    const entranceId = choice.kind === 'exit' ? choice.exit.entranceId : null
+    const entranceId = choice.kind === 'transfer' ? null : choice.exit.entranceId
     const e = entranceId === null ? undefined : interior.entrances.find((k) => k.id === entranceId)
     if (e) {
       const h = (opts.entranceSize + 1) / 2

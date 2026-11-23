@@ -5,6 +5,7 @@ import type { LocateControls } from '../data/useLocate'
 import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import { markedPlacement } from '../lib/locate'
+import type { BoardLine } from '../lib/boardView'
 import type { ExitLineView } from '../lib/exitView'
 import { nearNote } from '../lib/placeLabel'
 import type { Network } from '../lib/network'
@@ -32,8 +33,8 @@ export interface TripLines {
   transfers: ReadonlyMap<string, TransferLineView> | null
   /** Which stations have an interior: a step at one without says "No station layout". */
   index: IndexLoad
-  /** The way to the first platform at the From station (2q7.45.7); absent or null: none. */
-  board?: { text: string; spoken: string } | null
+  /** The way in at the From station of each journey that boards its first train there, by `boardLineKey` of that ride. */
+  boards: ReadonlyMap<string, BoardLine> | null
 }
 
 interface TripPanelProps {
@@ -61,7 +62,7 @@ interface TripPanelProps {
  * `TripAnnouncer`; the visible message under the ends is hidden from assistive tech to match.
  */
 export function TripPanel({ network, arrivals, locate, covered, headingRef, focusRequest, onClose, lines, focusSiblings, ref }: TripPanelProps) {
-  const { ends, places, plan, showLoading, setEnd, swap, retry, selection, openJourney, backToList, dropNoteShown, activeStep, stepTo } = useTrip()
+  const { ends, places, plan, showLoading, setEnd, swap, retry, selection, openJourney, backToList, dropNoteShown, activeStep, stepTo, fixEnd } = useTrip()
   const { focusedId } = useFocus()
   const { selectTrain } = useTrainSelection()
   const fromSearch = useRef<StationSearchHandle>(null)
@@ -191,7 +192,8 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
               exits: lines.exits,
               transfers: lines.transfers,
               layoutOf: (id) => layoutOf(id, lines.index),
-              board: lines.board,
+              boards: lines.boards,
+              fixPending: fixEnd,
               activeStep,
               onStep: stepTo,
             }}

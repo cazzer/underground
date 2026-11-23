@@ -4,7 +4,7 @@ import { decodeStationWalk } from '../data/loadStationWalk'
 import type { Connector, StationIndex, StationInterior } from '../data/stationSchema'
 import type { StationStreets, StreetEntrance } from '../data/streetSchema'
 import type { StationWalk } from '../data/walkSchema'
-import { chooseExit, quickestExit, streetEntranceIndex, streetJoinOf, walkMinutes, WALK_DETOUR, type ExitChoice, type ExitWalk } from './exitChoice'
+import { chooseExit, quickestEntry, quickestExit, streetEntranceIndex, streetJoinOf, walkMinutes, WALK_DETOUR, type ExitChoice, type ExitWalk } from './exitChoice'
 import { fixture } from './interiorFixture'
 import { toGround } from './projection'
 import { FIXTURE_ANCHOR, walkGraph } from './walkFixture'
@@ -152,6 +152,36 @@ describe('quickestExit', () => {
   it('says why there is no exit', () => {
     expect(quickestExit({ interior, stopId: 'X01S' })).toEqual({ kind: 'none', reason: 'no-track' })
     expect(quickestExit({ interior, stopId: 'X01N', closed: new Set(['PS1']) })).toEqual({ kind: 'none', reason: 'no-exit' })
+  })
+})
+
+describe('quickestEntry', () => {
+  const interior = twoExits()
+
+  it('takes the entry with the least time inside, as a way in with no walk or destination', () => {
+    const r = quickestEntry({ interior, stopId: 'X01N' })
+    if (r.kind !== 'board') throw new Error(r.reason)
+    expect(r.exit.entranceId).toBe('E1')
+    expect(r.connectorIds).toEqual(['PS1', 'ST1'])
+    expect(r.areaIds).toEqual(['P1', 'S1'])
+    expect([r.walk, r.destination, r.probable, r.stepFree, r.stationId, r.stopId]).toEqual([null, null, false, false, 'X01', 'X01N'])
+    expect(r.totalS).toBe(r.inStationS)
+  })
+
+  it('marks a generated or approximate interior probable, and skips an exit-only entrance', () => {
+    const g = quickestEntry({ interior: twoExits({ generated: { archetype: 'cut-cover-mezzanine', confidence: 0.9 } }), stopId: 'X01N' })
+    expect(g.kind === 'board' && g.probable).toBe(true)
+    const approximate = quickestEntry({ interior: twoExits({ approximate: true }), stopId: 'X01N' })
+    expect(approximate.kind === 'board' && approximate.probable).toBe(true)
+    const exitOnly = { ...interior, entrances: interior.entrances.map((e) => (e.id === 'E1' ? { ...e, entry: false } : e)) }
+    const r = quickestEntry({ interior: exitOnly, stopId: 'X01N' })
+    expect(r.kind === 'board' && r.exit.entranceId).toBe('E3')
+  })
+
+  it('says why there is no way in', () => {
+    expect(quickestEntry({ interior, stopId: 'X01S' })).toEqual({ kind: 'none', reason: 'no-track' })
+    expect(quickestEntry({ interior, stopId: 'X01N', closed: new Set(['PS1']) })).toEqual({ kind: 'none', reason: 'no-entrance' })
+    expect(quickestEntry({ interior, stopId: 'X01N', stepFree: true })).toEqual({ kind: 'none', reason: 'no-entrance' })
   })
 })
 

@@ -6,6 +6,7 @@ import type { TripJourney } from './route/plan'
 import { useFocus } from './focus'
 import { useTrainSelection } from './trainSelection'
 import { journeyKeys, reconcileOpened, tripSelection, type OpenedJourney, type TripSelection } from './tripSelection'
+import { afterFocus, afterPick, fixEndOf } from './tripFix'
 import { activeStepKey } from './tripSteps'
 import { plannable, tripKey, type TripEnds, type TripPlanState } from './tripView'
 
@@ -25,8 +26,14 @@ interface TripValue {
   showLoading: boolean
   /** Opens or closes the panel; `start` opens it on new ends. */
   setOpen: (open: boolean) => void
-  /** Sets both ends and their notes and opens the panel (a directions pick, `directionsTrip`). Equal ends keep the state's identity, so nothing replans. */
-  start: (ends: TripEnds, places: TripPlaces) => void
+  /** Sets both ends and their notes and opens the panel (a directions pick, `directionsTrip`); `fixStation` is the end
+   *  station it filled from the location fix, if any. Equal ends keep the state's identity, so nothing replans. */
+  start: (ends: TripEnds, places: TripPlaces, fixStation?: string | null) => void
+  /** An end station filled from the location fix that the visitor has neither picked nor focused since; null for none. */
+  fixStation: string | null
+  /** Which end `fixStation` is: its interior and street files are not fetched for the trip until the visitor focuses or
+   *  picks it, since the request would name the fix's nearest station. Null for none. */
+  fixEnd: TripEnd | null
   /** Sets an end to a station; `place` names the searched place it is the nearest station to (any station pick clears it). */
   setEnd: (end: TripEnd, stationId: string, place?: string | null) => void
   swap: () => void
@@ -87,7 +94,13 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   const [dropped, setDropped] = useState({ seq: 0, remaining: 0 })
   const [step, setStep] = useState<StoredStep | null>(null)
   const [stepEnds, setStepEnds] = useState(0)
+  const [fixStation, setFixStation] = useState<string | null>(null)
   const { focusedId, select, membersOf } = useFocus()
+  // Focusing the fix's station is the visitor's own look at it: from then on it counts as chosen (both are leads).
+  useEffect(() => {
+    if (afterFocus(fixStation, focusedId) !== fixStation) setFixStation(null)
+  }, [fixStation, focusedId])
+  const fixEnd = fixEndOf(ends, fixStation)
   const [dropNoteFor, setDropNoteFor] = useState<string | null>(null)
   const dropPlan = useRef<TripPlanState | null>(null)
   const sourceRef = useRef(arrivals)
@@ -178,13 +191,16 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
     setStep(null)
     setStepEnds((n) => n + 1)
   }, [])
-  const start = useCallback((next: TripEnds, notes: TripPlaces) => {
+  const start = useCallback((next: TripEnds, notes: TripPlaces, fix: string | null = null) => {
     setEnds((e) => (e.from === next.from && e.to === next.to ? e : next))
+    setFixStation(fix)
     setPlaces((p) => (p.from === notes.from && p.to === notes.to ? p : notes))
     setOpenState(true)
   }, [])
   const setEnd = useCallback((end: TripEnd, stationId: string, place: string | null = null) => {
     setEnds((e) => (e[end] === stationId ? e : { ...e, [end]: stationId }))
+    // A pick is a choice; an end it replaces is no longer one (`fixEnd` is derived from the ends).
+    setFixStation((f) => afterPick(f, stationId))
     setPlaces((p) => (p[end] === place ? p : { ...p, [end]: place }))
   }, [])
   const swap = useCallback(() => {
@@ -215,8 +231,10 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
       stepTo,
       stepEnds,
       endStep,
+      fixStation,
+      fixEnd,
     }),
-    [stepEnds, activeStep, activeStepLead, stepTo, endStep, open, ends, places, plan, showLoading, setOpen, start, setEnd, swap, retry, selection, selectedJourney, openJourney, backToList, dropped, dropNoteFor, planKey],
+    [fixStation, fixEnd, stepEnds, activeStep, activeStepLead, stepTo, endStep, open, ends, places, plan, showLoading, setOpen, start, setEnd, swap, retry, selection, selectedJourney, openJourney, backToList, dropped, dropNoteFor, planKey],
   )
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>
 }

@@ -1,5 +1,5 @@
 /**
- * The quickest way from a platform track to each street exit, over the interior route graph (interiorGraphCore.ts):
+ * The quickest way from a platform track to each street exit (and from each street entry to it), over the interior route graph (interiorGraphCore.ts):
  * its connectors and same-area walks, plus one node per exit entrance and the walk from a street end to the entrance
  * that lists it. All times are seconds; rises are real, never the drawn exaggeration.
  */
@@ -21,9 +21,11 @@ export interface StreetExit {
 }
 
 export interface InStationRoute {
+  /** Where the route meets the street: the exit a rider leaves by, or for a way in (`routesFromStreet`) the entry. */
   exit: StreetExit
+  /** Between the track and the street, whichever way the route is ridden. */
   seconds: number
-  /** Platform to street, in travel order. */
+  /** Platform to street: travel order for a way out, the reverse of it for a way in. */
   connectorIds: string[]
   /** The platform first, then each slab stood on. */
   areaIds: string[]
@@ -53,9 +55,23 @@ export function endpointArea(interior: StationInterior, end: Endpoint): string |
  * areas (a rider leaving needs no fare).
  */
 export function routesToStreet(interior: StationInterior, stopId: StopId, opts: InteriorRouteOptions = {}): InStationRoute[] | null {
+  return streetRoutes(interior, stopId, opts, 'out')
+}
+
+/**
+ * The quickest in-station route from every street entry that can reach a platform track of `stopId` (an entrance marked
+ * `entry`, or the street end of a connector no entrance lists), sorted by time as `routesToStreet`. The search runs from
+ * the track over the graph reversed (`reverse`), so a one-way escalator is only ever ridden the way it runs; each route
+ * still lists the platform first. Null and empty as for `routesToStreet`.
+ */
+export function routesFromStreet(interior: StationInterior, stopId: StopId, opts: InteriorRouteOptions = {}): InStationRoute[] | null {
+  return streetRoutes(interior, stopId, opts, 'in')
+}
+
+function streetRoutes(interior: StationInterior, stopId: StopId, opts: InteriorRouteOptions, way: 'out' | 'in'): InStationRoute[] | null {
   const tracks = stopTracks(interior, stopId)
   if (tracks.length === 0) return null
-  const graph = buildInteriorGraph(interior, opts)
+  const graph = buildInteriorGraph(interior, { ...opts, reverse: way === 'in' })
   const { nodes, streetEnd } = graph
 
   interface Exit extends StreetExit {
@@ -65,7 +81,7 @@ export function routesToStreet(interior: StationInterior, stopId: StopId, opts: 
   const listed = new Set<string>()
   for (const e of interior.entrances) {
     for (const id of e.connectors) listed.add(id)
-    if (!e.exit) continue
+    if (!(way === 'out' ? e.exit : e.entry)) continue
     const node = graph.addNode([e.x, e.z], null)
     exits.push({ entranceId: e.id, point: [e.x, e.z], type: e.type, node })
     for (const id of e.connectors) {

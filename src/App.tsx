@@ -9,6 +9,7 @@ import { useLocate } from './data/useLocate'
 import { useStationHash } from './data/useStationHash'
 import { NO_SIBLINGS } from './data/interiorLoad'
 import { useStationInterior } from './data/useStationInterior'
+import { useTripBoard } from './data/useTripBoard'
 import { useTripExit } from './data/useTripExit'
 import { useTripRoute } from './data/useTripRoute'
 import { useTripTransfers } from './data/useTripTransfers'
@@ -20,6 +21,7 @@ import { outagePanelView } from './lib/live/eneText'
 import { noStepFreeNow } from './lib/live/stepFreeLoss'
 import { markedPlacement } from './lib/locate'
 import type { Insets } from './lib/framing'
+import type { ExitLabel } from './lib/exitView'
 import type { ScreenRect } from './lib/interiorCamera'
 import type { StationPathDraw } from './lib/interiorPath'
 import type { Network } from './lib/network'
@@ -74,14 +76,17 @@ function MapView({ network, bands, live }: MapViewProps) {
   const outages = joinPanelOutages(interiorOutages, model?.interior ?? null, interiorSettled, stationEquipment(equipment, focusedId), ene, nowS)
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
-  const tripExit = useTripExit({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, selected: trip.selectedJourney })
-  const names = useMemo(() => tripNamesOf(network), [network])
-  // The changes of trains inside hand-authored complexes: described in the trip panel, drawn in their interiors.
-  const tripTransfers = useTripTransfers({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, names, selected: trip.selectedJourney })
-  const tripLines = useMemo(
-    () => ({ exits: tripExit?.lines ?? null, transfers: tripTransfers.lines, index: interior.index }),
-    [tripExit?.lines, tripTransfers.lines, interior.index],
-  )
+  // Only once the visitor chose the To (an end filled from the fix, then swapped there, waits for a focus or pick).
+  const tripExit = useTripExit({
+    open: trip.open,
+    ends: trip.ends,
+    plan: trip.plan,
+    index: interior.index,
+    ene,
+    nowS,
+    selected: trip.selectedJourney,
+    allowed: trip.fixEnd !== 'to',
+  })
   // The selected journey's ride legs on the drawn lines; drawn (and the network dimmed) while the trip panel is in front.
   const tripRoute = useTripRoute({
     network,
@@ -92,18 +97,50 @@ function MapView({ network, bands, live }: MapViewProps) {
     journey: trip.selectedJourney,
   })
   const tripShown = usePanelCollapse().front === 'trip'
-  const exitDraw = tripExit?.drawn ?? null
-  const exitInterior = tripExit?.interiorId ?? null
-  // The exit first: where an interior has both (a trip can't change at its To station), the exit wins.
-  const stationPaths = useMemo<StationPathDraw[]>(
-    () => [...(exitDraw && exitInterior ? [{ interiorId: exitInterior, choice: exitDraw }] : []), ...tripTransfers.drawn],
-    [exitDraw, exitInterior, tripTransfers.drawn],
-  )
   // A complex is one station (the catalog's complex): its other members, for the trip panel and directions.
   const siblingsOf = useCallback(
     (id: string): readonly string[] => network.groupById.get(id)?.memberIds.filter((m) => m !== id) ?? NO_SIBLINGS,
     [network],
   )
+  const fromId = trip.ends.from
+  const fromStations = useMemo(() => new Set(fromId === null ? [] : [fromId, ...siblingsOf(fromId)]), [fromId, siblingsOf])
+  // The quickest way in at the From station, only once the visitor chose it (a From filled from the fix waits for a focus or pick).
+  const tripBoard = useTripBoard({
+    open: trip.open,
+    ends: trip.ends,
+    plan: trip.plan,
+    index: interior.index,
+    ene,
+    nowS,
+    selected: trip.selectedJourney,
+    fromStations,
+    allowed: trip.fixEnd !== 'from',
+  })
+  const names = useMemo(() => tripNamesOf(network), [network])
+  // The changes of trains inside hand-authored complexes: described in the trip panel, drawn in their interiors.
+  const tripTransfers = useTripTransfers({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, names, selected: trip.selectedJourney })
+  const tripLines = useMemo(
+    () => ({ exits: tripExit?.lines ?? null, transfers: tripTransfers.lines, index: interior.index, boards: tripBoard?.lines ?? null }),
+    [tripExit?.lines, tripTransfers.lines, interior.index, tripBoard?.lines],
+  )
+  const exitDraw = tripExit?.drawn ?? null
+  const exitInterior = tripExit?.interiorId ?? null
+  const boardDraw = tripBoard?.drawn ?? null
+  const boardInterior = tripBoard?.interiorId ?? null
+  // The exit, then the way in, then the changes: the first for an interior draws. From and To are never one complex,
+  // and where the From complex also holds a change of trains, the way in wins.
+  const stationPaths = useMemo<StationPathDraw[]>(
+    () => [
+      ...(exitDraw && exitInterior ? [{ interiorId: exitInterior, choice: exitDraw }] : []),
+      ...(boardDraw && boardInterior ? [{ interiorId: boardInterior, choice: boardDraw }] : []),
+      ...tripTransfers.drawn,
+    ],
+    [exitDraw, exitInterior, boardDraw, boardInterior, tripTransfers.drawn],
+  )
+  // The drawn exit's and way in's entrances, which the street labels place first and tint.
+  const exitLabel = tripExit?.drawn ? tripExit.mapLabel : null
+  const boardLabel = tripBoard?.drawn ? tripBoard.mapLabel : null
+  const pathLabels = useMemo(() => [exitLabel, boardLabel].filter((l): l is ExitLabel => l !== null), [exitLabel, boardLabel])
   const focusSiblings = useMemo(() => (focusedId === null ? NO_SIBLINGS : siblingsOf(focusedId)), [focusedId, siblingsOf])
   const accessible = focusedId !== null && (network.groupById.get(focusedId)?.access.status ?? 'none') !== 'none'
   const outKey = outages.outIds.join(',')
@@ -133,7 +170,7 @@ function MapView({ network, bands, live }: MapViewProps) {
             here={here}
             placePin={place.shown?.ground ?? null}
             stationPaths={stationPaths}
-            exitLabel={tripExit?.drawn ? tripExit.mapLabel : null}
+            pathLabels={pathLabels}
             tripOpen={trip.open}
             tripRoute={tripRoute}
             tripShown={tripShown}

@@ -25,6 +25,8 @@ const ctx = (over: Partial<StepContext> & { layouts?: Record<string, StationLayo
     hasBoardPath: false,
     hasExitPath: () => false,
     hasTransferPath: () => false,
+    fixPending: null,
+    noWayIn: false,
     ...rest,
   }
 }
@@ -113,6 +115,29 @@ describe('journeyItinerary', () => {
   it('gives the first Board the board path only', () => {
     const rows = journeyItinerary([ride('L', BEDFORD, UNION_OFF), walk('R20', '14 St'), ride('N', ['R20', '14 St', '8:20'], TIMES)], ctx({ layouts: { L08: 'none', R20: 'none' }, hasBoardPath: true }))
     expect(steps(rows).map((s) => s.status)).toEqual([null, 'No station layout', null])
+  })
+})
+
+describe('a trip end from the location fix, and a layout with no way in', () => {
+  const journey = [ride('L', BEDFORD, TIMES)]
+  it('asks for a tap at the fix-filled end with a layout, also in the sentence', () => {
+    const [board, exit] = steps(journeyItinerary(journey, ctx({ fixPending: 'from' })))
+    expect(board!.status).toBe('Tap to show the way in')
+    expect(board!.spoken).toBe('Step 1 of 2: board the L at Bedford Av, 8:04. Tap to show the way in.')
+    expect(exit!.status).toBeNull()
+    const [, out] = steps(journeyItinerary(journey, ctx({ fixPending: 'to' })))
+    expect(out!.status).toBe('Tap to show the way out')
+    expect(out!.spoken).toContain('Tap to show the way out.')
+  })
+  it('says there is no layout instead where there is none, and nothing while the index loads', () => {
+    expect(steps(journeyItinerary(journey, ctx({ fixPending: 'from', layouts: { L08: 'none' } })))[0]!.status).toBe('No station layout')
+    expect(steps(journeyItinerary(journey, ctx({ fixPending: 'from', layouts: { L08: null } })))[0]!.status).toBeNull()
+  })
+  it('says the layout has no way in, at the From station only', () => {
+    expect(steps(journeyItinerary(journey, ctx({ noWayIn: true })))[0]!.status).toBe('No way in on the layout')
+    // A journey that walks to its first train boards elsewhere.
+    const walked = journeyItinerary([walk('L08', 'Bedford Av'), ride('L', BEDFORD, TIMES)], ctx({ noWayIn: true, fixPending: 'from' }))
+    expect(steps(walked)[0]!.status).toBeNull()
   })
 })
 

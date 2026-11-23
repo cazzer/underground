@@ -47,7 +47,7 @@ export interface TripPanelControls {
  * one frame later (a station panel underneath has mounted by then) it goes to the station heading, else to Search.
  */
 export function useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf }: TripPanelArgs): TripPanelControls {
-  const { open, ends, places, setOpen, start, selection, backToList, activeStep, endStep } = useTrip()
+  const { open, ends, places, fixStation, setOpen, start, selection, backToList, activeStep, endStep } = useTrip()
   const { focusedId } = useFocus()
   const { selectedSummary, notice, clearTrain, dismissNotice } = useTrainSelection()
   const { tripRequested, tripCollapsed } = usePanelCollapseControls()
@@ -55,14 +55,14 @@ export function useTripPanel({ locate, panel, stationHeading, searchButton, sibl
   const fix = markedPlacement(locate.state)
   const openTrip = useCallback(
     (end: TripEnd, target: DirectionsTarget) => {
-      const next = directionsTrip({ end, target, current: ends, currentPlaces: places, focusedId, siblingsOf, fix })
+      const next = directionsTrip({ end, target, current: ends, currentPlaces: places, focusedId, siblingsOf, fix, fixStation })
       if (selectedSummary !== null) clearTrain()
       if (notice !== null) dismissNotice()
       tripRequested()
-      start(next.ends, next.places)
+      start(next.ends, next.places, next.fixStation)
       setFocusRequest((r) => ({ target: next.empty ?? 'heading', n: (r?.n ?? 0) + 1 }))
     },
-    [ends, places, focusedId, siblingsOf, fix, selectedSummary, notice, clearTrain, dismissNotice, tripRequested, start],
+    [ends, places, fixStation, focusedId, siblingsOf, fix, selectedSummary, notice, clearTrain, dismissNotice, tripRequested, start],
   )
   const closeTrip = useCallback(() => {
     const hadFocus = panel.current?.contains(document.activeElement) ?? false
