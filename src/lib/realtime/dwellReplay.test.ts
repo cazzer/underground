@@ -1,5 +1,5 @@
 // Dwell on real public/data: no pattern hop needs an impossible speed, and a scheduled train replayed the way the client
-// runs it (re-plan every 20 s, step every 0.5 s) holds at each stop, never jumps, never cross-fades, and arrives on time.
+// runs it (re-plan every 15 s, step every 0.5 s) holds at each stop, never jumps, never cross-fades, and arrives on time.
 // The replay is a train on the static schedule (arrivals from segments.json), not worker/fixtures polls (those are
 // single snapshots), and it covers only the no-VehiclePosition path.
 // This test gates the daily data refresh (refresh-data.yml runs the tests): a failure on chore/data-refresh means the
@@ -25,7 +25,7 @@ const segments = (JSON.parse(segmentsRaw) as SegmentsFile).segments
 const geometries = [...buildShapeGeometries(shapes, index, stations, TRACK_OFFSET_M, new Map()).values()]
 
 const BASE = 1_795_228_554
-const POLL_S = 20
+const POLL_S = 15
 const FRAME_S = 0.5
 /** About a subway car's top speed (55 mph), which the eased run's cruise (its peak) must not exceed. */
 const MAX_SPEED_MPS = 25

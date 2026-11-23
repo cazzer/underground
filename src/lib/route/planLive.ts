@@ -2,7 +2,7 @@
  * Journeys on the timetable with the realtime overlay laid over it. Pure apart from `console.error`. The overlay
  * (about 100 ms on a poll's worth of trips) is built once per (timetable, snapshot) and reused by every query on
  * it, so the 30 s refresh and a changed pair never redo it. The overlay's `nowS` is that of the first query on
- * the snapshot and stays baked in for the later ones (at most one poll, about 20 s, older): it sets which stops
+ * the snapshot and stays baked in for the later ones (at most one poll, about 15 s, older): it sets which stops
  * count as passed, the replacement and cancel window, the ghost filter and the joins. A query is always at or after it.
  */
 import type { RealtimeSnapshot } from '../../data/realtime'

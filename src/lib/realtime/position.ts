@@ -3,6 +3,7 @@ import type { Arrival, VehicleStatus } from '../../data/realtime'
 import type { StopId } from '../../data/schema'
 import type { Ground } from '../projection'
 import { pointAtDistance } from './polyline'
+import { hopArrivalShift } from './arrivalShift'
 import { easeRun, rampShareFor } from './runEase'
 import type { ShapeGeometry } from './shapeGeometry'
 import { capArrival, type StopVisit } from './stopVisit'
@@ -33,6 +34,8 @@ export interface PositionInput {
   visit?: StopVisit | null
   /** The trip's own first stop, where it lays over; defaults to the shape's first stop. */
   origin?: StopId | null
+  /** Seconds to pull the hop's arrival in (arrivalShift.ts; default 0). The dwell grows by the same, so the leave time stays. */
+  arrivalShiftS?: number
 }
 
 export type PositionResult =
@@ -74,7 +77,7 @@ export interface HopPlan {
   arriveAt: number | null
   /** Scheduled seconds for the hop, arrival to arrival. */
   runS: number
-  /** Seconds held at `from` before running; part of `runS`. */
+  /** Seconds held at `from` before running; part of `runS`. `dwellFor(runS)` plus the arrival shift taken. */
   dwellS: number
   /** Progress along the hop when it doesn't depend on time (dwelling, overdue at the next stop); else null. */
   fixedFraction: number | null
@@ -154,14 +157,21 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
   const runS =
     segments[segmentKey(stops[hop.from]!, stops[hop.to]!)] ??
     Math.max(MIN_RUN_S, (D[hop.to]! - D[hop.from]!) / FALLBACK_SPEED_MPS)
-  const dwellS = dwellFor(runS)
+  const dwell0 = dwellFor(runS)
   // Never capped leaving the trip's own origin: a train laying over there has no schedule to keep. It may still
   // be held there (the floor), and a short turn joined to a longer pattern starts mid-shape, hence `origin`.
   const fromOrigin = stops[hop.from] === (input.origin ?? stops[0])
-  const arriveAt =
-    hop.arriveAt !== null && hop.from !== hop.to && input.visit
-      ? capArrival(hop.arriveAt, stops[hop.from]!, runS, dwellS, input.visit, !fromOrigin)
-      : hop.arriveAt
+  const moves = hop.arriveAt !== null && hop.from !== hop.to
+  const cappedAt = moves && input.visit ? capArrival(hop.arriveAt!, stops[hop.from]!, runS, dwell0, input.visit, !fromOrigin) : hop.arriveAt
+  // The arrival is shown sooner (arrivalShift.ts) and the dwell grows by as much, so the train leaves when it would
+  // have. A train the poll still places at the platform is held there: its departure is the unknown part. On the
+  // lingering-STOPPED_AT feeds (stopVisit.ts) `here` can flap between polls; the shift then disengages and
+  // smoothing holds the dot, rather than the plan moving it back.
+  const held = input.visit?.here === true && input.visit.stopId === stops[hop.from]
+  const shiftS =
+    cappedAt === null || !moves || held ? 0 : hopArrivalShift(input.arrivalShiftS ?? 0, runS - dwell0, D[hop.to]! - D[hop.from]!)
+  const dwellS = dwell0 + shiftS
+  const arriveAt = cappedAt === null ? null : cappedAt - shiftS
   return {
     from: hop.from,
     to: hop.to,
@@ -171,7 +181,7 @@ export function planHop(input: PositionInput): HopPlan | PlanFailure {
     fixedFraction: hop.fraction ?? null,
     minFraction: hop.fraction === undefined && status === 'INCOMING_AT' ? INCOMING_MIN_FRACTION : 0,
     departsInS: hop.departsInS,
-    capped: arriveAt !== hop.arriveAt,
+    capped: cappedAt !== hop.arriveAt,
     rampShare: rampShareFor(D[hop.to]! - D[hop.from]!, runS - dwellS),
   }
 }
@@ -195,9 +205,10 @@ export function hopDistance(plan: HopPlan, geometry: ShapeGeometry, now: number)
 
 /**
  * Where a train is along its shape: interpolated from the hop's scheduled run time and the
- * predicted arrival at its next stop. The first `dwellFor(runS)` seconds of the hop are a dwell
+ * predicted arrival at its next stop, less `input.arrivalShiftS` (the dwell grows by as much, so the train still
+ * leaves on time). The first `dwellFor(runS)` seconds of the hop, plus those, are a dwell
  * at the origin stop (segment times include it), so the train holds there, then runs and still
- * arrives on the predicted time; the same rule for every status, so a status flip never moves
+ * arrives on that arrival; the same rule for every status, so a status flip never moves
  * the target. The run pulls away, cruises and brakes (`easeRun`: a trapezoid, 1.25x the average speed at
  * cruise, capped at 25 m/s by shorter ramps). The shorter, eased run means a mid-hop revision of the predicted arrival moves the target up to
  * 1.25/0.65 (about 1.9x) as far as a constant-speed run over the whole hop would; the correction layer absorbs it. Overdue trains wait at

@@ -4,7 +4,8 @@ import type { StopId } from '../../data/schema'
 /**
  * The last stop a train was seen at, carried across polls. MTA predictions for the final approach run late
  * (about 40 s on a replay of 32 polls), while the schedule from the last stop is within seconds, so
- * `planHop` caps a predicted arrival with this visit plus the scheduled run (underground-d80).
+ * `planHop` caps a predicted arrival with this visit plus the scheduled run (underground-d80). The cap takes part of
+ * that bias; the rest, with the delay in getting the feed here, is the per-feed shift in arrivalShift.ts.
  */
 export interface StopVisit {
   stopId: StopId

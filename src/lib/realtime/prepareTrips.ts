@@ -1,5 +1,6 @@
 import { FEED_IDS, type FeedId, type RealtimeSnapshot, type RealtimeTrip } from '../../data/realtime'
 import type { ShapeId, StopId } from '../../data/schema'
+import { ARRIVAL_SHIFT_S } from './arrivalShift'
 import { GHOST, ghostReason, type GhostReason } from './filters'
 import { joinTrip, type JoinResult, type JoinStage } from './joinTrip'
 import { planHop, type HopPlan, type PlanFailure } from './position'
@@ -123,6 +124,7 @@ export function prepareTrips(
         now,
         visit,
         origin,
+        arrivalShiftS: ARRIVAL_SHIFT_S[feed],
       })
       if ('ok' in plan) {
         dropped[plan.reason]++
