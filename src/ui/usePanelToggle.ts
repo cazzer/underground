@@ -15,7 +15,8 @@ export interface PanelToggle {
  * the body; a tap doesn't focus a button on iOS, so it always moves.
  */
 export function usePanelToggle(panel: CollapsiblePanel, focusTarget: RefObject<HTMLElement | null>): PanelToggle {
-  const { stationCollapsed, tripCollapsed, setCollapsed } = usePanelCollapseControls()
+  const { stationCollapsed, tripCollapsed, changesCollapsed, setCollapsed } = usePanelCollapseControls()
+  const flags = { station: stationCollapsed, trip: tripCollapsed, changes: changesCollapsed }
   const set = useCallback(
     (next: boolean) => {
       flushSync(() => setCollapsed(panel, next))
@@ -25,5 +26,5 @@ export function usePanelToggle(panel: CollapsiblePanel, focusTarget: RefObject<H
   )
   const collapse = useCallback(() => set(true), [set])
   const expand = useCallback(() => set(false), [set])
-  return { collapsed: panel === 'station' ? stationCollapsed : tripCollapsed, collapse, expand }
+  return { collapsed: flags[panel], collapse, expand }
 }

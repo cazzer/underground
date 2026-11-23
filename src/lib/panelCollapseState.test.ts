@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { collapseReducer, collapsedFront, frontPanel, INITIAL_COLLAPSE, type FrontPanel } from './panelCollapseState'
 
-const FRONTS: FrontPanel[] = ['station', 'trip', 'train', 'notice', null]
-const none = { trainShown: false, noticeShown: false, tripOpen: false, focusedId: null }
+const FRONTS: FrontPanel[] = ['station', 'trip', 'changes', 'train', 'notice', null]
+const none = { trainShown: false, noticeShown: false, changesOpen: false, tripOpen: false, focusedId: null }
 
 describe('frontPanel', () => {
-  it('ranks train over notice over trip over station', () => {
-    expect(frontPanel({ trainShown: true, noticeShown: true, tripOpen: true, focusedId: 'L08' })).toBe('train')
-    expect(frontPanel({ ...none, noticeShown: true, tripOpen: true, focusedId: 'L08' })).toBe('notice')
+  it('ranks train over notice over changes over trip over station', () => {
+    expect(frontPanel({ trainShown: true, noticeShown: true, changesOpen: true, tripOpen: true, focusedId: 'L08' })).toBe('train')
+    expect(frontPanel({ ...none, noticeShown: true, changesOpen: true, tripOpen: true, focusedId: 'L08' })).toBe('notice')
+    expect(frontPanel({ ...none, changesOpen: true, tripOpen: true, focusedId: 'L08' })).toBe('changes')
     expect(frontPanel({ ...none, tripOpen: true, focusedId: 'L08' })).toBe('trip')
     expect(frontPanel({ ...none, focusedId: 'L08' })).toBe('station')
+  })
+  it('puts the changes list in front with nothing else open', () => {
+    expect(frontPanel({ ...none, changesOpen: true })).toBe('changes')
   })
   it('is null with no panel', () => {
     expect(frontPanel(none)).toBeNull()
@@ -53,7 +57,7 @@ describe('collapseReducer', () => {
     let s = collapseReducer(INITIAL_COLLAPSE, { type: 'set', panel: 'station', collapsed: true, front: 'station' })
     s = collapseReducer(s, { type: 'set', panel: 'trip', collapsed: true, front: 'trip' })
     const closed = collapseReducer(s, { type: 'tripClosed' })
-    expect(closed).toEqual({ station: true, trip: false, seq: 2 })
+    expect(closed).toEqual({ ...INITIAL_COLLAPSE, station: true, trip: false, seq: 2 })
     expect(collapseReducer(closed, { type: 'tripClosed' })).toBe(closed)
   })
 
@@ -61,14 +65,14 @@ describe('collapseReducer', () => {
     let s = collapseReducer(INITIAL_COLLAPSE, { type: 'set', panel: 'station', collapsed: true, front: 'station' })
     s = collapseReducer(s, { type: 'set', panel: 'trip', collapsed: true, front: 'trip' })
     const requested = collapseReducer(s, { type: 'tripRequested' })
-    expect(requested).toEqual({ station: true, trip: false, seq: 2 })
+    expect(requested).toEqual({ ...INITIAL_COLLAPSE, station: true, trip: false, seq: 2 })
     expect(collapseReducer(requested, { type: 'tripRequested' })).toBe(requested)
   })
 
   it('expands a collapsed station panel on an explicit pick without counting', () => {
     const s = collapseReducer(INITIAL_COLLAPSE, { type: 'set', panel: 'station', collapsed: true, front: 'station' })
     const picked = collapseReducer(s, { type: 'picked' })
-    expect(picked).toEqual({ station: false, trip: false, seq: 1 })
+    expect(picked).toEqual({ ...INITIAL_COLLAPSE, station: false, trip: false, seq: 1 })
     expect(collapseReducer(picked, { type: 'picked' })).toBe(picked)
   })
 
@@ -82,5 +86,39 @@ describe('collapseReducer', () => {
     expect(collapsedFront(s, null)).toBe(false)
     expect(collapsedFront(s, 'station')).toBe(true)
     expect(s.seq).toBe(1)
+  })
+})
+
+describe('the service changes panel', () => {
+  const opened = collapseReducer(INITIAL_COLLAPSE, { type: 'changesOpened' })
+
+  it('opens expanded without counting, and a repeat changes nothing', () => {
+    expect(opened).toEqual({ ...INITIAL_COLLAPSE, changesOpen: true })
+    expect(collapseReducer(opened, { type: 'changesOpened' })).toBe(opened)
+  })
+
+  it('collapses and expands only while in front, counting each', () => {
+    expect(collapseReducer(opened, { type: 'set', panel: 'changes', collapsed: true, front: 'train' })).toBe(opened)
+    expect(collapseReducer(opened, { type: 'set', panel: 'changes', collapsed: true, front: 'trip' })).toBe(opened)
+    const collapsed = collapseReducer(opened, { type: 'set', panel: 'changes', collapsed: true, front: 'changes' })
+    expect(collapsed.seq).toBe(1)
+    expect(collapsedFront(collapsed, 'changes')).toBe(true)
+    for (const front of ['station', 'trip', 'train', 'notice', null] as const) expect(collapsedFront(collapsed, front)).toBe(false)
+    expect(collapseReducer(collapsed, { type: 'set', panel: 'changes', collapsed: false, front: 'changes' }).seq).toBe(2)
+  })
+
+  it('reopens expanded, and closing resets the collapse, neither moving seq', () => {
+    const collapsed = collapseReducer(opened, { type: 'set', panel: 'changes', collapsed: true, front: 'changes' })
+    expect(collapseReducer(collapsed, { type: 'changesOpened' })).toEqual({ ...opened, seq: 1 })
+    const closed = collapseReducer(collapsed, { type: 'changesClosed' })
+    expect(closed).toEqual({ ...INITIAL_COLLAPSE, seq: 1 })
+    expect(collapseReducer(closed, { type: 'changesClosed' })).toBe(closed)
+  })
+
+  it('leaves the station and trip flags alone', () => {
+    let s = collapseReducer(INITIAL_COLLAPSE, { type: 'set', panel: 'station', collapsed: true, front: 'station' })
+    s = collapseReducer(s, { type: 'set', panel: 'trip', collapsed: true, front: 'trip' })
+    const there = collapseReducer(collapseReducer(s, { type: 'changesOpened' }), { type: 'changesClosed' })
+    expect(there).toEqual(s)
   })
 })

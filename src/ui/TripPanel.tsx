@@ -42,7 +42,7 @@ interface TripPanelProps {
   network: Network
   arrivals: ArrivalsSource | null
   locate: LocateControls
-  /** A train panel or notice is in front: the panel stays mounted but hidden and inert. */
+  /** A train panel, notice or the service changes list is in front: the panel stays mounted but hidden and inert. */
   covered: boolean
   /** The heading, or the bar while collapsed: takes focus on a directions pick that fills both ends, and when a train panel or notice over it is closed on purpose. */
   headingRef: RefObject<HTMLElement | null>

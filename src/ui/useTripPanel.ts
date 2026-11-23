@@ -29,7 +29,7 @@ export interface TripPanelControls {
   /** The panel is open, though a train panel or notice may be in front of it. */
   tripOpen: boolean
   /**
-   * A directions pick (a search row's From or To, the station panel's): closes a train panel or notice in front,
+   * A directions pick (a search row's From or To, the station panel's): closes a train panel, notice or the service changes list in front,
    * expands a collapsed trip panel, sets the ends by `directionsTrip` and asks the panel to focus the end left
    * empty, else its heading.
    */
@@ -50,7 +50,7 @@ export function useTripPanel({ locate, panel, stationHeading, searchButton, sibl
   const { open, ends, places, fixStation, setOpen, start, selection, backToList, activeStep, endStep } = useTrip()
   const { focusedId } = useFocus()
   const { selectedSummary, notice, clearTrain, dismissNotice } = useTrainSelection()
-  const { tripRequested, tripCollapsed } = usePanelCollapseControls()
+  const { tripRequested, tripCollapsed, changesOpen, closeChanges } = usePanelCollapseControls()
   const [focusRequest, setFocusRequest] = useState<TripFocusRequest | null>(null)
   const fix = markedPlacement(locate.state)
   const openTrip = useCallback(
@@ -58,11 +58,12 @@ export function useTripPanel({ locate, panel, stationHeading, searchButton, sibl
       const next = directionsTrip({ end, target, current: ends, currentPlaces: places, focusedId, siblingsOf, fix, fixStation })
       if (selectedSummary !== null) clearTrain()
       if (notice !== null) dismissNotice()
+      if (changesOpen) closeChanges()
       tripRequested()
       start(next.ends, next.places, next.fixStation)
       setFocusRequest((r) => ({ target: next.empty ?? 'heading', n: (r?.n ?? 0) + 1 }))
     },
-    [ends, places, fixStation, focusedId, siblingsOf, fix, selectedSummary, notice, clearTrain, dismissNotice, tripRequested, start],
+    [ends, places, fixStation, focusedId, siblingsOf, fix, selectedSummary, notice, clearTrain, dismissNotice, changesOpen, closeChanges, tripRequested, start],
   )
   const closeTrip = useCallback(() => {
     const hadFocus = panel.current?.contains(document.activeElement) ?? false

@@ -11,6 +11,14 @@ import { lineKey } from './lineFilter'
  */
 export const ALERTS_MAX_AGE_S = 480
 
+export type AlertsStatus =
+  /** Not configured, or still connecting (nothing polled yet, fewer than two failures). */
+  | 'none'
+  /** No snapshot younger than ALERTS_MAX_AGE_S, a version mismatch, or two failed polls with nothing yet. */
+  | 'unknown'
+  /** A fresh snapshot: it says what changes, or that nothing does. */
+  | 'known'
+
 /** The part of useAlerts' feed the join reads (this module doesn't import src/data/useAlerts). */
 export interface AlertsInput {
   configured: boolean
@@ -58,12 +66,26 @@ export interface ChangesJoin {
   known: boolean
 }
 
+/** Whether the feed says anything: the one rule the station join and the header's list share. */
+export function alertsStatus(input: AlertsInput, nowS: number): AlertsStatus {
+  if (!input.configured) return 'none'
+  const { snapshot } = input
+  if (snapshot !== null && nowS - snapshot.generatedAt <= ALERTS_MAX_AGE_S && !input.schemaMismatch) return 'known'
+  return snapshot === null && input.failures < 2 && !input.schemaMismatch ? 'none' : 'unknown'
+}
+
 const NONE: ChangesJoin = { panel: { kind: 'none' }, known: false }
 const KIND_ORDER: Record<ChangeKind, number> = { skipped: 0, suspended: 1, other: 2 }
 
+export interface RelevantPeriod {
+  now: boolean
+  start: number
+  end: number | null
+}
+
 /** The period of `alert` in effect at `nowS`, else the next one starting within the window; null when neither. */
-function relevantPeriod(alert: ServiceAlert, nowS: number): { now: boolean; start: number; end: number | null } | null {
-  let next: { now: boolean; start: number; end: number | null } | null = null
+export function relevantPeriod(alert: ServiceAlert, nowS: number): RelevantPeriod | null {
+  let next: RelevantPeriod | null = null
   for (const [start, end] of alert.periods) {
     if (end !== null && end <= nowS) continue
     if (start <= nowS) return { now: true, start, end }
@@ -141,13 +163,10 @@ export function joinStationChanges(
   nowS: number,
   routeOrder: ReadonlyMap<RouteId, number>,
 ): ChangesJoin {
-  if (!input.configured) return NONE
+  const status = alertsStatus(input, nowS)
+  if (status === 'none') return NONE
   const { snapshot } = input
-  const fresh = snapshot !== null && nowS - snapshot.generatedAt <= ALERTS_MAX_AGE_S && !input.schemaMismatch
-  if (!fresh) {
-    if (snapshot === null && input.failures < 2 && !input.schemaMismatch) return NONE
-    return { panel: { kind: 'unknown' }, known: false }
-  }
+  if (status === 'unknown' || snapshot === null) return { panel: { kind: 'unknown' }, known: false }
   const memberIds: ReadonlySet<StationId> = new Set(group.memberIds)
   const lines = new Set(group.routeIds.map(lineKey))
   const routes = new Set(group.routeIds)

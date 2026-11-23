@@ -18,6 +18,7 @@ import { usePlaceLine } from './ui/usePlaceLine'
 import { FocusProvider, useFocus } from './lib/focus'
 import { joinStationChanges } from './lib/live/alertJoin'
 import { alertSkipsOf } from './lib/live/alertSkips'
+import { alertListView } from './lib/live/alertList'
 import { serviceChangeView, type ServiceChangeView } from './lib/live/alertText'
 import { terminalsOf } from './lib/live/routeTerminals'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
@@ -93,6 +94,8 @@ function MapView({ network, bands, live }: MapViewProps) {
   const changes = focusedGroup
     ? serviceChangeView(joinStationChanges(focusedGroup, network.stationById, alerts, nowS, routeOrder), focusedGroup, network.routeById, nowS, terminalOf)
     : NO_CHANGES
+  // Every change in effect or within a day, for the header chip and its list.
+  const changeList = alertListView(alerts, routeOrder, nowS)
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
   // Only once the visitor chose the To (an end filled from the fix, then swapped there, waits for a focus or pick).
@@ -216,6 +219,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           outages={outagePanelView(outages, nowS, noStepFree)}
           changes={changes}
           skips={skips}
+          changeList={changeList}
           tripLines={tripLines}
           focusSiblings={focusSiblings}
           siblingsOf={siblingsOf}
