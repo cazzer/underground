@@ -13,14 +13,15 @@
  *  differs from the committed stations.json's is a WARNING (the files are then built against newer service days than
  *  the rest of the site; the daily refresh PR closes the gap).
  *
- *  Fails loudly: any problem throws (non-zero exit) and nothing is written. The deploy then runs `--empty`, so the site
+ *  Fails loudly: any problem throws (non-zero exit: 3 for a failed download, 1 for anything else) and nothing is written.
+ *  Before writing it checks its own output (lib/datedCheck.ts). The deploy then runs `--empty`, so the site
  *  still ships and the client plans on the regular schedule. Files over the per-file or total cap fail the same way.
  *  Needs about 2 GB of memory with both zips in; the deploy gives node a 4 GB heap. */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import type { StationsFile, StopId } from '../src/data/schema.ts'
+import type { RoutesFile, StationsFile, StopId } from '../src/data/schema.ts'
 import { EMPTY_DATED_INDEX, type StationChange } from '../src/data/timetableSchema.ts'
 import { nyDate } from '../src/lib/realtime/serviceDate.ts'
 import {
@@ -32,7 +33,10 @@ import {
   type RenderedFile,
 } from './lib/budget.ts'
 import { buildDatedTimetables, serviceDays, type ServiceDays } from './lib/datedTimetable.ts'
+import { checkDatedOutputs } from './lib/datedCheck.ts'
 import {
+  DOWNLOAD_EXIT_CODE,
+  DownloadError,
   FEED_URL,
   REGULAR_MAX_BYTES,
   SUPPLEMENTED_MAX_BYTES,
@@ -47,6 +51,7 @@ import { buildStationChanges } from './lib/timetable.ts'
 
 const DEFAULT_OUT = fileURLToPath(new URL('../public/data/timetable/dated/', import.meta.url))
 const COMMITTED_STATIONS = new URL('../public/data/stations.json', import.meta.url)
+const COMMITTED_ROUTES = new URL('../public/data/routes.json', import.meta.url)
 const PRUNE_WHY = 'its date has no planned work now'
 
 interface Baseline {
@@ -86,7 +91,7 @@ function buildDated(zip: Uint8Array, baseline: Baseline, knownStops: ReadonlySet
     `Dated timetables: ${dates.length} files [${dates.join(' ')}], ${patterns.length} patterns, ` +
     `${patterns.reduce((n, p) => n + p.trips.length, 0)} trips, ${built.skippedShort} trips under two stops skipped, ` +
     `${built.splitPatterns} patterns split for overtaking`
-  return { files, index, summary }
+  return { files, index, summary, built }
 }
 
 /** `dir`'s *.json become exactly `written` (prune removes every other *.json there). */
@@ -128,6 +133,9 @@ async function main(): Promise<void> {
   const suppZip = await loadZip(values['supplemented-zip'] ?? process.env.GTFS_SUPPLEMENTED_ZIP, SUPPLEMENTED_URL, SUPPLEMENTED_MAX_BYTES)
   const dated = buildDated(suppZip, baseline, knownStops)
 
+  const routes = JSON.parse(readFileSync(COMMITTED_ROUTES, 'utf8')) as RoutesFile
+  checkDatedOutputs(dated.built.files, dated.built.index, { routeIds: new Set(routes.routes.map((r) => r.id)), stops: knownStops })
+
   for (const f of dated.files) checkFileCap(f, TIMETABLE_FILE_GZIP_CAP_BYTES)
   const totalGzip = checkDatedTimetableTotal(dated.files)
   const written: RenderedFile[] = [...dated.files, dated.index]
@@ -139,5 +147,6 @@ async function main(): Promise<void> {
 
 main().catch((err: unknown) => {
   console.error(err)
-  process.exitCode = 1
+  // A failed download (an MTA outage) is told apart from a bug in the build, so the deploy can warn or fail loudly.
+  process.exitCode = err instanceof DownloadError ? DOWNLOAD_EXIT_CODE : 1
 })

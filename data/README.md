@@ -237,12 +237,17 @@ service files in the client's router; `index.json` (`{ format, feedVersion, date
 - Fails the run, writing nothing: the download or parse, the set over 14 dates, a bad date, a pattern calling at a stop
   `stations.json` lacks (the error names the stop and dates), and the checks above. A differing `feed_version` between
   the zips, no dated date at all and a last dated file already past are only `WARNING:` lines.
+- Checked before writing (`scripts/lib/datedCheck.ts`, with tests): the index and its files agree (dates, feed version), each file
+  passes the client's `expectTimetable` and decodes, service ids are plain, every route is in `routes.json`, every stop and station
+  change is in `stations.json` (what `buildRouterTimetable` would skip with its stale-deploy warning), and no trip overtakes
+  another. A zip entry that inflates past 512 MB (1 GB together) is refused. Exit code 3 means a download failed, 1 anything else.
 - Fail open in the deploy: when the script fails for any reason (an unreachable feed, a timeout, a cap), the deploy step
-  runs `npm run data:dated -- --empty`, which writes only an empty `index.json` (`EMPTY_DATED_INDEX`) and removes every other
+  runs `npm run data:dated -- --empty` (a warning for exit 3, a timeout or a kill; an error annotation for any other failure, since
+  the code broke), which writes only an empty `index.json` (`EMPTY_DATED_INDEX`) and removes every other
   `*.json` in the folder, and says so in a workflow warning and the job summary. The site still ships; trips plan on the
   regular schedule. The client also reads a 404 on the index (a local build, or an older deploy) as an empty one, with one
   console warning. `--out` must end in a folder named `dated`, since writing removes the other `*.json` there.
-- `verify-dated` (deploy.yml) fetches the live `dated/index.json` after each deploy.
+- `verify-dated` (deploy.yml) compares the live `dated/index.json` with the one the build shipped (retrying for CDN lag) and fetches each file it lists.
 
 The build throws, and writes nothing, when a timetable can't be built safely: a time that isn't a multiple of
 30 s, a departure before its arrival, an arrival before the previous departure, a stop that isn't a child stop

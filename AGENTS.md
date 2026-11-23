@@ -49,7 +49,11 @@ so dev and preview serve under that path.
   `TIMETABLE_DATED_TOTAL_GZIP_CAP_BYTES`. The directory is gitignored: every Pages deploy runs this into
   `dist/data/timetable/dated/` and fails open (any failure ships `--empty`'s `EMPTY_DATED_INDEX`, with a workflow warning and a
   summary line; the client then plans on the regular schedule). A failed download, more than 14 such dates, a date that isn't a
-  real YYYYMMDD or a stop `stations.json` lacks fails the run, writing nothing; `--out` must end in a folder named `dated`
+  real YYYYMMDD or a stop `stations.json` lacks fails the run, writing nothing, as does any problem `lib/datedCheck.ts`
+  finds in the output before it is written (routes, stops and station changes the committed data lacks, bad service ids, an index
+  that disagrees with its files, a file the client's `expectTimetable` or `decodePatternTimes` rejects, an overtaking trip).
+  Exit 3 is a failed download, 1 anything else; the deploy warns on 3 (or a timeout or kill) and annotates an error on the rest,
+  and fails open either way. `--out` must end in a folder named `dated`
   (other `*.json` in it are removed). The baseline and station changes come from the downloaded regular zip, the stops from the
   committed `stations.json`; a differing `feed_version` is a `WARNING:`. `vite preview` of a local build has no dated files
   (planning warns and uses the regular schedule) until you run it.
@@ -109,8 +113,8 @@ so dev and preview serve under that path.
   its cap means 128 buckets, not dropped content. Outside the startup budget, and nothing loads it yet (2q7.14).
 
 Run typecheck, test, and build before reporting work done. Pushing to `main` deploys
-via `.github/workflows/deploy.yml` (Actions to Pages), which also runs daily (09:23 UTC schedule; Pages jobs only, no Worker
-deploy) so the dated timetables, built in each deploy, roll forward; GitHub disables schedules after 60 days without repo activity.
+via `.github/workflows/deploy.yml` (Actions to Pages), which also runs daily (09:23 UTC schedule: it redeploys Pages and the unchanged Worker) so the dated
+timetables, built in each deploy, roll forward; GitHub disables schedules after 60 days without repo activity.
 
 Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `npm --prefix worker run dev`: `wrangler dev` serves `/rt`, `/ene` and `/geocode` on `http://localhost:8787`
@@ -733,7 +737,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `interiorCache.ts`: `timetable/<service>.json`, `timetable/dated/<date>.json` and its `index.json` (built by each deploy, never in git; a 404 on the index is
   an empty one with one console warning, any other failure rejects), `route/transfers.json`, and the calendar from `trip-index.json`) and
   `planTrip.ts` (`planTripLive(stations, from, to, atS, live)`: reads the calendar and the dated index (fetched together; a failed
-  index fetch rejects the plan, retried by the next one, never a silent fallback; a 404 is the empty index, warned once), picks the window, fetches the files it
+  index fetch rejects the plan, retried by the next one, never a silent fallback, except a 404, which reads as the empty index with one warning), picks the window, fetches the files it
   needs (a date the index lists reads its dated file, not its service files), builds one `RouterTimetable` per window and `feedVersion`, kept as a single cache entry, then `planOnLive`
   (`lib/route/planLive.ts`, pure: `overlayRealtime` over it with the snapshot, memoised on the timetable and snapshot
   identity, a snapshot over `SNAPSHOT_MAX_AGE_S` old never cached; a throwing overlay is one `console.error` per snapshot and the
@@ -859,8 +863,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `scripts/lib/streetsOsm.ts` and `streetsShard.ts`; `fetchJson.ts` is the retrying fetch both pin scripts share
 - `scripts/`: `lib/timetable.ts` (`buildTimetables`, `patternsOf`, `buildStationChanges`: pure, used by `build-data.ts`),
   `lib/datedTimetable.ts` (`datedWindow`, `buildDatedTimetables`: the supplemented feed to one file per date; `datedFixture.ts` its tests' feeds),
-  `build-dated.ts` (IO: the deploy's dated timetables, `--empty` its fallback), `lib/feedZip.ts` (the zip URLs, the size-capped
-  `loadZip`/`readCapped`, `decodeTables`, `pruneJson`, shared with `build-data.ts`),
+  `build-dated.ts` (IO: the deploy's dated timetables, `--empty` its fallback), `lib/datedCheck.ts` (`checkDatedOutputs`, its pre-write
+  checks), `lib/feedZip.ts` (the zip URLs, the size-capped `loadZip`/`readCapped` and `DownloadError`, `decodeTables` with its zip-bomb
+  limits, `pruneJson`, shared with `build-data.ts`),
   `build-data.ts`, `build-access.ts`, `build-stations.ts`, `fetch-station-sources.ts` and `fetch-station-catalog.ts`
   (the only IO) and pure transforms in `scripts/lib/`, tests colocated. `lib/stationMerge.ts` is the station
   merge (its connector half, with the walkway and `area` rules and the containment check, is `lib/stationConnectors.ts`);

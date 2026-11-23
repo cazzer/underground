@@ -76,5 +76,8 @@ export interface DatedTimetableIndex {
   dates: string[]
 }
 
+/** A dated index nothing may change: what the client caches (a shared empty one must not be mutated). */
+export type FrozenDatedIndex = Readonly<Omit<DatedTimetableIndex, 'dates'>> & { readonly dates: readonly string[] }
+
 /** The index of a deploy that built no dated files (or whose index is missing): every date uses the service files. */
-export const EMPTY_DATED_INDEX: DatedTimetableIndex = { format: 1, feedVersion: '', dates: [] }
+export const EMPTY_DATED_INDEX: FrozenDatedIndex = Object.freeze({ format: 1, feedVersion: '', dates: Object.freeze<string[]>([]) })
