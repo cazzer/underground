@@ -15,7 +15,9 @@ pure realtime library. The station panel shows real arrivals. Bedford Av (L08) h
 about 250 more stations have generated ones (labelled "Estimated layout"), shown to everyone since 9wc.5.
 Interiors draw by view, not only by focus (o3r.4): inside 1250 m the interiors of up to `MAX_VIEW_INTERIORS` (3, in
 `lib/viewStations.ts`; 2, `PHONE_VIEW_INTERIORS`, when the window's shorter side is under 600 px: `viewInteriorCap`; the cap is for a
-phone's frame rate) stations in view reveal with no tap or dwell, the focused one first and counted, each easing in and out over
+phone's frame rate) stations in view reveal with no tap or dwell (from `PREFETCH_FAR`, 2500 m = 2 x `REVEAL_FAR`, in, the files of up to
+`MAX_PREFETCH_STATIONS` (6) stations in view are fetched and built ahead of the reveal, o3r.8, so a fast zoom shows them as it
+begins; drawing stays gated at 1250 m), the focused one first and counted, each easing in and out over
 250 ms (`lib/presence.ts`); only the focused one has a panel, level labels, the trip's path, outages and the camera framing. With a
 bare station focused (no interior of its own drawn) its neighbours' interiors draw with no veil, so its marker, trains and streets
 keep full contrast.
@@ -471,13 +473,29 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `useFrame` priority 0, read-only and allocation-free per frame (the id list once per change): the pose each frame, timing from
     `reselectDue` (`lib/basemap/reselect.ts`) but "changed enough" from its own `viewMovedEnough` (2% pan, 3% zoom, 3 degrees,
     a resize; the tiles' 10% pan is over 100 px), passed as its `slidOut`, plus a dirty flag set by a free-rect change
-    (`interiorFreeRect`, as CameraRig), a focus change, a `gateZone` change and every frame the location cap is on; flights are
-    evaluated like any move. It writes Scene's `ViewStationSet` (`lib/viewStationSet.ts`: `get`, `subscribe`, `set`, listeners
+    (`interiorFreeRect`, as CameraRig), a focus change and every frame the location cap is on; a `viewZones` change (crossing
+    `REVEAL_FAR`, `PREFETCH_FAR` or either keep distance, both ways) chooses on that frame, bypassing the 150 / 500 ms timing;
+    flights are evaluated like any move. The frame's rules are `stepViewChoice` in `lib/viewStationsRun.ts` (pure, allocation-free,
+    `viewStationsRun.test.ts`: capped empties both stores even right after a publish, the first frame after the cap lifts
+    chooses, a zone change chooses against the timing, hovering inside a zone chooses only on `reselectDue`; `newViewRun`,
+    `emptyViewRun`); the hook feeds it the camera, free rect, focus and cap. Each choice also runs the prefetch choice (o3r.8:
+    the same `chooseViewStations`, `far` `PREFETCH_FAR`, `max` `MAX_PREFETCH_STATIONS`, no focused head, its own hysteresis, one
+    shared scratch) into a second store, Scene's `prefetchStations`, which only `StationPrefetchSource` reads, so its changes never
+    re-render Scene; it is empty under the cap and on unmount like the first (dev `__underground.prefetchStations()`). It writes Scene's `ViewStationSet` (`lib/viewStationSet.ts`: `get`, `subscribe`, `set`, listeners
     isolated like `locationCapHandle`; created in Scene, no App state, so only readers re-render: o3r.4 reads it through
     `useSyncExternalStore`) only when the members change, or the first slot does (only while a station is focused), compared
     with what was last written, not with the last choice (`chosen` is the hysteresis input); it is emptied on unmount.
     While `cap.isCapped()` it chooses nothing and writes an empty set (the focused station too); dev
     `__underground.viewStations()` returns the store's ids.
+  - `StationPrefetchSource.tsx` / `data/useStationPrefetch.ts` / `data/stationPrefetch.ts` (o3r.8) warm the caches for the
+    prefetch set without mounting anything: `prefetchTargets` (pure: `viewInteriorIds` at the interior cap + `PREFETCH_EXTRA_INTERIORS`
+    (2) with the focused file counted and left out and a file that failed within `VIEW_RETRY_MS` passed over, `viewStreetIds` at
+    `MAX_PREFETCH_STATIONS` (6); only ids of the set) feeds `prefetchInteriors` (`useStationInterior.ts`: cache `get` for a file
+    not loaded, not already being prefetched and not in `viewFailedAt`'s 30 s hold; a failure is warned once and recorded there)
+    and `prefetchStreetLayers` (`useStationStreets.ts`: `request(key, true)`, a complex's member files with its lead). Both
+    build inside the cache, so a view interior or street layer finds its model ready. Never aborted; drawing
+    (`useViewInteriors`, `useStreetLayers`) is unchanged and still gated at `REVEAL_FAR`. Bounds: at most cap + 2 interior
+    files (5 desktop, 4 phone) and 6 street layers per choice, a choice at most every 500 ms while moving plus zone crossings.
   - `Basemap.tsx` the citywide basemap: `useBasemapTiles` plus six class layers (`basemapLayer.ts`: one LineSegments2
     over a pooled buffer per class, tiles in `lib/basemap/tilePool.ts` order so a new tile set rewrites and uploads
     only from the first moved tile; it grows on demand and shrinks after `SHRINK_AFTER_S` (2 s) under a quarter full,
@@ -581,6 +599,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     rect padding, `KEEP_REACH_FACTOR` 1.25, `KEEP_RANK_SHARE` 0.1 of the half-diagonal rank bonus) for a previous pick, and at
     the gate (`gateZone`: a non-empty set keeps its own members, nothing new, out to `REVEAL_FAR` x `GATE_KEEP_FACTOR` 1.04).
     `chooseViewStations` allocates nothing and leaves its scratch clean. Never takes the location fix or `nearestStation`.
+    o3r.8: `PREFETCH_FAR` (2 x `REVEAL_FAR`), `MAX_PREFETCH_STATIONS` (`MAX_VIEW_STATIONS` + 2) and `PREFETCH_EXTRA_INTERIORS` (2);
+    `ViewQuery` takes an optional `far` and `max` (defaults `REVEAL_FAR`, `MAX_VIEW_STATIONS`), `newViewScratch(space, max)`,
+    `gateZone(distance, far)` and `viewZones(distance)` (both gates' zones in one number); `viewStationsPrefetch.test.ts`
     `MAX_VIEW_STREETS` (= `MAX_VIEW_STATIONS`, at most `MASK_N`) and `viewStreetIds` (o3r.5: the view's leads but the focused
     one, room kept for it; `viewStreetIds.test.ts`) pick the street layers
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
@@ -1585,12 +1606,18 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   ids in o3r.2's `ViewStationSet`, which is camera-driven, empty from 1250 m out and while the location cap is in force, and
   never keyed by the location fix or `nearestStation`; so no interior is fetched after a locate flight until the user moves
   the view. Each interior file is cached for the session (unbounded; a few KB each); one that failed is not asked for again for
-  `VIEW_RETRY_MS` (30 s).
+  `VIEW_RETRY_MS` (30 s). The prefetch set (o3r.8, `prefetchStations`) is the same class and widens only the distance: the
+  stations in the free rect within reach of the target while the camera is under 2500 m (`PREFETCH_FAR`), at most 6 per choice
+  (interior files: the cap + 2; street layers: all 6), a choice at most once per 500 ms while moving plus at each zone crossing;
+  camera-driven, empty while the location cap is in force, never keyed by the fix or `nearestStation`. A locate flight lands at
+  1450 m, inside the prefetch range, so nothing is fetched until the user moves the view (lifting the cap); then the stations in
+  the free rect up to 2500 m are prefetched.
 - **Member street files are fetched only for a complex lead the user focused or the camera shows** (and the trip's To and
   From complexes, through `useTripExit` and `useTripBoard`): each member is part of the station opened or in view; never for
   a fix's nearest station. View-driven street fetches (`useStreetLayers`, o3r.5) take only o3r.2's view set: nothing from
   `REVEAL_FAR` out, nothing while the location cap is in force (empty until the user moves the view), never keyed by the
-  fix or its nearest station.
+  fix or its nearest station. The street layers (a complex's member files with its lead) of the prefetch set (o3r.8, up to 6,
+  from 2500 m in) are warmed the same way (`prefetchStreetLayers`), under the same rules.
 - **Trip exit.** Once a plan for the trip panel's ends is ready, `src/data/useTripExit.ts` loads the To station's interior
   (`useInteriorModel`, the focused interior's cache) and street files (the interior file id's and, for a complex, the
   alighting member's; `useStationStreetsLoad` tells loading from missing, and the line waits for both). An end filled from
@@ -1632,6 +1659,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   input doesn't lift it. Tiles already loaded still draw.
   The stations-in-view set (`useViewStations.ts`, o3r.2) reads the same handle: while the cap is in force it chooses nothing and the
   set is empty (the focused station too), and its inputs are the camera, the free rect and the focused id, never the fix or `nearestStation`.
+  The prefetch set (o3r.8) is written by the same hook from the same handle, so it is empty under the cap too: both sets read it.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip

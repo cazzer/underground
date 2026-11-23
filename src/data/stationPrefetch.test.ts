@@ -25,6 +25,10 @@ describe('prefetchTargets', () => {
     expect(prefetchTargets(['L03', 'X99', '635', 'A02'], null, index, 3).interiors).toEqual(['635', 'A02'])
   })
 
+  it('passes over a file that failed lately without taking a slot', () => {
+    expect(prefetchTargets(many, null, listed(...many), 3, (f) => f === 'S1').interiors).toEqual(['S0', 'S2', 'S3', 'S4', 'S5'])
+  })
+
   it('names no interior while the index loads or failed', () => {
     expect(prefetchTargets(many, null, { status: 'loading' }, 3).interiors).toEqual([])
     expect(prefetchTargets(many, null, { status: 'error', message: 'x' }, 3).interiors).toEqual([])

@@ -3,7 +3,7 @@ import { useFocus } from '../lib/focus'
 import type { ViewStationSet } from '../lib/viewStationSet'
 import type { IndexLoad } from './interiorLoad'
 import { prefetchTargets } from './stationPrefetch'
-import { prefetchInteriors } from './useStationInterior'
+import { interiorFailedRecently, prefetchInteriors } from './useStationInterior'
 import { prefetchStreetLayers } from './useStationStreets'
 
 /**
@@ -20,7 +20,7 @@ import { prefetchStreetLayers } from './useStationStreets'
 export function useStationPrefetch(set: ViewStationSet, index: IndexLoad, interiorCap: number): void {
   const ids = useSyncExternalStore(set.subscribe, set.get)
   const { focusedId, membersOf } = useFocus()
-  const targets = useMemo(() => prefetchTargets(ids, focusedId, index, interiorCap), [ids, focusedId, index, interiorCap])
+  const targets = useMemo(() => prefetchTargets(ids, focusedId, index, interiorCap, interiorFailedRecently), [ids, focusedId, index, interiorCap])
   const interiors = targets.interiors.join(',')
   const streets = targets.streets.join(',')
   useEffect(() => {

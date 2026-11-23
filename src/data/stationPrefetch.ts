@@ -16,16 +16,18 @@ export interface PrefetchTargets {
 /**
  * The files to warm for `prefetch` (leads, nearest first), the focused station's own left out (its focus path loads it)
  * but counted. Interiors: stations the index doesn't list skipped, a complex's one file once, none until the index is
- * ready. `interiorCap` is viewInteriorCap of the window.
+ * ready; a file `skip` names (one that failed lately) is passed over without taking a slot. `interiorCap` is
+ * viewInteriorCap of the window.
  */
 export function prefetchTargets(
   prefetch: readonly string[],
   focusedId: string | null,
   index: IndexLoad,
   interiorCap: number,
+  skip: (file: string) => boolean = () => false,
 ): PrefetchTargets {
   return {
-    interiors: viewInteriorIds(prefetch, focusedId, index, interiorCap + PREFETCH_EXTRA_INTERIORS),
+    interiors: viewInteriorIds(prefetch, focusedId, index, interiorCap + PREFETCH_EXTRA_INTERIORS, skip),
     streets: viewStreetIds(prefetch, focusedId, MAX_PREFETCH_STATIONS),
   }
 }
