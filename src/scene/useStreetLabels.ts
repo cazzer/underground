@@ -9,7 +9,7 @@ import type { Ground } from '../lib/projection'
 import { isPhoneViewport, streetLabelRadiusM } from '../lib/streetLabelReveal'
 import { theme } from '../theme'
 import type { InteriorModel } from './interiorModel'
-import { createLabelPlacement, newView, type LabelPlacement, type PlacementView } from './labelPlacementState'
+import { createLabelPlacement, ensureNeighbourRoom, newView, type LabelPlacement, type PlacementView } from './labelPlacementState'
 import { placeLabels } from './streetLabelPlacement'
 import { LABEL_HALO } from './useLevelLabels'
 
@@ -40,6 +40,9 @@ export interface LabelContext {
   /** Per nearby station (the `stations` passed in): 1 while its marker isn't drawn; null for all drawn. Bump
    *  `markersVersion` on any change, so the labels are placed again. */
   markerHidden: Uint8Array | null
+  /** The other drawn street layers' entrance marks, scene ground x, z pairs (o3r.5); null for none. Bump
+   *  `markersVersion` when they change. */
+  neighbourMarks: Float32Array | null
   markersVersion: number
 }
 
@@ -159,8 +162,10 @@ function viewChanged(d: LabelDom, camera: PlacementView['camera'], size: { width
   d.proj.copy(camera.projectionMatrix)
   d.insets = ins
   d.levelsVersion = levels.version
+  if (d.markersVersion !== ctx.markersVersion) ensureNeighbourRoom(d.place, (ctx.neighbourMarks?.length ?? 0) / 2)
   d.markersVersion = ctx.markersVersion
   v.markerHidden = ctx.markerHidden
+  v.neighbourMarks = ctx.neighbourMarks
   v.width = size.width
   v.height = size.height
   v.left = size.left

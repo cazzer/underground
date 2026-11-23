@@ -57,6 +57,9 @@ export interface Theme {
   interiorStroke: string
   interiorTrack: string
   interiorEntrance: string
+  /** How far a neighbour's street entrance marks (a station in view, not the focused one, o3r.5) mix `interiorEntrance`
+   *  toward the background (sRGB, mixHex): a dimmer tier, at least 1.5:1 on the background (themeStreets.test.ts). */
+  interiorEntranceNeighbourMix: number
   interiorFine: string
   /**
    * Station interior machines: elevators and escalators. Each stays at least 3:1 on the background on the
@@ -175,6 +178,7 @@ export const THEMES = {
     interiorStroke: '#e6f6ff',
     interiorTrack: '#5ce1ff',
     interiorEntrance: '#ffd166',
+    interiorEntranceNeighbourMix: 0.5,
     interiorFine: '#8fb4de',
     interiorElevator: '#c38cff',
     interiorEscalator: '#7cf5a6',

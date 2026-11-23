@@ -12,7 +12,7 @@ import { Color } from 'three'
 import type { BasemapConfig } from '../data/basemapConfig'
 import { classVisibility } from '../lib/basemap/classFade'
 import { edgeFadeFor, NETWORK_FADE_M, NETWORK_PAD_M, sceneBox } from '../lib/basemap/edgeFade'
-import { BASEMAP_CLASSES, isRoadClass, type BasemapClass } from '../lib/basemap/featureClass'
+import { BASEMAP_CLASSES, isMaskedClass, type BasemapClass } from '../lib/basemap/featureClass'
 import { isNoOutline, networkHull } from '../lib/basemap/networkHull'
 import type { LocationCap } from '../lib/basemap/locationCapHandle'
 import type { StreetMask } from '../lib/basemap/streetMask'
@@ -77,15 +77,15 @@ export function Basemap({ config, stations, mask, shapes, tripLevels, locationCa
     const hull = networkHull(stations.map((s) => s.pos))
     if (isNoOutline(hull)) console.warn(`Basemap: ${stations.length} stations span no area, so the network fade is off`)
     const extent = createExtentUniforms(sceneBox(config.bbox), edgeFadeFor(Infinity), hull, NETWORK_PAD_M, NETWORK_FADE_M)
-    // Water and parks share a mask that is never written: strength 0, so they are never masked.
+    // Water, parks and paths share a mask that is never written: strength 0, so they are never masked.
     const unmasked = createMaskUniforms()
     const entries: ClassEntry[] = BASEMAP_CLASSES.map((cls) => ({
       cls,
       layer: createClassLayer({
         width: theme.basemap[cls].width,
         renderOrder: LAYER_ORDER[cls],
-        // Water and parks are areas the station's streets don't redraw, so only roads are masked.
-        mask: isRoadClass(cls) ? maskUniforms : unmasked,
+        // Water, parks and paths are what the station's streets don't redraw, so only the streets are masked.
+        mask: isMaskedClass(cls) ? maskUniforms : unmasked,
         extent,
       }),
       stroke: new Color(theme.basemap[cls].stroke),
@@ -131,7 +131,7 @@ export function Basemap({ config, stations, mask, shapes, tripLevels, locationCa
       for (const e of entries) e.layer.setVisibility(classVisibility(e.cls, d), e.stroke, background, dim)
       extent.edgeFadeM.value = edgeFadeFor(d)
     }
-    // The stations' streets draw at this opacity (StationStreets.tsx); the roads give way by as much.
+    // The stations' streets draw at this reveal times each layer's presence (StreetLines.tsx); the roads give way by as much.
     writeMaskUniforms(maskUniforms, mask, interiorOpacity(d))
   }, 0)
 

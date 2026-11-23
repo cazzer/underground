@@ -24,6 +24,8 @@ export interface LabelPlacement {
    *  blocked for all labels. */
   marks: readonly Ground[]
   stations: readonly Ground[]
+  /** Room in `bounds` for this many neighbour entrance marks (PlacementView.neighbourMarks); grown by ensureNeighbourRoom. */
+  neighbourCap: number
   /** Per street and run: each candidate's subway bundle along the street (routeBundles.ts, BUNDLE_STRIDE floats). */
   bundles: readonly (readonly Float32Array[])[]
   /** Measured label sizes, px, and line count, per item. */
@@ -77,12 +79,13 @@ export function createLabelPlacement(
   }
   const minus = (len: number) => new Int16Array(len).fill(-1)
   // The marks, the nearby stations and the focus ring, every drawn interior's level labels, then the interior (street names only).
-  const rects = FIXED_RECTS + marks.length + stations.length + 1 + MAX_LEVEL_BLOCKERS * BLOCKER_SLOTS + MAX_OUTLINE_SAMPLES
+  const rects = rectCount(marks.length, 0, stations.length)
   return {
     entrances,
     streets,
     marks,
     stations,
+    neighbourCap: 0,
     bundles,
     w: new Float32Array(n),
     h: new Float32Array(n),
@@ -123,6 +126,27 @@ export function createLabelPlacement(
   }
 }
 
+/** The blocked rects a placement needs: the fixed ones, the marks (own, then neighbours'), the nearby stations and the
+ *  focus ring, every drawn interior's level labels, then the interior's outline (street names only). */
+function rectCount(marks: number, neighbours: number, stations: number): number {
+  return FIXED_RECTS + marks + neighbours + stations + 1 + MAX_LEVEL_BLOCKERS * BLOCKER_SLOTS + MAX_OUTLINE_SAMPLES
+}
+
+/** Grows `p.bounds` to hold `n` neighbour marks (doubling, so a set that grows a little at a time reallocates rarely).
+ *  Only when the neighbours change, never per frame. */
+export function ensureNeighbourRoom(p: LabelPlacement, n: number): void {
+  if (n <= p.neighbourCap) return
+  p.neighbourCap = Math.max(n, 2 * p.neighbourCap, 16)
+  const rects = rectCount(p.marks.length, p.neighbourCap, p.stations.length)
+  p.bounds.rects = new Float32Array(rects * RECT)
+  p.bounds.exempt = new Uint32Array(rects)
+}
+
+/** How many of the view's neighbour marks the placement blocks: all of them, within the room made for them. */
+export function neighbourCount(p: LabelPlacement, view: PlacementView): number {
+  return Math.min((view.neighbourMarks?.length ?? 0) / 2, p.neighbourCap)
+}
+
 /** This frame's view: the camera, the canvas, and what covers it. */
 export interface PlacementView {
   camera: Camera
@@ -149,6 +173,9 @@ export interface PlacementView {
   /** Per nearby station (parallel to `LabelPlacement.stations`): 1 while its marker isn't drawn (a view interior stands
    *  in for it, faded out), so it blocks nothing; null for all drawn. */
   markerHidden: Uint8Array | null
+  /** The other drawn street layers' entrance marks (o3r.5), scene ground x, z pairs: labels keep clear of them as of
+   *  their own; null for none. */
+  neighbourMarks: Float32Array | null
   /** The loaded interior, whose outlines the street names keep clear of, and its group's y scale. */
   interior: InteriorModel | null
   depthScale: number
@@ -185,6 +212,7 @@ export function newView(camera: PlacementView['camera'], markHalfM: number): Pla
     ringRadiusM: 0,
     focusRing: null,
     markerHidden: null,
+    neighbourMarks: null,
     interior: null,
     depthScale: 1,
     priorityEntrance: -1,

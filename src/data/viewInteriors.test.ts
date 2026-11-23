@@ -94,7 +94,7 @@ describe('viewStreetInterior', () => {
   const m = (stationId: string, memberStationIds?: string[]) => ({ stationId, memberStationIds })
   const union = m('635', ['635', 'L03', 'R20'])
 
-  it('takes the drawn interior covering the station: marks against it, whole streets', () => {
+  it('takes the shown interior covering the station (drawn or fading out): marks against it, whole streets', () => {
     expect(viewStreetInterior('L08', [m('L10'), m('L08')], ['L08'], index)).toEqual({ interior: m('L08'), pending: false, clipped: false })
   })
 
@@ -106,7 +106,7 @@ describe('viewStreetInterior', () => {
     expect(viewStreetInterior('L08', [], [], { status: 'loading' })).toEqual({ interior: null, pending: true, clipped: false })
   })
 
-  it('waits on its marks while its file is requested and not drawn', () => {
+  it('waits on its marks while its file is requested and not shown', () => {
     expect(viewStreetInterior('L03', [], ['635'], index)).toEqual({ interior: null, pending: true, clipped: false })
   })
 

@@ -15,6 +15,12 @@ export function isRoadClass(cls: BasemapClass): boolean {
   return ROAD_CLASSES.has(cls)
 }
 
+/** The classes the station street layers' mask fades (Basemap.tsx): the streets they redraw. Not paths: a station layer
+ *  draws no footway or park path (streetBuffers keeps `isStreet` ways), so masking them would empty the disc of them. */
+export function isMaskedClass(cls: BasemapClass): boolean {
+  return cls !== 'path' && isRoadClass(cls)
+}
+
 /** MVT geometry types: 0 unknown, 1 point, 2 line, 3 polygon. */
 export type GeomType = 0 | 1 | 2 | 3
 

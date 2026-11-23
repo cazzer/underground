@@ -38,6 +38,10 @@ export interface StreetLabelsProps {
   pathLabels: readonly ExitLabel[]
   /** Stations another drawn interior stands in for (useSceneInteriors): a marker faded out by it blocks nothing. */
   covered: readonly CoveredStation[]
+  /** The other drawn street layers' entrance marks, scene ground x, z pairs: the labels keep clear of them too. */
+  neighbourMarks: Float32Array | null
+  /** The layer's presence: the labels fade with it. */
+  presence: Presence
 }
 
 /** Stations this far beyond the street label radius still block (their marker reaches in), meters. */
@@ -59,11 +63,13 @@ function nearbyStations(network: Network, layer: StreetLayer, interior: Interior
 }
 
 /**
- * The focused station's street and entrance labels (useStreetLabels.ts), and its dev entrance probe. A nearby station
+ * The focused station's street and entrance labels (useStreetLabels.ts), and its dev entrance probe. They keep clear
+ * of the other drawn layers' entrance marks as of their own (no rebuild: the marks come in through the context). A nearby station
  * whose marker a view interior has faded out (Stations.tsx collapses it once interiorOpacity x presence reaches 1)
  * blocks no label; the flag is checked per frame and only a change places the labels again, with no DOM rebuild.
  */
-export function StreetLabels({ layer, interior, interiorPending, insets, panel, labelBlockers, network, pathLabels, covered }: StreetLabelsProps) {
+export function StreetLabels(props: StreetLabelsProps) {
+  const { layer, interior, interiorPending, insets, panel, labelBlockers, network, pathLabels, covered, neighbourMarks, presence } = props
   const labelShown = useRef(0)
   const labelContext = useRef<LabelContext>({
     interior: null,
@@ -73,6 +79,7 @@ export function StreetLabels({ layer, interior, interiorPending, insets, panel, 
     ringRadiusM: 0,
     priorityEntrance: -1,
     markerHidden: null,
+    neighbourMarks: null,
     markersVersion: 0,
   })
   // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring.
@@ -87,6 +94,11 @@ export function StreetLabels({ layer, interior, interiorPending, insets, panel, 
     ctx.markerHidden = new Uint8Array(near.ids.length)
     ctx.markersVersion++
   }, [near])
+  useLayoutEffect(() => {
+    const ctx = labelContext.current
+    ctx.neighbourMarks = neighbourMarks
+    ctx.markersVersion++
+  }, [neighbourMarks])
   // Which street candidates a subway line runs along, so their labels step clear of its bundle.
   const bundles = useMemo(() => routeBundles(layer.streets, layer.anchor, network.shapes, STATION_REACH_M), [network, layer])
   const focused = network.stationById.get(layer.stationId)?.pos ?? null
@@ -112,7 +124,7 @@ export function StreetLabels({ layer, interior, interiorPending, insets, panel, 
     const distance = cameraDistance(state)
     const o = interiorOpacity(distance)
     const depth = depthFactor(distance)
-    labelShown.current = streetLabelOpacity(o, depth)
+    labelShown.current = streetLabelOpacity(o, depth) * presence.value
     const ctx = labelContext.current
     ctx.interior = interior
     ctx.focusRing = interior || interiorPending ? null : focused

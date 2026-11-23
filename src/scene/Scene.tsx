@@ -165,11 +165,12 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         interior={interior}
         interiorPending={!interior && !focusedMarker}
         view={scene.view}
-        drawn={scene.drawn}
+        shownInteriors={shown}
+        interiorPresences={presences}
         viewFiles={scene.viewFiles}
         covered={covered}
         index={index}
-        veiled={veiled}
+        veil={scene.store}
         insets={insets}
         panel={panel}
         labelBlockers={labelBlockers}

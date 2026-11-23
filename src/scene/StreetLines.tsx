@@ -2,121 +2,178 @@ import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, type Group } from 'three'
 import type { StreetLayer } from '../data/useStationStreets'
-import { claimMaskSlot, releaseMaskSlot, writeMaskSlot, type StreetMask } from '../lib/basemap/streetMask'
+import { claimMaskSlot, releaseMaskSlot, writeMaskSlot, writeMaskStrength, type StreetMask } from '../lib/basemap/streetMask'
 import { clipLineBuffers } from '../lib/clipLineBuffers'
 import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
 import { interiorOpacity } from '../lib/interiorReveal'
-import type { Rgb } from '../lib/lineBuffers'
+import type { LineBuffers, Rgb } from '../lib/lineBuffers'
 import type { Network } from '../lib/network'
-import { buildRouteClip, CLIP_TRACK_REACH_M } from '../lib/routeClip'
+import { stepPresence, type Presence } from '../lib/presence'
+import { prefersReducedMotion } from '../lib/reducedMotion'
+import { buildRouteClip, CLIP_TRACK_REACH_M, type RouteClip } from '../lib/routeClip'
+import { mixHex } from '../lib/routeColor'
 import { localTracks } from '../lib/routeTracks'
 import { clipToCell, type StreetCell } from '../lib/streetCells'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
 import { writeLineDim } from './bandLineMaterial'
 import { cameraDistance } from './cameraDistance'
+import type { PresenceStore } from './InteriorPresence'
 import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
 import { RENDER_ORDER } from './renderOrder'
 import { streetsLook } from './streetsLook'
 import { useLineLayer } from './useLineLayer'
 
 // Color(hex) converts sRGB to linear, which is what vertex colors must be.
-const MARK_COLOR = new Color(theme.interiorEntrance)
-const MARK_RGB: Rgb = [MARK_COLOR.r, MARK_COLOR.g, MARK_COLOR.b]
+const rgbOf = (hex: string): Rgb => {
+  const c = new Color(hex)
+  return [c.r, c.g, c.b]
+}
+const MARK_RGB = rgbOf(theme.interiorEntrance)
+/** A neighbour's marks (a station in view, not the focused one): a dimmer tier (themeStreets.test.ts). */
+const NEIGHBOUR_MARK_RGB = rgbOf(mixHex(theme.interiorEntrance, theme.background, theme.interiorEntranceNeighbourMix))
+/** The veil's drawn share past which the streets switch to their over-veil stroke: its midpoint, so they never lead it. */
+const VEILED_AT = 0.5
+/** The interior's presence past which its own entrances stand in for the street marks. */
+const INTERIOR_MARKS_AT = 0.5
 
 export interface StreetLinesProps {
   layer: StreetLayer
-  /** The drawn interior covering this station, once loaded: its entrances get no second mark. */
+  /** The focused station's layer: full-colour marks. Others get the neighbour tier. */
+  focused: boolean
+  /** This layer's presence: it eases in on joining and out on leaving (StationStreets steps the targets). */
+  presence: Presence
+  /** Called once when a leaving layer's presence reaches 0, so it can unmount. */
+  onFaded: (stationId: string) => void
+  /** Called once when a joining layer's presence reaches 1, so the cells take it in. */
+  onSettled: () => void
+  /** The shown interior covering this station, once loaded, and its presence: past one half its entrances get no
+   *  second mark. */
   interior: InteriorModel | null
+  interiorPresence: Presence | null
   /** Its interior is still loading: no marks yet, so none flash before it lands. */
   interiorPending: boolean
   /** Leave out the street pieces under a route line (routeClip.ts): only at a station with no interior. */
   clipped: boolean
   /** The part of the layer it draws where other drawn layers overlap it (streetCells.ts); NO_CELL for all of it. */
   cell: StreetCell
-  /** Look A's screen veil is up (any interior drawn): the streets rest above it, faint. */
-  veiled: boolean
+  /** The interiors' presences, whose `veilShare` (look A's screen veil) decides the stroke. */
+  veil: PresenceStore
   network: Network
-  /** A slot is claimed while the layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
+  /** A slot is claimed while the layer is mounted, so the basemap's roads give way inside its radius (Basemap.tsx). */
   mask: StreetMask
   /** The trip emphasis (SubwayLines, -0.25): the street lines dim with the route lines by its `networkDim`. */
   tripLevels: EmphasisLevels
 }
 
-/**
- * How the streets draw: above the interior veil at the veiled stroke (about 1.9:1, streetVeil.ts) while look A's
- * screen veil is up (any interior drawn), so they rest faint behind it instead of vanishing under it; otherwise under
- * the route lines at full color. `?streets=` forces either order, at full color.
- */
-function streetMode(veiled: boolean): 'under' | 'over' | 'veiled' {
-  if (streetsLook !== 'auto') return streetsLook
-  return veiled ? 'veiled' : 'under'
-}
+const routeCut = (base: LineBuffers, clip: RouteClip | null): LineBuffers => (clip ? clipLineBuffers(base, clip) : base)
 
 /**
- * One station's streets: one merged line layer at street level (y = 0) at its anchor, cut to its cell, and the marks
- * of the entrances its interior doesn't draw, fading in with the interior reveal. Keyed by station, so a new one
- * starts hidden and fades in from its own first frame.
+ * One station's streets: a line layer at street level (y = 0) at its anchor, cut to its cell, and the marks of the
+ * entrances its interior doesn't draw, fading in with the interior reveal times the layer's presence. Under look A
+ * (`?streets=` auto) both strokes are built once: the full-colour one under the route lines and the veiled one above
+ * the veil (about 1.9:1, streetVeil.ts), shown by the veil's drawn share, so a veil easing in or out never re-cuts them.
  */
-export function StreetLines({ layer, interior, interiorPending, clipped, cell, veiled, network, mask, tripLevels }: StreetLinesProps) {
+export function StreetLines(props: StreetLinesProps) {
+  const { layer, focused, presence, onFaded, onSettled, interior, interiorPresence, interiorPending, clipped, cell, veil, network, mask, tripLevels } = props
   const group = useRef<Group>(null)
-  const shown = useRef(-1)
-  // The street pieces that run under a route line are left out, so none reads as one more track in its bundle. Not
-  // at a station with an interior (loaded or loading): there the tracks sink under it, clear of the streets.
-  // While the station index is still loading, every station counts as pending (focusedMarkerShown), so a station
-  // with none draws its streets whole for that moment and the pieces under its lines pop out once the index lands.
+  const shown = useRef({ o: -1, veiled: false, own: false })
+  const reported = useRef(-1)
+  const auto = streetsLook === 'auto'
+  // The pieces under a route line are left out (not at a station with an interior: its tracks sink under it).
   const clip = useMemo(
     () => (clipped ? buildRouteClip(localTracks(network.shapes, layer.anchor, layer.file.radiusM + CLIP_TRACK_REACH_M)) : null),
     [clipped, network, layer],
   )
-  const mode = streetMode(veiled)
-  const routeClipped = useMemo(() => {
-    const base = mode === 'veiled' ? layer.veiledBuffers : layer.buffers
-    return clip ? clipLineBuffers(base, clip) : base
-  }, [mode, layer, clip])
-  // The key names the overlapping layers, which fix the planes: an unchanged key keeps the buffers.
-  const buffers = useMemo(() => clipToCell(routeClipped, cell), [routeClipped, cell.key])
-  const lines = useLineLayer(
-    buffers,
-    mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,
-    theme.streetWidth,
-    undefined,
-    { dimmable: true },
+  const fullRoute = useMemo(() => routeCut(layer.buffers, clip), [layer, clip])
+  const veiledRoute = useMemo(() => (auto ? routeCut(layer.veiledBuffers, clip) : null), [auto, layer, clip])
+  // The cell's key names the overlapping layers, which fix its planes: an unchanged key keeps the buffers, and a new
+  // neighbour re-cuts only by the cell, not the route clip.
+  const fullBuffers = useMemo(() => clipToCell(fullRoute, cell), [fullRoute, cell.key])
+  const veiledBuffers = useMemo(() => veiledRoute && clipToCell(veiledRoute, cell), [veiledRoute, cell.key])
+  const full = useLineLayer(fullBuffers, streetsLook === 'over' ? RENDER_ORDER.streetsOver : RENDER_ORDER.streets, theme.streetWidth, undefined, { dimmable: true })
+  const veiled = useLineLayer(veiledBuffers, RENDER_ORDER.streetsOver, theme.streetWidth, undefined, { dimmable: true })
+  const rgb = focused ? MARK_RGB : NEIGHBOUR_MARK_RGB
+  const allMarks = useMemo(
+    () => (interiorPending ? null : entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, null), ENTRANCE_SIZE_M, rgb)),
+    [layer, interiorPending, rgb],
   )
-  const markBuffers = useMemo(() => {
-    if (interiorPending) return null
-    const at = interior && { origin: interior.origin, entrances: interior.entrances }
-    return entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, at), ENTRANCE_SIZE_M, MARK_RGB)
-  }, [layer, interior, interiorPending])
-  const marks = useLineLayer(markBuffers, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
+  const ownMarks = useMemo(() => {
+    if (interiorPending || !interior) return null
+    const at = { origin: interior.origin, entrances: interior.entrances }
+    return entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, at), ENTRANCE_SIZE_M, rgb)
+  }, [layer, interior, interiorPending, rgb])
+  const marksAll = useLineLayer(allMarks, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
+  const marksOwn = useLineLayer(ownMarks, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
+  const slot = useRef<number | null>(null)
   useLayoutEffect(() => {
     // A full mask has logged; this layer then draws over the roads it would mask.
-    const slot = claimMaskSlot(mask)
-    if (slot === null) return
-    writeMaskSlot(mask, slot, layer.anchor.x, layer.anchor.z, layer.file.radiusM)
-    return () => releaseMaskSlot(mask, slot)
-  }, [layer, mask])
-  // A rebuilt layer (the mode changes when an interior lands, the cell when a neighbour joins) starts at full opacity: catch it up.
+    const s = claimMaskSlot(mask)
+    slot.current = s
+    if (s === null) return
+    writeMaskSlot(mask, s, layer.anchor.x, layer.anchor.z, layer.file.radiusM)
+    writeMaskStrength(mask, s, presence.value)
+    return () => {
+      slot.current = null
+      releaseMaskSlot(mask, s)
+    }
+  }, [layer, mask, presence])
+  // A rebuilt layer starts at full opacity: catch it up.
   useLayoutEffect(() => {
-    shown.current = -1
-  }, [lines])
+    shown.current.o = -1
+  }, [full, veiled, marksAll, marksOwn])
+
+  // With the other presences (PresenceDriver), before the draws and the basemap's mask at 0 read them.
+  useFrame((_, dt) => {
+    const v = stepPresence(presence, dt, prefersReducedMotion())
+    if (slot.current !== null) writeMaskStrength(mask, slot.current, v)
+    // Each end reported once per approach: 0 while leaving, 1 while joining.
+    const end = presence.target === 0 ? (v === 0 ? 0 : -1) : v === 1 ? 1 : -1
+    if (end !== reported.current && end !== -1) {
+      if (end === 0) onFaded(layer.stationId)
+      else onSettled()
+    }
+    reported.current = end
+  }, -0.25)
 
   useFrame((state) => {
     const g = group.current
     if (!g) return
-    const o = interiorOpacity(cameraDistance(state))
-    if (marks && marks.material.opacity !== o) marks.material.opacity = o
-    if (lines) writeLineDim(lines.material, tripLevels.networkDim)
-    if (o === shown.current) return
-    shown.current = o
-    if (lines) lines.material.opacity = o
+    const o = interiorOpacity(cameraDistance(state)) * presence.value
+    const overVeil = veiled !== null && veil.veilShare >= VEILED_AT
+    const own = marksOwn !== null && (interiorPresence?.value ?? 1) > INTERIOR_MARKS_AT
+    if (full) writeLineDim(full.material, tripLevels.networkDim)
+    if (veiled) writeLineDim(veiled.material, tripLevels.networkDim)
+    const last = shown.current
+    if (o === last.o && overVeil === last.veiled && own === last.own) return
+    last.o = o
+    last.veiled = overVeil
+    last.own = own
     g.visible = o > 0
+    if (full) {
+      full.material.opacity = o
+      full.visible = !overVeil
+    }
+    if (veiled) {
+      veiled.material.opacity = o
+      veiled.visible = overVeil
+    }
+    if (marksAll) {
+      marksAll.material.opacity = o
+      marksAll.visible = !own
+    }
+    if (marksOwn) {
+      marksOwn.material.opacity = o
+      marksOwn.visible = own
+    }
   })
 
   return (
     <group ref={group} position={[layer.anchor.x, 0, layer.anchor.z]} visible={false}>
-      {lines && <primitive object={lines} />}
-      {marks && <primitive object={marks} />}
+      {full && <primitive object={full} />}
+      {veiled && <primitive object={veiled} />}
+      {marksAll && <primitive object={marksAll} />}
+      {marksOwn && <primitive object={marksOwn} />}
     </group>
   )
 }

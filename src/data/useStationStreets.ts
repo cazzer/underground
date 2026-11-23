@@ -9,7 +9,6 @@ import { streetBuffers } from '../lib/streetBuffers'
 import { mergeComplexStreets, streetFileIds } from '../lib/streetMerge'
 import { streetLabelSources, type StreetLabelSource } from '../lib/streetRuns'
 import { veiledStreetHex } from '../lib/streetVeil'
-import { failedRecently } from '../lib/viewStations'
 import { theme } from '../theme'
 import { createInteriorCache } from './interiorCache'
 import { HttpError } from './loadNetwork'
@@ -128,15 +127,14 @@ const listeners = new Set<(key: string) => void>()
 
 /**
  * Starts the load of `key` when `requestDue` says so (streetLoadRule.ts): not while loading; a layer missing a member
- * once it is PARTIAL_RETRY_MS old, so the next focus retries without a retry storm; a failed key at once, or for a
- * view-driven caller (`viewDriven`) only once its failure is VIEW_RETRY_MS old. A retry still missing the same members
+ * once it is PARTIAL_RETRY_MS old, so the next focus retries without a retry storm; a failed key at once; for a
+ * view-driven caller (`viewDriven`) either only once VIEW_RETRY_MS old. A retry still missing the same members
  * keeps the old layer object, so nothing rebuilds. A failure is logged here, once per load however many components
  * wait on it, and leaves any older layer in place.
  */
 function request(key: string, viewDriven: boolean): void {
   const hit = loaded.get(key)
-  const now = performance.now()
-  if (!requestDue(hit && { missing: hit.missing.length, at: hit.at }, pending.has(key), viewDriven && failedRecently(failedAt, key, now), now)) return
+  if (!requestDue(hit && { missing: hit.missing.length, at: hit.at }, pending.has(key), failedAt.get(key), performance.now(), viewDriven)) return
   pending.add(key)
   const ids = key.split('+')
   loadLayer(ids)
@@ -236,8 +234,8 @@ const NO_LAYERS: readonly StreetLayer[] = Object.freeze([])
 /**
  * The loaded layers of `stationIds` (leads, and only from o3r.2's view set: `viewStreetIds`), in order; loading,
  * no-file and failed ones left out. Same store and keys as useStationStreets (a complex lead loads and merges its
- * members' files, part of the station in view), so focusing one reuses its layer. A failed one is asked again only
- * once VIEW_RETRY_MS old, on a change of the set. The list keeps its identity until a key changes or a load of one
+ * members' files, part of the station in view), so focusing one reuses its layer. A failed one, or one missing a
+ * member, is asked again only once VIEW_RETRY_MS old, on a change of the set. The list keeps its identity until a key changes or a load of one
  * settles.
  */
 export function useStreetLayers(stationIds: readonly string[]): readonly StreetLayer[] {

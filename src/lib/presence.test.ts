@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeShown, newPresence, PRESENCE_S, stepPresence, withoutFaded } from './presence'
+import { admitShown, mergeShown, newPresence, PRESENCE_S, stepPresence, withoutFaded } from './presence'
 
 describe('stepPresence', () => {
   it('eases from 0 to 1 over PRESENCE_S and back', () => {
@@ -53,5 +53,34 @@ describe('mergeShown and withoutFaded', () => {
     expect(withoutFaded(shown, [a, c], 'b')).toEqual([a, c])
     expect(withoutFaded(shown, [a, b], 'b')).toBe(shown)
     expect(withoutFaded(shown, [a], 'x')).toBe(shown)
+  })
+})
+
+describe('admitShown', () => {
+  const [a, b, c, d, e] = ['a', 'b', 'c', 'd', 'e'].map((stationId) => ({ stationId }))
+
+  it('admits every wanted layer while there is room, and keeps prev when nothing changed', () => {
+    const first = admitShown([], [a!, b!], 4)
+    expect(first.drawn).toEqual([a, b])
+    expect(admitShown(first.shown, [a!, b!], 4).shown).toBe(first.shown)
+  })
+
+  it('keeps leaving layers mounted and holds a joining one out while they fill the slots', () => {
+    const shown = [a!, b!, c!, d!]
+    const r = admitShown(shown, [e!, a!], 4)
+    // b, c and d leave and a stays: four slots held, so e waits.
+    expect(r.drawn).toEqual([a])
+    expect(r.shown).toEqual([a, b, c, d])
+    // Once one has faded, e joins.
+    const later = admitShown(withoutFaded(r.shown, r.drawn, 'b'), [e!, a!], 4)
+    expect(later.drawn).toEqual([e, a])
+    expect(later.shown).toEqual([e, a, c, d])
+  })
+
+  it('takes the wanted objects for layers already shown, in wanted order', () => {
+    const b2 = { stationId: 'b' }
+    const r = admitShown([a!, b!], [b2, a!], 4)
+    expect(r.drawn[0]).toBe(b2)
+    expect(r.shown).toEqual([b2, a])
   })
 })
