@@ -1,4 +1,5 @@
 import type { Ref } from 'react'
+import { LocateIcon } from './LocateIcon'
 
 interface LocateButtonProps {
   onLocate: () => void
@@ -26,20 +27,7 @@ export function LocateButton({ onLocate, onClear, locating, located, ref }: Loca
       title={label}
       className={`pointer-events-auto flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center border backdrop-blur-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${state}`}
     >
-      <svg
-        viewBox="0 0 24 24"
-        width="22"
-        height="22"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        aria-hidden="true"
-        className={locating ? 'animate-pulse opacity-60 motion-reduce:animate-none' : undefined}
-      >
-        <circle cx="12" cy="12" r="5" />
-        <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
-        <path d="M12 2v5M12 17v5M2 12h5M17 12h5" />
-      </svg>
+      <LocateIcon pulsing={locating} />
     </button>
   )
 }

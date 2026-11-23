@@ -9,8 +9,8 @@ interface LocateStatusProps {
 }
 
 /** A glyph per tone, so color is never the only cue. */
-const GLYPH: Record<LocateMessage['tone'], string> = { info: '◎', warn: '▲', error: '✕' }
-const TONE: Record<LocateMessage['tone'], string> = {
+export const LOCATE_GLYPH: Record<LocateMessage['tone'], string> = { info: '◎', warn: '▲', error: '✕' }
+export const LOCATE_TONE: Record<LocateMessage['tone'], string> = {
   info: 'text-ink-dim',
   warn: 'text-status-warn',
   error: 'text-status-error',
@@ -36,11 +36,11 @@ export function LocateStatus({ state, onClear }: LocateStatusProps) {
   const action = message?.action
   return (
     <div className={visible ? 'mt-1 flex max-w-72 items-start gap-3 text-xs' : 'text-xs'}>
-      <div className={`min-w-0 ${visible ? TONE[message.tone] : ''}`}>
+      <div className={`min-w-0 ${visible ? LOCATE_TONE[message.tone] : ''}`}>
         <p role="status" className={visible ? undefined : 'sr-only'}>
           {message && (
             <>
-              <span aria-hidden="true">{GLYPH[message.tone]} </span>
+              <span aria-hidden="true">{LOCATE_GLYPH[message.tone]} </span>
               {message.text}
             </>
           )}

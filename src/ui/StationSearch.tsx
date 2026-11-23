@@ -1,23 +1,27 @@
 import { useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react'
 import { GEOCODE_URL } from '../data/realtime'
+import type { LocateControls } from '../data/useLocate'
 import { useGeocode } from '../data/useGeocode'
 import { useFocus } from '../lib/focus'
 import { geocodeFocus } from '../lib/geocodeFocus'
 import { locateMemoryFor } from '../lib/locateMemory'
 import { announcementFor, nextErrorSpoken, searchEmptyText, type ErrorSpoken } from '../lib/geocodeView'
 import { multiBoroughNames } from '../lib/labels'
-import type { MarkedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
 import type { StationGroup } from '../lib/stationGroups'
 import { nearNote, placePick, type PlacePick } from '../lib/placeLabel'
 import { enterTarget, searchItems, type SearchItem } from '../lib/searchItems'
+import { HERE_NOTE, searchStatusText } from '../lib/searchHere'
 import { rowActions } from '../lib/searchRowActions'
 import { searchNav, type NavSpot } from '../lib/searchNav'
 import { buildSearchIndex, SEARCH_LIMIT, searchStations } from '../lib/stationSearch'
 import type { TripEnd } from '../lib/trip'
 import type { DirectionsTarget } from '../lib/tripDirections'
 import { SearchResults } from './SearchResults'
+import { SearchBar } from './SearchBar'
+import { SearchHere } from './SearchHere'
 import { useKeyboardInset } from './useKeyboardInset'
+import { useSearchHere } from './useSearchHere'
 
 export interface StationSearchHandle {
   /**
@@ -40,8 +44,17 @@ interface StationSearchProps {
    * panel's own searches leave it out and their rows have one button. A place's target is its nearest station and its name.
    */
   onDirections?: (end: TripEnd, target: DirectionsTarget) => void
-  /** The marked location fix: read only to keep the search's bias away from it, never sent. */
-  fix?: MarkedPlacement | null
+  /**
+   * The shared location state. Its fix is read to keep the geocode bias away from it and to offer "My location" and rank
+   * nearer stations first on ties, never sent anywhere; pressing "Use my location" runs `locate.find()`, no camera move.
+   */
+  locate: LocateControls
+  /**
+   * Given, the dialog offers "Use my location" while the input is blank, and a "My location" row once a fix is known:
+   * choosing it calls this with the nearest station's id and closes the dialog. With `onDirections` the row also
+   * offers From and To (the nearest station, noted as "you").
+   */
+  onChooseHere?: (nearestStationId: string) => void
   /** The dialog closed (Esc, the Android back gesture, Cancel, or a choice); mirrors the native close event. */
   onClose?: () => void
   /** The dialog's name and the input's label; a second instance says what it picks. Default "Search stations and places", or "Search stations" with places off. */
@@ -49,13 +62,6 @@ interface StationSearchProps {
   /** The input's placeholder. Default "Station, address or place", or "Station name" with places off. */
   placeholder?: string
   ref: Ref<StationSearchHandle>
-}
-
-function statusText(typed: boolean, count: number): string {
-  if (!typed) return ''
-  if (count === 0) return 'No stations match'
-  if (count >= SEARCH_LIMIT) return `Top ${SEARCH_LIMIT} stations`
-  return `${count} station${count === 1 ? '' : 's'}`
 }
 
 /**
@@ -67,7 +73,7 @@ function statusText(typed: boolean, count: number): string {
  * first row. Closing hands focus back to whatever had it when the dialog opened. Esc closes it and goes no
  * further: the dialog stops the keydown, so a window-level Esc handler (the HUD's panels) never also acts on it.
  */
-export function StationSearch({ network, onChoose, onChoosePlace, onDirections, fix = null, onClose, label, placeholder, ref }: StationSearchProps) {
+export function StationSearch({ network, onChoose, onChoosePlace, onDirections, locate, onChooseHere, onClose, label, placeholder, ref }: StationSearchProps) {
   const placesOn = GEOCODE_URL !== null && onChoosePlace !== undefined
   label ??= placesOn ? 'Search stations and places' : 'Search stations'
   placeholder ??= placesOn ? 'Station, address or place' : 'Station name'
@@ -83,7 +89,9 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
-  const results = useMemo(() => searchStations(index, query), [index, query])
+  const here = useSearchHere({ locate, enabled: onChooseHere !== undefined, open, query, network })
+  const { fix, distanceOf } = here
+  const results = useMemo(() => searchStations(index, query, SEARCH_LIMIT, distanceOf), [index, query, distanceOf])
   // The bias is read when a request goes out, not per render.
   const { focusedId, viewCenter } = useFocus()
   const latest = useRef({ focusedId, fix })
@@ -112,6 +120,9 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
   const typed = query.trim() !== ''
   const target = enterTarget(items, geo)
   const actions = rowActions(onDirections !== undefined)
+  // The location control and its row sit above the results and take the first data-rows.
+  const lead = here.showControl ? 1 + (here.row ? 1 : 0) : 0
+  const rowCount = lead + items.length
 
   useImperativeHandle(ref, () => ({
     open: () => {
@@ -142,9 +153,23 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
     }
     close()
   }
+  const chooseHere = () => {
+    if (here.row) onChooseHere?.(here.row.nearestId)
+    close()
+  }
+  const directionsHere = (end: TripEnd) => {
+    if (!onDirections || !here.row) throw new Error('Directions were picked from a location row that offers none')
+    onDirections(end, { stationId: here.row.nearestId, place: HERE_NOTE })
+    close()
+  }
   const focusSpot = (spot: NavSpot) => {
-    if (spot === 'input') input.current?.focus()
-    else dialog.current?.querySelector<HTMLElement>(`[data-row="${spot.row}"][data-col="${spot.col}"]`)?.focus()
+    if (spot === 'input') {
+      input.current?.focus()
+      return
+    }
+    const at = (col: number) => dialog.current?.querySelector<HTMLElement>(`[data-row="${spot.row}"][data-col="${col}"]`)
+    // The location control has one button: a move to a column it lacks lands on its first.
+    ;(at(spot.col) ?? at(0))?.focus()
   }
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && items.length > 0 && !e.nativeEvent.isComposing) {
@@ -153,7 +178,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
       if (target) choose(target)
       return
     }
-    const nav = searchNav('input', e, items.length, actions.length)
+    const nav = searchNav('input', e, rowCount, actions.length)
     if (!nav) return
     e.preventDefault()
     focusSpot(nav.to)
@@ -162,7 +187,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
     const row = Number(e.target instanceof HTMLElement ? e.target.dataset.row : undefined)
     const col = Number(e.target instanceof HTMLElement ? e.target.dataset.col : undefined)
     if (!Number.isInteger(row) || !Number.isInteger(col)) return
-    const nav = searchNav({ row, col }, e, items.length, actions.length)
+    const nav = searchNav({ row, col }, e, rowCount, actions.length)
     if (!nav) return
     if (!nav.keepDefault) e.preventDefault()
     focusSpot(nav.to)
@@ -182,51 +207,18 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
       className="pointer-events-auto m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-canvas p-0 text-ink backdrop:bg-canvas"
     >
       <div className="mx-auto flex h-full max-w-xl flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
-        <div className="flex items-center gap-2 border-b border-edge p-3">
-          <label htmlFor={`${id}-q`} className="sr-only">
-            {label}
-          </label>
-          <div className="relative min-w-0 flex-1">
-            <input
-              ref={input}
-              id={`${id}-q`}
-              type="text"
-              aria-describedby={[placesOn && disclosureId, !typed && hintId, enterId].filter(Boolean).join(' ')}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              enterKeyHint="go"
-              placeholder={placeholder}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => setInputFocused(true)}
-              onBlur={() => setInputFocused(false)}
-              onKeyDown={onKeyDown}
-              className="min-h-11 w-full border border-edge bg-panel pr-11 pl-3 text-base text-ink placeholder:text-ink-dim focus-visible:outline-2 focus-visible:outline-focus"
-            />
-            {query !== '' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery('')
-                  input.current?.focus()
-                }}
-                aria-label="Clear search text"
-                className="absolute inset-y-0 right-0 flex min-w-11 cursor-pointer items-center justify-center text-ink-dim hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
-              >
-                ×
-              </button>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            className="min-h-11 shrink-0 cursor-pointer px-2 text-base text-ink-dim hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
-          >
-            Cancel
-          </button>
-        </div>
+        <SearchBar
+          inputRef={input}
+          id={id}
+          label={label}
+          placeholder={placeholder}
+          describedBy={[placesOn && disclosureId, !typed && hintId, enterId].filter(Boolean).join(' ')}
+          query={query}
+          onQuery={setQuery}
+          onFocusChange={setInputFocused}
+          onKeyDown={onKeyDown}
+          onCancel={close}
+        />
         {/* The input's description, read when it takes focus, not on every keystroke. */}
         <p id={enterId} className="sr-only">
           Press Enter to choose the first result.
@@ -237,7 +229,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
           </p>
         )}
         <p role="status" className="sr-only">
-          {statusText(typed, results.length)}
+          {here.spoken ?? searchStatusText(typed, results.length)}
         </p>
         <p role="status" className="sr-only">
           {announcementFor(geo, nextSpoken)}
@@ -259,6 +251,21 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
           keyboardInset={keyboardInset}
           onChoose={choose}
           onDirections={directions}
+          rowOffset={lead}
+          lead={
+            here.showControl && (
+              <SearchHere
+                firstRow={0}
+                row={here.row}
+                visible={here.visible}
+                locating={here.locating}
+                actions={actions}
+                onPress={here.press}
+                onChoose={chooseHere}
+                onDirections={directionsHere}
+              />
+            )
+          }
           onRowKey={onRowKey}
         />
       </div>

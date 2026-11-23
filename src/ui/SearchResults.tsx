@@ -22,6 +22,10 @@ interface SearchResultsProps {
   keyboardInset: number
   onChoose: (item: SearchItem<StationGroup>) => void
   onDirections: (item: SearchItem<StationGroup>, end: TripEnd) => void
+  /** Rows above the lists (the location control): inside the scroll area, so Tab and the arrows pass through them. */
+  lead?: ReactNode
+  /** The number of `data-row`s the lead takes: result i is row i + `rowOffset`. */
+  rowOffset: number
   /** Arrow, Home, End and printable keys from a row's buttons. */
   onRowKey: (e: KeyboardEvent<HTMLElement>) => void
 }
@@ -74,12 +78,12 @@ function SourceCredit({ sources }: { sources: readonly GeocodeSource[] }) {
  * a listbox, because a row holds more than one button; `role="list"` is explicit because Safari drops list
  * semantics from an unstyled list.
  */
-export function SearchResults({ network, items, highlightFirst, actions, multiBorough, view, emptyText, keyboardInset, onChoose, onDirections, onRowKey }: SearchResultsProps) {
+export function SearchResults({ network, items, highlightFirst, actions, multiBorough, view, emptyText, keyboardInset, onChoose, onDirections, lead, rowOffset, onRowKey }: SearchResultsProps) {
   const headingId = useId()
   const stationRows: ReactNode[] = []
   const placeRows: ReactNode[] = []
   items.forEach((item, i) => {
-    const common = { row: i, highlighted: highlightFirst && i === 0, actions, onChoose: () => onChoose(item), onDirections: (end: TripEnd) => onDirections(item, end) }
+    const common = { row: i + rowOffset, highlighted: highlightFirst && i === 0, actions, onChoose: () => onChoose(item), onDirections: (end: TripEnd) => onDirections(item, end) }
     if (item.kind === 'station') {
       stationRows.push(<SearchResult key={item.key} {...common} network={network} item={item} showBorough={multiBorough.has(item.station.name)} />)
     } else {
@@ -89,6 +93,7 @@ export function SearchResults({ network, items, highlightFirst, actions, multiBo
   const searching = view.status === 'pending' && view.tier >= 1
   return (
     <div style={{ paddingBottom: keyboardInset }} onKeyDown={onRowKey} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      {lead}
       {stationRows.length > 0 && (
         <ul role="list" aria-label="Stations">
           {stationRows}
