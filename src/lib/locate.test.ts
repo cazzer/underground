@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dismissLocate, failLocating, failureFromCode, lastPlacement, markedPlacement, placeFix, startLocating, toFix, type LocateState, type Placement, APPROXIMATE_M, FAR_VIEW_PADDING, MIN_VIEW_RADIUS_M, NEAREST_IN_VIEW_CAP_M } from './locate'
+import { dismissLocate, failLocating, failureFromCode, lastPlacement, markedPlacement, markViewed, placeFix, startLocating, toFix, type LocateState, type Placement, APPROXIMATE_M, FAR_VIEW_PADDING, MIN_VIEW_RADIUS_M, NEAREST_IN_VIEW_CAP_M } from './locate'
 import type { Bounds, Station } from './network'
 import { toGround } from './projection'
 
@@ -144,6 +144,16 @@ describe('locate state transitions', () => {
     expect(dismissLocate(startLocating({ status: 'idle' }))).toEqual({ status: 'idle' })
     expect(dismissLocate(startLocating(located))).toEqual(located)
     expect(dismissLocate(failLocating(located, 'unavailable'))).toEqual(located)
+  })
+
+  it('marks the shown fix as flown to, in a located state or a kept one, and leaves the rest alone', () => {
+    expect(markedPlacement(located)?.viewed).toBeUndefined()
+    expect(markedPlacement(markViewed(located))?.viewed).toBe(true)
+    expect(markedPlacement(markViewed(startLocating(located)))?.viewed).toBe(true)
+    expect(markedPlacement(dismissLocate(markViewed(failLocating(located, 'timeout'))))?.viewed).toBe(true)
+    expect(markViewed({ status: 'idle' })).toEqual({ status: 'idle' })
+    expect(markViewed({ status: 'located', placement: outside })).toEqual({ status: 'located', placement: outside })
+    expect(markViewed(failLocating({ status: 'idle' }, 'denied'))).toEqual(failLocating({ status: 'idle' }, 'denied'))
   })
 
   it('draws no marker for an outside placement', () => {

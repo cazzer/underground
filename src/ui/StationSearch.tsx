@@ -3,8 +3,7 @@ import { GEOCODE_URL } from '../data/realtime'
 import type { LocateControls } from '../data/useLocate'
 import { useGeocode } from '../data/useGeocode'
 import { useFocus } from '../lib/focus'
-import { geocodeFocus } from '../lib/geocodeFocus'
-import { locateMemoryFor } from '../lib/locateMemory'
+import { searchFocus } from '../lib/geocodeFocus'
 import { announcementFor, nextErrorSpoken, searchEmptyText, type ErrorSpoken } from '../lib/geocodeView'
 import { multiBoroughNames } from '../lib/labels'
 import type { Network } from '../lib/network'
@@ -98,16 +97,8 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
   useEffect(() => {
     latest.current = { focusedId, fix }
   })
-  const focusFn = () => {
-    const view = viewCenter()
-    return geocodeFocus({
-      station: network.stationById.get(latest.current.focusedId ?? '')?.pos ?? null,
-      stationId: latest.current.focusedId,
-      view,
-      fix: latest.current.fix,
-      locate: locateMemoryFor(view),
-    })
-  }
+  const focusFn = () =>
+    searchFocus({ focusedId: latest.current.focusedId, stationById: network.stationById, view: viewCenter(), fix: latest.current.fix })
   const geo = useGeocode(placesOn ? GEOCODE_URL : null, query, open, focusFn)
   // The unavailable sentence is spoken once per dialog session; the state follows the view during render.
   const [errorSpoken, setErrorSpoken] = useState<ErrorSpoken>('none')
@@ -171,6 +162,11 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
     // The location control has one button: a move to a column it lacks lands on its first.
     ;(at(spot.col) ?? at(0))?.focus()
   }
+  // Only a new arrival moves focus. A press here that found you hands it to the My location row, which speaks the rest of the answer.
+  const { arrived } = here
+  useEffect(() => {
+    if (arrived) focusSpot({ row: 1, col: 0 })
+  }, [arrived])
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && items.length > 0 && !e.nativeEvent.isComposing) {
       e.preventDefault()

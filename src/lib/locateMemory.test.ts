@@ -5,6 +5,7 @@ import { toGround, type Ground } from './projection'
 const HERE = toGround({ lat: 40.7347, lon: -73.9906 })
 const east = (g: Ground, m: number): Ground => ({ x: g.x + m, z: g.z })
 const memory = (nearestId = 'A', center = HERE): LocateMemory => ({ center, radiusM: 250, nearestId })
+const ids = (view: Ground | null) => locateMemoryFor(view).map((m) => m.nearestId)
 
 describe('an unviewed fix (found in the search dialog, no flight)', () => {
   beforeEach(forgetLocate)
@@ -12,46 +13,65 @@ describe('an unviewed fix (found in the search dialog, no flight)', () => {
   it('survives a view that never came near it, and still excludes its nearest station', () => {
     rememberUnviewedFix(memory('A'))
     const far = east(HERE, 12000)
-    expect(locateMemoryFor(far)?.nearestId).toBe('A')
-    expect(locateMemoryFor(east(HERE, 30000))?.nearestId).toBe('A')
+    expect(ids(far)).toEqual(['A'])
+    expect(ids(east(HERE, 30000))).toEqual(['A'])
     expect(excludedByLocate(locateMemoryFor(far), far, null)).toBe(false)
     expect(excludedByLocate(locateMemoryFor(far), far, 'A')).toBe(true)
   })
 
   it('is forgotten once the view has come within the guard and then left', () => {
     rememberUnviewedFix(memory())
-    expect(locateMemoryFor(east(HERE, 500))).not.toBeNull()
-    expect(locateMemoryFor(east(HERE, 5000))).toBeNull()
-    expect(locateMemoryFor(HERE)).toBeNull()
+    expect(ids(east(HERE, 500))).toEqual(['A'])
+    expect(ids(east(HERE, 5000))).toEqual([])
+    expect(ids(HERE)).toEqual([])
   })
 
   it('holds with no camera target', () => {
     rememberUnviewedFix(memory())
-    expect(locateMemoryFor(null)).not.toBeNull()
+    expect(ids(null)).toEqual(['A'])
   })
 })
 
-describe('the memory slot', () => {
+describe('the two memory slots', () => {
   beforeEach(forgetLocate)
 
-  it('a flight replaces an unviewed fix and is armed at once', () => {
-    rememberUnviewedFix(memory('A'))
+  it('a flight is armed at once and forgotten when the view leaves', () => {
     rememberLocate(memory('B'))
-    expect(locateMemoryFor(east(HERE, 5000))).toBeNull()
+    expect(ids(east(HERE, 5000))).toEqual([])
   })
 
-  it('an unviewed fix replaces a flight', () => {
-    rememberLocate(memory('A', east(HERE, 20000)))
-    rememberUnviewedFix(memory('B'))
-    expect(locateMemoryFor(east(HERE, 9000))?.nearestId).toBe('B')
+  it('a fix found later does not replace the flight: both hold while the view stays at the flight', () => {
+    const elsewhere = east(HERE, 20000)
+    rememberLocate(memory('A'))
+    rememberUnviewedFix(memory('B', elsewhere))
+    expect(ids(HERE).sort()).toEqual(['A', 'B'])
+    expect(excludedByLocate(locateMemoryFor(HERE), HERE, 'B')).toBe(true)
+    expect(excludedByLocate(locateMemoryFor(HERE), HERE, null)).toBe(true)
   })
 
-  it('forgetLocate clears either', () => {
+  it('a later flight does not replace a fix never visited', () => {
+    const elsewhere = east(HERE, 20000)
+    rememberUnviewedFix(memory('B', elsewhere))
+    rememberLocate(memory('C'))
+    expect(ids(HERE).sort()).toEqual(['B', 'C'])
+    expect(excludedByLocate(locateMemoryFor(HERE), east(HERE, 9000), 'B')).toBe(true)
+  })
+
+  it('each slot is forgotten by its own rule', () => {
+    const elsewhere = east(HERE, 20000)
+    rememberLocate(memory('A'))
+    rememberUnviewedFix(memory('B', elsewhere))
+    // Leaving the flight forgets it; the unviewed fix, never visited, stays.
+    expect(ids(east(HERE, 9000))).toEqual(['B'])
+    // Visiting the unviewed fix and leaving forgets it too.
+    expect(ids(elsewhere)).toEqual(['B'])
+    expect(ids(east(elsewhere, 9000))).toEqual([])
+  })
+
+  it('forgetLocate clears both', () => {
     rememberUnviewedFix(memory())
+    rememberLocate(memory('B'))
     forgetLocate()
-    expect(locateMemoryFor(HERE)).toBeNull()
-    rememberLocate(memory())
-    forgetLocate()
-    expect(locateMemoryFor(HERE)).toBeNull()
+    expect(ids(HERE)).toEqual([])
   })
 })

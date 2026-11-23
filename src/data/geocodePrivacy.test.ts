@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { FIX_GUARD_M, geocodeFocus } from '../lib/geocodeFocus'
+import { FIX_GUARD_M, searchFocus } from '../lib/geocodeFocus'
 import { placeFix, type MarkedPlacement } from '../lib/locate'
-import { forgetLocate, locateMemoryFor, rememberLocate, rememberUnviewedFix } from '../lib/locateMemory'
+import { forgetLocate, rememberLocate, rememberUnviewedFix } from '../lib/locateMemory'
 import type { Bounds, Station } from '../lib/network'
 import { toGround, type Ground, type LatLon } from '../lib/projection'
 import { geocodeRequestUrl } from './geocodeFetch'
@@ -35,11 +35,11 @@ function randomFix(): { latLon: LatLon; placement: MarkedPlacement } | null {
   return placement && placement.kind !== 'outside' ? { latLon, placement } : null
 }
 
-/** The URL a search builds for a view, as StationSearch's `focusFn` does. */
+const stationById = new Map(stations.map((s) => [s.id, s]))
+
+/** The URL a search builds for a view: StationSearch's own `searchFocus`, then the request builder. */
 function urlFor(fix: MarkedPlacement | null, view: Ground, focusedId: string | null): string {
-  const focused = stations.find((s) => s.id === focusedId) ?? null
-  const focus = geocodeFocus({ station: focused?.pos ?? null, stationId: focusedId, view, fix, locate: locateMemoryFor(view) })
-  return geocodeRequestUrl(BASE, QUERY, focus)
+  return geocodeRequestUrl(BASE, QUERY, searchFocus({ focusedId, stationById, view, fix }))
 }
 
 function expectNoFix(url: string, latLon: LatLon): void {
@@ -102,6 +102,25 @@ describe('a location fix never reaches a geocode request', () => {
       expectNoFix(urlFor(null, placement.nearest.pos, placement.nearest.id), latLon)
     }
     expect(tested).toBeGreaterThan(20)
+  })
+
+  it('(e) a flight to one location, then a fix found elsewhere in the dialog: the view still at the flight sends no focus', () => {
+    let tested = 0
+    for (let i = 0; i < 200; i++) {
+      const a = randomFix()
+      const b = randomFix()
+      if (!a || !b || distance(a.placement.ground, b.placement.ground) < 8000) continue
+      tested++
+      forgetLocate()
+      rememberLocate({ center: a.placement.viewCenter, radiusM: a.placement.viewRadiusM, nearestId: a.placement.nearest.id })
+      rememberUnviewedFix({ center: b.placement.viewCenter, radiusM: b.placement.viewRadiusM, nearestId: b.placement.nearest.id })
+      for (const fix of [b.placement, null]) {
+        expectNoFix(urlFor(fix, a.placement.ground, null), a.latLon)
+        expectNoFix(urlFor(fix, a.placement.ground, null), b.latLon)
+        expectNoFix(urlFor(fix, a.placement.nearest.pos, a.placement.nearest.id), a.latLon)
+      }
+    }
+    expect(tested).toBeGreaterThan(5)
   })
 
   it('(d) shown with the view far away: only the map\'s own rounded focus goes, far from the fix', () => {

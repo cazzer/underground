@@ -3,6 +3,7 @@ import { placeFix, type LocateState, type MarkedPlacement, type Placement } from
 import type { Bounds } from './network'
 import { toGround, toLatLon } from './projection'
 import { realGroupById, realGroups, realStations } from './realGroups.testdata'
+import { formatDistance } from './locateMessage'
 import { fixDistanceOf, hereRow, hereStatus, searchStatusText } from './searchHere'
 import { SEARCH_LIMIT } from './stationSearch'
 
@@ -29,9 +30,9 @@ describe('hereRow', () => {
     const row = hereRow(fix)!
     expect(row.nearestId).toBe(fix.nearest.id)
     expect(row.title).toBe('My location')
-    expect(row.detail).toMatch(/^Nearest station .+ · about \d+ m$/)
+    expect(row.detail).toMatch(/^Nearest station .+ · (about \d\.\d mi|under 0\.1 mi)$/)
     expect(row.detail).toContain(fix.nearest.name)
-    expect(row.spoken).toMatch(/^My location, nearest station .+, about \d+ m$/)
+    expect(row.spoken).toMatch(/^My location, nearest station .+, (about \d\.\d mi|under 0\.1 mi)$/)
   })
 
   it('says approximate for a coarse fix, not for a precise one', () => {
@@ -41,10 +42,11 @@ describe('hereRow', () => {
     expect(hereRow(marked(UNION_SQ.lat, UNION_SQ.lon, 20))!.detail).not.toContain('approximate')
   })
 
-  it('reads a far fix in kilometers', () => {
+  it('reads a far fix in miles, as the header does', () => {
     const far = place(40.59, -73.89)
     if (far.kind !== 'far') throw new Error(`fixture fix is ${far.kind}`)
-    expect(hereRow(far)!.detail).toMatch(/about \d+(\.\d)? km/)
+    expect(hereRow(far)!.detail).toBe(`Nearest station ${far.nearest.name} · ${formatDistance(far.nearest.distanceM)}`)
+    expect(hereRow(far)!.detail).toMatch(/about \d+\.\d mi$/)
   })
 
   it('names a complex by its group, whichever member is nearest', () => {
@@ -85,8 +87,8 @@ describe('hereStatus', () => {
     expect(by.outside!.spoken).toBe("You're outside the area this map covers.")
     expect(by.outside!.visible?.tone).toBe('warn')
   })
-  it('points at the row on success and shows nothing extra', () => {
-    expect(by.found!.spoken).toBe(`Found your location. My location, nearest station ${near.nearest.name}, is below.`)
+  it('says only that it found you on success (the focused row speaks the rest) and shows nothing extra', () => {
+    expect(by.found!.spoken).toBe('Found your location.')
     expect(by.found!.visible).toBeNull()
   })
   it('keeps the failure words while a good fix is kept', () => {

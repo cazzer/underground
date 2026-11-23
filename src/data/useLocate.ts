@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dismissLocate, failLocating, failureFromCode, markedPlacement, placeFix, startLocating, toFix, type LocateFailure, type LocateState, type MarkedPlacement } from '../lib/locate'
+import { dismissLocate, failLocating, failureFromCode, markedPlacement, markViewed, placeFix, startLocating, toFix, type LocateFailure, type LocateState, type MarkedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
 import { rememberLocate, rememberUnviewedFix, type LocateMemory } from '../lib/locateMemory'
 import type { Ground } from '../lib/projection'
@@ -93,9 +93,10 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
           fail('unavailable')
           return
         }
-        settle(id, () => ({ status: 'located', placement }))
+        const flying = fly.current
+        settle(id, () => ({ status: 'located', placement: placement.kind === 'outside' ? placement : { ...placement, viewed: flying } }))
         if (placement.kind !== 'outside') {
-          if (fly.current) flyTo(placement, latest.current.flyToPoint)
+          if (flying) flyTo(placement, latest.current.flyToPoint)
           else rememberUnviewedFix(memoryOf(placement))
         }
       },
@@ -120,7 +121,9 @@ export function useLocate(network: Network, flyToPoint: (center: Ground, radiusM
 
   const showFix = useCallback(() => {
     const placement = markedPlacement(latest.current.state)
-    if (placement) flyTo(placement, latest.current.flyToPoint)
+    if (!placement) return
+    flyTo(placement, latest.current.flyToPoint)
+    setState(markViewed)
   }, [])
 
   const clear = useCallback(() => {

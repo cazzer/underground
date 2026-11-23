@@ -19,7 +19,7 @@ interface SearchHereProps {
 }
 
 /**
- * The lead of the dialog's results while the input is blank: a "Use my location" button and, once a fix is known (from
+ * The lead of the dialog's results while the input is blank: a "Use my location" button ("Update my location" once a fix is known) and, once a fix is known (from
  * this press or the header's), a "My location" row naming its nearest station. The visible status line is aria-hidden:
  * the dialog's polite region speaks it.
  */
@@ -32,15 +32,15 @@ export function SearchHere({ firstRow, row, visible, locating, actions, onPress,
           data-row={firstRow}
           data-col={0}
           onClick={onPress}
-          aria-busy={locating}
           className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2 text-left text-base hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
         >
           <LocateIcon pulsing={locating} />
-          Use my location
+          {row ? 'Update my location' : 'Use my location'}
         </button>
       </li>
       {visible && (
-        <li aria-hidden="true" className={`px-3 pb-2 text-sm ${LOCATE_TONE[visible.tone]}`}>
+        // Aligned with the button's text: the row's 4 px border, 12 px padding, the 22 px icon and its 12 px gap.
+        <li aria-hidden="true" className={`border-l-4 border-transparent pr-3 pb-2 pl-[calc(0.75rem+22px+0.75rem)] text-sm ${LOCATE_TONE[visible.tone]}`}>
           {LOCATE_GLYPH[visible.tone]} {visible.text}
         </li>
       )}

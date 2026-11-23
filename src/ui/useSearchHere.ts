@@ -29,6 +29,8 @@ export interface SearchHere {
   /** What the dialog's polite region says after a press, else null (the station count speaks). */
   spoken: string | null
   locating: boolean
+  /** A press in this dialog session has just settled on a marked fix: the row is there to take focus. */
+  arrived: boolean
   /** Runs one position request (no camera move). Call only from the user's press. */
   press: () => void
 }
@@ -57,6 +59,7 @@ export function useSearchHere({ locate, enabled, open, query, network }: SearchH
     visible: status?.visible ?? null,
     spoken: status && status.spoken !== '' ? status.spoken : null,
     locating: locate.state.status === 'locating',
+    arrived: asked && showControl && locate.state.status === 'located' && fix !== null,
     press: () => {
       setAsked(true)
       locate.find()

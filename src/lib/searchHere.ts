@@ -1,9 +1,8 @@
 /** What the search dialog says about the user's own location: the "My location" row, the status, the sort distance (pure). */
 import type { StationId } from '../data/schema'
 import type { LocateState, MarkedPlacement } from './locate'
-import { locateMessage, type LocateMessage } from './locateMessage'
+import { formatDistance, locateMessage, type LocateMessage } from './locateMessage'
 import type { Station } from './network'
-import { distanceText } from './placeLabel'
 import type { Ground } from './projection'
 import type { StationGroup } from './stationGroups'
 import { SEARCH_LIMIT } from './stationSearch'
@@ -15,7 +14,7 @@ export interface HereRow {
   /** The station it stands for: the group's id (a complex's lead). */
   nearestId: StationId
   title: string
-  /** The dim line: "Nearest station Bedford Av · about 250 m". */
+  /** The dim line: "Nearest station Bedford Av · about 0.2 mi" (the header's miles: one distance system for one fix). */
   detail: string
   /** The row's accessible name. */
   spoken: string
@@ -25,7 +24,7 @@ export interface HereRow {
 export function hereRow(fix: MarkedPlacement | null): HereRow | null {
   if (!fix) return null
   const { name } = fix.nearest
-  const distance = distanceText(fix.nearest.distanceM)
+  const distance = formatDistance(fix.nearest.distanceM)
   return {
     nearestId: fix.nearest.id,
     title: 'My location',
@@ -46,7 +45,8 @@ export function hereStatus(state: LocateState): HereStatus {
   const message = locateMessage(state)
   if (!message) return { spoken: '', visible: null }
   if (state.status === 'located' && state.placement.kind !== 'outside') {
-    return { spoken: `Found your location. My location, nearest station ${state.placement.nearest.name}, is below.`, visible: null }
+    // The focus moves to the row, which speaks the rest.
+    return { spoken: 'Found your location.', visible: null }
   }
   return { spoken: message.text, visible: { text: message.text, tone: message.tone } }
 }
