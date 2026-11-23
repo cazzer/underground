@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { FEATURES } from '../config'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { scheduleLabel } from '../lib/labels'
+import type { ServiceChangeView } from '../lib/live/alertText'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { OutagePanelView } from '../lib/live/eneText'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
@@ -31,6 +32,7 @@ import { TripPanel, type TripLines } from './TripPanel'
 import type { PlaceLine } from './usePlaceLine'
 import { useHudInsets } from './useHudInsets'
 import { useLineFilter } from './useLineFilter'
+import { usePanelReport } from './usePanelReport'
 import { useTripPanel } from './useTripPanel'
 
 interface HudProps {
@@ -45,6 +47,8 @@ interface HudProps {
   interior: InteriorStatusInfo
   /** The focused station's out-of-service machines, shown in its panel. */
   outages: OutagePanelView
+  /** The focused station's service changes (MTA alerts), shown in its panel. */
+  changes: ServiceChangeView
   /** Reports where the station panel sits (viewport px), or null when it closes. */
   onPanel: (rect: ScreenRect | null) => void
   /** The location button's state and actions. */
@@ -61,7 +65,7 @@ interface HudProps {
   siblingsOf: (stationId: string) => readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, changes, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const lineFilter = useLineFilter(focusedId)
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
@@ -144,31 +148,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   // Measured before the scene mounts, for its opening view, and again when the header, footer or window resizes.
   useHudInsets({ root, header, footer }, onInsets)
 
-  // Tracked while the panel is open, so a station fly-to can frame the view beside it. Resizes
-  // move a stacked (phone) panel's top; window resizes move a desktop panel's left edge.
-  useLayoutEffect(() => {
-    const el = panel.current
-    if (!el) {
-      onPanel(null)
-      return
-    }
-    // The list inside changes height with every poll; only a real move of the panel reaches the scene.
-    let last: ScreenRect | null = null
-    const measure = () => {
-      const p = el.getBoundingClientRect()
-      if (last && last.left === p.left && last.top === p.top && last.right === p.right && last.bottom === p.bottom) return
-      last = { left: p.left, top: p.top, right: p.right, bottom: p.bottom }
-      onPanel(last)
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    window.addEventListener('resize', measure)
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', measure)
-    }
-  }, [focusedId, trainOpen, noticeOpen, tripOpen, onPanel])
+  usePanelReport({ panel, onPanel, focusedId, trainOpen, noticeOpen, tripOpen })
 
   // Esc closes the front panel: the train panel, then the notice, then the trip panel (an active step ends first, then an opened journey goes back to the list, then it closes), then the station's.
   useEffect(() => {
@@ -263,6 +243,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             arrivals={arrivals}
             interior={interior}
             outages={outages}
+            changes={changes}
             lineFilter={lineFilter}
             onDirections={FEATURES.navigation ? (end) => openTrip(end, { stationId: focusedId, place: null }) : undefined}
             ref={panel}

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAlerts } from './data/useAlerts'
 import { useBands } from './data/useBands'
 import { useEne } from './data/useEne'
 import { useEquipmentIndex } from './data/useEquipmentIndex'
-import { ENE_URL } from './data/realtime'
+import { ALERTS_URL, ENE_URL } from './data/realtime'
 import { useLive } from './data/useLive'
 import { useNetwork } from './data/useNetwork'
 import { useLocate } from './data/useLocate'
@@ -15,6 +16,8 @@ import { useTripRoute } from './data/useTripRoute'
 import { useTripTransfers } from './data/useTripTransfers'
 import { usePlaceLine } from './ui/usePlaceLine'
 import { FocusProvider, useFocus } from './lib/focus'
+import { joinStationChanges } from './lib/live/alertJoin'
+import { serviceChangeView, type ServiceChangeView } from './lib/live/alertText'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
 import { joinPanelOutages, stationEquipment } from './lib/live/eneIndexJoin'
 import { outagePanelView } from './lib/live/eneText'
@@ -36,6 +39,9 @@ import { Hud } from './ui/Hud'
 import { HudCrash, LoadStatus, SceneCrash } from './ui/LoadStatus'
 import { LiveDebug } from './ui/LiveDebug'
 import { MapReveal } from './ui/MapReveal'
+
+/** The panel's service changes with no station focused: nothing, and nothing known. */
+const NO_CHANGES: ServiceChangeView = { known: false, body: { kind: 'none' }, skipSpoken: '' }
 
 interface MapViewProps {
   network: Network
@@ -75,6 +81,13 @@ function MapView({ network, bands, live }: MapViewProps) {
   const equipment = useEquipmentIndex(focusedId, ene.configured)
   const interiorSettled = interior.index.status !== 'loading' && interior.load.status !== 'loading'
   const outages = joinPanelOutages(interiorOutages, model?.interior ?? null, interiorSettled, stationEquipment(equipment, focusedId), ene, nowS)
+  // The MTA's service changes at the focused station (its group: any member's stops), listed in its panel.
+  const alerts = useAlerts(ALERTS_URL)
+  const routeOrder = useMemo(() => new Map(network.routes.map((r, i) => [r.id, i])), [network])
+  const focusedGroup = focusedId ? network.groupById.get(focusedId) : undefined
+  const changes = focusedGroup
+    ? serviceChangeView(joinStationChanges(focusedGroup, network.stationById, alerts, nowS, routeOrder), focusedGroup, network.routeById, nowS)
+    : NO_CHANGES
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
   // Only once the visitor chose the To (an end filled from the fix, then swapped there, waits for a focus or pick).
@@ -196,6 +209,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           linkNotice={{ show: stationHash.linkNotice, onDismiss: stationHash.dismissLinkNotice }}
           interior={{ load: interior.load, onRetry: interior.retry }}
           outages={outagePanelView(outages, nowS, noStepFree)}
+          changes={changes}
           tripLines={tripLines}
           focusSiblings={focusSiblings}
           siblingsOf={siblingsOf}
