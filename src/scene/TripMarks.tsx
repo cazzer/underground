@@ -6,18 +6,16 @@ import { dimLineRgbInto, srgb01 } from '../lib/lineDim'
 import { writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Ground } from '../lib/projection'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
-import { markRadius, startRadiusNearFix } from '../lib/tripMarkSize'
+import { tripMarkRadius, type ReticleClearance } from '../lib/tripMarkSize'
 import type { TripMark } from '../lib/tripMarks'
 import { theme } from '../theme'
 import { cameraDistance, screenScale, tripMarkRadiusPx } from './cameraDistance'
-import { RETICLE_MIN_METERS, RETICLE_PX, TICK_OUTER } from './hereShape'
+import { reticleClearanceInto } from './hereShape'
 import { MARKER_Y, SEGMENTS, TRIP_MARK_DOT, TRIP_MARK_HALO, TRIP_MARK_INNER, TRIP_MARK_MIN_METERS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
 const NO_MARKS: readonly TripMark[] = []
 const BACKGROUND = srgb01(theme.background)
-/** The grown start ring ends this far outside the location reticle. */
-const RETICLE_GAP_PX = 2
 
 interface TripMarksProps {
   /** Where the trip boards, changes and alights (TripRouteDraw.marks; held by SubwayLines while it eases out). */
@@ -60,7 +58,7 @@ interface MarkSetProps {
 }
 
 /**
- * Three InstancedMeshes (halo, ring, dot). The matrices are rewritten only when the scale, the fix or the marks change,
+ * Three InstancedMeshes (halo, ring, dot). The matrices are rewritten only when the scale, the reticle's size, the fix or the marks change,
  * the color only when the list view's dim does; opacity per frame. No allocation per frame.
  */
 function MarkSet({ marks, covered, fix, levels }: MarkSetProps) {
@@ -88,7 +86,16 @@ function MarkSet({ marks, covered, fix, levels }: MarkSetProps) {
     return new Float32Array([c.r, c.g, c.b])
   }, [])
   const tint = useMemo(() => new Float32Array(3), [])
-  const drawn = useRef<{ base: number; fix: Ground | null; marks: readonly TripMark[] | null; dim: number }>({ base: NaN, fix: null, marks: null, dim: NaN })
+  const reticle = useMemo<ReticleClearance>(() => ({ outerM: 0, gapM: 0 }), [])
+  /** What the matrices were last written for: every input of tripMarkRadius, so they never go stale. */
+  const drawn = useRef<{ base: number; outerM: number; gapM: number; fix: Ground | null; marks: readonly TripMark[] | null; dim: number }>({
+    base: NaN,
+    outerM: NaN,
+    gapM: NaN,
+    fix: null,
+    marks: null,
+    dim: NaN,
+  })
 
   useLayoutEffect(() => {
     for (const m of [halo.current, ring.current, dot.current]) m?.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -119,18 +126,18 @@ function MarkSet({ marks, covered, fix, levels }: MarkSetProps) {
       dm.color.copy(rm.color)
     }
     const base = screenScale(distance, tripMarkRadiusPx(distance), TRIP_MARK_MIN_METERS)
-    if (base === last.base && fix === last.fix && marks === last.marks) return
+    reticleClearanceInto(reticle, distance)
+    if (base === last.base && reticle.outerM === last.outerM && reticle.gapM === last.gapM && fix === last.fix && marks === last.marks) return
     last.base = base
+    last.outerM = reticle.outerM
+    last.gapM = reticle.gapM
     last.fix = fix
     last.marks = marks
-    const reticleOuter = TICK_OUTER * screenScale(distance, RETICLE_PX, RETICLE_MIN_METERS)
-    const gap = screenScale(distance, RETICLE_GAP_PX, 0)
     const hs = h.instanceMatrix.array as Float32Array
     const ds = d.instanceMatrix.array as Float32Array
     for (let i = 0; i < marks.length; i++) {
       const m = marks[i]!
-      let radius = markRadius(m.role, base)
-      if (m.role === 'start') radius = startRadiusNearFix(radius, m.pos, fix, reticleOuter, gap)
+      const radius = tripMarkRadius(m.role, base, m.pos, fix, reticle)
       writeInstanceMatrix(hs, i, m.pos.x, MARKER_Y, m.pos.z, radius)
       writeInstanceMatrix(ds, i, m.pos.x, MARKER_Y, m.pos.z, m.role === 'change' ? 0 : radius)
     }

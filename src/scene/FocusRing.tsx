@@ -3,10 +3,11 @@ import { useEffect, useMemo, useRef } from 'react'
 import { RingGeometry, type Mesh } from 'three'
 import type { Ground } from '../lib/projection'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
-import { FOCUS_OUTSIDE_INNER, FOCUS_OUTSIDE_OUTER, markRadius } from '../lib/tripMarkSize'
+import { FOCUS_OUTSIDE_INNER, FOCUS_OUTSIDE_OUTER, tripMarkRadius, type ReticleClearance } from '../lib/tripMarkSize'
 import type { TripMarkRole } from '../lib/tripMarks'
 import { theme } from '../theme'
 import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale, tripMarkRadiusPx } from './cameraDistance'
+import { reticleClearanceInto } from './hereShape'
 import { MARKER_MIN_METERS, MARKER_Y, RING_INNER, SEGMENTS, TRIP_MARK_MIN_METERS } from './markerShape'
 import { RENDER_ORDER } from './renderOrder'
 
@@ -16,16 +17,19 @@ interface FocusRingProps {
   tripRole: TripMarkRole | null
   /** This frame's trip look (SubwayLines, -0.25). */
   levels: EmphasisLevels
+  /** The location fix's ground point while its reticle shows: a start mark grown round it grows this ring too. */
+  fix: Ground | null
 }
 
 /**
  * The focus ring of a focused station that has no interior (the fallback marker): `theme.stationFocus`,
  * a little larger than its neighbours, drawn above the trains so a passing train can't hide which station is
  * selected. Same geometry and per-frame size as the instanced ring it covers; on a station the shown trip marks, a
- * band just outside the mark's halo instead (FOCUS_OUTSIDE_INNER..OUTER of its radius), so the two rings don't cross.
+ * band just outside the mark's halo instead (FOCUS_OUTSIDE_INNER..OUTER of its drawn radius, `tripMarkRadius` as
+ * TripMarks sizes it, a start grown round the reticle included), so the two rings don't cross.
  * The scale and geometry are written only when they change. A station with an interior draws no ring (the interior marks it).
  */
-export function FocusRing({ position, tripRole, levels }: FocusRingProps) {
+export function FocusRing({ position, tripRole, levels, fix }: FocusRingProps) {
   const mesh = useRef<Mesh>(null)
   const geometry = useMemo(
     () => ({
@@ -35,6 +39,7 @@ export function FocusRing({ position, tripRole, levels }: FocusRingProps) {
     [],
   )
   const drawn = useRef<{ scale: number; outside: boolean | null }>({ scale: NaN, outside: null })
+  const reticle = useMemo<ReticleClearance>(() => ({ outerM: 0, gapM: 0 }), [])
 
   useEffect(
     () => () => {
@@ -50,7 +55,7 @@ export function FocusRing({ position, tripRole, levels }: FocusRingProps) {
     const d = cameraDistance(state)
     const outside = tripRole !== null && levels.tripVisible
     let s: number
-    if (outside) s = markRadius(tripRole, screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS))
+    if (outside) s = tripMarkRadius(tripRole, screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS), position, fix, reticleClearanceInto(reticle, d))
     else {
       const base = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
       s = base * focusScaleFactor(d, base)

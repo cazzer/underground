@@ -150,6 +150,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         tripStations={tripRoute?.stations ?? null}
         tripMarks={tripRoute?.marks ?? null}
         levels={tripLevels}
+        fix={here?.ground ?? null}
       />
       <ScenePicker stations={network.stations} trainPick={trainPick} hiddenSiblings={hiddenSiblings} />
       {live && (

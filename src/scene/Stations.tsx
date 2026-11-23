@@ -5,6 +5,7 @@ import { useFocus } from '../lib/focus'
 import { dimLineRgbInto, srgb01 } from '../lib/lineDim'
 import { writeMarkerMatrices } from '../lib/markerMatrices'
 import type { Station } from '../lib/network'
+import type { Ground } from '../lib/projection'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
 import type { TripMark } from '../lib/tripMarks'
 import { theme } from '../theme'
@@ -26,6 +27,8 @@ interface StationsProps {
   tripStations: readonly string[] | null
   /** The trip's station marks (TripRouteDraw.marks); null with none: a focus ring on one draws outside it. */
   tripMarks: readonly TripMark[] | null
+  /** The location fix's ground point while its reticle shows (read only, sizes a focus ring round a grown start mark). */
+  fix: Ground | null
   /** This frame's trip look (SubwayLines, -0.25): the other stations' rings dim with the network. */
   levels: EmphasisLevels
 }
@@ -38,7 +41,7 @@ interface StationsProps {
  * shows, the rings of stations its journey doesn't call at mix toward the background by the network's dim (as the
  * lines do, lineDim.ts), rewritten only while that dim or the journey's stations change.
  */
-export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations, tripMarks, levels }: StationsProps) {
+export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations, tripMarks, levels, fix }: StationsProps) {
   const fill = useRef<InstancedMesh>(null)
   const ring = useRef<InstancedMesh>(null)
   const { focusedId } = useFocus()
@@ -146,7 +149,7 @@ export function Stations({ stations, focusedMarker, hiddenSiblings, tripStations
         {/* Default white material: the per-instance colors are the ring colors. */}
         <meshBasicMaterial transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
-      {focusedMarker && focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} tripRole={focusedRole} levels={levels} />}
+      {focusedMarker && focusedIndex >= 0 && <FocusRing position={stations[focusedIndex]!.pos} tripRole={focusedRole} levels={levels} fix={fix} />}
     </>
   )
 }

@@ -2,7 +2,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useMemo } from 'react'
 import { Color, type PerspectiveCamera } from 'three'
 import type { RouteId } from '../data/schema'
+import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { metersPerPx } from '../lib/follow'
+import { interiorOpacity } from '../lib/interiorReveal'
 import type { Rgb } from '../lib/lineBuffers'
 import type { Network } from '../lib/network'
 import { tripDashBuffers } from '../lib/tripDashBuffers'
@@ -37,15 +39,16 @@ interface TripDashesProps {
   route: TripRouteDraw | null
   /** This frame's look, written by SubwayLines at -0.25. */
   levels: EmphasisLevels
-  /** The focused interior is loaded under the screen veil: draw above it (RENDER_ORDER.tripWalkOver). */
+  /** The focused interior is loaded under the screen veil: the walks draw above it while it reveals (RENDER_ORDER.tripWalkOver). */
   overVeil: boolean
 }
 
 /**
- * The trip's walks between stations (theme.exitPath) and its rides found on no drawn shape (their route color, straight
- * through their stops), dashed, over the marks' halo discs and under their rings (above the veil while the focused
- * interior is loaded under look A). One plain dashed layer, every vertex at y 0 (the street, like the station points
- * the walks join, so the depth factor never moves them): the dashes stay
+ * The trip's walks between stations (theme.exitPath), dashed over the marks' halo discs and under their rings (above the
+ * veil while the focused interior is loaded under look A and revealing), and its rides found on no drawn shape (their
+ * route color, straight through their stops), dashed over the ride legs and under the station markers. Two plain dashed
+ * layers, every vertex at y 0 (the street, like the station points the walks join, so the depth factor never moves
+ * them): the dashes stay
  * theme.tripWalkDashPx / tripWalkGapPx on screen at the view's target, since the dash scale is written per frame as
  * pixels per meter there. As wide as the ride legs, dimmed with them in the list view, faded in by opacity. Takes no
  * picks (ScenePicker picks stations and trains only).
@@ -54,22 +57,41 @@ export function TripDashes({ network, route, levels, overVeil }: TripDashesProps
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const walks = route?.walks
   const straights = route?.straights
-  const buffers = useMemo(() => {
-    if (!walks || !straights) return null
+  const walkBuffers = useMemo(() => {
+    if (!walks) return null
     const pink = new Color(theme.exitPath)
-    return tripDashBuffers(walks, straights, [pink.r, pink.g, pink.b], straightColor(routeColorMap(network, theme.routeLineMix)))
-  }, [network, walks, straights])
-  const lines = useLineLayer(buffers, RENDER_ORDER.tripWalk, theme.tripLineWidth, DASH, { dimmable: true })
+    return tripDashBuffers(walks, [], [pink.r, pink.g, pink.b], () => null)
+  }, [walks])
+  const straightBuffers = useMemo(
+    () => (straights ? tripDashBuffers([], straights, [0, 0, 0], straightColor(routeColorMap(network, theme.routeLineMix))) : null),
+    [network, straights],
+  )
+  const walkLines = useLineLayer(walkBuffers, RENDER_ORDER.tripWalk, theme.tripLineWidth, DASH, { dimmable: true })
+  const straightLines = useLineLayer(straightBuffers, RENDER_ORDER.tripStraight, theme.tripLineWidth, DASH, { dimmable: true })
   useFrame((state) => {
-    if (!lines) return
-    lines.renderOrder = overVeil ? RENDER_ORDER.tripWalkOver : RENDER_ORDER.tripWalk
-    lines.visible = levels.tripVisible
-    if (!levels.tripVisible) return
-    const m = lines.material
-    m.linewidth = levels.tripWidthPx
-    m.dashScale = 1 / metersPerPx(cameraDistance(state), camera.fov, state.size.height)
-    m.opacity = levels.tripOpacity
-    writeLineDim(m, levels.tripDim)
+    const distance = cameraDistance(state)
+    const dashScale = 1 / metersPerPx(distance, camera.fov, state.size.height)
+    if (walkLines) {
+      walkLines.renderOrder = overVeil && interiorOpacity(distance) > 0 ? RENDER_ORDER.tripWalkOver : RENDER_ORDER.tripWalk
+      writeDashLook(walkLines, levels, dashScale)
+    }
+    if (straightLines) writeDashLook(straightLines, levels, dashScale)
   })
-  return lines && <primitive object={lines} />
+  return (
+    <>
+      {walkLines && <primitive object={walkLines} />}
+      {straightLines && <primitive object={straightLines} />}
+    </>
+  )
+}
+
+/** One dashed layer's per-frame look: shown with the trip, its width, dash scale, opacity and faint dim. No allocation. */
+function writeDashLook(lines: LineSegments2, levels: EmphasisLevels, dashScale: number): void {
+  lines.visible = levels.tripVisible
+  if (!levels.tripVisible) return
+  const m = lines.material
+  m.linewidth = levels.tripWidthPx
+  m.dashScale = dashScale
+  m.opacity = levels.tripOpacity
+  writeLineDim(m, levels.tripDim)
 }
