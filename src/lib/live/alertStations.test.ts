@@ -11,7 +11,9 @@ describe('alertKindOf', () => {
     expect(alertKindOf('Stop Skipped')).toBe('skip')
     expect(alertKindOf('Planned - Part Suspended')).toBe('part')
     expect(alertKindOf('Planned - Suspended')).toBe('suspended')
-    for (const other of ['Delays', 'Station Notice', 'Planned - Express to Local', 'Boarding Change', null]) expect(alertKindOf(other)).toBe('other')
+    expect(alertKindOf('Planned - Express to Local')).toBe('local')
+    expect(alertKindOf('Planned - Reroute')).toBe('reroute')
+    for (const other of ['Delays', 'Station Notice', 'Boarding Change', null]) expect(alertKindOf(other)).toBe('other')
   })
 })
 

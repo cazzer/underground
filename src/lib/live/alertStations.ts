@@ -3,18 +3,20 @@ import type { AlertPeriod, ServiceAlert } from '../../data/realtime'
 import type { Direction, RouteId, StationId } from '../../data/schema'
 import type { Station } from '../network'
 
-export type AlertKind = 'skip' | 'part' | 'suspended' | 'other'
+export type AlertKind = 'skip' | 'part' | 'suspended' | 'local' | 'reroute' | 'other'
 
 /**
  * What an alert does to service, from the MTA's free-text `alert_type` ("Planned - Stops Skipped", "Planned - Part
- * Suspended", "Planned - Suspended", "Delays", "Station Notice", ...). Anything we don't recognise is `other`: listed
- * with the MTA's header and no claim of our own.
+ * Suspended", "Planned - Suspended", "Planned - Express to Local", "Planned - Reroute", "Delays", "Station Notice", ...).
+ * Anything we don't recognise is `other`: listed with the MTA's header and no claim of our own.
  */
 export function alertKindOf(type: string | null): AlertKind {
   if (type === null) return 'other'
   if (/stops? skipped/i.test(type)) return 'skip'
   if (/part suspended/i.test(type)) return 'part'
   if (/\bsuspended\b/i.test(type)) return 'suspended'
+  if (/express to local/i.test(type)) return 'local'
+  if (/reroute/i.test(type)) return 'reroute'
   return 'other'
 }
 
@@ -26,7 +28,12 @@ export function alertKindOf(type: string | null): AlertKind {
  * caller to the informed stops.
  */
 export function skipClause(header: string): string {
-  const m = /\bskips?\b/i.exec(header)
+  return clauseAfter(header, /\bskips?\b/i)
+}
+
+/** The words after the first match of `lead`, up to the first line break, ";", ". ", " due to ", " for " or " while "; '' for no match. */
+function clauseAfter(header: string, lead: RegExp): string {
+  const m = lead.exec(header)
   if (!m) return ''
   const after = header.slice(m.index + m[0].length)
   const cut = after.search(/\n|;|\. | due to | for | while /i)
@@ -91,6 +98,15 @@ export function headerNamedStations(header: string, candidates: readonly { id: S
 }
 
 /**
+ * The candidates a header says trains stop at: the clause after "stop(s) ... at" ("all Manhattan-bound [7][7X]
+ * local/express trains stop at 74 St-Broadway"), by the rules of `namedIn`. Empty when it has no such clause: a "runs
+ * local from X to Y" header names the stretch's ends, not stops.
+ */
+export function headerStopNamed(header: string, candidates: readonly { id: StationId; name: string }[]): Set<StationId> {
+  return namedIn(clauseItems(clauseAfter(header, /\bstops?\b[^,.;\n]*?\bat\b/i)), candidates)
+}
+
+/**
  * The ends a header gives for "runs express from X to Y" or "express X to Y" (first line only), as the stations it
  * names among `candidates`; null when it has no such stretch or either end names no candidate.
  */
@@ -107,6 +123,30 @@ export function headerStretch(header: string, candidates: readonly { id: Station
 export function headerStretchEnds(header: string, candidates: readonly { id: StationId; name: string }[]): StationId[] | null {
   const stretch = headerStretch(header, candidates)
   return stretch && [...stretch.from, ...stretch.to]
+}
+
+/**
+ * The stations a header names at the two ends of its stretch: "from X to Y" (headerStretch), else "between X and Y"
+ * ("[Q] runs via the [R] in both directions between Canal St and DeKalb Av"), first line only; null when neither, or
+ * an end names no candidate.
+ */
+export function headerEnds(header: string, candidates: readonly { id: StationId; name: string }[]): StationId[] | null {
+  const stretch = headerStretchEnds(header, candidates)
+  if (stretch) return stretch
+  const line = header.split('\n')[0] ?? ''
+  const m = /\bbetween\s+(.+?)\s+and\s+(.+?)(?=\n|;|\. |,| due to | for | while |$)/i.exec(line)
+  if (!m) return null
+  const from = namedIn([canonTokens(m[1]!)], candidates)
+  const to = namedIn([canonTokens(m[2]!)], candidates)
+  return from.size > 0 && to.size > 0 ? [...from, ...to] : null
+}
+
+/**
+ * The names an alert's header is read against for `route`: every station of the route, so a neighbour with a longer
+ * matching name takes an item, plus the informed ones (a stop the route doesn't normally serve).
+ */
+export function candidatesOf(stationById: ReadonlyMap<StationId, Station>, route: RouteId, informed: readonly StationId[]): { id: StationId; name: string }[] {
+  return [...stationById.values()].filter((st) => st.routeIds.includes(route) || informed.includes(st.id)).map((st) => ({ id: st.id, name: st.name }))
 }
 
 /** How much longer than the straight line from X to Y a station's detour through it may be and still be "between" them. */
@@ -185,8 +225,7 @@ export function skipSetsOf(alert: ServiceAlert, stationById: ReadonlyMap<Station
   for (const route of routes) {
     const entities = alert.entities.filter((e) => e.route === route && e.stop !== null && stationById.has(e.stop))
     const informed = [...new Set(entities.map((e) => e.stop!))]
-    // Every station of the route, so a neighbour with a longer matching name takes the item; then the informed ones.
-    const candidates = [...stationById.values()].filter((st) => st.routeIds.includes(route) || informed.includes(st.id)).map((st) => ({ id: st.id, name: st.name }))
+    const candidates = candidatesOf(stationById, route, informed)
     const named = new Set([...headerNamedStations(alert.header, candidates)].filter((id) => informed.includes(id)))
     let stations: ReadonlySet<StationId>
     let probable = false

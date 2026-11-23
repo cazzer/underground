@@ -3,62 +3,32 @@
  * and the route frame draw. Pure. The MTA lists a change's stops as parent stations in no order; per route and
  * direction they are put in order along the route's own shape, then found on the drawn lines as a trip's ride is
  * (tripSpans.ts rideSpan), so the stretch lies exactly on its direction's track. A skip draws the informed stretch at
- * full colour and marks only the stations skipped; a suspension (part or whole) draws its stretch dashed. Nothing here
- * says more than the notice: the panel says the drawing is ours.
+ * full colour and marks only the stations skipped; a suspension (part or whole) draws its stretch dashed; an Express to
+ * Local change and a reroute are drawn by their stations (changeDrawStops.ts). Nothing here says more than the notice:
+ * the panel says the drawing is ours.
  */
 import type { AlertEntity, ServiceAlert } from '../data/realtime'
-import type { Direction, RouteId, StationId, StopId } from '../data/schema'
+import type { Direction, RouteId, StationId } from '../data/schema'
+import { addedSetsOf, type ServiceOf } from './live/alertAdded'
 import { alertKindOf, sharedDirection, skipSetsOf } from './live/alertStations'
 import type { Station } from './network'
-import { projectForward } from './realtime/polyline'
+import { BOTH, informedOf, orderedRun, type ChangeDrawContext } from './changeRun'
+import { localChangeDraw, rerouteChangeDraw, rerouteStations } from './changeDrawStops'
 import type { TripRouteDraw } from './tripLineBuffers'
 import type { TripMark } from './tripMarks'
-import { MAX_STOP_OFFSET_M, rideSpan, type RideShapeSpan, type SpanShape } from './tripSpans'
+import { rideSpan, type RideShapeSpan } from './tripSpans'
 
-export interface ChangeDrawContext {
-  /** The drawn shapes (banded once the bands arrive): the stretches are found on what TripLines draws. */
-  shapes: readonly SpanShape[]
-  stationById: ReadonlyMap<StationId, Station>
-  stopStations: ReadonlyMap<StopId, Station>
-}
+export type { ChangeDrawContext } from './changeRun'
 
 export interface ChangeDraw {
   route: TripRouteDraw
   /** Some skipped stations are our guess from the stops listed (RouteSkipSet.probable): the panel says "probably". */
   probable: boolean
-}
-
-const BOTH: readonly Direction[] = ['N', 'S']
-const START = { segment: 0, t: 0 }
-
-/** The stations of `route` the alert lists, each once in feed order (a station the network lacks is left out). */
-function informedOf(alert: ServiceAlert, route: RouteId, stationById: ReadonlyMap<StationId, Station>): StationId[] {
-  const ids = alert.entities.filter((e) => e.route === route && e.stop !== null && stationById.has(e.stop)).map((e) => e.stop!)
-  return [...new Set(ids)]
-}
-
-/**
- * The stations' child stops of `direction`, in order along the route's first shape of that direction (primary first,
- * then by id) that passes within MAX_STOP_OFFSET_M of all of them; null when no shape does. A station with no stop of
- * that direction (a terminal's) is left out.
- */
-function orderedRun(route: RouteId, direction: Direction, ids: readonly StationId[], ctx: ChangeDrawContext): StopId[] | null {
-  const stops = ids.flatMap((id) => {
-    const station = ctx.stationById.get(id)
-    const stop = station?.stops.find((s) => s.endsWith(direction))
-    return station && stop ? [{ stop, pos: station.pos }] : []
-  })
-  if (stops.length === 0) return null
-  const shapes = ctx.shapes
-    .filter((s) => s.routeId === route && s.direction === direction)
-    .sort((a, b) => Number(b.primary) - Number(a.primary) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-  for (const shape of shapes) {
-    const hits = stops.map((s) => projectForward(shape, s.pos, START))
-    if (hits.every((h) => h.offsetM <= MAX_STOP_OFFSET_M)) {
-      return stops.map((s, i) => ({ stop: s.stop, d: hits[i]!.distance })).sort((a, b) => a.d - b.d).map((s) => s.stop)
-    }
-  }
-  return null
+  /**
+   * What the drawing rests on: the notice alone, the notice and our timetable (an Express to Local change's added stops
+   * are the informed ones the route doesn't normally call at), or only the stations the notice names (a reroute).
+   */
+  basis: 'notice' | 'timetable' | 'names'
 }
 
 /**
@@ -96,7 +66,8 @@ const hasStop = (e: AlertEntity, stationById: ReadonlyMap<StationId, Station>): 
  * lie on no line). A skip: per route its informed stretch, on the skip set's direction (both when the MTA names none),
  * and a mark at each station skipped (once, however many routes skip it; a complex's member at its own point). A
  * suspension: per route with stops its informed stretch, dashed, the ends unserved but unmarked; a route the alert names
- * only whole (a full suspension) every primary shape of it. Throws only for a broken network (a stop no station lists).
+ * only whole (a full suspension) every primary shape of it. An Express to Local change and a reroute: changeDrawStops.ts.
+ * Throws only for a broken network (a stop no station lists).
  */
 export function serviceChangeDraw(alert: ServiceAlert, ctx: ChangeDrawContext, key: string): ChangeDraw | null {
   const kind = alertKindOf(alert.type)
@@ -105,7 +76,16 @@ export function serviceChangeDraw(alert: ServiceAlert, ctx: ChangeDrawContext, k
   const marks = new Map<StationId, TripMark>()
   const stations = new Set<StationId>()
   let probable = false
-  if (kind === 'skip') {
+  let basis: ChangeDraw['basis'] = 'notice'
+  let frame: StationId[] | null = null
+  if (kind === 'local' || kind === 'reroute') {
+    const d = kind === 'local' ? localChangeDraw(alert, ctx) : rerouteChangeDraw(alert, ctx)
+    rides.push(...d.rides)
+    for (const m of d.marks) marks.set(m.stationId, m)
+    for (const id of d.stations) stations.add(id)
+    frame = d.frame
+    basis = kind === 'local' ? 'timetable' : 'names'
+  } else if (kind === 'skip') {
     for (const set of skipSetsOf(alert, ctx.stationById)) {
       const informed = informedOf(alert, set.route, ctx.stationById)
       rides.push(...stretches(alert.id, set.route, set.direction ? [set.direction] : BOTH, informed, ctx))
@@ -134,25 +114,29 @@ export function serviceChangeDraw(alert: ServiceAlert, ctx: ChangeDrawContext, k
   } else return null
   if (rides.length === 0 && suspended.length === 0 && marks.size === 0) return null
   const ids = [...stations]
-  const frameStations = ids.map((id) => {
+  const frameStations = (frame ?? ids).map((id) => {
     const pos = ctx.stationById.get(id)!.pos
     return { x: pos.x, z: pos.z }
   })
   return {
     route: { kind: 'change', key, rides, suspended, straights: [], walks: [], marks: [...marks.values()], stations: ids, frameStations, faint: false },
     probable,
+    basis,
   }
 }
 
 /**
  * Whether a list row can be picked to draw: what serviceChangeDraw draws, by its own rules, without geometry. A skip
- * with a skip set (it always marks); a suspension, part or whole, with a route that lists two stations or more (a
- * stretch; one station draws nothing), or for a whole suspension a route named alone that some station serves. Only a
- * stretch no drawn line holds (warned) can still draw nothing (changeDrawNote says so).
+ * with a skip set (it always marks); an Express to Local change with an added set (it marks them; none while
+ * `serviceOf` is null); a reroute with a named station; a suspension, part or whole, with a route that lists two
+ * stations or more (a stretch; one station draws nothing), or for a whole suspension a route named alone that some
+ * station serves. Only a stretch no drawn line holds (warned) can still draw nothing (changeDrawNote says so).
  */
-export function changeDrawable(alert: ServiceAlert, stationById: ReadonlyMap<StationId, Station>): boolean {
+export function changeDrawable(alert: ServiceAlert, stationById: ReadonlyMap<StationId, Station>, serviceOf: ServiceOf | null): boolean {
   const kind = alertKindOf(alert.type)
   if (kind === 'skip') return skipSetsOf(alert, stationById).length > 0
+  if (kind === 'local') return serviceOf !== null && addedSetsOf(alert, { stationById, serviceOf }).length > 0
+  if (kind === 'reroute') return rerouteStations(alert, stationById).length > 0
   if (kind !== 'part' && kind !== 'suspended') return false
   return [...new Set(alert.entities.map((e) => e.route))].some((route) => {
     const ofRoute = alert.entities.filter((e) => e.route === route)
@@ -163,14 +147,17 @@ export function changeDrawable(alert: ServiceAlert, stationById: ReadonlyMap<Sta
 
 export const DRAWN_NOTE = 'Drawn from the MTA notice'
 export const PROBABLE_NOTE = `${DRAWN_NOTE} · skipped stops probably as shown`
+export const TIMETABLE_NOTE = 'Drawn from the MTA notice and our timetable'
+export const NAMES_NOTE = "Stations named in the MTA notice · the new route isn't drawn"
 export const NOT_DRAWN_NOTE = "Can't be drawn on the map"
 
 /**
- * The picked row's dim line: the drawing is ours, from the MTA's notice (and the skips our guess), or nothing drew.
+ * The picked row's dim line: the drawing is ours, from the MTA's notice (and the skips our guess, or the added stops
+ * from our timetable), only the stations a reroute names, or nothing drew.
  * `from` is the start of a change not yet in effect ("11:45 PM", nyWhen's wording), so the map isn't read as now.
  */
 export function changeDrawNote(draw: ChangeDraw | null, from: string | null = null): string {
   if (draw === null) return NOT_DRAWN_NOTE
-  const note = draw.probable ? PROBABLE_NOTE : DRAWN_NOTE
+  const note = draw.basis === 'timetable' ? TIMETABLE_NOTE : draw.basis === 'names' ? NAMES_NOTE : draw.probable ? PROBABLE_NOTE : DRAWN_NOTE
   return from === null ? note : `${note} · from ${from}`
 }

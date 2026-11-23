@@ -38,7 +38,7 @@ const EXPRESS_AT = 1796190000
 /** The Worker's answer at `nowS` (it is polled then), joined at that moment. */
 function joinAt(id: string, nowS: number) {
   const input = { configured: true, snapshot: transformAlerts(FEED, nowS).snapshot, failures: 0, schemaMismatch: false }
-  return joinStationChanges(realGroupById.get(id)!, stationById, input, nowS, routeOrder)
+  return joinStationChanges(realGroupById.get(id)!, stationById, input, nowS, routeOrder, null)
 }
 const changesAt = (id: string, nowS: number): StationChange[] => {
   const { panel } = joinAt(id, nowS)

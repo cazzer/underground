@@ -6,8 +6,32 @@ import type { StationId, StopId } from '../data/schema'
 import type { Station } from './network'
 import type { Ground } from './projection'
 
-/** `start` and `end` draw filled, `change` hollow; `skip` (a service change's skipped station, changeDraw.ts) hollow with a cross. 08r.8 adds `added`. */
-export type TripMarkRole = 'start' | 'change' | 'end' | 'skip'
+/**
+ * `start` and `end` draw filled, `change` hollow. A service change's (changeDraw.ts): `skip` (a skipped station) hollow
+ * with a cross, `added` (a stop an Express to Local change adds) filled, `named` (a station a reroute's notice names) a
+ * plain ring: the three read apart by shape, not colour alone.
+ */
+export type TripMarkRole = 'start' | 'change' | 'end' | 'skip' | 'added' | 'named'
+
+/** What a mark draws inside its ring: a dot, a cross, or neither. */
+export interface MarkParts {
+  dot: boolean
+  cross: boolean
+}
+
+const PARTS: Readonly<Record<TripMarkRole, Readonly<MarkParts>>> = {
+  start: { dot: true, cross: false },
+  end: { dot: true, cross: false },
+  change: { dot: false, cross: false },
+  skip: { dot: false, cross: true },
+  added: { dot: true, cross: false },
+  named: { dot: false, cross: false },
+}
+
+/** The parts of `role`'s mark (one shared object per role, so a frame that reads it allocates nothing). */
+export function markParts(role: TripMarkRole): Readonly<MarkParts> {
+  return PARTS[role]
+}
 
 export interface TripMark {
   stationId: StationId

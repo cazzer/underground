@@ -208,7 +208,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Trip walk tokens (TripDashes.tsx, 2q7.45.4): `tripWalkDashPx` (6) and `tripWalkGapPx` (4), CSS px at the view's target, dash the
   trip's walks between stations and its straight-drawn rides; the walks and the trip marks are `exitPath`, at least 2.5:1 over every
   route dimmed by `tripNetworkDim` (2.66:1 over N/Q/R/W) and, faint, on the background (3.03:1; themeTrip.test.ts).
-  Service change tokens (08r.6, themeChange.test.ts): `changeSkipMark` (ink, a skipped station's ring and cross in TripMarks;
+  Service change tokens (08r.6, themeChange.test.ts): `changeMark` (ink, a skipped station's ring and cross in TripMarks;
   at least 3:1 on the background, 14.4:1, and over every route dimmed by `tripNetworkDim`, 6.76:1 over N), `changeSuspendedDim`
   (0.35: a suspended stretch's route colour mixed this far toward the background, at least 1.45x its dimmed route, 1.51x
   for SI, and 2:1 on the background, 2.04:1 SI) and `changeSuspendedDashPx` / `GapPx` (5 / 4, CSS px at the view's target).
@@ -311,7 +311,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     ring 4.5 from `TRIP_MARK_INNER` 0.62 to 1, a dot 4.55 at `TRIP_MARK_DOT` 0.4 for the start and end only, so a change reads
     hollow, and for a service change's `skip` role (08r.6) no dot but a cross, two arms `SKIP_CROSS_WIDTH` 0.2 wide reaching
     `SKIP_CROSS_HALF` 0.62, one outline so nothing draws twice as it fades; its `look` prop, the route's `kind`, colours every
-    mesh `changeSkipMark` for a change, `exitPath` for a trip, and orders them: a trip's at 4.4 to 4.55 under the trains, a
+    mesh `changeMark` for a change, `exitPath` for a trip, and orders them: a trip's at 4.4 to 4.55 under the trains, a
     change's over every train and car at 6.53 (halo), 6.535 (ring) and 6.54 (cross), so no train hides a skip; a skip mark is
     full size), radius `screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS 9)` (cameraDistance.ts: 1.6x the station marker,
     5..13 px), a change at `CHANGE_MARK_SHARE` 0.7 of it, and a start the location reticle overlaps (the fix within its radius

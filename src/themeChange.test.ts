@@ -1,6 +1,6 @@
 /**
  * A picked service change's look (08r.6, through the trip's route view): the network dims by `tripNetworkDim` as for a
- * trip; a skipped station's ring and cross (TripMarks.tsx) are `changeSkipMark`; a suspended stretch (TripLines.tsx)
+ * trip; a skipped station's ring and cross (TripMarks.tsx) are `changeMark`; a suspended stretch (TripLines.tsx)
  * dashes in its route colour mixed `changeSuspendedDim` toward the background. The mixes are the sRGB ones mixHex
  * makes (lineDim.test.ts holds the shader to it), so these contrasts are what draws.
  */
@@ -29,10 +29,10 @@ const MIN_SUSPENDED_ON_BACKGROUND = 2
 describe('service change tokens', () => {
   it('keep the skip mark at 3:1 on the background and over every route dimmed by the network dim', async () => {
     for (const t of Object.values(await themes())) {
-      expect(contrastRatio(t.changeSkipMark, t.background), `${t.name} skip on background`).toBeGreaterThanOrEqual(MIN_SKIP)
+      expect(contrastRatio(t.changeMark, t.background), `${t.name} skip on background`).toBeGreaterThanOrEqual(MIN_SKIP)
       for (const r of routes) {
         const dimmed = mixHex(routeLineColor(`#${r.color}`, t.routeLineMix, t.background), t.background, t.tripNetworkDim)
-        expect(contrastRatio(t.changeSkipMark, dimmed), `${t.name} skip over dimmed ${r.id}`).toBeGreaterThanOrEqual(MIN_SKIP)
+        expect(contrastRatio(t.changeMark, dimmed), `${t.name} skip over dimmed ${r.id}`).toBeGreaterThanOrEqual(MIN_SKIP)
       }
     }
   })

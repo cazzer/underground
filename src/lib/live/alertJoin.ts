@@ -2,6 +2,7 @@ import { ALERT_WINDOW_S, type AlertEntity, type AlertsSnapshot, type ServiceAler
 import type { Direction, RouteId, StationId } from '../../data/schema'
 import type { Station } from '../network'
 import type { StationGroup } from '../stationGroups'
+import { addedSetsOf, type ServiceOf } from './alertAdded'
 import { alertKindOf, sharedDirection, skipSetsOf, stretchEnds } from './alertStations'
 import { lineKey } from './lineFilter'
 
@@ -27,8 +28,8 @@ export interface AlertsInput {
   schemaMismatch: boolean
 }
 
-/** What a change does at this station: trains skip it, there is no service here, or a notice we only quote. */
-export type ChangeKind = 'skipped' | 'suspended' | 'other'
+/** What a change does at this station: trains skip it, there is no service here, an express stops here, or a notice we only quote. */
+export type ChangeKind = 'skipped' | 'suspended' | 'added' | 'other'
 
 export interface StationChange {
   alertId: string
@@ -75,7 +76,7 @@ export function alertsStatus(input: AlertsInput, nowS: number): AlertsStatus {
 }
 
 const NONE: ChangesJoin = { panel: { kind: 'none' }, known: false }
-const KIND_ORDER: Record<ChangeKind, number> = { skipped: 0, suspended: 1, other: 2 }
+const KIND_ORDER: Record<ChangeKind, number> = { skipped: 0, suspended: 1, added: 2, other: 3 }
 
 export interface RelevantPeriod {
   now: boolean
@@ -128,6 +129,7 @@ function classify(
   reaching: readonly AlertEntity[],
   memberIds: ReadonlySet<StationId>,
   stationById: ReadonlyMap<StationId, Station>,
+  serviceOf: ServiceOf | null,
 ): Classified {
   const direction = sharedDirection(reaching.map((e) => e.direction))
   const other: Classified = { kind: 'other', probable: false, direction }
@@ -143,6 +145,12 @@ function classify(
       return partSuspendedHere(informed, memberIds, stationById) ? { kind: 'suspended', probable: false, direction } : other
     case 'suspended':
       return reaching.length > 0 ? { kind: 'suspended', probable: false, direction } : other
+    case 'local': {
+      if (serviceOf === null) return other
+      const sets = addedSetsOf(alert, { stationById, serviceOf }).filter((s) => s.route === route && [...memberIds].some((id) => s.stations.has(id)))
+      if (sets.length === 0) return other
+      return { kind: 'added', probable: false, direction: sets.length === 1 ? sets[0]!.direction : null }
+    }
     default:
       return other
   }
@@ -155,6 +163,9 @@ function classify(
  * MTA header rides along verbatim. Only alerts in effect or starting within a day count (re-checked here against
  * `nowS`, since the Worker's body is up to minutes old). With no snapshot younger than ALERTS_MAX_AGE_S, or a
  * version mismatch, the panel is `unknown`; two failed polls with nothing yet is also unknown, one is still connecting.
+ * An Express to Local change is `added` where it adds a stop (alertAdded.ts, over `serviceOf`, the normal service); while
+ * `serviceOf` is null (the trip patterns not loaded) it is `other`, and the join isn't `known`, so the row turning
+ * `added` once they load is never announced as news.
  */
 export function joinStationChanges(
   group: StationGroup,
@@ -162,6 +173,7 @@ export function joinStationChanges(
   input: AlertsInput,
   nowS: number,
   routeOrder: ReadonlyMap<RouteId, number>,
+  serviceOf: ServiceOf | null,
 ): ChangesJoin {
   const status = alertsStatus(input, nowS)
   if (status === 'none') return NONE
@@ -172,14 +184,17 @@ export function joinStationChanges(
   const routes = new Set(group.routeIds)
   const rank = (r: RouteId) => routeOrder.get(r) ?? Infinity
   const merged = new Map<string, StationChange>()
+  let waiting = false
   for (const alert of snapshot.alerts) {
     const period = relevantPeriod(alert, nowS)
     if (period === null) continue
-    const exact = alertKindOf(alert.type) === 'suspended'
+    const kind = alertKindOf(alert.type)
+    const exact = kind === 'suspended'
     const reaching = alert.entities.filter((e) => reaches(e, memberIds, lines, routes, exact))
+    if (kind === 'local' && serviceOf === null && reaching.length > 0) waiting = true
     for (const route of new Set(reaching.map((e) => e.route))) {
       const ofRoute = reaching.filter((e) => e.route === route)
-      const c = classify(alert, route, ofRoute, memberIds, stationById)
+      const c = classify(alert, route, ofRoute, memberIds, stationById, serviceOf)
       const wide = ofRoute.every((e) => e.stop === null)
       const key = `${alert.id}|${c.kind}|${c.direction ?? ''}`
       const have = merged.get(key)
@@ -212,5 +227,5 @@ export function joinStationChanges(
       (a.from ?? 0) - (b.from ?? 0) ||
       (a.alertId < b.alertId ? -1 : a.alertId > b.alertId ? 1 : 0),
   )
-  return { panel: changes.length > 0 ? { kind: 'changes', changes } : { kind: 'none' }, known: true }
+  return { panel: changes.length > 0 ? { kind: 'changes', changes } : { kind: 'none' }, known: !waiting }
 }

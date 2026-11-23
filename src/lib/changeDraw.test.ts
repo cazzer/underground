@@ -21,7 +21,7 @@ const shape = (id: string, direction: 'N' | 'S', xs: number[], primary = true): 
   return { id, routeId: 'G', direction, primary, points, cumulative, length: cumulative.at(-1)! }
 }
 const shapes = [shape('G..N', 'N', [0, 500, 1000, 1500]), shape('G..S', 'S', [1500, 1000, 500, 0]), shape('G..N2', 'N', [500, 1000], false)]
-const ctx: ChangeDrawContext = { shapes, stationById: new Map(stations.map((s) => [s.id, s])), stopStations: stopStations(stations) }
+const ctx: ChangeDrawContext = { shapes, stationById: new Map(stations.map((s) => [s.id, s])), stopStations: stopStations(stations), serviceOf: null }
 
 const at = (stop: string | null, direction: 'N' | 'S' | null = null, route = 'G'): AlertEntity => ({ route, stop, direction })
 const alert = (type: string, header: string, entities: AlertEntity[]): ServiceAlert => ({ id: 'a', type, header, periods: [[0, null]], entities })
@@ -84,17 +84,17 @@ describe('serviceChangeDraw', () => {
 describe('changeDrawable', () => {
   const by = ctx.stationById
   it('takes skips with a skip set, suspensions with a stretch of two stations or a whole route', () => {
-    expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips Bravo St', [at('G2')]), by)).toBe(true)
-    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at('G2'), at('G3')]), by)).toBe(true)
-    expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at(null)]), by)).toBe(true)
+    expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips Bravo St', [at('G2')]), by, null)).toBe(true)
+    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at('G2'), at('G3')]), by, null)).toBe(true)
+    expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at(null)]), by, null)).toBe(true)
   })
   it('refuses other kinds, a part suspension with no stop, and stations the network lacks', () => {
-    expect(changeDrawable(alert('Delays', 'Delays', [at(null)]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at(null)]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips X', [at('X1')]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at('X1')]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G] at Alpha Av', [at('G1')]), by)).toBe(false)
-    expect(changeDrawable(alert('Planned - Suspended', 'No [Z]', [at(null, null, 'Z')]), by)).toBe(false)
+    expect(changeDrawable(alert('Delays', 'Delays', [at(null)]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at(null)]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips X', [at('X1')]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at('X1')]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G] at Alpha Av', [at('G1')]), by, null)).toBe(false)
+    expect(changeDrawable(alert('Planned - Suspended', 'No [Z]', [at(null, null, 'Z')]), by, null)).toBe(false)
   })
   it('agrees with what serviceChangeDraw draws on every synthetic case', () => {
     const cases = [
@@ -105,7 +105,7 @@ describe('changeDrawable', () => {
       alert('Planned - Suspended', 'No [G]', [at('G1'), at(null)]),
       alert('Delays', 'Delays', [at(null)]),
     ]
-    for (const a of cases) expect(changeDrawable(a, by), a.header).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
+    for (const a of cases) expect(changeDrawable(a, by, null), a.header).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
   })
 })
 

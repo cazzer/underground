@@ -26,7 +26,7 @@ const network = buildNetwork(
   2,
 )
 const banded = bandNetwork(network)
-const ctx: ChangeDrawContext = { shapes: banded.shapes, stationById: network.stationById, stopStations: stopStations(network.stations) }
+const ctx: ChangeDrawContext = { shapes: banded.shapes, stationById: network.stationById, stopStations: stopStations(network.stations), serviceOf: null }
 const shapeById = new Map(banded.shapes.map((s) => [s.id, s]))
 const alerts = transformAlerts(JSON.parse(readFileSync('worker/fixtures/alerts.json', 'utf8')) as unknown, 1795465325).snapshot!.alerts
 const alertOf = (id: string): ServiceAlert => alerts.find((a) => a.id === `lmm:planned_work:${id}`)!
@@ -120,7 +120,7 @@ describe('serviceChangeDraw on the recorded feed', () => {
   })
 
   it('makes a row a button exactly when it draws something, for every alert of the feed', () => {
-    for (const a of alerts) expect(changeDrawable(a, network.stationById), a.id).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
+    for (const a of alerts) expect(changeDrawable(a, network.stationById, null), a.id).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
   })
 
   it('draws nothing for a delay, a notice or an express-to-local change', () => {
