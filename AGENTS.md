@@ -33,6 +33,10 @@ It polls `/alerts` the same way and the station panel lists the MTA's service ch
 Picking a skip or suspension in that list draws it on the map (08r.6): the network dims as under a trip, the affected stretch
 redraws at full colour on its direction's track (a suspended one dashed), each skipped station gets a hollow ring with a
 cross, and the camera frames it top-down; the row says "Drawn from the MTA notice". Closing the list, Esc or a second press ends it.
+An Express to Local change (08r.8) draws the stretch it runs local over and marks each stop it adds (informed stops the route doesn't
+call at in normal service, from the trip patterns) with a ring and a dot ("Drawn from the MTA notice and our timetable"); the station
+panel at an added stop says "[D] stops here (runs local)". A reroute shows only the stations its notice names (informed stops and the
+header's "between X and Y"), each a plain ring, and no path ("Stations named in the MTA notice · the new route isn't drawn").
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
 With the Worker configured the search dialog also finds streets, intersections ("Bedford Av & N 7 St"), addresses and places through `/geocode` (2q7.16, 2q7.14; none of it without `VITE_RT_URL`).
 Trip planning is behind `FEATURES.navigation` (`src/config.ts`), off by default.
@@ -208,7 +212,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   Trip walk tokens (TripDashes.tsx, 2q7.45.4): `tripWalkDashPx` (6) and `tripWalkGapPx` (4), CSS px at the view's target, dash the
   trip's walks between stations and its straight-drawn rides; the walks and the trip marks are `exitPath`, at least 2.5:1 over every
   route dimmed by `tripNetworkDim` (2.66:1 over N/Q/R/W) and, faint, on the background (3.03:1; themeTrip.test.ts).
-  Service change tokens (08r.6, themeChange.test.ts): `changeMark` (ink, a skipped station's ring and cross in TripMarks;
+  Service change tokens (08r.6, themeChange.test.ts): `changeMark` (ink, every service change mark in TripMarks: a skipped
+  station's ring and cross, an added stop's ring and dot, a reroute's named station's plain ring, 08r.8;
   at least 3:1 on the background, 14.4:1, and over every route dimmed by `tripNetworkDim`, 6.76:1 over N), `changeSuspendedDim`
   (0.35: a suspended stretch's route colour mixed this far toward the background, at least 1.45x its dimmed route, 1.51x
   for SI, and 2:1 on the background, 2.04:1 SI) and `changeSuspendedDashPx` / `GapPx` (5 / 4, CSS px at the view's target).
@@ -310,10 +315,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `TripMarks.tsx`, four InstancedMeshes at MARKER_Y (a `theme.background` disc 4.4 at `TRIP_MARK_HALO` 1.2, the `exitPath`
     ring 4.5 from `TRIP_MARK_INNER` 0.62 to 1, a dot 4.55 at `TRIP_MARK_DOT` 0.4 for the start and end only, so a change reads
     hollow, and for a service change's `skip` role (08r.6) no dot but a cross, two arms `SKIP_CROSS_WIDTH` 0.2 wide reaching
-    `SKIP_CROSS_HALF` 0.62, one outline so nothing draws twice as it fades; its `look` prop, the route's `kind`, colours every
+    `SKIP_CROSS_HALF` 0.62, one outline so nothing draws twice as it fades; an `added` role (08r.8) the dot, a `named` role
+    neither, so the three read apart by shape (`markParts` in `lib/tripMarks.ts`, one shared object per role); its `look` prop, the route's `kind`, colours every
     mesh `changeMark` for a change, `exitPath` for a trip, and orders them: a trip's at 4.4 to 4.55 under the trains, a
-    change's over every train and car at 6.53 (halo), 6.535 (ring) and 6.54 (cross), so no train hides a skip; a skip mark is
-    full size), radius `screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS 9)` (cameraDistance.ts: 1.6x the station marker,
+    change's over every train and car at 6.53 (halo), 6.535 (ring and dot) and 6.54 (cross), so no train hides a skip; skip,
+    added and named marks are full size), radius `screenScale(d, tripMarkRadiusPx(d), TRIP_MARK_MIN_METERS 9)` (cameraDistance.ts: 1.6x the station marker,
     5..13 px), a change at `CHANGE_MARK_SHARE` 0.7 of it, and a start the location reticle overlaps (the fix within its radius
     plus the reticle's outer radius, `reticleClearanceInto` in hereShape.ts: `TICK_OUTER` × its scale) grown so its ring ends
     2 px past the reticle's far edge, at most `START_GROWTH_CAP` 2.5×, easing in over the reticle's radius of offset
@@ -999,7 +1005,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `src/lib/live/workerPoll.ts` (`applyWorkerPoll`, pure: state, delay, log, whether to publish; a `PollPolicy` gives the interval, the staleness age and the log label),
   `src/data/useWorkerPoll.ts` (one request at a time, a hidden tab aborts, backoff, a republish when the snapshot goes stale). `useEne` / `enePoll.ts` / `eneFetch.ts` are thin wrappers over them (the `?ene=` dev fake aside).
 - `src/data/useAlerts.ts` polls the Worker's `/alerts` (`ALERTS_URL` = `alertsUrlFrom(RT_URL)`, null without `VITE_RT_URL` or on an MTA host: nothing fetches) every 120 s through
-  `useWorkerPoll`; `alertsFetch.ts` validates one body. Pure joins in `lib/live/`: `alertStations.ts` (`alertKindOf`: the free-text type to skip / part suspended / suspended / other;
+  `useWorkerPoll`; `alertsFetch.ts` validates one body. Pure joins in `lib/live/`: `alertStations.ts` (`alertKindOf`: the free-text type to skip / part suspended / suspended / local ("Express to Local", 08r.8) / reroute / other;
+  `headerStopNamed`: the stations after "stop(s) ... at" ("trains stop at 74 St-Broadway"); `headerEnds`: a stretch's ends, "from X to Y" else "between X and Y" (first line); `candidatesOf`: the route's stations plus the informed ones, which every header read uses;
   `headerNamedStations`: the stations a header names, by whole-word match of a name or a part of it (split on `-`, `/`, parentheses; `searchTokens` canon, so Av/Avenue) in the clause after
   the first "skip" (a header with no "skip", "runs express from A to B", has an empty clause: nothing is named, so the probable rule applies) split into items on ",", "&" and "and", an item matching when it equals the
   name or a part or starts with it, over every station of the alert's route and then intersected with the informed stops: of the candidates an item matches only those whose best matching form is longest (in tokens) are named, a whole name winning a tie (so "149 St-Hostos" is not "3 Av-149 St", "Sutphin Blvd" not "Sutphin Blvd-Archer Av-JFK Airport"; `alertStations.data.test.ts` checks every station of every route), up to a line break, ";", ". ", " due to ", " for " or " while "; `stretchEnds`: the two farthest-apart informed stations; `skipSetsOf` / `RouteSkipSet`: per route of a skip
@@ -1012,8 +1019,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   "Canarsie-bound"), the terminal from `routeTerminals.ts` (`terminalsOf(route, direction, memberIds)`, per station: the route's shapes for that direction that pass within 30 m of a member, each ending at the nearest
   station the route serves to its last point, an end lying on another candidate's path before its end dropped as a short turn; one distinct end is the terminal, several or none is null; startup data only, since the trip
   index loads only with the live feed), else "one direction only" (where branches part, e.g. Rockaway Blvd on the A: honest beats wrong); and `skipSpoken`), `nyWhen.ts` ("7:45 AM", "tomorrow 5 AM", "Fri 11:45 PM", "Dec 31"; `eneText`'s
-  return labels use it) and `alertAnnounce.ts`. `alertJoin.data.test.ts` runs the recorded feed (`worker/fixtures/alerts.json`) through the Worker's transform onto the real stations.
-  `alertSkips.ts` (08r.7) is the same skip sets as a lookup for the train and station panels (App builds one `AlertSkips` per snapshot with `alertSkipsOf`, indexed by route, and passes it through Hud to
+  return labels use it) and `alertAnnounce.ts`. `alertAdded.ts` (08r.8, pure): `serviceIndex(patterns, stationById)` gives a route and direction's
+  normal service (`ServiceOf`, memoised per key; null with no primary): the primary pattern's stations, plus every other pattern's stop
+  the primary doesn't run past (a stop is run past when its nearest primary-called neighbours on both sides are consecutive in the primary:
+  the D's night 4 Av locals; a branch tail or another way round is normal), plus their complexes' other members; `addedSetsOf` /
+  `RouteAddedSet`: per route and direction of an Express to Local alert (an entity with no direction counts for both) the informed stops
+  outside normal service, narrowed to the header's `headerStopNamed` ones when any remain. Known miss: an alert whose route's primary is
+  the local pattern (the E's) adds nothing and lists as a notice. The join's `added` change (`ChangeKind`, after skipped and suspended)
+  is a station in an added set, its direction the set's (both: null); with `serviceOf` null (patterns not loaded) a local alert is
+  `other` and the join isn't `known`, so the row turning `added` is never announced; `alertText` words it "stops here (runs local)" /
+  "stop here (run local)", spoken "The D train runs local and stops here, uptown only, until …", ended "The local stop for … has ended."
+  `src/data/useNormalStops.ts` gives App's `serviceOf`: the live layer's TripLookup (`live.arrivals.lookup`, no fetch of its own) when
+  loaded, else, only while the snapshot holds a local alert, `tripPatterns()` (the planner chunk's trip-index fetch) with the network's
+  primary shapes; a failure logs once. `src/data/useServiceChanges.ts` holds App's alert wiring (the join, the skip sets, the list and
+  its drawable set, the picked change's drawing and note). `alertJoin.data.test.ts` runs the recorded feed (`worker/fixtures/alerts.json`) through the Worker's transform onto the real stations.
+  `alertSkips.ts` (08r.7) is the same skip sets as a lookup for the train and station panels (App, through `useServiceChanges`, builds one `AlertSkips` per snapshot with `alertSkipsOf`, indexed by route, and passes it through Hud to
   `TrainPanel` and `ArrivalsPanel`; both joins share `skipSetsOf`, so they agree): `skipAt(skips, route, direction, stationIds, nowS)` gives `'skips'`, `'probably'` (a `probable` set: a note only, never a strike) or null; only
   alerts in effect now (a period with start <= now < end, no end is open) and null with an index over `ALERTS_MAX_AGE_S` old by the live clock; an alert for a line covers its express (the 6's covers the 6X, not the reverse);
   a null-direction alert covers both directions, and a train of unknown direction matches only those; one whose stop entities mix N and S (or only some name a direction) is a guess (`probably`), never a strike; a named skip beats a guess; `trainLine` takes the train's route (`trainRouteId`) and its direction from
@@ -1059,18 +1079,26 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   aria-hidden dim note line under it (`changeDrawNote`: "Drawn from the MTA notice", "… · skipped stops probably as shown",
   plus " · from 11:45 PM" (nyWhen) for a row under Later today, or "Can't be drawn on the map"); a press keeps focus and
   speaks nothing more; the rest stay a `div`), or a dim "Checking for service changes", "Service changes unavailable" or "No service changes in the next 24 hours." No live region anywhere in it. The header grows a row once the first /alerts poll settles (an inset change only: it starts no flight).
-- Service change on the map (08r.6): `src/lib/changeDraw.ts` (pure) `serviceChangeDraw(alert, { shapes, stationById, stopStations }, key)`
+- Service change on the map (08r.6): `src/lib/changeDraw.ts` (pure) `serviceChangeDraw(alert, { shapes, stationById, stopStations, serviceOf }, key)`
+  (the context and `orderedRun` live in `changeRun.ts`)
   builds the route view (`TripRouteDraw` `kind: 'change'`, below): per route and direction the informed stations' child stops are
   ordered along the route's first shape of that direction (primary first) that passes within `MAX_STOP_OFFSET_M` of all of them,
   then found on the drawn lines by `rideSpan` (a straight fallback, or a run no shape orders, warns and draws nothing). A skip
   (`skipSetsOf`): the informed stretch as `rides`, on the set's direction or both, and a `skip` mark per skipped station (once,
   at the member's own point); a part suspension or a suspension with stops: the stretch as `suspended`, no marks; a suspension
-  naming a route only: every primary shape of it whole. Any other kind, or nothing drawn, is null. `frameStations` are the
-  informed stations' points (a whole route: all its stations). `changeDrawable` (cheap, no geometry) follows the same
-  rules (a suspension needs a route listing two stations, or a whole route some station serves), so a row is a button
-  exactly when it draws (`changeDraw.data.test.ts` checks every fixture alert); `changeDrawNote`.
+  naming a route only: every primary shape of it whole. Express to Local and reroute (08r.8, `changeDrawStops.ts`): per added set the
+  route's primary stations and the added ones ordered along its shape and cut to one station either side of the added stretch, as a
+  ride (36538: 59 St to 125 St on the uptown D track), with an `added` mark per added stop; a reroute draws no ride, only a `named`
+  mark per station its notice names (informed, then `headerEnds`; one per complex, by `leadId`: 36553 marks Canal St and DeKalb Av),
+  every named member kept in `stations`, `frameStations` the marks. Any other kind, or nothing drawn, is null. `frameStations` are
+  otherwise the informed stations' points (a whole route: all its stations). `ChangeDraw.basis` is `notice`, `timetable` (local) or
+  `names` (reroute). `changeDrawable(alert, stationById, serviceOf)` (cheap, no geometry) follows the same rules (a suspension
+  needs a route listing two stations, or a whole route some station serves; a local change an added set, none while `serviceOf` is
+  null; a reroute a named station), so a row is a button exactly when it draws (`changeDraw.data.test.ts` checks every fixture
+  alert at three times); `changeDrawNote` ("Drawn from the MTA notice and our timetable", "Stations named in the MTA notice · the
+  new route isn't drawn").
   `src/data/useChangeRoute.ts` draws the pick while the list still lists it (memo on the pick, the alert's type, header and
-  entities, the paths; a throw logs and draws nothing; no fetch). App: `route = changeRoute?.route ?? tripRoute`, shown while
+  entities, the paths, `serviceOf`; a throw logs and draws nothing; no fetch). App: `route = changeRoute?.route ?? tripRoute`, shown while
   its panel is in front (`'changes'` for a change, `'trip'` for a trip; a trip under the list waits), so Scene draws it through
   SubwayLines (the held route eases out, a trip to change swap remounts TripLines' boundary) and CameraRig frames it.
   `src/ui/useHudSearch.ts` holds the HUD's search dialog handlers (split out of Hud.tsx for the line cap). Esc in an expanded
@@ -1322,7 +1350,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `src/gen/` generated protobufjs decoder (`npm run gen`); never hand-edit
   - `proto/subway-rt.proto` trimmed subset of gtfs-realtime + nyct-subway
   - `fixtures/` recorded feeds for tests (see its README; `ene.json` is the E&E sample, `geocode.json` the GeoSearch and
-    Photon answers)
+    Photon answers, `alerts.json` 14 of the alerts feed's entities, whole and verbatim: the D 36538 Express to Local and Q 36553
+    reroute added in 08r.8, both outside the feed's own 24 h window, so the tests transform it at their period times)
   - `data/streetIndex.json` the generated street index (`npm run data:search:streets`; see the scripts entry above), a plain JSON
     import that wrangler's bundler inlines (evaluated lazily): about 690 KB raw, 181 KB gzipped, the Worker's bundle 981 KiB (226 KiB gzipped)
     against a 64 MiB limit; `npx wrangler check startup` measures its startup (15 to 16 ms, unchanged by the index)
