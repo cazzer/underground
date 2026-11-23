@@ -31,21 +31,23 @@ function ChangeList({ body, routeById, onFocusLost }: ChangeListProps) {
     <div className="mt-2 text-xs">
       <DisclosureToggle label="Service changes" markClass="bg-status-warn" expanded={expanded} count={body.rows.length} controls={listId} onToggle={() => setExpanded((e) => !e)} onFocusLost={onFocusLost} />
       {expanded && (
-        <ul id={listId} aria-label="Service changes" className="mt-1 space-y-2">
+        <ul id={listId} aria-label="Service changes" className="mt-1">
           {body.rows.map((row) => (
-            <li key={row.key}>
-              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-ink">
-                {row.routes.map((id) => {
-                  const route = routeById.get(id)
-                  return route ? (
-                    <RouteChip key={id} route={route} as="span">
-                      <span className="sr-only">{routeSpokenName(route.shortName)} train</span>
-                    </RouteChip>
-                  ) : (
-                    <span key={id}>{id}</span>
-                  )
-                })}
-                <span>
+            <li key={row.key} className="border-t border-edge py-2 last:pb-0">
+              <div className="flex items-start gap-1.5 text-ink">
+                <span className="flex shrink-0 gap-1">
+                  {row.routes.map((id) => {
+                    const route = routeById.get(id)
+                    return route ? (
+                      <RouteChip key={id} route={route} as="span">
+                        <span className="sr-only">{routeSpokenName(route.shortName)} train</span>
+                      </RouteChip>
+                    ) : (
+                      <span key={id}>{id}</span>
+                    )
+                  })}
+                </span>
+                <span className="min-w-0">
                   {row.parts.map((part, i) => (
                     <span key={part}>
                       {i > 0 && ' · '}
@@ -53,8 +55,8 @@ function ChangeList({ body, routeById, onFocusLost }: ChangeListProps) {
                     </span>
                   ))}
                 </span>
-              </span>
-              <p className="mt-1 whitespace-pre-line border-l-2 border-edge pl-2 text-ink-dim">{row.header}</p>
+              </div>
+              <p className="mt-1 whitespace-pre-line break-words border-l-2 border-edge pl-2 text-ink-dim">{row.header}</p>
             </li>
           ))}
         </ul>
@@ -88,6 +90,19 @@ function useChangesAnnouncement(stationId: string, view: ServiceChangeView): str
   return said.stationId === stationId ? said.text : ''
 }
 
+/**
+ * One polite screen-reader-only region that speaks only a change at the station already open. It is mounted outside
+ * the panel's collapsible body, so it still speaks while the panel is collapsed to its bar.
+ */
+export function ServiceChangeAnnouncer({ view, stationId }: { view: ServiceChangeView; stationId: string }) {
+  const announcement = useChangesAnnouncement(stationId, view)
+  return (
+    <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      {announcement}
+    </div>
+  )
+}
+
 interface ServiceChangeStatusProps {
   view: ServiceChangeView
   stationId: string
@@ -98,17 +113,8 @@ interface ServiceChangeStatusProps {
 
 /**
  * The station panel's service changes: a closed "Service changes (N)" disclosure over the rows, or a dim "Service
- * changes unavailable" line (never "none" when the data is old). Nothing renders without the Worker. One polite
- * screen-reader-only region stays mounted and speaks only a change at the station already open.
+ * changes unavailable" line (never "none" when the data is old). Nothing renders without the Worker.
  */
 export function ServiceChangeStatus({ view, stationId, routeById, onFocusLost }: ServiceChangeStatusProps) {
-  const announcement = useChangesAnnouncement(stationId, view)
-  return (
-    <>
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-        {announcement}
-      </div>
-      <ChangeList key={`${stationId}|${view.body.kind}`} body={view.body} routeById={routeById} onFocusLost={onFocusLost} />
-    </>
-  )
+  return <ChangeList key={`${stationId}|${view.body.kind}`} body={view.body} routeById={routeById} onFocusLost={onFocusLost} />
 }

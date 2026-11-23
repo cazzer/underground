@@ -12,8 +12,8 @@ import { PartialAccessNote, StationName } from './AccessIcon'
 import { ArrivalsList } from './ArrivalsList'
 import { EntranceList } from './EntranceList'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
-import { OutageStatus } from './OutageStatus'
-import { ServiceChangeStatus } from './ServiceChangeStatus'
+import { OutageAnnouncer, OutageStatus } from './OutageStatus'
+import { ServiceChangeAnnouncer, ServiceChangeStatus } from './ServiceChangeStatus'
 import { CollapseButton, ExpandBar } from './PanelBar'
 import type { LineFilterControl } from './useLineFilter'
 import { usePanelToggle } from './usePanelToggle'
@@ -53,8 +53,8 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   const access = accessLabel(station.access)
   // Said after the name (and its access words) only when this station is skipped right now, so a rider hears it first.
-  const skipSaid = changes.skipSpoken === '' ? '' : `${access === null ? '. ' : ' '}${changes.skipSpoken}`
-  const barLabel = `Arrivals at ${station.name}${access === null ? '' : `, ${access}${outages.noStepFree ? '; no step-free access now' : ''}.`}${skipSaid}`
+  const skipSaid = changes.skipSpoken
+  const barLabel = `Arrivals at ${station.name}${access === null ? '' : `, ${access}${outages.noStepFree ? '; no step-free access now' : ''}.`}${skipSaid === '' ? '' : `${access === null ? '. ' : ' '}${skipSaid}`}`
   return (
     <aside
       ref={ref}
@@ -71,11 +71,14 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
         <div className="flex items-start justify-between gap-3">
           <h2 ref={setHeading} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
             <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} />
-            {skipSaid !== '' && <span className="sr-only">{skipSaid}</span>}
+            {skipSaid !== '' && <>{' '}<span className="sr-only">{skipSaid}</span></>}
           </h2>
           <CollapseButton label="Collapse station panel" controls={bodyId} onCollapse={collapse} />
         </div>
       )}
+      {/* Outside the body, which is hidden when collapsed: a hidden live region says nothing. */}
+      <OutageAnnouncer view={outages} stationId={stationId} />
+      <ServiceChangeAnnouncer view={changes} stationId={stationId} />
       <div id={bodyId} hidden={collapsed}>
         {station.otherNames.length > 0 && <p className="mt-1 text-sm text-ink-dim">with {station.otherNames.join(', ')}</p>}
         <PartialAccessNote access={station.access} />

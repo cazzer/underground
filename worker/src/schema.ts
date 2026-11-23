@@ -83,7 +83,6 @@ export interface ServiceAlert {
   id: string                  // entity id ("lmm:planned_work:35124")
   type: string | null         // mercury alert_type, free text ("Planned - Stops Skipped"), at most 80 chars, else null
   header: string              // header_text's `en` translation, VERBATIM: MTA terms forbid editing it
-  period: string | null       // human_readable_active_period's `en` text, verbatim, at most 200 chars, else null
   periods: AlertPeriod[]      // those overlapping the window, by start, the first ALERT_MAX_PERIODS; not clipped
   entities: AlertEntity[]     // deduped, in feed order, the first ALERT_MAX_ENTITIES
 }

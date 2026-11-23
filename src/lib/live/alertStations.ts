@@ -20,13 +20,14 @@ export function alertKindOf(type: string | null): AlertKind {
 
 /**
  * The words of a header that name the stations a skip is about: after the first "skip"/"skips" up to the first line
- * break, ";", ". ", " due to ", " for " or " while " (a header with no "skip" gives its first line). The stretch that
- * follows, "Woodside-61 St" on a second line or "the Thanksgiving Day Parade", is never read as a station.
+ * break, ";", ". ", " due to ", " for " or " while ". The stretch that follows, "Woodside-61 St" on a second line or
+ * "the Thanksgiving Day Parade", is never read as a station. A header with no "skip" ("runs express from A to B")
+ * names nothing: its two stations are the ends of the stretch, not skipped ones, so the empty clause sends the
+ * caller to the informed stops.
  */
 export function skipClause(header: string): string {
-  const firstLine = header.split('\n')[0] ?? ''
   const m = /\bskips?\b/i.exec(header)
-  if (!m) return firstLine
+  if (!m) return ''
   const after = header.slice(m.index + m[0].length)
   const cut = after.search(/\n|;|\. | due to | for | while /i)
   return cut === -1 ? after : after.slice(0, cut)
@@ -34,27 +35,27 @@ export function skipClause(header: string): string {
 
 const canonTokens = (text: string): string[] => searchTokens(text).map((t) => t.canon)
 
-function containsRun(haystack: readonly string[], needle: readonly string[]): boolean {
-  if (needle.length === 0) return false
-  for (let i = 0; i + needle.length <= haystack.length; i++) {
-    if (needle.every((t, j) => haystack[i + j] === t)) return true
-  }
-  return false
+/** The clause's items, split on ",", "&" and "and": each is one station name, maybe with words after it ("in both directions"). */
+function clauseItems(clause: string): string[][] {
+  return clause.split(/,|&|\band\b/i).map(canonTokens).filter((t) => t.length > 0)
 }
+
+const startsWith = (item: readonly string[], form: readonly string[]): boolean => form.every((t, i) => item[i] === t)
 
 /** A station name and its parts: split on "-", "/" and parentheses ("Times Sq-42 St" is also "Times Sq" and "42 St"). */
 function nameForms(name: string): string[][] {
-  const parts = [name, ...name.split(/[-/()]/)].map(canonTokens).filter((t) => t.length > 0)
-  return parts
+  return [name, ...name.split(/[-/()]/)].map(canonTokens).filter((t) => t.length > 0)
 }
 
 /**
- * The candidates the header names: the whole name, or any part of it, appears in the clause as whole words
- * ("25 St" is not in "125 St"; "Av" and "Avenue", "Ft" and "Fort" are the same word).
+ * The candidates the header names: some item of the clause is the whole name, or one of its parts, or starts with it
+ * (so "81 St-Museum of Natural History in both directions" and a trailing "- Take the A" still match). Whole words,
+ * from the item's start: "25 St" is not "125 St", and "4 Av-9 St" does not name Smith-9 Sts nor "3 Av-149 St"
+ * 149 St-Hostos. "Av" and "Avenue", "Ft" and "Fort" are the same word.
  */
 export function headerNamedStations(header: string, candidates: readonly { id: StationId; name: string }[]): Set<StationId> {
-  const clause = canonTokens(skipClause(header))
-  return new Set(candidates.filter((c) => nameForms(c.name).some((form) => containsRun(clause, form))).map((c) => c.id))
+  const items = clauseItems(skipClause(header))
+  return new Set(candidates.filter((c) => nameForms(c.name).some((form) => items.some((item) => startsWith(item, form)))).map((c) => c.id))
 }
 
 /**

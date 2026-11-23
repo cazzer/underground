@@ -14,7 +14,6 @@ const ID_PATTERN = /^[\w:.-]{1,100}$/
 const ROUTE_PATTERN = /^[A-Z0-9]{1,4}$/
 const STOP_PATTERN = /^[A-Z0-9]{1,6}$/
 const TYPE_MAX_CHARS = 80
-const PERIOD_TEXT_MAX_CHARS = 200
 
 type Rec = Record<string, unknown>
 
@@ -114,12 +113,10 @@ export function transformAlerts(json: unknown, generatedAt: number): AlertsTrans
     periodsCut += Math.max(0, inWindow.length - ALERT_MAX_PERIODS)
     const meta = isRecord(alert['transit_realtime.mercury_alert']) ? alert['transit_realtime.mercury_alert'] : {}
     const type = typeof meta.alert_type === 'string' && meta.alert_type.length <= TYPE_MAX_CHARS ? meta.alert_type : null
-    const period = englishText(meta.human_readable_active_period)
     alerts.push({
       id,
       type,
       header,
-      period: period !== null && period.length <= PERIOD_TEXT_MAX_CHARS ? period : null,
       periods: inWindow.slice(0, ALERT_MAX_PERIODS),
       entities,
     })

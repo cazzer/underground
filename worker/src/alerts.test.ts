@@ -43,7 +43,7 @@ describe('transformAlerts on the recorded feed', () => {
       'lmm:planned_work:35972',
       'lmm:planned_work:35976',
     ])
-    expect(r.outsideWindow).toBe(1)
+    expect(r.outsideWindow).toBe(2)
   })
 
   it('passes every header through byte for byte, the line break of 31498 included', () => {
@@ -66,11 +66,10 @@ describe('transformAlerts on the recorded feed', () => {
     ])
   })
 
-  it('keeps the type and the human-readable period verbatim', () => {
+  it('keeps the type verbatim and ships no human-readable period', () => {
     const a = byId(GENERATED_AT).get('lmm:planned_work:35124')!
     expect(a.type).toBe('Planned - Stops Skipped')
-    expect(a.period).toBe('All times, until 1st Quarter 2027')
-    expect(byId(GENERATED_AT).get('lmm:alert:277657:26')!.period).toBeNull()
+    expect(Object.keys(a).sort()).toEqual(['entities', 'header', 'id', 'periods', 'type'])
   })
 
   it('keeps only the periods overlapping the window, unclipped, with a missing start as 0 and a missing end as null', () => {
@@ -163,10 +162,9 @@ describe('transformAlerts bad input', () => {
     expect(r.entitiesDropped).toBe(2)
   })
 
-  it('nulls a type or a period over its cap rather than cutting it', () => {
-    const meta = { alert_type: 't'.repeat(81), human_readable_active_period: { translation: [{ text: 'p'.repeat(201), language: 'en' }] } }
-    const a = run([entity({ 'transit_realtime.mercury_alert': meta })]).snapshot.alerts[0]!
-    expect(a).toMatchObject({ type: null, period: null })
+  it('nulls a type over its cap rather than cutting it', () => {
+    const a = run([entity({ 'transit_realtime.mercury_alert': { alert_type: 't'.repeat(81) } })]).snapshot.alerts[0]!
+    expect(a.type).toBeNull()
   })
 
   it('throws when the feed has no entity array, so a format change fails loudly', () => {

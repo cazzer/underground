@@ -24,8 +24,10 @@ describe('skipClause', () => {
     expect(skipClause('[R] skip Union St while work is done')).toBe(' Union St')
   })
 
-  it('gives the first line when there is no skip', () => {
-    expect(skipClause('Enter at 5 Av only\nMadison Av is exit only')).toBe('Enter at 5 Av only')
+  it('is empty when there is no skip: "runs express from A to B" names the ends of the stretch, not skipped stations', () => {
+    expect(skipClause('Enter at 5 Av only\nMadison Av is exit only')).toBe('')
+    expect(skipClause('In the Bronx, Manhattan-bound [6] runs express from Parkchester to 3 Av-138 St')).toBe('')
+    expect(named('In the Bronx, Manhattan-bound [6] runs express from Parkchester to 3 Av-138 St', ['Parkchester', '3 Av-138 St'])).toEqual([])
   })
 })
 
@@ -38,7 +40,7 @@ describe('headerNamedStations', () => {
     expect(named('[6] skips 68 St and 51 St', ['68 St-Hunter College', '51 St', '59 St'])).toEqual(['68 St-Hunter College', '51 St'])
     expect(named('[F] skips Jay St', ['Jay St-MetroTech', 'Borough Hall'])).toEqual(['Jay St-MetroTech'])
     expect(named('[A] skips 110 St', ['Cathedral Pkwy (110 St)', '116 St'])).toEqual(['Cathedral Pkwy (110 St)'])
-    expect(named('[R] skips 4 Av-9 St', ['4 Av-9 St', '9 St'])).toEqual(['4 Av-9 St', '9 St'])
+    expect(named('[R] skips 4 Av-9 St', ['4 Av-9 St', '9 St'])).toEqual(['4 Av-9 St'])
   })
 
   it('matches the whole name, and the long and short spellings alike (Avenue and Av, Fort and Ft)', () => {
@@ -49,6 +51,19 @@ describe('headerNamedStations', () => {
   it('does not read what is past the clause: a second line, a "due to" cause', () => {
     expect(named('[7] skips 52 St\nAll trains at Woodside-61 St board', ['52 St', '61 St-Woodside'])).toEqual(['52 St'])
     expect(named('[7] skips 52 St due to work at 69 St', ['52 St', '69 St'])).toEqual(['52 St'])
+  })
+
+  it('reads each item of the clause: a trailing remark still matches, a longer name does not', () => {
+    expect(named('[A] skips 81 St in both directions - Take the [C] instead', ['81 St'])).toEqual(['81 St'])
+    expect(named('[A] skips 4 Av-9 St', ['Smith-9 Sts', '4 Av-9 St'])).toEqual(['4 Av-9 St'])
+    expect(named('[A] skips 3 Av-149 St', ['149 St-Hostos', '3 Av-149 St'])).toEqual(['3 Av-149 St'])
+    expect(named('[F] skips 4 Av/9 St', ['4 Av-9 St'])).toEqual(['4 Av-9 St'])
+  })
+
+  it('reads the whole 35969 header: three names, with Smith-9 Sts among the informed stops', () => {
+    const header = 'In Brooklyn, Coney Island-bound [F] and Church Av-bound [G] skip 4 Av-9 St, 15 St-Prospect Park and Fort Hamilton Pkwy'
+    const names = ['Smith-9 Sts', '4 Av-9 St', '15 St-Prospect Park', 'Fort Hamilton Pkwy', 'Bergen St', 'Church Av', 'Coney Island-Stillwell Av']
+    expect(named(header, names)).toEqual(['4 Av-9 St', '15 St-Prospect Park', 'Fort Hamilton Pkwy'])
   })
 
   it('names nothing from words before the skip (the direction, the line)', () => {
@@ -90,7 +105,6 @@ const alert = (over: Partial<ServiceAlert>): ServiceAlert => ({
   id: 'x',
   type: 'Planned - Stops Skipped',
   header: 'Downtown [1] skips Beta St',
-  period: null,
   periods: [[0, null]],
   entities: ['a', 'b', 'c'].map((stop) => ({ route: '1', stop, direction: 'S' as const })),
   ...over,

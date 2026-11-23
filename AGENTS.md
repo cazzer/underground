@@ -537,7 +537,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   The trip panel: `useTripPanel.ts` (`openTrip`: a directions pick from a search row or the station panel; it closes a train panel or notice in front, expands a collapsed trip (`tripRequested`, no seq), sets the ends by `directionsTrip` (`lib/tripDirections.ts`: the picked end, then the other from the trip's earlier other end (an end already chosen stays), the fix's nearest station (From only), the focused station, then the trip's earlier picked end, which gives the way back; none may be the picked station or in its complex, `siblingsOf`; a place sets its nearest station and note; `fixStation` names an end the fix filled, see Data, "Trip board") and hands `TripPanel` a `focusRequest`: the end left empty, else the heading; it moves no camera; `closeTrip`: "Close trip", or Esc through `escapeTrip` (an opened journey goes back to the list first; a collapsed bar closes), when focus was in the panel, focuses the station heading else the Search button one frame later) and `TripPanel.tsx`, the trip
   panel (see Navigation UI below), which sits behind a train or notice and in front of the station panel and shares its `panel` ref); `LoadStatus.tsx` loading/error panel
   plus `SceneCrash`/`HudCrash`; `LiveStatus.tsx` the HUD live-trains badge (a polite live region);
-  `FocusAnnouncer.tsx` a polite sr-only live region ("Showing <station>", name only) for any newly focused station (auto-focus, tap, link,
+  `FocusAnnouncer.tsx` a polite sr-only live region ("Showing <station>", then, only when the station is skipped now, `skipSpoken`: "Showing 125 St. The downtown 1 train skips this station now.") for any newly focused station (auto-focus, tap, link,
   "Go to"), 300 ms after it is entered and only if still focused, not covered by a train panel and not already holding focus (a
   search pick moves focus to the heading, so it stays silent); pure rules in `focusAnnounce.ts`; never moves focus;
   `ErrorBoundary.tsx`; `LiveDebug.tsx` dev-only `?debug` overlay (drawn count, drops by reason, join
@@ -556,11 +556,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   whose panel stays open and clears its text after 6 s (`outageAnnounce.ts`, pure; silent on open, station change or stale data)
   `ServiceChangeStatus.tsx` (08r.4) the panel's service changes after `OutageStatus`, built like it (`DisclosureToggle.tsx`, the button `OutageStatus` also uses, with a label and a `bg-status-*` swatch class): a closed
   "Service changes (N)" disclosure (aria-expanded, focus to the heading if it unmounts while focused) over rows, each our short line (route chips, "skips this
-  station · downtown only · until Fri 11:45 PM", "probably skips this station" when the skip set is our guess, "no service here", "service change") over the MTA's
-  `en` header in its own `whitespace-pre-line` paragraph as a plain text node (verbatim: never edited, truncated, re-cased or built from the html string; no
+  station · downtown only · until Fri 11:45 PM", "probably skips this station" when the skip set is our guess, "no service here", else the alert type in our words: "delays", "reduced service", "boarding change", "station notice", "service change"; two or more routes take "skip") over the MTA's
+  `en` header in its own `whitespace-pre-line break-words` paragraph as a plain text node (verbatim: never edited, truncated, re-cased or built from the html string; no
   `dangerouslySetInnerHTML`); a dim "Service changes unavailable" line when the snapshot is stale or the version differs (never "none"); nothing without `VITE_RT_URL`.
-  The heading's sr-only text (and the collapsed bar's label) adds "Downtown 1 trains skip this station now." only when this station is skipped now and the header named it
-  (`skipSpoken`); one always-mounted polite sr-only region speaks only a change at the open station, never on open, poll or station change (`alertAnnounce.ts`, like `outageAnnounce.ts`).
+  The heading's sr-only text (and the collapsed bar's label) adds "The downtown 1 train skips this station now." (or "The Flushing-bound 7 train skips…", "A and C trains skip…") only when this station is skipped now and the header named it
+  (`skipSpoken`); `ServiceChangeAnnouncer` (and `OutageAnnouncer`), one always-mounted polite sr-only region each, sit outside the panel's collapsible body so they speak while it is collapsed, and
+  speak only a change at the open station, never on open, poll or station change (`alertAnnounce.ts`, like `outageAnnounce.ts`; an ended row says "The skip for the 1 train at this station has ended.").
+  Rows are separated by `border-t border-edge`, the route chips sit in a `shrink-0` group beside a `min-w-0` text span.
   `usePanelReport.ts` is the HUD's panel measuring effect (moved out of Hud.tsx to keep it under 300 lines).
   `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a labelled input over lists of result rows (`ResultRow.tsx`: a primary button with `SearchResult.tsx` or `PlaceResult.tsx` content and, in the HUD's search, given `onDirections`, "From" and "To" buttons named "Directions from/to <name>", `lib/searchRowActions.ts`; a directions pick calls `openTrip`, with a place's nearest station and name). The top bar is `SearchBar.tsx`. It is not a combobox, because a listbox option can't hold buttons. Every button is in Tab order; arrows move focus (`lib/searchNav.ts`: Down from the input, Up/Down between rows, Left/Right/Home/End within one, a printable key back to the input); Enter in the input picks the highlighted first row (the input's description says so, read on focus); a first row that came from `/geocode` is neither highlighted nor picked while the lookup is pending, since it belongs to the previous text (`enterTarget` in `lib/searchItems.ts`; a station first row always is the current text's). A station row shows the name and access icon, the borough on a dim line only for names whose stations span boroughs
   (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart; choosing a result
@@ -967,13 +969,16 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/useAlerts.ts` polls the Worker's `/alerts` (`ALERTS_URL` = `alertsUrlFrom(RT_URL)`, null without `VITE_RT_URL` or on an MTA host: nothing fetches) every 120 s through
   `useWorkerPoll`; `alertsFetch.ts` validates one body. Pure joins in `lib/live/`: `alertStations.ts` (`alertKindOf`: the free-text type to skip / part suspended / suspended / other;
   `headerNamedStations`: the stations a header names, by whole-word match of a name or a part of it (split on `-`, `/`, parentheses; `searchTokens` canon, so Av/Avenue) in the clause after
-  the first "skip" up to a line break, ";", ". ", " due to ", " for " or " while "; `stretchEnds`: the two farthest-apart informed stations; `skipSetsOf` / `RouteSkipSet`: per route of a skip
+  the first "skip" (a header with no "skip", "runs express from A to B", has an empty clause: nothing is named, so the probable rule applies) split into items on ",", "&" and "and", an item matching when it equals the
+  name or a part or starts with it (so "4 Av-9 St" is not Smith-9 Sts, "3 Av-149 St" not 149 St-Hostos), up to a line break, ";", ". ", " due to ", " for " or " while "; `stretchEnds`: the two farthest-apart informed stations; `skipSetsOf` / `RouteSkipSet`: per route of a skip
   alert the stations skipped, `probable` and `direction`, which later features reuse: header-named ∩ informed, else the informed stops (all when two or fewer, else minus the stretch's ends),
   marked probable), `alertJoin.ts` (`joinStationChanges`: the focused group, any member's stops; an entity reaches it by a member's stop, or a whole-route entity of one of its lines (`lineKey`, so 7X
-  reaches the 7); per route a skipped / suspended / other change (skip: in the skip set; Part Suspended: inside the informed stretch with its ends excluded, one stop is itself; Suspended: informed or
-  route-only), merged by alert, kind and direction, in effect first; a route-only alert such as Delays is "other" at every station of its lines; the period is re-checked against the clock;
+  reaches the 7; a suspension's whole-route entity matches the exact route id); per route a skipped / suspended / other change (skip: in the skip set; Part Suspended: inside the informed stretch with its ends excluded, one stop is itself; Suspended: informed or
+  route-only), merged by alert, kind and direction, in effect first, then the changes about this station before the route-wide ones (`routeWide`); a route-only alert such as Delays is "other" at every station of its lines; the period is re-checked against the clock;
   a snapshot over `ALERTS_MAX_AGE_S` 480 s old by the live clock, a version mismatch or two failed polls with nothing yet is unknown, never "no changes"), `alertText.ts` (`serviceChangeView`: rows, the
-  direction words uptown / downtown at a Manhattan station else north / southbound, and `skipSpoken`), `nyWhen.ts` ("7:45 AM", "tomorrow 5 AM", "Fri 11:45 PM", "Dec 31"; `eneText`'s
+  direction words: GTFS N/S are track directions, so uptown / downtown only for a north-south line at a Manhattan station (not the L, 7, 7X, GS, FS, H), else "<terminal>-bound" ("Flushing-bound",
+  "Canarsie-bound"), the terminal from `routeTerminals.ts` (`terminalsOf`: the nearest station the route serves to the end of its primary shape for that direction; startup data only, since the trip index
+  loads only with the live feed), else "one direction only"; and `skipSpoken`), `nyWhen.ts` ("7:45 AM", "tomorrow 5 AM", "Fri 11:45 PM", "Dec 31"; `eneText`'s
   return labels use it) and `alertAnnounce.ts`. `alertJoin.data.test.ts` runs the recorded feed (`worker/fixtures/alerts.json`) through the Worker's transform onto the real stations.
 - `src/data/useEne.ts` polls the Worker's `/ene` (`ENE_URL` = `eneUrlFrom(RT_URL)`, never an MTA host) beside `useRealtimeFeed`: every 120 s,
   one request at a time, a hidden tab aborts and stops, backoff via `lib/live/enePoll.ts`; `eneFetch.ts` validates one body
@@ -1245,10 +1250,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     fixed error codes only: a fetch error's text can hold the query)
   - `/alerts` (08r.4): `alerts.ts` pure `transformAlerts(json, generatedAt)` over `upstream.ts`' `fetchAlerts` (`camsys%2Fsubway-alerts.json`, about 1 MB, under the 2 MB
     cap; `fetchJson` is shared with `fetchEne` and reports the body size) to the `ServiceAlert` contract in `schema.ts`: alerts with a period in effect or starting within
-    `ALERT_WINDOW_S` (24 h; `display_before_active` ignored; periods not clipped, at most 4), each `{ id, type (alert_type, free text), header, period, periods,
-    entities }` with the `en` `header_text` byte for byte (a header over 1000 characters drops the alert, never truncates it), entities `{ route, stop (parent
+    `ALERT_WINDOW_S` (24 h; `display_before_active` ignored; periods not clipped, at most 4), each `{ id, type (alert_type, free text), header, periods,
+    entities }` (no `human_readable_active_period`: nothing shows it) with the `en` `header_text` byte for byte (a header over 1000 characters drops the alert, never truncates it), entities `{ route, stop (parent
     station id or null), direction (0 N, 1 S, absent null) }` deduped and capped at 120; `description_text`, the `en-html` strings and `affected_stations` are never read.
-    A bad row is dropped and counted; a non-array `entity` throws. One counts-only `alerts-miss` log line (no header text). About 13 KB raw today.
+    A bad row is dropped and counted; a non-array `entity` throws. One counts-only `alerts-miss` log line (no header text). About 13 KB raw today. A miss parses about 1 MB of JSON (3 to 6.5 ms warm, measured locally): watch the `alerts-miss` CPU
+    after the first deploy; the fallback is the protobuf feed or a byte-level pre-filter.
   - `src/transform.ts` pure decode-to-snapshot logic; `ene.ts` pure E&E transform (`parseNyTime`,
     `transformEne`; the feed's `isupcomingoutage` is unreliable, so it is ignored: a row is skipped only if it has
     not started yet); `cors.ts` allowed origins

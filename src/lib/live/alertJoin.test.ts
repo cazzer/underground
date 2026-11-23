@@ -37,7 +37,6 @@ const alert = (over: Partial<ServiceAlert> = {}): ServiceAlert => ({
   id: 'lmm:planned_work:1',
   type: 'Planned - Stops Skipped',
   header: 'Downtown [1] skips Beta St',
-  period: null,
   periods: [[NOW - 100, NOW + 1000]],
   entities: [stop('1', 'a', 'S'), stop('1', 'b', 'S'), stop('1', 'c', 'S')],
   ...over,
@@ -126,6 +125,32 @@ describe('suspended and other alerts', () => {
     const express = alert({ type: 'Delays', entities: [{ route: '7X', stop: null, direction: null }] })
     expect(changes('x', [express]).map(brief)).toEqual(['other:7X'])
     expect(changes('y', [express])).toEqual([])
+  })
+})
+
+describe('route-wide changes', () => {
+  const wide = (over: Partial<ServiceAlert> = {}) => alert({ id: 'w', type: 'Delays', header: 'Delays', entities: [{ route: '1', stop: null, direction: null }], ...over })
+
+  it('are marked route-wide, carry the type, and come after the changes about this station, even when both are in effect', () => {
+    const list = changes('b', [wide(), alert({ id: 'z' })])
+    expect(list.map((c) => [c.alertId, c.routeWide, c.type])).toEqual([['z', false, 'Planned - Stops Skipped'], ['w', true, 'Delays']])
+  })
+
+  it('a route-wide change in effect still comes before one that has not started, within each group', () => {
+    const later = wide({ id: 'w2', periods: [[NOW + 100, NOW + 900]] })
+    expect(changes('b', [later, wide()]).map((c) => c.alertId)).toEqual(['w', 'w2'])
+  })
+
+  it('a route-wide suspension is exact: a 6X-only suspension is not "no service here" at a 6 station', () => {
+    const six = [station('s6', 'Six St', 0, ['6'])]
+    const byId = new Map([...STATIONS, ...six].map((s) => [s.id, s]))
+    const g = { ...six[0]!, memberIds: ['s6'], otherNames: [] }
+    const suspended = (route: string) => alert({ type: 'Planned - Suspended', header: 'No service', entities: [{ route, stop: null, direction: null }] })
+    const run = (a: ServiceAlert) => joinStationChanges(g, byId, feed([a]), NOW, ORDER).panel
+    expect(run(suspended('6X'))).toEqual({ kind: 'none' })
+    expect(run(suspended('6'))).toMatchObject({ kind: 'changes', changes: [{ kind: 'suspended' }] })
+    // Delays on the 6X, by contrast, do reach the 6 (an express is folded into its line).
+    expect(run(alert({ type: 'Delays', entities: [{ route: '6X', stop: null, direction: null }] }))).toMatchObject({ kind: 'changes' })
   })
 })
 

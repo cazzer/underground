@@ -7,7 +7,6 @@ const alert = () => ({
   id: 'lmm:planned_work:35124',
   type: 'Planned - Stops Skipped',
   header: 'Downtown [1] skips 125 St',
-  period: null,
   periods: [[1_000, null]],
   entities: [{ route: '1', stop: '116', direction: 'S' }],
 })
@@ -52,6 +51,7 @@ describe('alertsUrlFrom', () => {
   it('is the /alerts sibling of the /rt URL, and never an MTA host', () => {
     expect(alertsUrlFrom('https://x.workers.dev/rt')).toBe('https://x.workers.dev/alerts')
     expect(alertsUrlFrom('http://localhost:8787/rt/')).toBe('http://localhost:8787/alerts')
+    expect(alertsUrlFrom('https://x.workers.dev/rt?x=1')).toBe('https://x.workers.dev/alerts')
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(alertsUrlFrom('https://api.mta.info/rt')).toBeNull()
     expect(error).toHaveBeenCalledOnce()

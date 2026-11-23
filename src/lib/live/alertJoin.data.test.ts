@@ -5,11 +5,14 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { transformAlerts } from '../../../worker/src/alerts'
-import type { RoutesFile } from '../../data/schema'
+import { decodeShapePoints } from '../../data/codec'
+import type { RoutesFile, ShapesFile } from '../../data/schema'
+import { toGround } from '../projection'
 import { realGroupById, realStations } from '../realGroups.testdata'
 import { joinStationChanges, type StationChange } from './alertJoin'
 import { skipSetsOf } from './alertStations'
 import { serviceChangeView } from './alertText'
+import { terminalsOf } from './routeTerminals'
 
 const FEED = JSON.parse(readFileSync('worker/fixtures/alerts.json', 'utf8')) as unknown
 /** The feed's own timestamp, a Monday evening. */
@@ -20,6 +23,17 @@ const routes = (JSON.parse(readFileSync('public/data/routes.json', 'utf8')) as R
 const routeOrder = new Map(routes.map((r, i) => [r.id, i]))
 const routeById = new Map(routes.map((r) => [r.id, { id: r.id, shortName: r.shortName, longName: r.longName, color: r.color }]))
 const stationById = new Map(realStations.map((s) => [s.id, s]))
+const terminalOf = terminalsOf(
+  (JSON.parse(readFileSync('public/data/shapes.json', 'utf8')) as ShapesFile).shapes.map((s) => ({
+    routeId: s.routeId,
+    direction: s.direction,
+    primary: s.primary,
+    points: decodeShapePoints(s).map((p) => toGround(p)),
+  })),
+  realStations,
+)
+/** 2026-12-02 05:00 GMT, inside the first period of the 4/6 "run express" alert. */
+const EXPRESS_AT = 1796190000
 
 /** The Worker's answer at `nowS` (it is polled then), joined at that moment. */
 function joinAt(id: string, nowS: number) {
@@ -103,13 +117,32 @@ describe('joinStationChanges on the recorded feed', () => {
     expect(changesAt('629', NIGHT).map(summary)).toEqual(['35962 suspended N now', '35976 otherS 46 now'])
   })
 
+  it('reads a header with no "skip" ("run express from A to B") by the probable rule: the stretch ends stay quoted, the stops between are probably skipped', () => {
+    for (const id of ['632', '640']) expect(at(id, EXPRESS_AT, '36275'), id).toEqual(['36275 otherS 46 now'])
+    for (const id of ['633', '634', '636', '637', '638', '639']) expect(at(id, EXPRESS_AT, '36275'), id).toEqual(['36275 skippedS? 46 now'])
+    // A probable skip is never in the heading's sentence.
+    const group = realGroupById.get('637')!
+    expect(serviceChangeView(joinAt('637', EXPRESS_AT), group, routeById, EXPRESS_AT, terminalOf).skipSpoken).toBe('')
+    expect(group.borough).toBe('M')
+  })
+
+  it('words the direction by terminal for the 7 and the L, and by uptown/downtown for the 1', () => {
+    const words = (id: string, nowS: number) => {
+      const v = serviceChangeView(joinAt(id, nowS), realGroupById.get(id)!, routeById, nowS, terminalOf)
+      return v.body.kind === 'changes' ? v.body.rows.map((r) => r.parts[1]) : []
+    }
+    expect(words('713', FEED_AT)).toEqual(['Flushing-bound only'])
+    expect(words('116', FEED_AT)).toEqual(['downtown only'])
+    expect(serviceChangeView(joinAt('713', FEED_AT), realGroupById.get('713')!, routeById, FEED_AT, terminalOf).skipSpoken).toBe('The Flushing-bound 7 train skips this station now.')
+  })
+
   it('makes the panel line and the spoken sentence', () => {
     const group = realGroupById.get('116')!
-    const view = serviceChangeView(joinAt('116', FEED_AT), group, routeById, FEED_AT)
+    const view = serviceChangeView(joinAt('116', FEED_AT), group, routeById, FEED_AT, terminalOf)
     expect(view.body).toMatchObject({ kind: 'changes' })
     if (view.body.kind !== 'changes') return
     expect(view.body.rows[0]!.parts.join(' · ')).toBe('skips this station · downtown only · until Fri 11:45 PM')
     expect(view.body.rows[0]!.header).toBe('Downtown [1] skips 125 St')
-    expect(view.skipSpoken).toBe('Downtown 1 trains skip this station now.')
+    expect(view.skipSpoken).toBe('The downtown 1 train skips this station now.')
   })
 })

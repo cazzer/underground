@@ -25,19 +25,17 @@ function parsePeriod(raw: unknown, where: string): AlertPeriod {
 
 function parseAlert(raw: unknown, index: number): ServiceAlert {
   if (!isRecord(raw)) throw new Error(`alert ${index} is not an object`)
-  const { id, type, header, period, periods, entities } = raw
+  const { id, type, header, periods, entities } = raw
   if (typeof id !== 'string' || id === '') throw new Error(`alert ${index} has no id`)
   const where = `alert ${index} (${id})`
   if (type !== null && typeof type !== 'string') throw new Error(`${where} has a bad type`)
   if (typeof header !== 'string') throw new Error(`${where} has no header`)
-  if (period !== null && typeof period !== 'string') throw new Error(`${where} has a bad period`)
   if (!Array.isArray(periods)) throw new Error(`${where} has no periods`)
   if (!Array.isArray(entities)) throw new Error(`${where} has no entities`)
   return {
     id,
     type,
     header,
-    period,
     periods: periods.map((p, i) => parsePeriod(p, `${where} period ${i}`)),
     entities: entities.map((e, i) => parseEntity(e, `${where} entity ${i}`)),
   }

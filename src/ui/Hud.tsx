@@ -194,7 +194,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
           <p role="status" aria-live="polite" className="sr-only">
             {notice ?? ''}
           </p>
-          <FocusAnnouncer network={network} covered={trainOpen || noticeOpen || tripOpen} panel={panel} />
+          <FocusAnnouncer network={network} covered={trainOpen || noticeOpen || tripOpen} panel={panel} skipSpoken={changes.skipSpoken} />
           {FEATURES.navigation && <TripAnnouncer network={network} arrivals={arrivals} covered={trainOpen || noticeOpen} focusSiblings={focusSiblings} />}
           <LinkNotice
             show={linkNotice.show}

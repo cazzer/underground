@@ -18,6 +18,7 @@ import { usePlaceLine } from './ui/usePlaceLine'
 import { FocusProvider, useFocus } from './lib/focus'
 import { joinStationChanges } from './lib/live/alertJoin'
 import { serviceChangeView, type ServiceChangeView } from './lib/live/alertText'
+import { terminalsOf } from './lib/live/routeTerminals'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
 import { joinPanelOutages, stationEquipment } from './lib/live/eneIndexJoin'
 import { outagePanelView } from './lib/live/eneText'
@@ -84,9 +85,10 @@ function MapView({ network, bands, live }: MapViewProps) {
   // The MTA's service changes at the focused station (its group: any member's stops), listed in its panel.
   const alerts = useAlerts(ALERTS_URL)
   const routeOrder = useMemo(() => new Map(network.routes.map((r, i) => [r.id, i])), [network])
+  const terminalOf = useMemo(() => terminalsOf(network.shapes, network.stations), [network])
   const focusedGroup = focusedId ? network.groupById.get(focusedId) : undefined
   const changes = focusedGroup
-    ? serviceChangeView(joinStationChanges(focusedGroup, network.stationById, alerts, nowS, routeOrder), focusedGroup, network.routeById, nowS)
+    ? serviceChangeView(joinStationChanges(focusedGroup, network.stationById, alerts, nowS, routeOrder), focusedGroup, network.routeById, nowS, terminalOf)
     : NO_CHANGES
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.

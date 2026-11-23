@@ -39,6 +39,10 @@ export interface StationChange {
   until: number | null
   /** The MTA's header, verbatim. */
   header: string
+  /** The alert's free-text type ("Delays"), which alertText's typeWord puts in our words for a change that is neither a skip nor a suspension. */
+  type: string | null
+  /** Every entity behind this change names a whole route, none a stop here: listed after the changes that are about this station. */
+  routeWide: boolean
 }
 
 export type StationChanges =
@@ -68,9 +72,14 @@ function relevantPeriod(alert: ServiceAlert, nowS: number): { now: boolean; star
   return next
 }
 
-/** Whether an entity concerns the station: its stop is a member's, or it names a whole route the station has a line of. */
-function reaches(e: AlertEntity, memberIds: ReadonlySet<StationId>, lines: ReadonlySet<string>): boolean {
-  return e.stop === null ? lines.has(lineKey(e.route)) : memberIds.has(e.stop)
+/**
+ * Whether an entity concerns the station: its stop is a member's, or it names a whole route the station has a line of
+ * (an express folded into its line: delays on the 7X reach the 7). A suspension is exact: a 6X-only suspension is not
+ * "no service here" at every 6 station, so its whole-route entities must name a route the station has.
+ */
+function reaches(e: AlertEntity, memberIds: ReadonlySet<StationId>, lines: ReadonlySet<string>, routes: ReadonlySet<RouteId>, exact: boolean): boolean {
+  if (e.stop !== null) return memberIds.has(e.stop)
+  return exact ? routes.has(e.route) : lines.has(lineKey(e.route))
 }
 
 interface Classified {
@@ -141,19 +150,24 @@ export function joinStationChanges(
   }
   const memberIds: ReadonlySet<StationId> = new Set(group.memberIds)
   const lines = new Set(group.routeIds.map(lineKey))
+  const routes = new Set(group.routeIds)
   const rank = (r: RouteId) => routeOrder.get(r) ?? Infinity
   const merged = new Map<string, StationChange>()
   for (const alert of snapshot.alerts) {
     const period = relevantPeriod(alert, nowS)
     if (period === null) continue
-    const reaching = alert.entities.filter((e) => reaches(e, memberIds, lines))
+    const exact = alertKindOf(alert.type) === 'suspended'
+    const reaching = alert.entities.filter((e) => reaches(e, memberIds, lines, routes, exact))
     for (const route of new Set(reaching.map((e) => e.route))) {
-      const c = classify(alert, route, reaching.filter((e) => e.route === route), memberIds, stationById)
+      const ofRoute = reaching.filter((e) => e.route === route)
+      const c = classify(alert, route, ofRoute, memberIds, stationById)
+      const wide = ofRoute.every((e) => e.stop === null)
       const key = `${alert.id}|${c.kind}|${c.direction ?? ''}`
       const have = merged.get(key)
       if (have) {
         have.routes = [...have.routes, route].sort((a, b) => rank(a) - rank(b) || (a < b ? -1 : 1))
         have.probable = have.probable || c.probable
+        have.routeWide = have.routeWide && wide
         continue
       }
       merged.set(key, {
@@ -166,12 +180,15 @@ export function joinStationChanges(
         from: !period.now && period.start > 0 ? period.start : null,
         until: period.now ? period.end : null,
         header: alert.header,
+        type: alert.type,
+        routeWide: wide,
       })
     }
   }
   const changes = [...merged.values()].sort(
     (a, b) =>
       Number(b.now) - Number(a.now) ||
+      Number(a.routeWide) - Number(b.routeWide) ||
       KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
       (a.from ?? 0) - (b.from ?? 0) ||
       (a.alertId < b.alertId ? -1 : a.alertId > b.alertId ? 1 : 0),

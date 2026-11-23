@@ -89,18 +89,19 @@ interface OutageStatusProps {
 }
 
 /**
- * The station panel's out-of-service machines: a closed "Out of service (N)" disclosure over the rows, or a dim
- * "status unavailable" line. One polite screen-reader-only region stays mounted and speaks only a change to the
- * machines out at the station already open.
+ * One polite screen-reader-only region that speaks only a change to the machines out at the station already open.
+ * Mounted outside the panel's collapsible body, so it still speaks while the panel is collapsed to its bar.
  */
-export function OutageStatus({ view, stationId, onFocusLost }: OutageStatusProps) {
+export function OutageAnnouncer({ view, stationId }: Pick<OutageStatusProps, 'view' | 'stationId'>) {
   const announcement = useOutageAnnouncement(stationId, view)
   return (
-    <>
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-        {announcement}
-      </div>
-      <OutageList key={`${stationId}|${view.body.kind}`} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
-    </>
+    <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      {announcement}
+    </div>
   )
+}
+
+/** The station panel's out-of-service machines: a closed "Out of service (N)" disclosure over the rows, or a dim "status unavailable" line. */
+export function OutageStatus({ view, stationId, onFocusLost }: OutageStatusProps) {
+  return <OutageList key={`${stationId}|${view.body.kind}`} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
 }

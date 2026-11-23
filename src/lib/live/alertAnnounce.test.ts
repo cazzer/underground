@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { changesAnnouncement, type ChangesSeen } from './alertAnnounce'
 
-const row = (kind: 'skipped' | 'suspended' | 'other', now: boolean, spoken: string) => ({ kind, now, spoken })
+const row = (kind: 'skipped' | 'suspended' | 'other', now: boolean, spoken: string, ended = 'The skip for the 1 train at this station has ended.') => ({ kind, now, spoken, ended })
 const seen = (rows: Record<string, ReturnType<typeof row>>, over: Partial<ChangesSeen> = {}): ChangesSeen => ({ stationId: 's', known: true, rows: new Map(Object.entries(rows)), ...over })
 const SKIP = row('skipped', true, '1: skips this station.')
 
@@ -29,7 +29,7 @@ describe('changesAnnouncement', () => {
   })
 
   it('speaks changes that ended', () => {
-    expect(changesAnnouncement(seen({ a: SKIP }), seen({}))).toBe('A service change ended.')
+    expect(changesAnnouncement(seen({ a: SKIP }), seen({}))).toBe('The skip for the 1 train at this station has ended.')
     expect(changesAnnouncement(seen({ a: SKIP, b: SKIP }), seen({}))).toBe('2 service changes ended.')
   })
 })
