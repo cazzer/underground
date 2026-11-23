@@ -1,11 +1,10 @@
 /** The committed index (worker/data/streetIndex.json) through the Worker's search. */
 import { describe, expect, it } from 'vitest'
 import { distanceM } from './geocodeMerge'
-import { bundledStreetIndex } from './streetIndexData'
+import { STREET_INDEX } from './streetIndexData'
 import { searchStreets } from './streetSearch'
 import type { GeocodeQuery } from './geocodeQuery'
 
-const STREET_INDEX = await bundledStreetIndex()
 const search = (text: string, focus: GeocodeQuery['focus'] = null) => searchStreets(STREET_INDEX, { text, focus })
 const labels = (text: string, focus: GeocodeQuery['focus'] = null) => {
   const { whole, partial } = search(text, focus)
@@ -13,11 +12,6 @@ const labels = (text: string, focus: GeocodeQuery['focus'] = null) => {
 }
 
 describe('the committed street index', () => {
-  it('loads once per isolate, on first use', async () => {
-    expect(await bundledStreetIndex()).toBe(STREET_INDEX)
-    expect(bundledStreetIndex()).toBe(bundledStreetIndex())
-  })
-
   it('finds Bedford Av and N 7 St as one intersection, within 30 m of the crossing, in either order', () => {
     for (const text of ['bedford av & n 7', 'n 7 st and bedford av']) {
       const hit = [...search(text).whole, ...search(text).partial].find((c) => c.result.label === 'Bedford Av & N 7 St, Brooklyn')

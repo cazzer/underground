@@ -939,8 +939,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     2 places kept for them); `geocodeOutcome.ts` (status, attribution, `incomplete`, the log line, whose `osm` count is the index's
     rows shown; with index rows and every upstream failed the answer is a 200, `incomplete`, never cached; 502 or 503 only with no
     index row either);
-    the street index: `streetIndexData.ts` (`bundledStreetIndex()`: a dynamic import of `../data/streetIndex.json`, kept after the first `/geocode` miss of the isolate, so `/rt` and `/ene` never pay for it
-    (startup stays at the base's 15 to 16 ms by `wrangler check startup`) and a bad index is a 500 through `serveGeocode`'s catch, not a failed startup; only `index.ts` and its test import
+    the street index: `streetIndexData.ts` (`STREET_INDEX`: `../data/streetIndex.json` parsed at startup, eager on purpose: startup has its own 1 s
+    limit, while a lazy load would put about 10 ms into the first `/geocode` miss, over the Free plan's 10 ms CPU per request;
+    `wrangler check startup` reads 22 to 27 ms, base 15 to 16; a bad index fails startup, caught first by the root freshness test and worker CI; only `index.ts` and its test import
     it, so the client never bundles it; 3.5 MB of heap once loaded) over `streetIndex.ts` (`loadStreetIndex`: checks
     the format and every index, throws a fixed message so a bad index fails `/geocode` loudly; builds the key map and per-street
     crossings), `streetSearch.ts` (`searchStreets` -> `{ whole, partial }` candidates, source `osm`, label "Name, Borough", an

@@ -162,9 +162,9 @@ lines and should take milliseconds on 4k nodes (not benchmarked).
 records (a street per borough, a site per nearby station) and 11,512 intersections from the street pin, within 300 m of a station,
 into one JSON module, `worker/data/streetIndex.json`: 689 KB raw, 181 KB gzipped (it first shipped as 64 hash-bucket shards fetched by
 the client, 523 KB gzipped in all; moving it into the Worker kept the typed text off the static host, below). The Worker's bundle
-goes from 182 KiB (35 KiB gzipped) to 981 KiB (226 KiB gzipped), against a 64 MiB limit. The index is a dynamic import, loaded on the first
-`/geocode` miss of an isolate, so `wrangler check startup` (local, warm runs) still reads 15 to 16 ms of active startup, as before (a static
-import cost 22 to 27 ms); the JSON parse is about 3 ms and `loadStreetIndex` about 6 ms cold in node, once, and the index holds roughly 3.5 MB of heap. A name is filed under the
+goes from 182 KiB (35 KiB gzipped) to about 922 KiB (220 KiB gzipped), against a 64 MiB limit. The index is parsed at startup, which has
+its own 1 s limit, so `wrangler check startup` (local, warm runs) reads 22 to 27 ms of active startup (15 to 16 before); a lazy load on the
+first `/geocode` miss would put that work into a request, over the Free plan's 10 ms CPU limit; the JSON parse is about 3 ms and `loadStreetIndex` about 6 ms cold in node, once, and the index holds roughly 3.5 MB of heap. A name is filed under the
 first two characters of each distinctive token (not st, av, a compass letter and the like), spelled as published, canonical and as a long form, so
 a query finds it from any prefix of 2+ characters of that token (a query like "w 4" reads only the "4" key); a key lists at most 108 of the
 3,222 streets, so a query scores about 5 to 108 candidates (under 0.5 ms), never all. An intersection query is split at the first

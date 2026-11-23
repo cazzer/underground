@@ -1,13 +1,9 @@
-import { loadStreetIndex, type StreetIndex } from './streetIndex.ts'
-
-let loaded: Promise<StreetIndex> | undefined
+import data from '../data/streetIndex.json'
+import { loadStreetIndex } from './streetIndex.ts'
 
 /**
- * The bundled street index, loaded on the first /geocode miss of the isolate and kept: /rt and /ene never pay for it, and a
- * bad committed index fails /geocode (a 500 through serveGeocode's catch, no query logged) rather than the Worker's startup.
- * The JSON is a dynamic import, which wrangler's bundler inlines but evaluates on first use. Only index.ts and its data test
- * import this file: the client must never bundle it (the build is checked for a street name in dist/).
+ * The bundled street index, parsed once per isolate at startup. Eager on purpose: startup has its own 1 s limit, while a lazy
+ * load would put about 10 ms of parsing into the first /geocode miss and could break the Free plan's 10 ms CPU per request.
+ * Only index.ts and its data test import this file: the client must never bundle it (the build is checked for a street name in dist/).
  */
-export function bundledStreetIndex(): Promise<StreetIndex> {
-  return (loaded ??= import('../data/streetIndex.json').then((m) => loadStreetIndex(m.default)))
-}
+export const STREET_INDEX = loadStreetIndex(data)

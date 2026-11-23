@@ -44,7 +44,7 @@ function parseResult(raw: unknown, index: number): GeocodeResult {
   return { label, kind: kind as GeocodeKind, source: source as GeocodeSource, lat, lon }
 }
 
-/** A v1 body (before the street index) is a valid v2 one without osm rows, so a new client still reads a Worker not yet deployed. */
+/** A v1 body (before the street index) reads as a v2 one without osm rows (its street rows dropped), so a new client still reads a Worker not yet deployed. */
 const ACCEPTED_VERSIONS: readonly unknown[] = [1, GEOCODE_SCHEMA_VERSION]
 
 /** Checks a /geocode body at the boundary: version, the rows (each field), the attribution and `incomplete`. */
@@ -55,7 +55,9 @@ export function parseGeocodeResponse(raw: unknown): GeocodeResponse {
     throw new SchemaMismatchError(`address schema v${String(r.version)}, client expects v${GEOCODE_SCHEMA_VERSION}; reload`)
   }
   if (!Array.isArray(r.results) || r.results.length > GEOCODE_MAX_RESULTS) throw new GeocodeParseError('address response has bad results')
-  const results = r.results.map(parseResult)
+  const parsed = r.results.map(parseResult)
+  // A v1 Worker still sends GeoSearch's own street rows, which v2 replaces with the street index's.
+  const results = r.version === 1 ? parsed.filter((p) => p.kind !== 'street') : parsed
   const attribution = r.attribution
   if (typeof attribution !== 'object' || attribution === null || Object.values(attribution).some((v) => typeof v !== 'string')) {
     throw new GeocodeParseError('address response has bad attribution')
