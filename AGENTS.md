@@ -374,6 +374,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing). Sized after mount,
     after `document.fonts.ready` and when a resize flips phone and desktop sizes; opacity `streetLabelOpacity` (the level labels' depth gate)
     While mounted it writes Scene's `StreetMask` (anchor and file radius), which the basemap's roads give way to
+  - `useLocationCap.ts` / `LocationCapSource.tsx` the location zoom cap's driver (the fly request in a layout effect, pointer
+    events through `useViewMoves`), run once by Scene inside the Canvas whether or not the basemap is; the shared handle is
+    `lib/basemap/locationCapHandle.ts` (`isCapped()`, `subscribe`), which Scene creates and passes to Basemap
   - `Basemap.tsx` the citywide basemap: `useBasemapTiles` plus six class layers (`basemapLayer.ts`: one LineSegments2
     over a pooled buffer per class, tiles in `lib/basemap/tilePool.ts` order so a new tile set rewrites and uploads
     only from the first moved tile; it grows on demand and shrinks after `SHRINK_AFTER_S` (2 s) under a quarter full,
@@ -774,8 +777,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   kept); a throw there fails the worker, so the basemap goes off, logged); `basemapConfig.ts` `BASEMAP` (the build-time `__BASEMAP__`: bbox, maxzoom, layers, the tile pin's
   release as version; null for a legacy or absent pin; under `vite serve`, `VITE_BASEMAP_DEV=1` in `.env.local` loads
   the local `public/basemap/tiles` with version "dev") and `tileUrl` (`basemap/tiles/{z}/{x}/{y}.mvt?v=<release>`).
-  `src/scene/useBasemapTiles.ts` runs it (starts after the first frame and an idle callback; feeds the location cap its pointer events through `useViewMoves.ts`,
-  see Data), mounted by `src/scene/Basemap.tsx`, with `__underground.basemap()` for its counters, decode times and the
+  `src/scene/useBasemapTiles.ts` runs it (starts after the first frame and an idle callback; mirrors the shared location cap onto
+  `capZoom`, which `useLocationCap.ts` owns, see Data), mounted by `src/scene/Basemap.tsx`, with `__underground.basemap()` for its counters, decode times and the
   request log
 - `src/lib/basemap/`: pure basemap helpers, tests colocated: `tileMath.ts` (Web Mercator tiles, numeric `tileKey`,
   `zoomFor` with 512 px tiles clamped to [`MIN_Z` 9, maxzoom]), `footprint.ts` (`groundFootprint` from the frustum's
@@ -1475,9 +1478,12 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   follow the camera, never the fix. After a location fly-to, tiles load no finer than z12 (several km a tile) until
   the user moves the view (a drag past the 6 px mouse / 10 px touch slop, a wheel step, a second finger) or picks a
   station or a searched place (tap, panel, search; only a `'locate'` point flight sets the cap); a tap that doesn't move, or the controls' `start` alone, keeps the cap
-  (`lib/basemap/locationCap.ts`, fed by `useBasemapTiles.ts`, which sets the cap in a layout effect, so it is in force
-  before any frame of the flight, even a reduced-motion one). Following a train or keyboard input doesn't lift it.
-  Tiles already loaded still draw.
+  (`lib/basemap/locationCap.ts` the machine, `locationCapHandle.ts` the one shared object, `isCapped()` plus `subscribe`; fed by
+  `src/scene/useLocationCap.ts`, run by `LocationCapSource.tsx` which Scene always mounts, so it exists with no basemap pin or
+  `?basemap=off`; it applies the fly request in a layout effect, so the cap is in force before any frame of the flight, even a
+  reduced-motion one, and takes pointer events through `useViewMoves.ts`; dev `__underground.locationCapped()`). `useBasemapTiles.ts`
+  mirrors it onto `store.capZoom`, and view-driven station fetches (o3r) will read the same handle. Following a train or keyboard
+  input doesn't lift it. Tiles already loaded still draw.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
