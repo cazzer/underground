@@ -96,6 +96,16 @@ export interface OrbitProbe {
 }
 
 /** Dev-only console and Playwright hooks; each provider adds and removes only its own. */
+/** The shared street label pass (useStreetLabels): per drawn station, in label order, its placed and total entrance
+ *  and street labels; the pass's last and slowest time and the 95th percentile of its latest runs, ms. */
+export interface StreetLabelsProbe {
+  stations: { id: string; entrances: [number, number]; streets: [number, number] }[]
+  lastMs: number
+  maxMs: number
+  p95Ms: number
+  samples: number
+}
+
 export interface UndergroundDevHooks {
   /** The focused station's street layer probe (useEntranceProbe), while it has a streets file. */
   entrancesAt?: () => EntranceProbe
@@ -120,6 +130,8 @@ export interface UndergroundDevHooks {
   drawnInteriors?: () => string[]
   /** The station ids whose street layers draw now, the focused one first (StationStreets). */
   streetLayers?: () => string[]
+  /** The street label pass's counts and timings; `reset` clears the timings after reading them. */
+  streetLabels?: (reset?: boolean) => StreetLabelsProbe
   /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */
   basemapSegments?: () => { distance: number; classes: Record<string, { used: number; capacity: number; visible: boolean }> }
 }

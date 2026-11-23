@@ -1,12 +1,11 @@
 import type { Camera, Vector3 } from 'three'
-import type { EntranceLabelSource } from '../data/useStationStreets'
+import type { EntranceLabelSource, StreetLayer } from '../data/useStationStreets'
 import type { ScreenRect } from '../lib/interiorCamera'
-import { MAX_OUTLINE_SAMPLES } from '../lib/interiorOutline'
-import { BLOCKER_SLOTS, MAX_LEVEL_BLOCKERS } from '../lib/labelBlockers'
 import type { LabelBounds, LabelCandidates } from '../lib/labelDeclutter'
-import { BOX, RECT, writeBox } from '../lib/labelGeometry'
+import { writeBox } from '../lib/labelGeometry'
 import type { Ground } from '../lib/projection'
 import type { StreetLabelSource } from '../lib/streetRuns'
+import { MAX_VIEW_INTERIORS } from '../lib/viewStations'
 import type { InteriorModel } from './interiorModel'
 
 /** Entrance candidates: right and left of the mark, then a corner of the label at each of its corners. */
@@ -15,19 +14,42 @@ export const ENTRANCE_SLOTS = 6
 export const STREET_SLOTS = 3
 /** Blocked rects before the marks: header, footer, panel (a zero rect when there is none). */
 export const FIXED_RECTS = 3
+/** Drawn interiors whose outlines the street names keep clear of: the view's, and as many again leaving. */
+export const MAX_LABEL_INTERIORS = 2 * MAX_VIEW_INTERIORS
 
-/** Typed arrays for one station's labels, sized once: items are its entrances (first), then its streets. */
-export interface LabelPlacement {
-  entrances: readonly EntranceLabelSource[]
-  streets: readonly StreetLabelSource[]
-  /** Every entrance mark (meters from the anchor) and nearby station marker but the focused one's (scene ground),
-   *  blocked for all labels. */
-  marks: readonly Ground[]
-  stations: readonly Ground[]
-  /** Room in `bounds` for this many neighbour entrance marks (PlacementView.neighbourMarks); grown by ensureNeighbourRoom. */
-  neighbourCap: number
-  /** Per street and run: each candidate's subway bundle along the street (routeBundles.ts, BUNDLE_STRIDE floats). */
+/** One drawn station in the label pass: its street layer and, per street and run, each candidate's subway bundle
+ *  along the street (routeBundles.ts, BUNDLE_STRIDE floats). */
+export interface PlacementStation {
+  layer: StreetLayer
   bundles: readonly (readonly Float32Array[])[]
+}
+
+/**
+ * Typed arrays for every drawn station's labels, sized once per station set (labelPlacementLayout.ts). Items are flat
+ * across the stations, station by station (segment s): its entrances, then its streets. Order positions match item
+ * indexes, so a segment's entrances rank within [segItem0, segStreet0) and its streets within [segStreet0, segEnd).
+ * Blocked rects: the fixed ones, each station's entrance marks, the nearby station markers and the focus ring, the
+ * level labels, then each drawn interior's outline; one rect group (labelDeclutter.ts GROUP) each.
+ */
+export interface LabelPlacement {
+  stations: readonly PlacementStation[]
+  /** Station markers the labels keep clear of (scene ground); a rect for the focus ring follows theirs. */
+  nearby: readonly Ground[]
+  /** Per station: its first entrance item, its first street item, one past its last item, and its mark rects. */
+  segItem0: Int32Array
+  segStreet0: Int32Array
+  segEnd: Int32Array
+  segMark0: Int32Array
+  segMarkEnd: Int32Array
+  /** The first marker rect (the nearby markers, then the focus ring) and the first level label rect. */
+  markerRect: number
+  levelRect: number
+  /** Per item: its station, its index in that station's entrances or streets, and its street key's id (-1 for an
+   *  entrance); per key id, whether a street label with it is placed this pass (one label per street in view). */
+  stationOf: Uint8Array
+  local: Int16Array
+  keyId: Int16Array
+  keyPlaced: Uint8Array
   /** Measured label sizes, px, and line count, per item. */
   w: Float32Array
   h: Float32Array
@@ -50,101 +72,26 @@ export interface LabelPlacement {
   lastAngle: Float32Array
   prefer: Int16Array
   out: Int16Array
-  /** Scratch: each entrance mark's screen point and rank score, each head house's best score; per run its on-screen
-   *  count and whether it was emitted; per street whether a placed entrance label names it. */
+  /** Scratch, per item: an entrance mark's screen point and rank score, a head house's best score (at its station's
+   *  first item plus the house index), whether a placed entrance label names a street; per run its on-screen count
+   *  and whether it was emitted. */
   markX: Float32Array
   markY: Float32Array
   score: Float64Array
   houseBest: Float64Array
+  named: Uint8Array
   runCount: Int16Array
   runDone: Uint8Array
-  named: Uint8Array
 }
 
-export function createLabelPlacement(
-  entrances: readonly EntranceLabelSource[],
-  streets: readonly StreetLabelSource[],
-  marks: readonly Ground[],
-  stations: readonly Ground[],
-  bundles: readonly (readonly Float32Array[])[],
-): LabelPlacement {
-  const n = entrances.length + streets.length
-  let boxes = entrances.length * ENTRANCE_SLOTS
-  let runs = 0
-  for (const s of streets) {
-    for (const r of s.runs) {
-      boxes += r.length * STREET_SLOTS
-    }
-    runs = Math.max(runs, s.runs.length)
-  }
-  const minus = (len: number) => new Int16Array(len).fill(-1)
-  // The marks, the nearby stations and the focus ring, every drawn interior's level labels, then the interior (street names only).
-  const rects = rectCount(marks.length, 0, stations.length)
-  return {
-    entrances,
-    streets,
-    marks,
-    stations,
-    neighbourCap: 0,
-    bundles,
-    w: new Float32Array(n),
-    h: new Float32Array(n),
-    lines: new Uint8Array(n).fill(1),
-    cand: {
-      boxes: new Float32Array(boxes * BOX),
-      start: new Int32Array(n),
-      size: new Int32Array(n),
-      order: new Int16Array(n).map((_, i) => i),
-      count: n,
-    },
-    bounds: {
-      viewport: { left: 0, top: 0, right: 0, bottom: 0 },
-      rects: new Float32Array(rects * RECT),
-      count: 0,
-      exempt: new Uint32Array(rects),
-    },
-    cx: new Float32Array(boxes),
-    cy: new Float32Array(boxes),
-    angle: new Float32Array(boxes),
-    srcRun: new Int16Array(boxes),
-    src: new Int16Array(boxes),
-    srcSide: new Int8Array(boxes),
-    lastFirst: new Uint8Array(n),
-    lastRun: minus(n),
-    lastSrc: minus(n),
-    lastSide: new Int8Array(n),
-    lastAngle: new Float32Array(n).fill(NaN),
-    prefer: minus(n),
-    out: minus(n),
-    markX: new Float32Array(entrances.length),
-    markY: new Float32Array(entrances.length),
-    score: new Float64Array(entrances.length),
-    houseBest: new Float64Array(entrances.length),
-    runCount: new Int16Array(runs),
-    runDone: new Uint8Array(runs),
-    named: new Uint8Array(streets.length),
-  }
+/** Entrance item `i`'s source. */
+export function entranceOf(p: LabelPlacement, i: number): EntranceLabelSource {
+  return p.stations[p.stationOf[i]!]!.layer.entrances[p.local[i]!]!
 }
 
-/** The blocked rects a placement needs: the fixed ones, the marks (own, then neighbours'), the nearby stations and the
- *  focus ring, every drawn interior's level labels, then the interior's outline (street names only). */
-function rectCount(marks: number, neighbours: number, stations: number): number {
-  return FIXED_RECTS + marks + neighbours + stations + 1 + MAX_LEVEL_BLOCKERS * BLOCKER_SLOTS + MAX_OUTLINE_SAMPLES
-}
-
-/** Grows `p.bounds` to hold `n` neighbour marks (doubling, so a set that grows a little at a time reallocates rarely).
- *  Only when the neighbours change, never per frame. */
-export function ensureNeighbourRoom(p: LabelPlacement, n: number): void {
-  if (n <= p.neighbourCap) return
-  p.neighbourCap = Math.max(n, 2 * p.neighbourCap, 16)
-  const rects = rectCount(p.marks.length, p.neighbourCap, p.stations.length)
-  p.bounds.rects = new Float32Array(rects * RECT)
-  p.bounds.exempt = new Uint32Array(rects)
-}
-
-/** How many of the view's neighbour marks the placement blocks: all of them, within the room made for them. */
-export function neighbourCount(p: LabelPlacement, view: PlacementView): number {
-  return Math.min((view.neighbourMarks?.length ?? 0) / 2, p.neighbourCap)
+/** Street item `i`'s source. */
+export function streetOf(p: LabelPlacement, i: number): StreetLabelSource {
+  return p.stations[p.stationOf[i]!]!.layer.streets[p.local[i]!]!
 }
 
 /** This frame's view: the camera, the canvas, and what covers it. */
@@ -162,7 +109,7 @@ export interface PlacementView {
   panel: ScreenRect | null
   /** How far labels keep clear of the panel, px. */
   panelPad: number
-  /** How far from the anchor a street label may sit, meters. */
+  /** How far from its anchor a street label may sit, meters. */
   radiusM: number
   /** An entrance mark's half side, and a station marker's and the focus ring's radius as drawn now, meters. */
   markHalfM: number
@@ -170,21 +117,24 @@ export interface PlacementView {
   ringRadiusM: number
   /** The focused station's point while it draws a focus ring (no interior), else null. */
   focusRing: Ground | null
-  /** Per nearby station (parallel to `LabelPlacement.stations`): 1 while its marker isn't drawn (a view interior stands
+  /** Per nearby station (parallel to `LabelPlacement.nearby`): 1 while its marker isn't drawn (a view interior stands
    *  in for it, faded out), so it blocks nothing; null for all drawn. */
   markerHidden: Uint8Array | null
-  /** The other drawn street layers' entrance marks (o3r.5), scene ground x, z pairs: labels keep clear of them as of
-   *  their own; null for none. */
-  neighbourMarks: Float32Array | null
-  /** The loaded interior, whose outlines the street names keep clear of, and its group's y scale. */
-  interior: InteriorModel | null
+  /** Every drawn interior, whose outlines the street names keep clear of (the first MAX_LABEL_INTERIORS), and their
+   *  groups' y scale. */
+  interiors: readonly InteriorModel[]
   depthScale: number
-  /** The street-file entrance index of the trip's exit; the label that has it among its `members` ranks before every
-   *  other entrance while its path is drawn; -1 for none. */
+  /** The first station is the focused one: it places unbudgeted, and only it ranks and tints the trip's exit. */
+  focusedFirst: boolean
+  /** How many entrance and street labels each other station may place. */
+  budgetEntrances: number
+  budgetStreets: number
+  /** The focused station's street-file entrance index of the trip's exit; the label that has it among its `members`
+   *  ranks before every other entrance while its path is drawn; -1 for none. */
   priorityEntrance: number
   /** Ignore last placement's picks this time (the view has settled): every label takes its best spot again. */
   fresh: boolean
-  /** Scratch, written by placeLabels: the free area's middle and the station's point, canvas px. */
+  /** Scratch, written by placeLabels: the free area's middle, and the point of the station being placed, canvas px. */
   focusX: number
   focusY: number
   stationX: number
@@ -212,9 +162,11 @@ export function newView(camera: PlacementView['camera'], markHalfM: number): Pla
     ringRadiusM: 0,
     focusRing: null,
     markerHidden: null,
-    neighbourMarks: null,
-    interior: null,
+    interiors: [],
     depthScale: 1,
+    focusedFirst: false,
+    budgetEntrances: Infinity,
+    budgetStreets: Infinity,
     priorityEntrance: -1,
     fresh: false,
     focusX: 0,

@@ -1,7 +1,7 @@
 /** The street label tests' stations: entrance and street label sources with measured sizes, laid out around an
  *  anchor, and a top-down camera over them. Test-only. */
 import { PerspectiveCamera } from 'three'
-import type { EntranceLabelSource } from '../data/useStationStreets'
+import type { EntranceLabelSource, StreetLayer } from '../data/useStationStreets'
 import { BUNDLE_STRIDE } from '../lib/routeBundles'
 import type { Ground } from '../lib/projection'
 import type { LabelCandidate, StreetLabelSource } from '../lib/streetRuns'
@@ -46,6 +46,8 @@ export interface FixtureStreet {
 export interface FixtureStation {
   id: string
   anchor: Ground
+  /** A street layer holding just what the labels read (no line buffers or file). */
+  layer: StreetLayer
   entrances: EntranceLabelSource[]
   streets: StreetLabelSource[]
   /** Every entrance mark, meters from the anchor: the labelled ones and `extraMarks`. */
@@ -93,12 +95,16 @@ export function fixtureStation(
       return out
     }),
   )
+  const marks = [...spec.entrances.map((e) => ({ x: e.x, z: e.z })), ...(spec.extraMarks ?? [])]
+  // The labels never read a layer's buffers or file.
+  const layer = { stationId: id, anchor, entrances, streets, marks } as unknown as StreetLayer
   return {
     id,
     anchor,
+    layer,
     entrances,
     streets,
-    marks: [...spec.entrances.map((e) => ({ x: e.x, z: e.z })), ...(spec.extraMarks ?? [])],
+    marks,
     bundles,
     w: [...spec.entrances.map((e) => e.w), ...spec.streets.map((s) => s.w)],
     h: [...spec.entrances.map((e) => e.h ?? 12), ...spec.streets.map((s) => s.h ?? 12)],

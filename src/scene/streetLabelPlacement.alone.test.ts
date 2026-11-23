@@ -3,7 +3,8 @@ import { Vector3 } from 'three'
 import { createLabelBlockers } from '../lib/labelBlockers'
 import { RECT } from '../lib/labelGeometry'
 import { crowdedStation, snapshot, topDownCamera, type PlacedSnapshot } from './labelFixture'
-import { createLabelPlacement, newView } from './labelPlacementState'
+import { createLabelPlacement } from './labelPlacementLayout'
+import { newView } from './labelPlacementState'
 
 // The placement module reads the TEMPORARY look flags from window.location on import; tests run in node.
 vi.stubGlobal('window', { location: { search: '' } })
@@ -17,7 +18,7 @@ function placeAlone(): { first: PlacedSnapshot; panned: PlacedSnapshot } {
     { x: s.anchor.x + 50, z: s.anchor.z + 40 },
     { x: 400, z: 0 },
   ]
-  const p = createLabelPlacement(s.entrances, s.streets, s.marks, stations, s.bundles)
+  const p = createLabelPlacement([{ layer: s.layer, bundles: s.bundles }], stations)
   s.w.forEach((w, i) => (p.w[i] = w))
   s.h.forEach((h, i) => (p.h[i] = h))
   const levels = createLabelBlockers()
@@ -37,7 +38,8 @@ function placeAlone(): { first: PlacedSnapshot; panned: PlacedSnapshot } {
     view.ringRadiusM = 6
     view.focusRing = s.anchor
     view.priorityEntrance = 5
-    placeLabels(p, s.anchor, view, levels, a, b)
+    view.focusedFirst = true
+    placeLabels(p, view, levels, a, b)
     return snapshot(p.out, p.cand.start, p.cx, p.cy, p.cand.count)
   }
   // 2 m at about 2.54 px a meter.

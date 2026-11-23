@@ -5,7 +5,7 @@ import { DESKTOP_LABEL_RADIUS_M } from '../lib/streetLabelReveal'
 import type { LabelCandidate } from '../lib/streetRuns'
 import { BUNDLE_STRIDE } from '../lib/routeBundles'
 import { theme } from '../theme'
-import { addBox, onScreen, STREET_SLOTS, toScreen, type LabelPlacement, type PlacementView } from './labelPlacementState'
+import { addBox, entranceOf, onScreen, STREET_SLOTS, streetOf, toScreen, type LabelPlacement, type PlacementView } from './labelPlacementState'
 
 /** Street labels turn along the street's screen direction over this many meters of it. */
 const TANGENT_M = 5
@@ -16,7 +16,7 @@ const NOWHERE = -1e6
 
 function radiusOf(p: LabelPlacement, i: number, view: PlacementView): number {
   // A street an entrance label names is worth reaching for: out to the desktop radius on a phone too.
-  return p.named[i - p.entrances.length] ? Math.max(view.radiusM, DESKTOP_LABEL_RADIUS_M) : view.radiusM
+  return p.named[i] ? Math.max(view.radiusM, DESKTOP_LABEL_RADIUS_M) : view.radiusM
 }
 
 function shows(c: LabelCandidate, anchor: Ground, view: PlacementView, radius: number, a: Vector3): boolean {
@@ -39,8 +39,7 @@ function note(p: LabelPlacement, i: number, view: PlacementView, box: number, ru
  * half a band pitch per route) and the centered slot is unused. Returns the next free box.
  */
 function candidateBoxes(p: LabelPlacement, i: number, anchor: Ground, view: PlacementView, a: Vector3, b: Vector3, box: number, run: number, k: number): number {
-  const s = i - p.entrances.length
-  const c = p.streets[s]!.runs[run]![k]!
+  const c = streetOf(p, i).runs[run]![k]!
   toScreen(a, anchor.x + c.x, 0, anchor.z + c.z, view)
   const ax = a.x
   const ay = a.y
@@ -51,7 +50,7 @@ function candidateBoxes(p: LabelPlacement, i: number, anchor: Ground, view: Plac
   const nx = -Math.sin(angle)
   const ny = Math.cos(angle)
   const away = nx * (ax - view.stationX) + ny * (ay - view.stationY) >= 0 ? 1 : -1
-  const bundle = p.bundles[s]![run]!
+  const bundle = p.stations[p.stationOf[i]!]!.bundles[p.local[i]!]![run]!
   const routes = bundle[k * BUNDLE_STRIDE]!
   // How far the bundle reaches off the centerline on the label's +n side and its -n side, px: the street's left in
   // the world ((-tz, tx)) is +n on screen when it projects that way.
@@ -80,7 +79,7 @@ function candidateBoxes(p: LabelPlacement, i: number, anchor: Ground, view: Plac
 /** A run's on-screen candidates within the radius, nearest the station first (their stored order); returns the next
  *  free box. */
 function runBoxes(p: LabelPlacement, i: number, anchor: Ground, view: PlacementView, a: Vector3, b: Vector3, box: number, run: number): number {
-  const cands = p.streets[i - p.entrances.length]!.runs[run]!
+  const cands = streetOf(p, i).runs[run]!
   const radius = radiusOf(p, i, view)
   for (let k = 0; k < cands.length; k++) {
     if (shows(cands[k]!, anchor, view, radius, a)) box = candidateBoxes(p, i, anchor, view, a, b, box, run, k)
@@ -91,13 +90,17 @@ function runBoxes(p: LabelPlacement, i: number, anchor: Ground, view: PlacementV
 /**
  * A street's candidates: first its run with the most on-screen candidates within the radius (last placement's run
  * while it has at most one fewer, so the label doesn't hop between carriageways), then its other runs by count, so
- * the label falls back to another run when the first has no room. Returns the next free box.
+ * the label falls back to another run when the first has no room. A street an earlier station's label already names
+ * (the same `streetKey`) gets none: one label per street in view. Returns the next free box.
  */
-export function streetBoxes(p: LabelPlacement, i: number, anchor: Ground, view: PlacementView, a: Vector3, b: Vector3, box: number): number {
-  const runs = p.streets[i - p.entrances.length]!.runs
-  const radius = radiusOf(p, i, view)
+export function streetBoxes(p: LabelPlacement, i: number, view: PlacementView, a: Vector3, b: Vector3, box: number): number {
+  const runs = streetOf(p, i).runs
+  const anchor = p.stations[p.stationOf[i]!]!.layer.anchor
   p.cand.start[i] = box
+  p.cand.size[i] = 0
   p.prefer[i] = -1
+  if (p.keyPlaced[p.keyId[i]!] === 1) return box
+  const radius = radiusOf(p, i, view)
   let best = -1
   for (let r = 0; r < runs.length; r++) {
     let count = 0
@@ -121,26 +124,33 @@ export function streetBoxes(p: LabelPlacement, i: number, anchor: Ground, view: 
   return box
 }
 
-/** Marks the streets a placed entrance label names (`named`). */
-export function markNamedStreets(p: LabelPlacement): void {
-  p.named.fill(0)
-  for (let i = 0; i < p.entrances.length; i++) {
+/** Marks station `s`'s streets a placed entrance label of it names (`named`). */
+export function markNamedStreets(p: LabelPlacement, s: number): void {
+  const streets = p.segStreet0[s]!
+  p.named.fill(0, streets, p.segEnd[s]!)
+  for (let i = p.segItem0[s]!; i < streets; i++) {
     if (p.out[i]! < 0) continue
-    const named = p.entrances[i]!.streets
-    for (let k = 0; k < named.length; k++) p.named[named[k]!] = 1
+    const named = entranceOf(p, i).streets
+    for (let k = 0; k < named.length; k++) p.named[streets + named[k]!] = 1
   }
 }
 
-/** Orders the streets (order positions E onward): those a placed entrance label names first, then the rest; within
- *  each, last placement's winners first, then by length (their index order). */
-export function rankStreets(p: LabelPlacement): void {
-  const e = p.entrances.length
-  let r = e
+/** Orders station `s`'s streets (order positions segStreet0 to segEnd - 1): those a placed entrance label names
+ *  first, then the rest; within each, last placement's winners first, then by length (their index order). */
+export function rankStreets(p: LabelPlacement, s: number): void {
+  const first = p.segStreet0[s]!
+  const end = p.segEnd[s]!
+  let r = first
   for (let tier = 0; tier < 4; tier++) {
     const named = tier < 2 ? 1 : 0
     const placed = tier % 2 === 0
-    for (let s = 0; s < p.streets.length; s++) {
-      if (p.named[s] === named && (p.lastSrc[e + s]! >= 0) === placed) p.cand.order[r++] = e + s
+    for (let i = first; i < end; i++) {
+      if (p.named[i] === named && (p.lastSrc[i]! >= 0) === placed) p.cand.order[r++] = i
     }
   }
+}
+
+/** Records the street keys station `s`'s placed street labels name, so later stations' copies get no candidates. */
+export function markPlacedKeys(p: LabelPlacement, s: number): void {
+  for (let i = p.segStreet0[s]!; i < p.segEnd[s]!; i++) if (p.out[i]! >= 0) p.keyPlaced[p.keyId[i]!] = 1
 }

@@ -1,7 +1,7 @@
 import type { Vector3 } from 'three'
+import { setExempt } from '../lib/labelDeclutter'
 import { RECT } from '../lib/labelGeometry'
-import type { Ground } from '../lib/projection'
-import { addBox, ENTRANCE_SLOTS, groundHalfPx, onScreen, toScreen, type LabelPlacement, type PlacementView } from './labelPlacementState'
+import { addBox, ENTRANCE_SLOTS, entranceOf, groundHalfPx, onScreen, toScreen, type LabelPlacement, type PlacementView } from './labelPlacementState'
 
 /** Gap between an entrance mark's edge and a label beside it, px; and above or below it. */
 const SIDE_GAP_PX = 6
@@ -17,13 +17,10 @@ export const STICKY_PX = 48
 
 /** Lets entrance `i` ignore the station marker rects (from `first`, `count` of them) its own mark sits in. */
 function exemptOwnMarker(p: LabelPlacement, i: number, x: number, y: number, first: number, count: number): void {
-  // The exemption is one bit per label in a 32-bit mask (`labelDeclutter.ts`); two words per rect would lift it to 64.
-  if (i >= 32) return
   const rects = p.bounds.rects
-  const exempt = p.bounds.exempt!
   for (let k = first; k < first + count; k++) {
     const o = k * RECT
-    if (x >= rects[o]! && x <= rects[o + 2]! && y >= rects[o + 1]! && y <= rects[o + 3]!) exempt[k] = exempt[k]! | (1 << i)
+    if (x >= rects[o]! && x <= rects[o + 2]! && y >= rects[o + 1]! && y <= rects[o + 3]!) setExempt(p.bounds, k, i)
   }
 }
 
@@ -36,7 +33,6 @@ function exemptOwnMarker(p: LabelPlacement, i: number, x: number, y: number, fir
 export function entranceBoxes(
   p: LabelPlacement,
   i: number,
-  anchor: Ground,
   view: PlacementView,
   a: Vector3,
   b: Vector3,
@@ -44,7 +40,8 @@ export function entranceBoxes(
   markerRect: number,
   markerCount: number,
 ): number {
-  const e = p.entrances[i]!
+  const e = entranceOf(p, i)
+  const anchor = p.stations[p.stationOf[i]!]!.layer.anchor
   p.cand.start[i] = box
   p.cand.size[i] = 0
   p.prefer[i] = view.fresh && !p.lastFirst[i] ? -1 : p.lastSrc[i]!
@@ -73,28 +70,31 @@ export function entranceBoxes(
 }
 
 /**
- * Orders the entrances (order positions 0 to E - 1): the trip's exit first, then elevators, then labels no other entrance shares; within
- * those, the best of each head house before any second, then nearest the free area's middle on screen, last
- * placement's winners STICKY_PX nearer. Entrances off screen have no candidates, so their rank doesn't matter.
- * Insertion sort over a few items; no allocation.
+ * Orders station `s`'s entrances (order positions segItem0 to segStreet0 - 1): the trip's exit first (the focused
+ * station's only), then elevators, then labels no other entrance shares; within those, the best of each head house
+ * before any second, then nearest the free area's middle on screen, last placement's winners STICKY_PX nearer.
+ * Entrances off screen have no candidates, so their rank doesn't matter. Insertion sort over a few items; no
+ * allocation.
  */
-export function rankEntrances(p: LabelPlacement, view: PlacementView): void {
-  const n = p.entrances.length
+export function rankEntrances(p: LabelPlacement, view: PlacementView, s: number): void {
+  const first = p.segItem0[s]!
+  const end = p.segStreet0[s]!
   const order = p.cand.order
-  p.houseBest.fill(Infinity)
-  for (let i = 0; i < n; i++) {
-    const e = p.entrances[i]!
+  const exit = s === 0 && view.focusedFirst ? view.priorityEntrance : -1
+  p.houseBest.fill(Infinity, first, end)
+  for (let i = first; i < end; i++) {
+    const e = entranceOf(p, i)
     const near = p.cand.size[i]! > 0 ? Math.hypot(p.markX[i]! - view.focusX, p.markY[i]! - view.focusY) : 1e8
-    p.score[i] = (e.members.includes(view.priorityEntrance) ? 0 : EXIT_TIER) + (e.elevator ? 0 : ELEVATOR_TIER) + (e.unique ? 0 : UNIQUE_TIER) + near - (p.lastSrc[i]! >= 0 ? STICKY_PX : 0)
-    if (p.score[i]! < p.houseBest[e.headHouse]!) p.houseBest[e.headHouse] = p.score[i]!
+    p.score[i] = (exit >= 0 && e.members.includes(exit) ? 0 : EXIT_TIER) + (e.elevator ? 0 : ELEVATOR_TIER) + (e.unique ? 0 : UNIQUE_TIER) + near - (p.lastSrc[i]! >= 0 ? STICKY_PX : 0)
+    if (p.score[i]! < p.houseBest[first + e.headHouse]!) p.houseBest[first + e.headHouse] = p.score[i]!
     order[i] = i
   }
-  for (let i = 0; i < n; i++) if (p.score[i]! > p.houseBest[p.entrances[i]!.headHouse]!) p.score[i] = p.score[i]! + HOUSE_TIER
-  for (let r = 1; r < n; r++) {
+  for (let i = first; i < end; i++) if (p.score[i]! > p.houseBest[first + entranceOf(p, i).headHouse]!) p.score[i] = p.score[i]! + HOUSE_TIER
+  for (let r = first + 1; r < end; r++) {
     const item = order[r]!
-    const s = p.score[item]!
+    const sc = p.score[item]!
     let q = r - 1
-    while (q >= 0 && p.score[order[q]!]! > s) {
+    while (q >= first && p.score[order[q]!]! > sc) {
       order[q + 1] = order[q]!
       q--
     }

@@ -25,3 +25,19 @@ export function isPhoneViewport(viewport: Viewport): boolean {
 export function streetLabelRadiusM(viewport: Viewport): number {
   return isPhoneViewport(viewport) ? PHONE_LABEL_RADIUS_M : DESKTOP_LABEL_RADIUS_M
 }
+
+export interface LabelBudget {
+  entrances: number
+  streets: number
+}
+
+/** How many entrance and street labels each station but the focused one may place (o3r.6): the focused station is
+ *  never budgeted; with none focused, every station is. */
+export const NEIGHBOUR_LABEL_BUDGET: { phone: LabelBudget; desktop: LabelBudget } = {
+  phone: { entrances: 2, streets: 1 },
+  desktop: { entrances: 4, streets: 3 },
+}
+
+export function neighbourLabelBudget(viewport: Viewport): LabelBudget {
+  return isPhoneViewport(viewport) ? NEIGHBOUR_LABEL_BUDGET.phone : NEIGHBOUR_LABEL_BUDGET.desktop
+}

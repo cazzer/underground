@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { interiorCovers, viewStreetInterior, type IndexLoad } from '../data/interiorLoad'
 import { useStationStreets, useStreetLayers, type StreetLayer } from '../data/useStationStreets'
 import { MASK_N, type StreetMask } from '../lib/basemap/streetMask'
@@ -50,28 +50,13 @@ interface StationStreetsProps {
   tripLevels: EmphasisLevels
 }
 
-/** Every entrance mark of the layers, scene ground x, z pairs; null for none. */
-function marksOf(layers: readonly StreetLayer[]): Float32Array | null {
-  const n = layers.reduce((sum, l) => sum + l.marks.length, 0)
-  if (n === 0) return null
-  const out = new Float32Array(2 * n)
-  let k = 0
-  for (const l of layers) {
-    for (const m of l.marks) {
-      out[k++] = l.anchor.x + m.x
-      out[k++] = l.anchor.z + m.z
-    }
-  }
-  return out
-}
-
 /**
  * The streets and entrance marks of the focused station (fetched on focus) and of up to MAX_VIEW_STREETS - 1 more
  * station leads in view (o3r.5; fetched only for o3r.2's camera-driven set, `useStreetLayers`), focused first. Each
  * is a StreetLines keyed by station that eases in and out with its own presence (a leaving one stays mounted, holding
  * its mask slot, until faded; a joining one waits while the slots are full, `admitShown`) and, once settled, draws only
- * its power cell where layers overlap (streetCells.ts), so a street two files hold draws once. Only the focused one is labelled
- * (StreetLabels), clear of the others' marks.
+ * its power cell where layers overlap (streetCells.ts), so a street two files hold draws once. Every mounted layer is
+ * labelled in one pass (StreetLabels, o3r.6), the focused one first.
  */
 export function StationStreets(props: StationStreetsProps) {
   const { interior, interiorPending, view, shownInteriors, interiorPresences, viewFiles, covered, index, veil } = props
@@ -123,10 +108,6 @@ export function StationStreets(props: StationStreetsProps) {
     return new Map(settled.map((l, i) => [l.stationId, list[i]!]))
     // The anchors and radii are fixed per station: the ids say it all.
   }, [settledKey])
-  // `shown` keeps its identity only while every mounted layer object does, so a rebuilt neighbour layer (a member
-  // retried) re-packs its marks; `drawnKey` says which of them are drawn.
-  const neighbourMarks = useMemo(() => marksOf(drawn.filter((l) => l !== focusedLayer)), [shown, drawnKey, focusedLayer])
-
   const ids = useRef<string[]>([])
   useEffect(() => {
     ids.current = drawn.map((l) => l.stationId)
@@ -139,48 +120,52 @@ export function StationStreets(props: StationStreetsProps) {
     }
   }, [])
 
-  return shown.map((layer) => {
-    const isFocused = layer === focusedLayer && drawn.includes(layer)
-    // A complex's interior covers every member: focused on any of them, it is this station's.
-    const own = isFocused && interiorCovers(interior, layer.stationId) ? interior : null
+  const labelledFocus = focusedLayer && drawn.includes(focusedLayer) ? focusedLayer : null
+  // A complex's interior covers every member: focused on any of them, it is this station's.
+  const own = labelledFocus && interiorCovers(interior, labelledFocus.stationId) ? interior : null
+  const lines = shown.map((layer) => {
+    const isFocused = layer === labelledFocus
     const rules = isFocused
       ? { interior: own, pending: interiorPending, clipped: !own && !interiorPending }
       : viewStreetInterior(layer.stationId, shownInteriors, viewFiles, index)
     const presence = presences.get(layer.stationId)!
     return (
-      <Fragment key={layer.stationId}>
-        <StreetLines
-          layer={layer}
-          focused={isFocused}
-          presence={presence}
-          onFaded={onFaded}
-          onSettled={onSettled}
-          interior={rules.interior}
-          interiorPresence={rules.interior ? (interiorPresences.get(rules.interior.stationId) ?? null) : null}
-          interiorPending={rules.pending}
-          clipped={rules.clipped}
-          cell={cells.get(layer.stationId) ?? NO_CELL}
-          veil={veil}
-          network={network}
-          mask={mask}
-          tripLevels={tripLevels}
-        />
-        {isFocused && (
-          <StreetLabels
-            layer={layer}
-            interior={own}
-            interiorPending={interiorPending}
-            insets={insets}
-            panel={panel}
-            labelBlockers={labelBlockers}
-            network={network}
-            pathLabels={pathLabels}
-            covered={covered}
-            neighbourMarks={neighbourMarks}
-            presence={presence}
-          />
-        )}
-      </Fragment>
+      <StreetLines
+        key={layer.stationId}
+        layer={layer}
+        focused={isFocused}
+        presence={presence}
+        onFaded={onFaded}
+        onSettled={onSettled}
+        interior={rules.interior}
+        interiorPresence={rules.interior ? (interiorPresences.get(rules.interior.stationId) ?? null) : null}
+        interiorPending={rules.pending}
+        clipped={rules.clipped}
+        cell={cells.get(layer.stationId) ?? NO_CELL}
+        veil={veil}
+        network={network}
+        mask={mask}
+        tripLevels={tripLevels}
+      />
     )
   })
+  return (
+    <>
+      {lines}
+      <StreetLabels
+        layers={shown}
+        presences={presences}
+        focusedLayer={labelledFocus}
+        interior={own}
+        interiorPending={interiorPending}
+        interiors={shownInteriors}
+        insets={insets}
+        panel={panel}
+        labelBlockers={labelBlockers}
+        network={network}
+        pathLabels={pathLabels}
+        covered={covered}
+      />
+    </>
+  )
 }
