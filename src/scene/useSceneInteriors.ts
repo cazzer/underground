@@ -22,7 +22,7 @@ export interface SceneInteriors {
   shown: readonly InteriorModel[]
   /** Each shown interior's presence, by file id. */
   presences: ReadonlyMap<string, Presence>
-  /** The presences the driver steps, the veil's and their max (Scene's PresenceDriver, ScreenVeil, LiveTrains). */
+  /** The presences the driver steps and the veil's (Scene's PresenceDriver, ScreenVeil, LiveTrains). */
   store: PresenceStore
   /** PresenceDriver's callback: a leaving interior has faded out. */
   onFaded: (id: string) => void
@@ -66,7 +66,7 @@ export function useSceneInteriors(
   const { focusedId } = useFocus()
   const view = useSyncExternalStore(viewSet.subscribe, viewSet.get)
   const cap = useSyncExternalStore(subscribeResize, capNow)
-  const inView = useViewInteriors(view, focusedId, index, cap)
+  const { models: inView, loading: viewLoading } = useViewInteriors(view, focusedId, index, cap)
   const drawn = useMemo(() => drawnInteriors(focused, inView, (id) => network.stationById.has(id), cap), [focused, inView, network, cap])
   const own = focused !== null && drawn[0] === focused ? focused : null
 
@@ -87,12 +87,16 @@ export function useSceneInteriors(
   for (const m of shown) if (!presences.has(m.stationId)) presences.set(m.stationId, newPresence(m.stationId))
   const presenceOf = (m: InteriorModel): Presence => presences.get(m.stationId)!
   const store = useState(createPresenceStore)[0]
-  const veiled = interiorLook.veil === 'screen' && drawn.length > 0 && (focusedId === null || own !== null)
+  // The veil rule: look A, and the focused station's own interior drawn when one is focused (a bare one gets none).
+  const veilAllowed = interiorLook.veil === 'screen' && (focusedId === null || own !== null)
+  const veiled = veilAllowed && drawn.length > 0
+  // The veil's own presence holds while anything shows or a view interior loads, so a swap never dips it.
+  const veilHeld = veilAllowed && (shown.length > 0 || viewLoading)
   useLayoutEffect(() => {
     for (const id of [...presences.keys()]) if (!shown.some((m) => m.stationId === id)) presences.delete(id)
     for (const m of shown) presenceOf(m).target = drawn.includes(m) ? 1 : 0
     store.items = shown.map(presenceOf)
-    store.veil.target = veiled ? 1 : 0
+    store.veil.target = veilHeld ? 1 : 0
   })
 
   const { spans, spansByDeck } = useMemo(() => {

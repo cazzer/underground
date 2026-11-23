@@ -82,9 +82,13 @@ describe('weights over a list', () => {
     expect(trainWeightIn(115, list)).toBe(trainWeightIn(115, [list[0]!]))
   })
 
-  it("scales a train's lift by its interior's presence, not the track's fade", () => {
+  it("scales a train's lift and the track's fade by its interior's presence", () => {
     const fading: ShownSpan[] = [{ span: span(0, 100), presence: { value: 0.25 } }]
     expect(trainWeightIn(50, fading)).toBe(0.25)
-    expect(maskWeightIn(50, fading)).toBe(1)
+    expect(maskWeightIn(50, fading)).toBe(0.25)
+    // Two interiors on one shape: each weight is its own presence's.
+    const two: ShownSpan[] = [...fading, { span: span(900, 1000), presence: FULL }]
+    expect(maskWeightIn(50, two)).toBe(0.25)
+    expect(maskWeightIn(950, two)).toBe(1)
   })
 })

@@ -23,7 +23,8 @@ const WHITE = new Color(1, 1, 1)
 /**
  * The ties of the stations a drawn interior other than the focused one stands in for (o3r.4), as their own layer: each
  * tie's color mixes toward the background by interiorOpacity x its interior's presence (per vertex, rewritten only
- * when that changes), so it fades as the interior reveals instead of dropping out. Opacity, depth scale and the trip
+ * when that changes), so it fades as the interior reveals instead of dropping out; once fully faded it leaves the
+ * drawn ties, so it masks nothing. Opacity, depth scale and the trip
  * dim follow StationTies' main layer (`opacity` gives its tie opacity for a depth). Allocation-free per frame.
  */
 export function useCoveredTies(network: Network, covered: readonly CoveredStation[], levels: EmphasisLevels, opacity: (depth: number) => number): LineSegments2 | null {
@@ -48,7 +49,19 @@ export function useCoveredTies(network: Network, covered: readonly CoveredStatio
     lines.renderOrder = RENDER_ORDER.stationTie
     lines.frustumCulled = false
     const presence: Presence[] = list.map((c) => c.presence)
-    return { lines, presence, stroke: Float32Array.of(stroke.r, stroke.g, stroke.b), rgb: new Float32Array(3), last: new Float32Array(list.length).fill(NaN), depth: { last: NaN } }
+    return {
+      lines,
+      presence,
+      /** Every tie's two points, and its color at the last write (6 floats each), to compact the drawn ones from. */
+      positions: Float32Array.from(positions),
+      colors,
+      /** 1 while fully faded: left out of the drawn ties, so it doesn't mask the lines it crosses. */
+      gone: new Uint8Array(list.length),
+      stroke: Float32Array.of(stroke.r, stroke.g, stroke.b),
+      rgb: new Float32Array(3),
+      last: new Float32Array(list.length).fill(NaN),
+      depth: { last: NaN },
+    }
   }, [network, covered])
 
   useEffect(
@@ -73,19 +86,35 @@ export function useCoveredTies(network: Network, covered: readonly CoveredStatio
       lines.material.opacity = o
     }
     const reveal = interiorOpacity(d)
-    const attr = lines.geometry.attributes.instanceColorStart as InterleavedBufferAttribute
-    const buf = attr.data.array as Float32Array
     let changed = false
     for (let k = 0; k < layer.presence.length; k++) {
       const amount = reveal * layer.presence[k]!.value
       if (amount === layer.last[k]) continue
       layer.last[k] = amount
+      layer.gone[k] = amount >= 1 ? 1 : 0
       dimLineRgbInto(layer.rgb, layer.stroke, BACKGROUND, amount)
-      buf.set(layer.rgb, k * 6)
-      buf.set(layer.rgb, k * 6 + 3)
+      layer.colors.set(layer.rgb, k * 6)
+      layer.colors.set(layer.rgb, k * 6 + 3)
       changed = true
     }
-    if (changed) attr.data.needsUpdate = true
+    if (!changed) return
+    // The ties not fully faded, compacted to the front with their colors; only those draw.
+    const at = lines.geometry.attributes.instanceStart as InterleavedBufferAttribute
+    const ac = lines.geometry.attributes.instanceColorStart as InterleavedBufferAttribute
+    const pos = at.data.array as Float32Array
+    const col = ac.data.array as Float32Array
+    let n = 0
+    for (let k = 0; k < layer.presence.length; k++) {
+      if (layer.gone[k] === 1) continue
+      for (let j = 0; j < 6; j++) {
+        pos[n * 6 + j] = layer.positions[k * 6 + j]!
+        col[n * 6 + j] = layer.colors[k * 6 + j]!
+      }
+      n++
+    }
+    lines.geometry.instanceCount = n
+    at.data.needsUpdate = true
+    ac.data.needsUpdate = true
   })
 
   return layer?.lines ?? null

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { NO_BANDS } from './corridors'
 import type { ShapePath } from './network'
-import { FADE_INPUTS, maskBreaks, writePlatformFade } from './platformMask'
+import { FADE_INPUTS, maskBreaks, writePlatformFade, writeShapeFade } from './platformMask'
 import { MASK_INSET_M } from './platformSpan'
 import { EMPTY_PROFILE } from './trackProfile'
 
@@ -86,6 +86,21 @@ describe('writePlatformFade', () => {
     expect(endWeight(MASK_INSET_M)).toBe(1)
     expect(endWeight(900 + MASK_INSET_M)).toBe(1)
     expect(endWeight(500)).toBe(0)
+  })
+
+  it("rewrites one shape's weights at its interior's presence as it eases", () => {
+    const e = path('e', [0, 100, 200])
+    const out = new Float32Array(2 * FADE_INPUTS)
+    const presence = { value: 0.5 }
+    const list = [{ span: { d0: 0, d1: 200 }, presence }]
+    writeShapeFade(out, e, Int32Array.of(0, 1), list)
+    expect(out[1]).toBe(0.5)
+    presence.value = 1
+    writeShapeFade(out, e, Int32Array.of(0, 1), list)
+    expect(out[1]).toBe(1)
+    presence.value = 0
+    writeShapeFade(out, e, Int32Array.of(0, 1), list)
+    expect([...out].every((v) => v === 0)).toBe(true)
   })
 
   it('clears everything for no station', () => {

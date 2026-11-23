@@ -7,7 +7,7 @@
  */
 import type { ShapeId } from '../data/schema'
 import type { ShapePath } from './network'
-import { MASK_INSET_M, maskWeightIn, type PlatformSpan, type SpanSet } from './platformSpan'
+import { MASK_INSET_M, maskWeightIn, type PlatformSpan, type ShownSpan, type SpanSet } from './platformSpan'
 
 /**
  * Vertex spacing along each end ramp of a span. The shader interpolates the fade linearly between vertices, so one
@@ -27,7 +27,7 @@ export const FADE_INPUTS = 2
 
 /**
  * Writes the fade weights of `spans` (the drawn interiors', or null for none; each segment end takes its highest weight
- * over the shape's spans) into `fade`, laid out like the line buffers
+ * over the shape's spans, each times its interior's presence) into `fade`, laid out like the line buffers
  * (`segments.get(id)[i - 1]` is the buffer segment joining points i - 1 and i of shape `id`, -1 when it isn't
  * drawn). Every other segment gets 0.
  */
@@ -42,13 +42,20 @@ export function writePlatformFade(
   for (const path of paths) {
     const list = spans.get(path.id)
     const of = segments.get(path.id)
-    if (!list || !of) continue
-    for (let i = 1; i < path.points.length; i++) {
-      const seg = of[i - 1]!
-      if (seg < 0) continue
-      const o = seg * FADE_INPUTS
-      fade[o] = maskWeightIn(path.cumulative[i - 1]!, list)
-      fade[o + 1] = maskWeightIn(path.cumulative[i]!, list)
-    }
+    if (list && of) writeShapeFade(fade, path, of, list)
+  }
+}
+
+/**
+ * Rewrites one shape's fade weights (its buffer segments `of`, -1 for one not drawn) for its spans `list`, at their
+ * interiors' current presence: what a frame calls while a presence eases. No allocation.
+ */
+export function writeShapeFade(fade: Float32Array, path: ShapePath, of: Int32Array, list: readonly ShownSpan[]): void {
+  for (let i = 1; i < path.points.length; i++) {
+    const seg = of[i - 1]!
+    if (seg < 0) continue
+    const o = seg * FADE_INPUTS
+    fade[o] = maskWeightIn(path.cumulative[i - 1]!, list)
+    fade[o + 1] = maskWeightIn(path.cumulative[i]!, list)
   }
 }

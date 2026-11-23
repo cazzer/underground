@@ -248,7 +248,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
     shapes arrive, then eases them in over 300 ms (`BandView.ease`: offset and split blend linearly from unbanded, so no fold); writes the shared `BandView` (Scene owns it; LiveTrains reads
     it) and the band uniforms per frame at priority -0.25); `usePlatformFade.ts` (given `interiorSpans`, a `SpanSet` of every drawn interior's spans: `memberSpans` unions a complex's members, never two interiors) writes the drawn interiors'
-    per-segment platform fade for every band layer (the `?lines=` overlays too); `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial
+    per-segment platform fade for every band layer (the `?lines=` overlays too), each span's weight times its interior's
+    presence; while any presence changes a frame rewrites only the shapes the spans touch (`writeShapeFade`) and uploads only
+    their ranges, and with every presence still nothing; `bandLineMaterial.ts` `BandLineMaterial` (LineMaterial
     with `BAND_GLSL` patched into its vertex shader and the platform fade into its fragment alpha; the patches throw
     if three's anchors move) and the shared `BAND_UNIFORMS`; `useLineLayer` uses it for buffers that carry `bands`.
     Each BandLineMaterial also has its own `lineDim` uniform (not in `BAND_UNIFORMS`): `DIM_GLSL`'s `dimLine` mixes the
@@ -299,9 +301,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     or the set changes) and every `StationTies.tsx` tie dims by it (`DimLineMaterial`); the fills and the trains don't dim;
     `StationTies.tsx` a thin vertical tie
     from each station marker with a depth down to its sunken platform tracks (`network.stationTrackY`; one
-    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, and so are its complex siblings' (`hiddenStations`, `compactTies` in `lib/stationTie.ts`); every other drawn interior's stations' ties move to `useCoveredTies.ts`' own layer, per-vertex colors mixed toward the background by `interiorOpacity` × that interior's presence (rewritten only on a change), kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
+    LineSegments2, `theme.stationTieWidth`; `scale.y` = the depth factor, opacity ramping in from depth 0.35 to 0.65; the focused station's tie is dropped when it has an interior, and so are its complex siblings' (`hiddenStations`, `compactTies` in `lib/stationTie.ts`); every other drawn interior's stations' ties move to `useCoveredTies.ts`' own layer, per-vertex colors mixed toward the background by `interiorOpacity` × that interior's presence (rewritten only on a change; a fully faded one leaves the drawn ties), kept (or a `STUB_DEPTH_M` stub in `lib/stationTie.ts` when it has no depth) when it has none or its load failed); `LineHighlight.tsx` holds the
     temporary `?lines=a|c` layers; `Stations.tsx` (two InstancedMeshes; the focused station's
-    instance, and its complex siblings' once the interior covering them is loaded (`hiddenSiblingIds` in `interiorLoad.ts`: the index's siblings intersected with the model's members) are scaled to 0 (`writeMarkerMatrices`' `hidden` list) when it has an interior (ready or loading), so it has no marker, and drawn when it has none or its load failed, with a `theme.stationFocus` `FocusRing.tsx` over the trains (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); every other drawn interior's stations (`covered`, o3r.4) keep their marker, the ring color mixed toward the background by `interiorOpacity` × that interior's presence (the fill is the background already), so the 1250 m gate and a swap leave no gap; `markerShape.ts` the marker constants);
+    instance, and its complex siblings' once the interior covering them is loaded (`hiddenSiblingIds` in `interiorLoad.ts`: the index's siblings intersected with the model's members) are scaled to 0 (`writeMarkerMatrices`' `hidden` list) when it has an interior (ready or loading), so it has no marker, and drawn when it has none or its load failed, with a `theme.stationFocus` `FocusRing.tsx` over the trains (`focusedMarkerShown` in `interiorLoad.ts`, passed down as `focusedMarker`); every other drawn interior's stations (`covered`, o3r.4) keep their marker, the ring color mixed toward the background by `interiorOpacity` × that interior's presence (the fill is the background already), so the 1250 m gate and a swap leave no gap, and a fully faded one collapses to scale 0; `markerShape.ts` the marker constants);
     `ScenePicker.tsx` click/tap picking of stations and trains in screen space (see Rendering conventions);
     `LiveTrains.tsx` (instanced dots plus a background-colored halo, sized by `trainSize.ts`, `theme.train` if `routeLineMix.amount` is 1 (mono lines); stable per-trip slots, fades in
     and out; the selected train (dot 1.6×) gets a background gap and then a
@@ -329,9 +331,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `ViewStationSet` (read with `useSyncExternalStore`), through `drawnInteriors`, capped by `viewInteriorCap` of the window;
     `shown` is those plus any dropped one still fading out (`mergeShown` / `withoutFaded` in `lib/presence.ts`). Each has a
     `Presence` (0 to 1, smoothstep over `PRESENCE_S` 0.25 s; reduced motion snaps), which `InteriorPresence.tsx`'s
-    `PresenceDriver` steps at -0.25 into a Scene-owned `PresenceStore` (`items`, the veil's own presence, `max`, `veilShare` =
-    veil × max) and reports a faded one so it unmounts. Presence multiplies into the interior's strokes, footprint veil and level
-    labels, its lifted cars' weight (`ShownSpan.presence`, `trainWeightIn`), its stations' marker and tie fade, and the screen veil.
+    `PresenceDriver` steps at -0.25 into a Scene-owned `PresenceStore` (`items`; the veil's own presence, whose
+    value is `veilShare`) and reports a faded one so it unmounts. Presence multiplies into the interior's strokes, footprint veil
+    and level labels, its lifted cars' weight (`ShownSpan.presence`, `trainWeightIn`), its map-track platform fade (`maskWeightIn`)
+    and its stations' marker and tie fade; a covered marker or tie fully faded collapses (scale 0, left out of the covered ties) so
+    it masks no passing line. The veil eases on its own: its target is 1 while the veil rule allows one (look A, and the focused
+    station's own interior drawn when one is focused) and any interior is shown or a view interior is loading, so a swap or a
+    brief empty drawn set never dips it.
     Outputs: their `SpanSet`, deck sets, `hiddenSiblings` (the focused one's, only while its model is drawn), `covered` (every other
     shown interior's stations with that presence), `hiddenStations` (both; ScenePicker's hidden set, so a train in reach beats a
     neighbour's hidden point and a direct tap with none still picks it), `markHidden` and `veiled`: look A, any interior drawn, and
@@ -340,7 +346,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `StationInterior` in one keyed list, each in its own null-fallback `ErrorBoundary` (a crash draws nothing for it); only the
     focused one gets the trip path, `outOfService` and level labels (`labels`; the others claim no blocker slot).
     `ScreenVeil.tsx` look A's one screen-wide veil at the orbit target, always mounted under look A, at `veilShare`, so the veil
-    darkens once however many reveal and eases with them
+    darkens once however many reveal and eases in and out on its own
   - `StationInterior.tsx` a drawn station's interior (two line layers per stroke band, up to four bands; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx` (look B's footprint veil per interior; look A's plane, in ScreenVeil), level
     labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
     drawable model (theme colors, labels, camera target; `STEP_RISE_M`); `interiorLook.ts` TEMPORARY look overrides;
@@ -528,7 +534,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `.ts` imports for `scripts/lib/trackDepth.test.ts`;
     `platformSpan.ts` per station and shape the platform span `[d0, d1]` (`network.platformSpans`; `memberSpans` unions a complex's members per shape, the `interiorSpans` that SubwayLines, LineHighlight and usePlatformFade take instead of a station; `deckSpans` splits them by `PlatformSpan.stopId` per deck for LiveTrains id; `SpanSet` several drawn interiors' spans by shape, a list each, never unioned across interiors so the track between two stations stays, from `spanSet`, `deckSpanSets` (deck k of every interior) and `maskWeightIn` / `trainWeightIn`, the highest weight over a list) and its
     weights (`trainSpanWeight`, `maskSpanWeight`, `veilTint`: a lifted car keeps `PLATFORM_RESIDUAL_TINT` 0.2 of the veil on the platform); `platformMask.ts` the platform fade (`maskBreaks`
-    adds line vertices through its ramps, `writePlatformFade` the per-segment weights); `trackBreaks.ts`
+    adds line vertices through its ramps, `writePlatformFade` the per-segment weights, `writeShapeFade` one shape's, each at its interior's presence); `trackBreaks.ts`
     `lineBreaks`, every extra vertex a drawn line needs (ramps via `rampSampling.ts`, band tapers every 30 m but only once the slot
     moved 0.25, less 1e-5 so a variant's mapped knots keep its primary's breaks; `trackBreaks.data.test.ts` checks no primary's
     breaks change with it; fade ramps);

@@ -7,16 +7,15 @@ import { prefersReducedMotion } from '../lib/reducedMotion'
 export interface PresenceStore {
   /** One per shown interior (drawn or still fading out), replaced by useSceneInteriors when that list changes. */
   items: readonly Presence[]
-  /** Look A's screen veil: target 1 while the veil rule holds (useSceneInteriors' `veiled`). */
+  /** Look A's screen veil, eased on its own: target 1 while any interior is shown or a view interior loads, and the veil
+   *  rule allows one (useSceneInteriors), so a swap or a brief empty drawn set never dips it. */
   veil: Presence
-  /** Per frame: the highest presence over `items`. */
-  max: number
-  /** Per frame: veil.value x max, the share of the veil drawn (ScreenVeil) and the lifted cars' tint follow (LiveTrains). */
+  /** Per frame: veil.value, the share of the veil drawn (ScreenVeil) and the lifted cars' tint follow (LiveTrains). */
   veilShare: number
 }
 
 export function createPresenceStore(): PresenceStore {
-  return { items: [], veil: newPresence('veil'), max: 0, veilShare: 0 }
+  return { items: [], veil: newPresence('veil'), veilShare: 0 }
 }
 
 interface PresenceDriverProps {
@@ -33,18 +32,15 @@ export function PresenceDriver({ store, onFaded }: PresenceDriverProps): null {
   const reported = useMemo(() => new WeakSet<Presence>(), [])
   useFrame((_, dt) => {
     const reduced = prefersReducedMotion()
-    let max = 0
     for (let i = 0; i < store.items.length; i++) {
       const p = store.items[i]!
       const v = stepPresence(p, dt, reduced)
-      if (v > max) max = v
       if (p.target === 0 && v === 0 && !reported.has(p)) {
         reported.add(p)
         onFaded(p.id)
       } else if (p.target === 1) reported.delete(p)
     }
-    store.max = max
-    store.veilShare = stepPresence(store.veil, dt, reduced) * max
+    store.veilShare = stepPresence(store.veil, dt, reduced)
   }, -0.25)
   return null
 }

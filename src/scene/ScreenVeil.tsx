@@ -9,14 +9,14 @@ import type { PresenceStore } from './InteriorPresence'
 import { InteriorVeil } from './InteriorVeil'
 
 interface ScreenVeilProps {
-  /** The veil's share (PresenceDriver's veilShare: its own eased presence, on while the veil rule holds, x the highest interior presence). */
+  /** The veil's share (PresenceDriver's veilShare: its own eased presence, held on while interiors show or load and the veil rule allows). */
   store: PresenceStore
 }
 
 /**
  * Look A's one screen-wide veil, always mounted by Scene under look A (o3r.4). The reveal depends only on the camera
  * distance, so every drawn interior would set the same opacity: one plane dims the street once instead of one per
- * interior stacking, scaled by `store.veilShare` so it eases in and out with the interiors and the veil rule (none
+ * interior stacking, scaled by `store.veilShare` so it eases in and out on its own, never dipping on a swap (none
  * with a bare station focused). It follows the orbit target (the camera's x/z without controls), so it covers the view
  * wherever the interiors are; opacity is written only when it changes.
  */

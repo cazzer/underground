@@ -150,10 +150,10 @@ export function deckSpanSets(perInterior: readonly InteriorDeckSpans[]): (SpanSe
   return Array.from({ length: decks }, (_, k) => spanSet(perInterior.map((d) => ({ spans: d.decks[k] ?? null, presence: d.presence }))))
 }
 
-/** The highest of `maskSpanWeight` over the spans (0 for none). No allocation. */
+/** The highest of `maskSpanWeight` times its interior's presence over the spans (0 for none), so the map track returns as an interior eases out. No allocation. */
 export function maskWeightIn(d: number, spans: readonly ShownSpan[]): number {
   let w = 0
-  for (let i = 0; i < spans.length; i++) w = Math.max(w, maskSpanWeight(d, spans[i]!.span))
+  for (let i = 0; i < spans.length; i++) w = Math.max(w, maskSpanWeight(d, spans[i]!.span) * spans[i]!.presence.value)
   return w
 }
 

@@ -4,7 +4,7 @@ import { CircleGeometry, Color, DynamicDrawUsage, RingGeometry, type InstancedMe
 import { useFocus } from '../lib/focus'
 import { interiorOpacity } from '../lib/interiorReveal'
 import { dimLineRgbInto, srgb01 } from '../lib/lineDim'
-import { writeMarkerMatrices } from '../lib/markerMatrices'
+import { writeInstanceMatrix, writeMarkerMatrices } from '../lib/markerMatrices'
 import type { Station } from '../lib/network'
 import type { Ground } from '../lib/projection'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
@@ -90,7 +90,16 @@ export function Stations({ stations, focusedMarker, hiddenStations, covered, tri
   const fades = useMemo(() => {
     const indexOf = new Map(stations.map((s, i) => [s.id, i]))
     const list = covered.filter((c) => indexOf.has(c.id))
-    return { index: Int32Array.from(list, (c) => indexOf.get(c.id)!), presence: list.map((c) => c.presence), last: new Float32Array(list.length).fill(NaN), rgb: new Float32Array(3) }
+    return {
+      index: Int32Array.from(list, (c) => indexOf.get(c.id)!),
+      presence: list.map((c) => c.presence),
+      last: new Float32Array(list.length).fill(NaN),
+      /** 1 while fully faded: collapsed to scale 0, so its background disc doesn't mask the lines passing it. */
+      gone: new Uint8Array(list.length),
+      rgb: new Float32Array(3),
+      /** A station's collapse changed: the matrices need a rewrite. */
+      moved: true,
+    }
   }, [stations, covered])
   // A station no longer covered gets its own ring color back: the next frame rewrites every ring.
   useLayoutEffect(() => {
@@ -141,6 +150,11 @@ export function Stations({ stations, focusedMarker, hiddenStations, covered, tri
       if (amount === fades.last[k]) continue
       fades.last[k] = amount
       const i = fades.index[k]!
+      const gone = amount >= 1 ? 1 : 0
+      if (gone !== fades.gone[k]) {
+        fades.gone[k] = gone
+        fades.moved = true
+      }
       const base = onTrip[i] || !(t.dim > 0) ? tint.full : tint.dimmed
       ;(r.instanceColor!.array as Float32Array).set(dimLineRgbInto(fades.rgb, base, BACKGROUND, amount), i * 3)
       faded = true
@@ -148,11 +162,18 @@ export function Stations({ stations, focusedMarker, hiddenStations, covered, tri
     if (faded) r.instanceColor!.needsUpdate = true
     const scale = screenScale(d, markerRadiusPx(d), MARKER_MIN_METERS)
     const last = drawn.current
-    if (scale === last.scale && hidden === last.hidden) return
+    if (scale === last.scale && hidden === last.hidden && !fades.moved) return
     last.scale = scale
     last.hidden = hidden
-    // Scale 0 collapses a hidden instance, so neither its fill nor its ring draws.
-    writeMarkerMatrices(f.instanceMatrix.array as Float32Array, positions, MARKER_Y, scale, hidden)
+    fades.moved = false
+    // Scale 0 collapses a hidden instance, so neither its fill nor its ring draws; so does a fully faded covered one.
+    const matrices = f.instanceMatrix.array as Float32Array
+    writeMarkerMatrices(matrices, positions, MARKER_Y, scale, hidden)
+    for (let k = 0; k < fades.index.length; k++) {
+      if (fades.gone[k] !== 1) continue
+      const p = positions[fades.index[k]!]!
+      writeInstanceMatrix(matrices, fades.index[k]!, p.x, MARKER_Y, p.z, 0)
+    }
     r.instanceMatrix.array.set(f.instanceMatrix.array)
     f.instanceMatrix.needsUpdate = true
     r.instanceMatrix.needsUpdate = true
