@@ -29,7 +29,9 @@ import { basemapLook } from './basemapLook'
 import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
+import { createViewStationSet } from '../lib/viewStationSet'
 import { LocationCapSource } from './LocationCapSource'
+import { ViewStationsSource } from './ViewStationsSource'
 import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
 import { StationStreets } from './StationStreets'
@@ -97,6 +99,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const streetMask = useMemo(createStreetMask, [])
   /** Driven by LocationCapSource (always mounted), read by Basemap's tile store: the location zoom cap. */
   const locationCap = useState(createLocationCap)[0]
+  /** Written by ViewStationsSource: the station leads in view (empty under the cap); o3r.4 reads it. */
+  const viewStations = useState(createViewStationSet)[0]
   /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
   const interiorSpans = useMemo(
     () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),
@@ -198,6 +202,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       />
       <ViewCenterSource />
       <LocationCapSource cap={locationCap} />
+      <ViewStationsSource network={network} insets={insets} panel={panel} cap={locationCap} set={viewStations} />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>

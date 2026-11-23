@@ -378,6 +378,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `useLocationCap.ts` / `LocationCapSource.tsx` the location zoom cap's driver (the fly request in a layout effect, pointer
     events through `useViewMoves`), run once by Scene inside the Canvas whether or not the basemap is; the shared handle is
     `lib/basemap/locationCapHandle.ts` (`isCapped()`, `subscribe`), which Scene creates and passes to Basemap
+  - `useViewStations.ts` / `ViewStationsSource.tsx` (o3r.2) the stations in view, run once by Scene inside the Canvas at
+    `useFrame` priority 0, read-only and allocation-free per frame (the id list once per change): the pose each frame, timing from
+    `reselectDue` (`lib/basemap/reselect.ts`) but "changed enough" from its own `viewMovedEnough` (2% pan, 3% zoom, 3 degrees,
+    a resize; the tiles' 10% pan is over 100 px), passed as its `slidOut`, plus a dirty flag set by a free-rect change
+    (`interiorFreeRect`, as CameraRig), a focus change, a `gateZone` change and every frame the location cap is on; flights are
+    evaluated like any move. It writes Scene's `ViewStationSet` (`lib/viewStationSet.ts`: `get`, `subscribe`, `set`, listeners
+    isolated like `locationCapHandle`; created in Scene, no App state, so only readers re-render: o3r.4 reads it through
+    `useSyncExternalStore`) only when the members change, or the first slot does (only while a station is focused), compared
+    with what was last written, not with the last choice (`chosen` is the hysteresis input); it is emptied on unmount.
+    While `cap.isCapped()` it chooses nothing and writes an empty set (the focused station too); dev
+    `__underground.viewStations()` returns the store's ids.
   - `Basemap.tsx` the citywide basemap: `useBasemapTiles` plus six class layers (`basemapLayer.ts`: one LineSegments2
     over a pooled buffer per class, tiles in `lib/basemap/tilePool.ts` order so a new tile set rewrites and uploads
     only from the first moved tile; it grows on demand and shrinks after `SHRINK_AFTER_S` (2 s) under a quarter full,
@@ -470,6 +481,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     to its group (id, name, point; the distance stays the member's); `arrivalsAt` takes a group's `stops` and `memberIds` (a trip once at its
     soonest member, one ending at any member skipped, north first then soonest); the panel, announcers and trip bar name the group;
     `useStationHash` writes the lead and resolves any member id to it;
+  - `viewStations.ts` (o3r.2, pure; `viewStations.test.ts`) the stations in view: nothing from `REVEAL_FAR` (1250 m) out; a
+    group (complex lead, `viewStationSpace`: member points in CSR typed arrays) qualifies when any member projects (`ToScreen`)
+    inside the free rect and lies within `REACH_SHARE` (1.5) x the camera distance of the orbit target on the ground (a horizon
+    guard; a test pins it against the real camera at both free rects); ranked by the nearest member's screen distance to the
+    free rect's middle; the focused lead first, counted in the cap `MAX_VIEW_STATIONS` (4); hysteresis (`KEEP_PAD_SHARE` 15%
+    rect padding, `KEEP_REACH_FACTOR` 1.25, `KEEP_RANK_SHARE` 0.1 of the half-diagonal rank bonus) for a previous pick, and at
+    the gate (`gateZone`: a non-empty set keeps its own members, nothing new, out to `REVEAL_FAR` x `GATE_KEEP_FACTOR` 1.04).
+    `chooseViewStations` allocates nothing and leaves its scratch clean. Never takes the location fix or `nearestStation`
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
   - `network.ts` public/data → render model (projected stations, routes, shape paths without bands, bounds,
     `trackLines` for the corridor search; `drawnPath` resamples one shape); `networkBands.ts` `bandShapes` redraws
@@ -1490,6 +1509,8 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   reduced-motion one, and takes pointer events through `useViewMoves.ts`; dev `__underground.locationCapped()`). `useBasemapTiles.ts`
   mirrors it onto `store.capZoom`, and view-driven station fetches (o3r) will read the same handle. Following a train or keyboard
   input doesn't lift it. Tiles already loaded still draw.
+  The stations-in-view set (`useViewStations.ts`, o3r.2) reads the same handle: while the cap is in force it chooses nothing and the
+  set is empty (the focused station too), and its inputs are the camera, the free rect and the focused id, never the fix or `nearestStation`.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
