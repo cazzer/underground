@@ -3,8 +3,10 @@ import { useTripPlan } from '../data/useTripPlan'
 import type { StationsFile } from '../data/schema'
 import type { ArrivalsSource } from './live/arrivals'
 import type { TripJourney } from './route/plan'
+import { useFocus } from './focus'
 import { useTrainSelection } from './trainSelection'
 import { journeyKeys, reconcileOpened, tripSelection, type OpenedJourney, type TripSelection } from './tripSelection'
+import { activeStepKey } from './tripSteps'
 import { plannable, tripKey, type TripEnds, type TripPlanState } from './tripView'
 
 export type TripEnd = keyof TripEnds
@@ -41,6 +43,23 @@ interface TripValue {
   dropped: { seq: number; remaining: number }
   /** The "no longer offered" line shows: a drop in this plan, until the next settled refresh, 6 s, or the visitor opens or goes back. */
   dropNoteShown: boolean
+  /** The key of the step (`TripStep.key`) the visitor pressed in the opened journey, while it still holds: the journey is open and its station is the focused one. */
+  activeStep: string | null
+  /** The lead of the active step's station (what `focusedId` is while it holds), else null. */
+  activeStepLead: string | null
+  /** A step was pressed: makes it the active step and flies to its station (`select`). */
+  stepTo: (key: string, stationId: string) => void
+  /** Counts the times the visitor ended the active step (Esc); a step that merely stopped holding does not count. */
+  stepEnds: number
+  /** Ends the active step only: its station stays focused, with its interior and path, and the camera stays where it is. */
+  endStep: () => void
+}
+
+/** A step pressed in a journey's detail view, with the lead of its station (`focusedId` at the station while it holds). */
+interface StoredStep {
+  journeyKey: string | null
+  key: string
+  leadId: string
 }
 
 interface TripProviderProps {
@@ -66,6 +85,9 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   const [places, setPlaces] = useState<TripPlaces>({ from: null, to: null })
   const [opened, setOpened] = useState<OpenedJourney | null>(null)
   const [dropped, setDropped] = useState({ seq: 0, remaining: 0 })
+  const [step, setStep] = useState<StoredStep | null>(null)
+  const [stepEnds, setStepEnds] = useState(0)
+  const { focusedId, select, membersOf } = useFocus()
   const [dropNoteFor, setDropNoteFor] = useState<string | null>(null)
   const dropPlan = useRef<TripPlanState | null>(null)
   const sourceRef = useRef(arrivals)
@@ -80,6 +102,14 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   const planKey = plan.status === 'ready' ? plan.key : null
   const selection = useMemo(() => tripSelection(keys, planKey, opened), [keys, planKey, opened])
   const selectedJourney = plan.status === 'ready' ? (plan.journeys[selection.selectedIndex] ?? null) : null
+  const activeStep = activeStepKey(step, selection.openedKey, focusedId)
+  const activeStepLead = activeStep !== null ? (step?.leadId ?? null) : null
+  // A stored step that no longer holds (another station focused, the journey closed) is dropped, so focusing that station
+  // again later is the visitor's own and never counts as the step. `stepTo` sets the step and focus in one batch, so a
+  // press never shows up here as not holding.
+  useEffect(() => {
+    if (step !== null && activeStep === null) setStep(null)
+  }, [step, activeStep])
 
   // A settled plan keeps the opened journey, opens a lone one, or notes that the opened one left. The view itself is
   // derived (`tripSelection`), so a plan that drops it never flashes it; this only saves the result.
@@ -117,6 +147,7 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
     setOpenState(next)
     if (!next) {
       setOpened(null)
+      setStep(null)
       setDropNoteFor(null)
     }
   }, [])
@@ -124,13 +155,28 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
     (key: string) => {
       if (planKey === null) return
       setOpened({ planKey, key })
+      setStep(null)
       setDropNoteFor(null)
     },
     [planKey],
   )
   const backToList = useCallback(() => {
     setOpened(null)
+    setStep(null)
     setDropNoteFor(null)
+  }, [])
+  const openedKey = selection.openedKey
+  const stepTo = useCallback(
+    (key: string, stationId: string) => {
+      // `select` focuses the group's lead, which `membersOf` lists first.
+      setStep({ journeyKey: openedKey, key, leadId: membersOf(stationId)[0] ?? stationId })
+      select(stationId)
+    },
+    [openedKey, membersOf, select],
+  )
+  const endStep = useCallback(() => {
+    setStep(null)
+    setStepEnds((n) => n + 1)
   }, [])
   const start = useCallback((next: TripEnds, notes: TripPlaces) => {
     setEnds((e) => (e.from === next.from && e.to === next.to ? e : next))
@@ -164,8 +210,13 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
       backToList,
       dropped,
       dropNoteShown: dropNoteFor !== null && dropNoteFor === planKey && selection.view !== 'none',
+      activeStep,
+      activeStepLead,
+      stepTo,
+      stepEnds,
+      endStep,
     }),
-    [open, ends, places, plan, showLoading, setOpen, start, setEnd, swap, retry, selection, selectedJourney, openJourney, backToList, dropped, dropNoteFor, planKey],
+    [stepEnds, activeStep, activeStepLead, stepTo, endStep, open, ends, places, plan, showLoading, setOpen, start, setEnd, swap, retry, selection, selectedJourney, openJourney, backToList, dropped, dropNoteFor, planKey],
   )
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>
 }

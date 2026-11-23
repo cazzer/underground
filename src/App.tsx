@@ -68,6 +68,10 @@ function MapView({ network, bands, live }: MapViewProps) {
   const names = useMemo(() => tripNamesOf(network), [network])
   // The changes of trains inside hand-authored complexes: described in the trip panel, drawn in their interiors.
   const tripTransfers = useTripTransfers({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, names, selected: trip.selectedJourney })
+  const tripLines = useMemo(
+    () => ({ exits: tripExit?.lines ?? null, transfers: tripTransfers.lines, index: interior.index }),
+    [tripExit?.lines, tripTransfers.lines, interior.index],
+  )
   const exitDraw = tripExit?.drawn ?? null
   const exitInterior = tripExit?.interiorId ?? null
   // The exit first: where an interior has both (a trip can't change at its To station), the exit wins.
@@ -124,8 +128,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           linkNotice={{ show: stationHash.linkNotice, onDismiss: stationHash.dismissLinkNotice }}
           interior={{ load: interior.load, onRetry: interior.retry }}
           outages={outagePanelView(outages, nowS, noStepFree)}
-          tripExits={tripExit?.lines ?? null}
-          tripTransfers={tripTransfers.lines}
+          tripLines={tripLines}
           focusSiblings={focusSiblings}
           siblingsOf={siblingsOf}
         />

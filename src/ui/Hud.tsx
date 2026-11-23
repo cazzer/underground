@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ExitLineView } from '../lib/exitView'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
@@ -12,7 +11,6 @@ import { frontPanel } from '../lib/panelCollapseState'
 import type { Network } from '../lib/network'
 import type { PlacePick } from '../lib/placeLabel'
 import { useTrainSelection } from '../lib/trainSelection'
-import type { TransferLineView } from '../lib/transferView'
 import type { LocateControls } from '../data/useLocate'
 import { ArrivalsPanel } from './ArrivalsPanel'
 import { Attribution } from './Attribution'
@@ -28,7 +26,7 @@ import { TrainGonePanel, TrainPanel } from './TrainPanel'
 import { SearchButton } from './SearchButton'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
 import { TripAnnouncer } from './TripAnnouncer'
-import { TripPanel } from './TripPanel'
+import { TripPanel, type TripLines } from './TripPanel'
 import { usePlaceLine } from './usePlaceLine'
 import { useHudInsets } from './useHudInsets'
 import { useLineFilter } from './useLineFilter'
@@ -52,17 +50,15 @@ interface HudProps {
   locate: LocateControls
   /** Shown under the location message when a `#station=` link named no station. */
   linkNotice: { show: boolean; onDismiss: () => void }
-  /** The trip panel's exit lines, by the trip id of a journey's last ride. */
-  tripExits: ReadonlyMap<string, ExitLineView> | null
-  /** The trip panel's transfer lines, by change leg key. */
-  tripTransfers: ReadonlyMap<string, TransferLineView> | null
+  /** The trip panel's exit and transfer lines and the station index its steps read. */
+  tripLines: TripLines
   /** The focused station's complex siblings (its group's other members): the trip panel treats them as the focused station. */
   focusSiblings: readonly string[]
   /** Any station's complex siblings (its group's other members): a directions pick never pairs a station with its own complex. */
   siblingsOf: (stationId: string) => readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripExits, tripTransfers, focusSiblings, siblingsOf }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, onPanel, locate, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const lineFilter = useLineFilter(focusedId)
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
@@ -168,7 +164,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     }
   }, [focusedId, trainOpen, noticeOpen, tripOpen, onPanel])
 
-  // Esc closes the front panel: the train panel, then the notice, then the trip panel (an opened journey goes back to the list first), then the station's.
+  // Esc closes the front panel: the train panel, then the notice, then the trip panel (an active step ends first, then an opened journey goes back to the list, then it closes), then the station's.
   useEffect(() => {
     // While search is open, Esc belongs to it: one press must not also dismiss a panel.
     if ((!focusedId && !trainOpen && !noticeOpen && !tripOpen) || searchOpen) return
@@ -277,8 +273,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             focusRequest={focusRequest}
             onClose={closeTrip}
             covered={trainOpen || noticeOpen}
-            exits={tripExits}
-            transfers={tripTransfers}
+            lines={tripLines}
             focusSiblings={focusSiblings}
             ref={trainOpen || noticeOpen ? null : panel}
           />

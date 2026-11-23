@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ANNOUNCE_DELAY_MS } from '../lib/focusAnnounce'
+import { ANNOUNCE_DELAY_MS, focusAnnouncement } from '../lib/focusAnnounce'
 import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { Network } from '../lib/network'
@@ -30,7 +30,7 @@ interface TripAnnouncerProps {
  * changing.
  */
 export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: TripAnnouncerProps) {
-  const { open, ends, plan, dropped } = useTrip()
+  const { open, ends, plan, dropped, activeStep, activeStepLead, stepEnds } = useTrip()
   const { focusedId } = useFocus()
   const [text, setText] = useState('')
   const lastId = useRef<string | null>(null)
@@ -39,8 +39,8 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
   const refill = useRef(0)
   const lastFocused = useRef<string | null>(focusedId)
   const settledAt = useRef<number | null>(null)
-  const latest = useRef({ ends, plan, focusSiblings })
-  latest.current = { ends, plan, focusSiblings }
+  const latest = useRef({ ends, plan, focusSiblings, activeStepLead })
+  latest.current = { ends, plan, focusSiblings, activeStepLead }
 
   const say = (next: string | null) => {
     window.clearTimeout(refill.current)
@@ -93,7 +93,7 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
     const station = focusedId !== null ? network.groupById.get(focusedId) : undefined
     if (!station) return
     const timer = window.setTimeout(() => {
-      const { ends: now, plan: current, focusSiblings: siblings } = latest.current
+      const { ends: now, plan: current, focusSiblings: siblings, activeStepLead: stepLead } = latest.current
       const settled = settledAt.current
       if (
         shouldAnnounceOnMap({
@@ -102,6 +102,8 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
           shown,
           isEnd: isTripEnd(station.id, siblings, now),
           planLoading: current.status === 'loading',
+          // A step press focuses its station on purpose: the button and the map say it, so this region stays silent.
+          stepped: stepLead === focusedId,
           sinceSettledMs: settled === null ? null : performance.now() - settled,
         })
       ) {
@@ -110,6 +112,26 @@ export function TripAnnouncer({ network, arrivals, covered, focusSiblings }: Tri
     }, ANNOUNCE_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [focusedId, shown])
+
+  // A step press says "Showing <station>" once (FocusAnnouncer's wording; it is covered while the trip panel is open, and the
+  // focus effect above skips the stepped station), after the same hold, and only if the step still holds.
+  useEffect(() => {
+    if (activeStep === null || activeStepLead === null) return
+    const name = network.groupById.get(activeStepLead)?.name
+    if (name === undefined) return
+    const timer = window.setTimeout(() => {
+      if (latest.current.activeStepLead === activeStepLead) say(focusAnnouncement(name))
+    }, ANNOUNCE_DELAY_MS)
+    return () => window.clearTimeout(timer)
+    // The pressed step is what triggers it; the station follows from it.
+  }, [activeStep])
+
+  // Esc ending a step changes nothing on screen a listener can find, so it says so once. A step that lapsed (the visitor
+  // focused another station) is not counted by `stepEnds`.
+  useEffect(() => {
+    if (stepEnds > 0 && open) say('Back to the trip')
+    // The Esc press is what triggers it.
+  }, [stepEnds])
 
   useEffect(() => () => window.clearTimeout(refill.current), [])
 

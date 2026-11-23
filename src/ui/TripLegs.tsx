@@ -1,41 +1,15 @@
 import { useRef } from 'react'
 import type { ExitLineView } from '../lib/exitView'
+import { routeSpokenName } from '../lib/labels'
 import type { Network } from '../lib/network'
 import type { TransferLineView } from '../lib/transferView'
+import type { StationLayout } from '../data/interiorLoad'
+import { journeyItinerary, type StepContext } from '../lib/tripSteps'
 import type { JourneyView, LegView, RideLegView } from '../lib/tripView'
 import { RouteChip } from './RouteChip'
 import { TripExitLine } from './TripExitLine'
+import { TripStepButton } from './TripStepButton'
 import { TripTransferLine } from './TripTransferLine'
-
-interface LegProps {
-  network: Network
-  leg: LegView
-  /** The journey mixes live and scheduled trains, so a scheduled one says so. */
-  mixed: boolean
-  drawnKeys: ReadonlySet<string> | null
-  onStation: (stationId: string) => void
-  onShowTrain: (tripId: string) => void
-  transfers: ReadonlyMap<string, TransferLineView> | null
-}
-
-interface StationLinkProps {
-  stationId: string
-  name: string
-  onStation: (stationId: string) => void
-}
-
-function StationLink({ stationId, name, onStation }: StationLinkProps) {
-  return (
-    <button
-      type="button"
-      onClick={() => onStation(stationId)}
-      aria-description="Show on map"
-      className="-my-3 inline-flex min-h-11 cursor-pointer items-center text-left underline hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
-    >
-      {name}
-    </button>
-  )
-}
 
 interface ShowTrainProps {
   leg: RideLegView
@@ -67,19 +41,21 @@ function ShowTrain({ leg, routeName, drawn, onShowTrain }: ShowTrainProps) {
   )
 }
 
-function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain, transfers }: LegProps) {
-  if (leg.kind === 'change') {
-    const transfer = transfers?.get(leg.transferKey)
-    return (
-      <li>
-        <p className="text-ink-dim">
-          Change at {leg.name}
-          {leg.minutes !== null && ` · ${leg.minutes} min`}
-        </p>
-        {transfer && <TripTransferLine view={transfer} />}
-      </li>
-    )
-  }
+interface LegProps {
+  network: Network
+  leg: LegView
+  /** The ride says when it gets off (no Exit step follows it with the time), and where when `offPlace` names the station (a walk follows). */
+  showOff: boolean
+  offPlace: string | null
+  /** The journey mixes live and scheduled trains, so a scheduled one says so. */
+  mixed: boolean
+  drawnKeys: ReadonlySet<string> | null
+  onShowTrain: (tripId: string) => void
+}
+
+/** A ride (route, headsign, stops and when it gets off, Show train) or a walk; a change is a step, never a leg row. */
+function Leg({ network, leg, showOff, offPlace, mixed, drawnKeys, onShowTrain }: LegProps) {
+  if (leg.kind === 'change') return null // unreachable: a change is always a step
   if (leg.kind === 'walk') {
     return (
       <li className="text-ink-dim">
@@ -97,11 +73,9 @@ function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain, transfers
           {mixed && !leg.live && <span className="text-ink-dim"> · scheduled</span>}
         </span>
       </p>
-      <p className="text-sm">
-        Board {leg.board.clock} at <StationLink stationId={leg.board.stationId} name={leg.board.name} onStation={onStation} />
-      </p>
-      <p className="text-sm">
-        {leg.stopsText}, off {leg.alight.clock} at <StationLink stationId={leg.alight.stationId} name={leg.alight.name} onStation={onStation} />
+      <p className="text-sm text-ink-dim">
+        {leg.stopsText}
+        {showOff && ` · off ${leg.alight.clock}${offPlace !== null ? ` at ${offPlace}` : ''}`}
       </p>
       <ShowTrain leg={leg} routeName={route?.shortName ?? leg.routeId} drawn={leg.live && drawnKeys?.has(leg.tripId) === true} onShowTrain={onShowTrain} />
     </li>
@@ -111,32 +85,59 @@ function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain, transfers
 export interface JourneyLegsProps {
   network: Network
   view: JourneyView
-  onStation: (stationId: string) => void
   drawnKeys: ReadonlySet<string> | null
   onShowTrain: (tripId: string) => void
   exits: ReadonlyMap<string, ExitLineView> | null
   transfers: ReadonlyMap<string, TransferLineView> | null
+  /** What the station's interior is (null until the station index is ready): a step says where there is none. */
+  layoutOf: (stationId: string) => StationLayout
+  /** The way to the first platform at the From station (2q7.45.7): the visible line and the sentence a screen reader hears; null or absent: none. */
+  board?: { text: string; spoken: string } | null
+  /** The pressed step's key while it holds. */
+  activeStep: string | null
+  /** A step was pressed: flies to its station and makes it the active step. */
+  onStep: (key: string, stationId: string) => void
 }
 
-/** A journey's legs in travel order, then the way out at its To station when it ends on a train. */
-export function JourneyLegs({ network, view, onStation, drawnKeys, onShowTrain, exits, transfers }: JourneyLegsProps) {
-  const last = view.legs.at(-1)
-  const exit = last?.kind === 'ride' ? exits?.get(last.tripId) : undefined
+/**
+ * The journey as an itinerary in travel order: a Board step, the ride, a Change step per change, the next ride, the Exit
+ * step. A step is a button that flies to its station, with the way through it (the change's transfer line, the exit line)
+ * beside the button, never inside it.
+ */
+export function JourneyLegs({ network, view, drawnKeys, onShowTrain, exits, transfers, layoutOf, board = null, activeStep, onStep }: JourneyLegsProps) {
+  const ctx: StepContext = {
+    layoutOf,
+    routeName: (id) => network.routeById.get(id)?.shortName ?? id,
+    routeSpoken: (id) => routeSpokenName(network.routeById.get(id)?.shortName ?? id),
+    hasBoardPath: board !== null,
+    hasExitPath: (tripId) => exits?.has(tripId) === true,
+    hasTransferPath: (key) => transfers?.has(key) === true,
+  }
+  const rows = journeyItinerary(view.legs, ctx)
+  const firstBoard = rows.find((r) => r.kind === 'step' && r.step.kind === 'board')
   return (
     <ol className="flex flex-col gap-2 pb-3 pl-1 text-sm">
-      {view.legs.map((leg, i) => (
-        <Leg
-          key={i}
-          network={network}
-          leg={leg}
-          mixed={view.source === 'mixed'}
-          drawnKeys={drawnKeys}
-          onStation={onStation}
-          onShowTrain={onShowTrain}
-          transfers={transfers}
-        />
-      ))}
-      {exit && <TripExitLine view={exit} />}
+      {rows.map((row) => {
+        if (row.kind === 'leg') {
+          return <Leg key={`leg:${row.index}`} network={network} leg={row.leg} showOff={row.showOff} offPlace={row.offPlace} mixed={view.source === 'mixed'} drawnKeys={drawnKeys} onShowTrain={onShowTrain} />
+        }
+        const { step } = row
+        const transfer = step.transferKey !== null ? transfers?.get(step.transferKey) : undefined
+        const exit = step.tripId !== null ? exits?.get(step.tripId) : undefined
+        return (
+          <li key={step.key}>
+            <TripStepButton step={step} active={activeStep === step.key} onPress={onStep} />
+            {row === firstBoard && board && (
+              <>
+                <p aria-hidden="true">{board.text}</p>
+                <span className="sr-only">{board.spoken}</span>
+              </>
+            )}
+            {transfer && <TripTransferLine view={transfer} />}
+            {exit && <TripExitLine view={exit} />}
+          </li>
+        )
+      })}
     </ol>
   )
 }

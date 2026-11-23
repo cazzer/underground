@@ -54,6 +54,21 @@ export function interiorIdOf(stationId: string | null, index: IndexLoad): string
   return index.index.stations[stationId]!.file ?? stationId
 }
 
+/** What a station's interior is: hand-authored, generated, none, or null while the station index isn't ready (nothing is known). */
+export type StationLayout = 'authored' | 'generated' | 'none' | null
+
+/**
+ * What the station's interior is, for the trip steps: its file's provenance, `'none'` when the ready index doesn't list
+ * it, null while the index is loading or failed (nothing is known, so nothing is said).
+ */
+export function layoutOf(stationId: string, index: IndexLoad): StationLayout {
+  if (index.status !== 'ready') return null
+  const file = interiorIdOf(stationId, index)
+  if (file === null) return 'none'
+  const entry = Object.hasOwn(index.index.stations, file) ? index.index.stations[file]! : index.index.stations[stationId]!
+  return entry.provenance
+}
+
 /** The distinct interior file ids of the hand-authored stations in the index, sorted; none until it is ready. */
 export function authoredInteriorIds(index: IndexLoad): string[] {
   if (index.status !== 'ready') return []

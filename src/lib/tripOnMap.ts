@@ -12,16 +12,18 @@ export interface OnMapInput {
   /** The focused station is already From or To. */
   isEnd: boolean
   planLoading: boolean
+  /** The focused station is the one the visitor just stepped to in the opened journey: they asked for it, so it is not news. */
+  stepped: boolean
   /** Milliseconds since a plan settled; null if none has. */
   sinceSettledMs: number | null
 }
 
 /**
  * Whether "On the map: X" is said: only when the focused station really changed while the panel is in front
- * (never on opening, a swap, an end pick or the cover going), it is not an end, and no result is loading or has
- * just settled.
+ * (never on opening, a swap, an end pick or the cover going), it is not an end or a stepped-to station, and no
+ * result is loading or has just settled.
  */
 export function shouldAnnounceOnMap(i: OnMapInput): boolean {
-  if (i.focusedId === null || i.focusedId === i.previousId || !i.shown || i.isEnd || i.planLoading) return false
+  if (i.focusedId === null || i.focusedId === i.previousId || !i.shown || i.isEnd || i.stepped || i.planLoading) return false
   return i.sinceSettledMs === null || i.sinceSettledMs >= ON_MAP_QUIET_MS
 }
