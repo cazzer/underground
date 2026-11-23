@@ -20,12 +20,14 @@ import { holdsFocus, releaseHold } from '../lib/placeHold'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { tiltForDistance } from '../lib/tilt'
 import { complexMemberPoints, flushMotion, newFlight, turnOffset, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
+import type { TripRouteDraw } from '../lib/tripLineBuffers'
 import type { InteriorModel } from './interiorModel'
 import { useCollapseReframe } from './useCollapseReframe'
 import { usePathProbe } from './usePathProbe'
 import { useFocusGroups } from './useFocusGroups'
 import { useInteriorReframe } from './useInteriorReframe'
 import { usePlaceHold } from './usePlaceHold'
+import { useRouteFlight } from './useRouteFlight'
 import { useStationFlights } from './useStationFlights'
 import { useStationOrbit } from './useStationOrbit'
 import { useTrainFollow } from './useTrainFollow'
@@ -50,9 +52,11 @@ interface CameraRigProps {
   frame: PriorityFrame | null
   /** The trip panel is open: a framed interior goes on reframing onto its priority frame (useInteriorReframe). */
   tripOpen: boolean
+  /** The selected journey's ride legs as the lines draw them (useTripRoute): the route frame covers them. */
+  tripRoute: TripRouteDraw | null
 }
 
-export function CameraRig({ network, insets, interior, index, panel, anchor, frame, tripOpen }: CameraRigProps) {
+export function CameraRig({ network, insets, interior, index, panel, anchor, frame, tripOpen, tripRoute }: CameraRigProps) {
   const controls = useRef<MapControlsImpl>(null)
   const flight = useRef<Flight | null>(null)
   const hold = useRef<FocusHold | null>(null)
@@ -130,6 +134,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
     [camera],
   )
   const follow = useTrainFollow({ controls, camera, flight, startFlight, anchor, free, viewport: size })
+  const routeLanded = useRouteFlight({ controls, camera, flight, layout: latest, network, flyRequest, startFlight, following: follow.active, gesture, tookOver, tripRoute, panel, size, insets })
   // While following, the follow owns the target: the orbit neither pivots nor clamps the pan.
   const flying = useCallback(() => flight.current !== null || follow.active(), [follow.active])
   const busy = useCallback(() => flight.current !== null || hold.current !== null || follow.active(), [follow.active])
@@ -191,6 +196,7 @@ export function CameraRig({ network, insets, interior, index, panel, anchor, fra
         flushMotion(c, camera)
         landed()
         resized(f)
+        routeLanded(f)
       }
     } else if (hold.current && focusedId !== hold.current.stationId) {
       hold.current = null

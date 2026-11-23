@@ -176,6 +176,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         anchor={anchor}
         frame={priorityFrame}
         tripOpen={tripOpen}
+        tripRoute={tripRoute}
       />
       <ViewCenterSource />
       {basemapConfig && (

@@ -226,6 +226,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     destinations" button, arrivals notes. An interior's panel size alone still never moves the camera. On a 390×844 phone (free
     bottom 393.5 px under the open panel, 690 px under the bar) 127 lands with 10 of its 16 marks and 120 with 2 of 6; collapsed, all
     of both; the outage disclosure arriving (52 px) reframes 127 from 8 to 10 and leaves 120 at 2 (`panelGrow.data.test.ts`);
+    `useRouteFlight.ts` the trip route frame (2q7.45.5; see Rendering conventions: `lib/routeFrame.ts` the route's ground points and `frameTopDown`, the pure top-down fit into the free rect;
+    `lib/routeFrameRule.ts` `routeFrameDecision`, when it fires; `useViewMoved.ts` a drag, pinch or wheel past the click slop (locationCap.ts's rules, unchanged); `useRouteReframe.ts` and `lib/routeReframe.ts`
+    its reframes after landing; `routeFlightState.ts` what they share; CameraRig calls the hook and passes its landing call every landing, `onStart` is untouched);
     `useTrainFollow.ts` the camera follow of the selected train (see Rendering conventions); `useFollowAnchor.ts`
     LiveTrains' -3 frame: steps every slot and writes the selected train's drawn point (`lib/live/followAnchor.ts`)
   - `SubwayLines.tsx` (one merged LineSegments2 via `useLineLayer.ts`; draws `network.shapes` until the banded
@@ -1094,6 +1097,21 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   the follow anchor (with the last frame's band view); -2 CameraRig (the follow's `beforeFlight`, the flight step,
   focus, the polar lock), the touch twist's goal (`useTouchOrbit`) and the orbit's bounds; -1 drei's `update()`; -0.75 the train follow; -0.5 the orbit's pivot
   and pan clamp; -0.25 the band view; 0 the draws (and `useBasemapTiles` reading the camera, read-only).
+- The trip route frame (`useRouteFlight.ts`, 2q7.45.5): with the trip panel in front, a settled plan (its ends and attempt, never a
+  silent tick or poll) or a journey or list the visitor opens or leaves (the token is the view plus the journey key, so the first
+  journey reframes too) flies the camera top-down and north-up to the whole selected journey, every point of its spans and stations
+  (`routeFramePoints` over `useTripRoute`'s ride spans, the same ones TripLines draws, which App passes down through Scene as CameraRig's `tripRoute`, plus the journey's stations; with no route to draw, its patterns still loading, its spans unmappable or every leg straight, nothing frames; `front` is `usePanelCollapse().front === 'trip'`) inside the free rect less 32 px (`frameTopDown`: the
+  smallest distance at or above `ROUTE_MIN_DISTANCE`, EXIT_DISTANCE plus 0.1%, so the fit is exact and focus drops, the focus machine's
+  test being strict; clamped to the zoom-out limit). It is not a `FlyRequest`: it starts through CameraRig's `startFlight` (clearing
+  the hold and the pending reframes), never sets or lifts the basemap's location cap, and records its flight only if one started. It
+  never fires (`routeFrameDecision`) behind a train panel or notice, over a follow, a gesture or another flight, or for a plan the
+  visitor moved the view during (a drag, pinch or wheel past the click slop, `useViewMoved`, or a station request since the plan began
+  loading, or since the ends changed or the panel opened: a plain tap is not a move); a skipped route never fires later. A panel or
+  viewport change retargets its flight. After it lands, while it is the last landing, the trip panel is in front and no gesture has
+  begun (`useRouteReframe`, `lib/routeReframe.ts`): a user collapse or expand of the panel (`usePanelCollapse().seq`), or one measured
+  panel move that shifts the free rect's bottom within 2 s of the landing (a press or key closes that window), waits for the panel to
+  hold still (`collapseDueIn`) and reframes once onto the route in the new free rect, 0.6-1 s eased, no turn, only when it moves
+  anything; a reduced-motion landing snaps and re-snaps once just after on a panel, size or inset change (`shouldResnapPoint`). The reframes frame only the route still drawn: an ends change, a non-ready plan or a different route (skipped or none) forgets the landed flight (`routeIsFramed`); a retry's settling, new ends and the panel opening reset the visitor's move.
 - Selecting a train follows it (`useTrainFollow.ts`): a flight retargeted each frame to the moving train, at the
   distance where its consist spans 80% of the free width, held to 400..600 m (`followDistanceFor`; a desktop stays at
   400), never started over another flight. Then at -0.75 `stepFollow` moves target and camera by one step so its dot
