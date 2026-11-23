@@ -91,7 +91,8 @@ export function StationStreets(props: StationStreetsProps) {
 
   // The mounted layers: the wanted ones admitted while the slots allow, then the leaving ones until faded (adjusted during render).
   const [shownState, setShown] = useState<readonly StreetLayer[]>([])
-  const { drawn, shown } = admitShown(shownState, wanted, MASK_N)
+  // The focused station's layer never waits for a slot: the oldest leaving layer goes at once instead.
+  const { drawn, shown } = admitShown(shownState, wanted, MASK_N, focusedLayer != null && wanted[0] === focusedLayer)
   if (shown !== shownState) setShown(shown)
   const presences = useState(() => new Map<string, Presence>())[0]
   for (const l of shown) if (!presences.has(l.stationId)) presences.set(l.stationId, newPresence(l.stationId))
@@ -122,7 +123,9 @@ export function StationStreets(props: StationStreetsProps) {
     return new Map(settled.map((l, i) => [l.stationId, list[i]!]))
     // The anchors and radii are fixed per station: the ids say it all.
   }, [settledKey])
-  const neighbourMarks = useMemo(() => marksOf(drawn.filter((l) => l !== focusedLayer)), [drawnKey, focusedLayer])
+  // `shown` keeps its identity only while every mounted layer object does, so a rebuilt neighbour layer (a member
+  // retried) re-packs its marks; `drawnKey` says which of them are drawn.
+  const neighbourMarks = useMemo(() => marksOf(drawn.filter((l) => l !== focusedLayer)), [shown, drawnKey, focusedLayer])
 
   const ids = useRef<string[]>([])
   useEffect(() => {

@@ -84,3 +84,27 @@ describe('admitShown', () => {
     expect(r.shown).toEqual([b2, a])
   })
 })
+
+describe('admitShown for the focused layer', () => {
+  const [a, b, c, d, f] = ['a', 'b', 'c', 'd', 'f'].map((stationId) => ({ stationId }))
+
+  it('drops the oldest leaving layer at once rather than make the focused one wait', () => {
+    // a left first (it sits last), then b, c and d: every slot is held by a leaving layer.
+    const prev = [d!, c!, b!, a!]
+    expect(admitShown(prev, [f!], 4).drawn).toEqual([])
+    const r = admitShown(prev, [f!], 4, true)
+    expect(r.drawn).toEqual([f])
+    expect(r.shown).toEqual([f, d, c, b])
+  })
+
+  it('drops only as many as it needs, and none when there is room or it is already shown', () => {
+    expect(admitShown([c!, b!, a!], [f!], 4, true).shown).toEqual([f, c, b, a])
+    const shown = [f!, d!, c!, b!]
+    expect(admitShown(shown, [f!], 4, true).shown).toBe(shown)
+  })
+
+  it('still holds a later joining layer out', () => {
+    const r = admitShown([d!, c!, b!, a!], [f!, a!, { stationId: 'g' }], 4, true)
+    expect(r.drawn.map((m) => m.stationId)).toEqual(['f', 'a'])
+  })
+})

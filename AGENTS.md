@@ -175,8 +175,10 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `interiorEntranceNeighbourMix` (0.5) mixes `interiorEntrance` toward the background (sRGB, mixHex) for the entrance marks
   of a station in view that isn't focused (3.68:1; at least 1.5:1 and at most half the focused marks' contrast,
   `src/themeStreets.test.ts`); the focused station's marks keep the full color.
-  Default (auto): under the route lines at 0.35 at full color, but above the veil at 7.5, drawn at a fainter stroke
-  (1.9:1, `veiledStreetHex` in `src/lib/streetVeil.ts`), while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused).
+  Default (auto): each street layer draws both strokes, cross-faded by look A's veil share `s` (`PresenceStore.veilShare`,
+  the veil's own eased presence): under the route lines at 0.35 at full color at opacity x (1 - s), and above the veil at
+  7.5 at a fainter stroke (1.9:1, `veiledStreetHex` in `src/lib/streetVeil.ts`) at opacity x s; both draw only while
+  0 < s < 1, so the streets follow the veil and never lead it.
   TEMPORARY: `?streets=under|over` forces one order until the ost.7 card is decided; the removal list is in
   `src/scene/streetsLook.ts`
   `basemap` holds one `{ stroke, width }` per basemap class (highway, major, minor, path, water, park), faint by color;
@@ -383,8 +385,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     leads with street files draws every street once). Each layer has its own `Presence` (`lib/presence.ts`, 250 ms,
     reduced motion snaps), stepped by its `StreetLines` at -0.25: it eases in on joining the set and out on leaving, a
     leaving layer staying mounted (and holding its mask slot) until faded. `admitShown` keeps the mounted layers within
-    `MASK_N`: while leaving layers fill the slots a joining one (the focused one too) waits, in view order, until one
-    fades, at most 250 ms. The cells are cut among the settled layers only (drawn and fully in): a joining or leaving
+    `MASK_N`: while leaving layers fill the slots a joining neighbour waits, in view order, until one fades (up to 250
+    ms); the focused station's layer never waits: the oldest leaving layers are dropped at once to make room
+    (`admitShown`'s `firstUrgent`; their slots free in that commit). The cells are cut among the settled layers only (drawn and fully in): a joining or leaving
     layer draws its whole disc while it eases, so nothing in an overlap dips or pops (its faded edge band shows doubled for
     that moment); a settled layer takes over a leaving one's part at once and gives up its part to a joining one once
     that one is in. A layer in view takes the shown interior covering it, drawn or fading out (`viewStreetInterior` in
@@ -401,9 +404,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     so no 1 px centerline reads as one more track in a bundle; the labels still name the street. Not while the station
     has an interior (loaded or loading): its tracks sink under it, so the streets above stay whole. Its draw order is auto: above the veil (7.5), built from
     `StreetLayer.veiledBuffers` (the 1.9:1 stroke, fading to the background like the others; material color stays
-    white), while look A's veil's drawn share (`PresenceStore.veilShare`) is at least one half, so the stroke never
-    changes ahead of the veil; else 0.35 at full color. Both are cut once per layer and the frame shows one, so the
-    switch re-cuts nothing; `streetsLook.ts` TEMPORARY override (one stroke only). It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
+    white), cross-faded with the full-color stroke at 0.35 by look A's veil share `s` (`PresenceStore.veilShare`): the
+    full one at opacity x (1 - s), the veiled one at opacity x s, each drawn only while its share is above 0, so the
+    stroke never changes ahead of the veil. Both are cut once per layer, so the cross-fade re-cuts nothing; `streetsLook.ts` TEMPORARY override (one stroke only). It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
     street-file entrance the interior doesn't draw itself (`src/lib/entranceMarks.ts`: no interior entrance within
     1.5 m on the scene ground with the same type; none while an interior is still loading;
     `entranceMarks.data.test.ts` checks L08 adds none), and calls `useStreetLabels.ts`: one aria-hidden wrapper div
@@ -1283,8 +1286,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   back to north-up). Esc, ×, a station pick or search choice (they clear the train), the panel's Stop and the
   location button (`unfollow`) end it too. Auto-focus never enters while following; its exits still apply.
 - Overlay layers (lines, markers, trains) are `transparent` with `depthTest={false}` and
-  an explicit `renderOrder` from `src/scene/renderOrder.ts`: station streets (focused and in view) 0.35 (7.5 above the veil
-  while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused); TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
+  an explicit `renderOrder` from `src/scene/renderOrder.ts`: station streets (focused and in view) 0.35, cross-fading by look A's
+  veil share into their veiled stroke at 7.5 above the veil (`PresenceStore.veilShare`; TEMPORARY `?streets=` forces either), basemap park 0.36, water 0.37, path 0.38, minor 0.39, major
   0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`), a straight-drawn trip ride 2.2 (`TripDashes.tsx`),
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo 4.4, trip walks 4.45
   (`TripDashes.tsx`; 7.55 above the veil while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused) and it reveals), trip mark ring 4.5 and dot 4.55

@@ -32,8 +32,6 @@ const rgbOf = (hex: string): Rgb => {
 const MARK_RGB = rgbOf(theme.interiorEntrance)
 /** A neighbour's marks (a station in view, not the focused one): a dimmer tier (themeStreets.test.ts). */
 const NEIGHBOUR_MARK_RGB = rgbOf(mixHex(theme.interiorEntrance, theme.background, theme.interiorEntranceNeighbourMix))
-/** The veil's drawn share past which the streets switch to their over-veil stroke: its midpoint, so they never lead it. */
-const VEILED_AT = 0.5
 /** The interior's presence past which its own entrances stand in for the street marks. */
 const INTERIOR_MARKS_AT = 0.5
 
@@ -72,12 +70,13 @@ const routeCut = (base: LineBuffers, clip: RouteClip | null): LineBuffers => (cl
  * One station's streets: a line layer at street level (y = 0) at its anchor, cut to its cell, and the marks of the
  * entrances its interior doesn't draw, fading in with the interior reveal times the layer's presence. Under look A
  * (`?streets=` auto) both strokes are built once: the full-colour one under the route lines and the veiled one above
- * the veil (about 1.9:1, streetVeil.ts), shown by the veil's drawn share, so a veil easing in or out never re-cuts them.
+ * the veil (about 1.9:1, streetVeil.ts), cross-faded by the veil's drawn share (the full one at 1 - share, the veiled
+ * one at share; both drawn only between), so a veil easing in or out never re-cuts them.
  */
 export function StreetLines(props: StreetLinesProps) {
   const { layer, focused, presence, onFaded, onSettled, interior, interiorPresence, interiorPending, clipped, cell, veil, network, mask, tripLevels } = props
   const group = useRef<Group>(null)
-  const shown = useRef({ o: -1, veiled: false, own: false })
+  const shown = useRef({ o: -1, share: -1, own: false })
   const reported = useRef(-1)
   const auto = streetsLook === 'auto'
   // The pieces under a route line are left out (not at a station with an interior: its tracks sink under it).
@@ -140,23 +139,24 @@ export function StreetLines(props: StreetLinesProps) {
     const g = group.current
     if (!g) return
     const o = interiorOpacity(cameraDistance(state)) * presence.value
-    const overVeil = veiled !== null && veil.veilShare >= VEILED_AT
+    // The two strokes cross-fade by the veil's drawn share, so the streets follow it exactly and never lead it.
+    const share = veiled === null ? 0 : veil.veilShare
     const own = marksOwn !== null && (interiorPresence?.value ?? 1) > INTERIOR_MARKS_AT
     if (full) writeLineDim(full.material, tripLevels.networkDim)
     if (veiled) writeLineDim(veiled.material, tripLevels.networkDim)
     const last = shown.current
-    if (o === last.o && overVeil === last.veiled && own === last.own) return
+    if (o === last.o && share === last.share && own === last.own) return
     last.o = o
-    last.veiled = overVeil
+    last.share = share
     last.own = own
     g.visible = o > 0
     if (full) {
-      full.material.opacity = o
-      full.visible = !overVeil
+      full.material.opacity = o * (1 - share)
+      full.visible = share < 1
     }
     if (veiled) {
-      veiled.material.opacity = o
-      veiled.visible = overVeil
+      veiled.material.opacity = o * share
+      veiled.visible = share > 0
     }
     if (marksAll) {
       marksAll.material.opacity = o
