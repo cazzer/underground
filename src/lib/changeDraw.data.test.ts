@@ -7,10 +7,12 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { transformAlerts } from '../../worker/src/alerts'
 import type { ServiceAlert } from '../data/realtime'
-import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
+import type { RoutesFile, ShapesFile, StationsFile, TripIndexFile } from '../data/schema'
 import type { PackedDepthsFile } from '../data/stationSchema'
-import { changeDrawable, serviceChangeDraw, type ChangeDraw, type ChangeDrawContext } from './changeDraw'
+import { changeDrawable, changeDrawNote, NAMES_NOTE, serviceChangeDraw, TIMETABLE_NOTE, type ChangeDraw, type ChangeDrawContext } from './changeDraw'
+import { serviceIndex } from './live/alertAdded'
 import { buildNetwork } from './network'
+import { buildTripLookup } from './realtime/tripLookup'
 import { bandNetwork } from './networkBands'
 import type { Ground } from './projection'
 import { TRACK_OFFSET_M } from './trackOffset'
@@ -26,10 +28,19 @@ const network = buildNetwork(
   2,
 )
 const banded = bandNetwork(network)
-const ctx: ChangeDrawContext = { shapes: banded.shapes, stationById: network.stationById, stopStations: stopStations(network.stations), serviceOf: null }
+const serviceOf = serviceIndex(buildTripLookup(read<TripIndexFile>('trip-index.json'), read<ShapesFile>('shapes.json')), network.stationById)
+const ctx: ChangeDrawContext = { shapes: banded.shapes, stationById: network.stationById, stopStations: stopStations(network.stations), serviceOf }
 const shapeById = new Map(banded.shapes.map((s) => [s.id, s]))
-const alerts = transformAlerts(JSON.parse(readFileSync('worker/fixtures/alerts.json', 'utf8')) as unknown, 1795465325).snapshot!.alerts
-const alertOf = (id: string): ServiceAlert => alerts.find((a) => a.id === `lmm:planned_work:${id}`)!
+const FEED = JSON.parse(readFileSync('worker/fixtures/alerts.json', 'utf8')) as unknown
+/** The feed's own timestamp; 2026-12-15 05:01 GMT, in the Q reroute's first period (36553); 2026-12-19 06:01 GMT, in the D's local run (36538). */
+const FEED_AT = 1795465325
+const REROUTE_AT = 1797310860
+const LOCAL_AT = 1797660060
+/** Every alert of the feed, from the Worker's answers at the three times (the two later ones are outside the first's day). */
+const everyAlert = [
+  ...new Map([FEED_AT, REROUTE_AT, LOCAL_AT].flatMap((t) => transformAlerts(FEED, t).snapshot!.alerts).map((a) => [a.id, a])).values(),
+]
+const alertOf = (id: string): ServiceAlert => everyAlert.find((a) => a.id === `lmm:planned_work:${id}`)!
 
 function draw(id: string): ChangeDraw {
   const d = serviceChangeDraw(alertOf(id), ctx, `${id}#1`)
@@ -113,17 +124,60 @@ describe('serviceChangeDraw on the recorded feed', () => {
     }
   })
 
+  it('draws the uptown D local from 59 St to 125 St, marking the seven stops it adds and neither end', () => {
+    const d = draw('36538')
+    expect(d.basis).toBe('timetable')
+    expect(changeDrawNote(d)).toBe(TIMETABLE_NOTE)
+    expect(d.route.rides).toHaveLength(1)
+    const ride = d.route.rides[0]!
+    expect(ride.routeId).toBe('D')
+    expect(directionOf(ride)).toBe('N')
+    const [a, b] = ends(ride)
+    expect(near(a, pos('A24'))).toBeLessThan(30)
+    expect(near(b, pos('A15'))).toBeLessThan(30)
+    expect(marked(d)).toEqual(['A16', 'A17', 'A18', 'A19', 'A20', 'A21', 'A22'])
+    expect(d.route.marks.every((m) => m.role === 'added')).toBe(true)
+    expect([...d.route.stations].sort()).toEqual(['A15', 'A16', 'A17', 'A18', 'A19', 'A20', 'A21', 'A22', 'A24'])
+    expect(d.route.suspended).toEqual([])
+  })
+
+  it('draws the 7X from 61 St-Woodside to Junction Blvd through 74 St, its one added stop', () => {
+    const d = draw('31871')
+    expect(d.route.rides.map((r) => r.routeId)).toEqual(['7X'])
+    const [a, b] = ends(d.route.rides[0]!)
+    expect(near(a, pos('712'))).toBeLessThan(30)
+    expect(near(b, pos('707'))).toBeLessThan(30)
+    expect(d.route.marks).toEqual([{ stationId: '710', pos: { x: pos('710').x, z: pos('710').z }, role: 'added' }])
+  })
+
+  it('marks only the Q reroute\'s named stations, Canal St once and DeKalb Av, with no path', () => {
+    const d = draw('36553')
+    expect(d.basis).toBe('names')
+    expect(changeDrawNote(d)).toBe(NAMES_NOTE)
+    expect(d.route.rides).toEqual([])
+    expect(d.route.suspended).toEqual([])
+    expect(marked(d)).toEqual(['Q01', 'R30'])
+    expect(d.route.marks.every((m) => m.role === 'named')).toBe(true)
+    expect([...d.route.stations].sort()).toEqual(['Q01', 'R23', 'R30'])
+    expect(d.route.frameStations).toEqual([pos('Q01'), pos('R30')].map((p) => ({ x: p.x, z: p.z })))
+  })
+
+  it('draws no added stop while the normal service is unknown', () => {
+    expect(serviceChangeDraw(alertOf('36538'), { ...ctx, serviceOf: null }, 'k')).toBeNull()
+    expect(changeDrawable(alertOf('36538'), network.stationById, null)).toBe(false)
+  })
+
   it('finds every stretch of the feed on a drawn line (nothing warned)', () => {
     warn.mockClear()
-    for (const a of alerts) serviceChangeDraw(a, ctx, 'k')
+    for (const a of everyAlert) serviceChangeDraw(a, ctx, 'k')
     expect(warn).not.toHaveBeenCalled()
   })
 
   it('makes a row a button exactly when it draws something, for every alert of the feed', () => {
-    for (const a of alerts) expect(changeDrawable(a, network.stationById, null), a.id).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
+    for (const a of everyAlert) expect(changeDrawable(a, network.stationById, serviceOf), a.id).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
   })
 
-  it('draws nothing for a delay, a notice or an express-to-local change', () => {
-    for (const a of alerts.filter((x) => !/Skipped|Suspended/.test(x.type ?? ''))) expect(serviceChangeDraw(a, ctx, 'k')).toBeNull()
+  it('draws nothing for a delay or a notice', () => {
+    for (const a of everyAlert.filter((x) => !/Skipped|Suspended|Local|Reroute/.test(x.type ?? ''))) expect(serviceChangeDraw(a, ctx, 'k')).toBeNull()
   })
 })

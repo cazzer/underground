@@ -6,9 +6,11 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { transformAlerts } from '../../../worker/src/alerts'
 import { decodeShapePoints } from '../../data/codec'
-import type { RoutesFile, ShapesFile } from '../../data/schema'
+import type { RoutesFile, ShapesFile, TripIndexFile } from '../../data/schema'
 import { toGround } from '../projection'
+import { buildTripLookup } from '../realtime/tripLookup'
 import { realGroupById, realStations } from '../realGroups.testdata'
+import { serviceIndex, type ServiceOf } from './alertAdded'
 import { joinStationChanges, type StationChange } from './alertJoin'
 import { skipSetsOf } from './alertStations'
 import { serviceChangeView } from './alertText'
@@ -36,12 +38,12 @@ const terminalOf = terminalsOf(
 const EXPRESS_AT = 1796190000
 
 /** The Worker's answer at `nowS` (it is polled then), joined at that moment. */
-function joinAt(id: string, nowS: number) {
+function joinAt(id: string, nowS: number, serviceOf: ServiceOf | null = null) {
   const input = { configured: true, snapshot: transformAlerts(FEED, nowS).snapshot, failures: 0, schemaMismatch: false }
-  return joinStationChanges(realGroupById.get(id)!, stationById, input, nowS, routeOrder, null)
+  return joinStationChanges(realGroupById.get(id)!, stationById, input, nowS, routeOrder, serviceOf)
 }
-const changesAt = (id: string, nowS: number): StationChange[] => {
-  const { panel } = joinAt(id, nowS)
+const changesAt = (id: string, nowS: number, serviceOf: ServiceOf | null = null): StationChange[] => {
+  const { panel } = joinAt(id, nowS, serviceOf)
   return panel.kind === 'changes' ? panel.changes : []
 }
 const summary = (c: StationChange) => `${c.alertId.replace('lmm:planned_work:', '')} ${c.kind}${c.direction ?? ''}${c.probable ? '?' : ''} ${c.routes.join('')} ${c.now ? 'now' : 'later'}`
@@ -151,5 +153,40 @@ describe('joinStationChanges on the recorded feed', () => {
     expect(view.body.rows[0]!.parts.join(' · ')).toBe('skips this station · downtown only · until Fri 11:45 PM')
     expect(view.body.rows[0]!.header).toBe('Downtown [1] skips 125 St')
     expect(view.skipSpoken).toBe('The downtown 1 train skips this station now.')
+  })
+})
+
+describe('joinStationChanges for an Express to Local change', () => {
+  const shapesFile = JSON.parse(readFileSync('public/data/shapes.json', 'utf8')) as ShapesFile
+  const lookup = buildTripLookup(JSON.parse(readFileSync('public/data/trip-index.json', 'utf8')) as TripIndexFile, shapesFile)
+  const serviceOf = serviceIndex(lookup, stationById)
+  /** 2026-12-19 06:01 GMT, inside the D's uptown local run (36538). */
+  const LOCAL_AT = 1797660060
+  const local = (id: string, nowS: number, with_: ServiceOf | null) => changesAt(id, nowS, with_).filter((c) => /:(36538|31871)$/.test(c.alertId)).map(summary)
+
+  it('81 St: the uptown D stops here, a row of our own over the header', () => {
+    expect(local('A21', LOCAL_AT, serviceOf)).toEqual(['36538 addedN D now'])
+    const view = serviceChangeView(joinAt('A21', LOCAL_AT, serviceOf), realGroupById.get('A21')!, routeById, LOCAL_AT, terminalOf)
+    if (view.body.kind !== 'changes') throw new Error('no changes at 81 St')
+    const row = view.body.rows.find((r) => r.kind === 'added')!
+    expect(row.parts.slice(0, 2)).toEqual(['stops here (runs local)', 'uptown only'])
+    expect(row.parts[2]).toMatch(/^until /)
+    expect(row.header).toBe('In Manhattan, uptown [D] runs local from 59 St-Columbus Circle to 125 St')
+    expect(row.spoken).toMatch(/^The D train runs local and stops here, uptown only, until /)
+    expect(row.ended).toBe('The local stop for the D train at this station has ended.')
+  })
+
+  it('59 St-Columbus Circle, where the D stops anyway, only quotes it', () => {
+    expect(local('A24', LOCAL_AT, serviceOf)).toEqual(['36538 otherN D now'])
+  })
+
+  it('quotes it while the normal service is unknown, and says the join is not yet known', () => {
+    expect(local('A21', LOCAL_AT, null)).toEqual(['36538 otherN D now'])
+    expect(joinAt('A21', LOCAL_AT, null).known).toBe(false)
+    expect(joinAt('A21', LOCAL_AT, serviceOf).known).toBe(true)
+  })
+
+  it('74 St-Broadway: the 7X stops here, the 7 (which always does) only quoted', () => {
+    expect(local('710', FEED_AT, serviceOf)).toEqual(['31871 addedN 7X now', '31871 otherN 7 now'])
   })
 })

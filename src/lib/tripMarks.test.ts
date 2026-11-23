@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Station } from './network'
-import { tripMarks, tripStationIds, type MarkLeg } from './tripMarks'
+import { markParts, tripMarks, tripStationIds, type MarkLeg, type TripMarkRole } from './tripMarks'
 import { stopStations } from './tripSpans'
 
 function station(id: string, x: number, leadId = id): Station {
@@ -56,5 +56,21 @@ describe('tripStationIds', () => {
 
   it('throws for an unknown stop', () => {
     expect(() => tripStationIds([walk('AN', 'ZZ')], stops)).toThrow(/ZZ/)
+  })
+})
+
+describe('markParts', () => {
+  it("tells a service change's three marks apart by shape: a cross, a dot, a plain ring", () => {
+    const roles: TripMarkRole[] = ['skip', 'added', 'named']
+    const keys = roles.map((r) => JSON.stringify(markParts(r)))
+    expect(new Set(keys).size).toBe(roles.length)
+    expect(markParts('skip')).toEqual({ dot: false, cross: true })
+    expect(markParts('added')).toEqual({ dot: true, cross: false })
+    expect(markParts('named')).toEqual({ dot: false, cross: false })
+  })
+
+  it("fills a trip's start and end and leaves a change hollow", () => {
+    expect(markParts('start').dot && markParts('end').dot).toBe(true)
+    expect(markParts('change')).toEqual({ dot: false, cross: false })
   })
 })

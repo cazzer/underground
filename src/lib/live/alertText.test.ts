@@ -103,8 +103,19 @@ describe('serviceChangeView rows', () => {
     expect(other('Boarding Change')).toBe('boarding change')
     expect(other('Station Notice')).toBe('station notice')
     expect(other('Planned - Express to Local')).toBe('service change')
+    expect(other('Planned - Reroute')).toBe('reroute')
     expect(other(null)).toBe('service change')
     expect(typeWord('Planned - Delays')).toBe('delays')
+  })
+
+  it('an added stop: "stops here (runs local)", agreeing with several routes, and its spoken and ended sentences', () => {
+    const one = rows(join(change({ kind: 'added', routes: ['A'], direction: 'N', type: 'Planned - Express to Local' })))[0]!
+    expect(one.parts).toEqual(['stops here (runs local)', 'uptown only', 'until 8:22 PM'])
+    expect(one.spoken).toBe('The A train runs local and stops here, uptown only, until 8:22 PM.')
+    expect(one.ended).toBe('The local stop for the A train at this station has ended.')
+    const two = rows(join(change({ kind: 'added', routes: ['A', 'C'], direction: null, type: 'Planned - Express to Local' })))[0]!
+    expect(two.parts[0]).toBe('stop here (run local)')
+    expect(two.spoken).toBe('A and C trains run local and stop here, until 8:22 PM.')
   })
 
   it('times: until for one in effect, from for one to come, nothing when open-ended or unbounded', () => {
