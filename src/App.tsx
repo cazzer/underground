@@ -35,6 +35,7 @@ import { ErrorBoundary } from './ui/ErrorBoundary'
 import { Hud } from './ui/Hud'
 import { HudCrash, LoadStatus, SceneCrash } from './ui/LoadStatus'
 import { LiveDebug } from './ui/LiveDebug'
+import { MapReveal } from './ui/MapReveal'
 
 interface MapViewProps {
   network: Network
@@ -155,26 +156,32 @@ function MapView({ network, bands, live }: MapViewProps) {
     <>
       <ErrorBoundary fallback={(e) => <SceneCrash message={e.message} />}>
         {insets && (
-          <Scene
-            network={network}
-            banded={banded}
-            insets={insets}
-            live={live.layer}
-            onLiveError={live.onLayerError}
-            panel={panel}
-            interior={model}
-            outOfService={outages.outIds}
-            focusedMarker={interior.streetMarker}
-            siblings={interior.siblings}
-            index={interior.index}
-            here={here}
-            placePin={place.shown?.ground ?? null}
-            stationPaths={stationPaths}
-            pathLabels={pathLabels}
-            tripOpen={trip.open}
-            tripRoute={tripRoute}
-            tripShown={tripShown}
-          />
+          <>
+            <Scene
+              network={network}
+              banded={banded}
+              insets={insets}
+              live={live.layer}
+              onLiveError={live.onLayerError}
+              panel={panel}
+              interior={model}
+              outOfService={outages.outIds}
+              focusedMarker={interior.streetMarker}
+              siblings={interior.siblings}
+              index={interior.index}
+              here={here}
+              placePin={place.shown?.ground ?? null}
+              stationPaths={stationPaths}
+              pathLabels={pathLabels}
+              tripOpen={trip.open}
+              tripRoute={tripRoute}
+              tripShown={tripShown}
+            />
+            {/* Decoration: a crash here shows the map at once. */}
+            <ErrorBoundary fallback={null}>
+              <MapReveal insets={insets} panel={panel} />
+            </ErrorBoundary>
+          </>
         )}
       </ErrorBoundary>
       <ErrorBoundary fallback={(e) => <HudCrash message={e.message} onMounted={defaultInsets} />}>
