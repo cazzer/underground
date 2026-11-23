@@ -32,8 +32,8 @@ export interface TripLines {
   transfers: ReadonlyMap<string, TransferLineView> | null
   /** Which stations have an interior: a step at one without says "No station layout". */
   index: IndexLoad
-  /** The way to the first platform at the From station (2q7.45.7); absent or null: none. */
-  board?: { text: string; spoken: string } | null
+  /** The way in at the From station of each journey that boards its first train there, by `boardLineKey` of that ride. */
+  boards: ReadonlyMap<string, ExitLineView> | null
 }
 
 interface TripPanelProps {
@@ -191,7 +191,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
               exits: lines.exits,
               transfers: lines.transfers,
               layoutOf: (id) => layoutOf(id, lines.index),
-              board: lines.board,
+              boards: lines.boards,
               activeStep,
               onStep: stepTo,
             }}

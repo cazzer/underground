@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { StationIndex, StationInterior } from '../data/stationSchema'
-import { routesToStreet } from './interiorGraph'
+import { routesFromStreet, routesToStreet } from './interiorGraph'
+import { escalatorsAgainstTravel } from './interiorGraphEntryCheck'
 
 const index = JSON.parse(readFileSync('public/data/stations/index.json', 'utf8')) as StationIndex
 const files = [...new Set(Object.entries(index.stations).map(([id, entry]) => entry.file ?? id))].sort()
@@ -43,5 +44,27 @@ describe('routesToStreet on every committed interior', () => {
       expect(routes.length, stop).toBeGreaterThan(0)
       expect(routes.every((r) => r.exit.entranceId === null), stop).toBe(true)
     }
+  }, 60_000)
+
+  it('finds a way in to every track but two exit-only platforms, never riding an escalator against its travel', () => {
+    const none: string[] = []
+    const against: string[] = []
+    let oneWay = 0
+    for (const id of files) {
+      const interior = load(id)
+      if (interior.connectors.some((c) => c.travel !== undefined)) oneWay++
+      for (const stop of new Set(interior.platforms.flatMap((p) => p.tracks.map((t) => t.stopId)))) {
+        for (const stepFree of [false, true]) {
+          const routes = routesFromStreet(interior, stop, { stepFree })!
+          if (!stepFree && routes.length === 0) none.push(`${id} ${stop}`)
+          against.push(...escalatorsAgainstTravel(interior, routes).map((a) => `${id} ${stop}: ${a}`))
+        }
+      }
+    }
+    // Generated ones too: 116's up escalators (ES102, ES103) and down one (ES101), G07's.
+    expect(oneWay).toBeGreaterThan(10)
+    // At 302 and A03 every stair to the uptown platform is exit-only in the catalog, so it has no way in.
+    expect(none).toEqual(['302 302N', 'A03 A03N'])
+    expect(against).toEqual([])
   }, 60_000)
 })

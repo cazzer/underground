@@ -1,10 +1,11 @@
 /**
  * The walk a station path takes through an interior (interiorPath.ts): flat pieces on a level and each connector run
- * exactly where it is drawn (`planEnds`), from the platform track a rider steps off at to its street exit, or for a
- * transfer to the next train's track. Group-local drawn points (y × yScale, before the depth factor). Pure.
+ * exactly where it is drawn (`planEnds`), from the platform track a rider steps off at to its street exit (a way in runs
+ * the same way, from the track it boards at out to its entry), or for a transfer to the next train's track. Group-local
+ * drawn points (y × yScale, before the depth factor). Pure.
  */
 import type { Connector, LocalPoint, StationInterior } from '../data/stationSchema'
-import type { ExitChoice } from './exitChoice'
+import type { BoardChoice, ExitChoice } from './exitChoice'
 import { planEnds, type ConnectorContext } from './interiorConnectors'
 import { endpointArea } from './interiorGraph'
 import { dist3 } from './interiorPathStrokes'
@@ -12,8 +13,9 @@ import type { TransferChoice } from './interiorTransfer'
 import type { Vec3 } from './interiorSegments'
 import { nearestOnPolyline } from './planGeometry'
 
-/** What a station path draws: the way out at a trip's To station, or a change of trains inside a complex. */
-export type StationPathChoice = ExitChoice | TransferChoice
+/** What a station path draws: the way out at a trip's To station, the way in at its From station (drawn the same way,
+ *  platform to street), or a change of trains inside a complex. */
+export type StationPathChoice = ExitChoice | BoardChoice | TransferChoice
 
 export type Piece =
   | { kind: 'flat'; level: number; a: Vec3; b: Vec3 }
@@ -30,16 +32,18 @@ export interface TrackAt {
 
 export interface Walk {
   pieces: Piece[]
-  /** Where the path starts over the track the rider steps off at. */
+  /** Where the path starts over the track the rider steps off at (or, for a way in, boards at). */
   start: TrackAt
-  /** A transfer's end over the next train's track; null for an exit. */
+  /** A transfer's end over the next train's track; null for an exit or a way in. */
   end: TrackAt | null
 }
 
 export type PlanCtx = Omit<ConnectorContext, 'strong' | 'fine'>
 
+const PATH_NAME: Readonly<Record<StationPathChoice['kind'], string>> = { exit: 'Exit', board: 'Way-in', transfer: 'Transfer' }
+
 export function walkOf(interior: StationInterior, choice: StationPathChoice, ctx: PlanCtx): Walk {
-  const where = `${choice.kind === 'exit' ? 'Exit' : 'Transfer'} path at ${interior.stationId}`
+  const where = `${PATH_NAME[choice.kind]} path at ${interior.stationId}`
   const levelIndex = new Map(interior.levels.map((l, i) => [l.id, i]))
   const indexOf = (id: string): number => {
     const i = levelIndex.get(id)
@@ -94,7 +98,7 @@ export function walkOf(interior: StationInterior, choice: StationPathChoice, ctx
     area = endpointArea(interior, leave.end)
   }
   let end: TrackAt | null = null
-  if (choice.kind === 'exit') {
+  if (choice.kind === 'exit' || choice.kind === 'board') {
     if (choice.exit.entranceId !== null) pieces.push({ kind: 'flat', level, a: at3(point!, level), b: at3(choice.exit.point, level) })
   } else {
     // The next train's track on the platform the last connector lands on, nearest that landing.

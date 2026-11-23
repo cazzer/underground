@@ -1,9 +1,11 @@
-/** What the trip panel says about the way out at the To station: which journeys end on a train, and the exit line's
- *  text, its dim note and the sentence a screen reader hears. Pure. */
+/** What the trip panel says about the way out at the To station (and, in the same words, the way in at the From
+ *  station): which journeys end on a train, and the exit line's text, its dim note and the sentence a screen reader
+ *  hears. Pure. */
 import type { StopId } from '../data/schema'
 import type { StationInterior } from '../data/stationSchema'
 import type { StationStreets } from '../data/streetSchema'
-import { STREET_MATCH_M, streetEntranceIndex, walkMinutes, type ExitChoice } from './exitChoice'
+import { STREET_MATCH_M, streetEntranceIndex, walkMinutes, type BoardChoice, type ExitChoice } from './exitChoice'
+import type { StreetExit } from './interiorGraph'
 import { interiorBounds } from './interiorFraming'
 import { MERGE_M, type EntranceText } from './entranceText'
 import { toGround } from './projection'
@@ -46,7 +48,7 @@ export interface ExitLineView {
 
 const COMPASS8 = ['east', 'southeast', 'south', 'southwest', 'west', 'northwest', 'north', 'northeast'] as const
 
-/** "the northeast": which way the exit lies from the interior's plan center (x east, z south). */
+/** "the northeast": which way the exit (or entry) lies from the interior's plan center (x east, z south). */
 function compassOf(interior: StationInterior, point: readonly [number, number]): string {
   const b = interiorBounds(interior)
   const angle = Math.atan2(point[1] - (b.minZ + b.maxZ) / 2, point[0] - (b.minX + b.maxX) / 2)
@@ -79,7 +81,7 @@ export function exitEntranceIndex(exit: ExitLabel, file: StationStreets): number
  * its own, or the same-text twin it merged into), else the nearest label of the same kind within MERGE_M in any source.
  * A complex passes its file's streets and the alighting member's.
  */
-function labelOf(choice: ExitChoice, interior: StationInterior, sources: readonly StreetSource[]): EntranceText | null {
+function labelOf(choice: { exit: StreetExit }, interior: StationInterior, sources: readonly StreetSource[]): EntranceText | null {
   if (choice.exit.entranceId === null) return null
   const origin = toGround(interior.anchor)
   const scene = { x: origin.x + choice.exit.point[0], z: origin.z + choice.exit.point[1] }
@@ -112,16 +114,19 @@ export function machinesUsed(route: { connectorIds: readonly string[] }, interio
  * at …" toward a point; with no street label, the way from the station's middle ("toward the northeast"). The note
  * holds the label's tail, "probably" on an estimated layout, the walk on, and "elevator status unknown" (or
  * escalator) when the route rides one and the station panel would call machine status unknown (`closedKnown` false).
+ * The way in at the From station (a `BoardChoice`) reads the same: "Quickest way in: Bedford Av & N 7 St", or with no
+ * street label "Quickest way in: from the northeast".
  */
 export function exitLineView(
-  choice: ExitChoice,
+  choice: ExitChoice | BoardChoice,
   interior: StationInterior,
   sources: readonly StreetSource[],
   closedKnown: boolean,
 ): ExitLineView {
   const label = labelOf(choice, interior, sources)
-  const head = label ? label.head : `toward ${compassOf(interior, choice.exit.point)}`
-  const lead = choice.destination === null ? 'Quickest way out:' : label ? 'Exit at' : 'Exit'
+  const board = choice.kind === 'board'
+  const head = label ? label.head : `${board ? 'from' : 'toward'} ${compassOf(interior, choice.exit.point)}`
+  const lead = board ? 'Quickest way in:' : choice.destination === null ? 'Quickest way out:' : label ? 'Exit at' : 'Exit'
   const unknown = closedKnown ? [] : machinesUsed(choice, interior)
   const status = unknown.length > 0 ? `${unknown.join(' and ')} status unknown` : null
   const walk = choice.walk
