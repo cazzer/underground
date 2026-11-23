@@ -15,7 +15,7 @@ import { buildNetwork } from './network'
 import { route } from './route/raptor'
 import { buildRouterTimetable } from './route/timetable'
 import type { TripJourney } from './route/plan'
-import { frameTopDown, legStationPoints, ROUTE_PAD_PX, routeFramePoints } from './routeFrame'
+import { frameTopDown, legStationPoints, ROUTE_MIN_DISTANCE, ROUTE_PAD_PX, routeFramePoints } from './routeFrame'
 import { TRACK_OFFSET_M } from './trackOffset'
 import { journeySpans, stopStations } from './tripSpans'
 
@@ -62,8 +62,8 @@ describe('the L08 to 127 route frame', { timeout: 60_000 }, () => {
       const spans = journeySpans(legs, { shapes: network.shapes, stopStations: stops, patterns: hint })
       const points = routeFramePoints(spans, network.shapeById, legStationPoints(legs, stops))
       expect(points.length).toBeGreaterThan(2)
-      const f = frameTopDown(points, viewport, free, FOV, EXIT_DISTANCE, 200_000)
-      expect(f.distance).toBeGreaterThanOrEqual(EXIT_DISTANCE)
+      const f = frameTopDown(points, viewport, free, FOV, ROUTE_MIN_DISTANCE, 200_000)
+      expect(f.distance).toBeGreaterThan(EXIT_DISTANCE)
       const mpp = (2 * f.distance * Math.tan((FOV * Math.PI) / 360)) / viewport.height
       for (const p of points) {
         const x = viewport.width / 2 + (p.x - f.target.x) / mpp

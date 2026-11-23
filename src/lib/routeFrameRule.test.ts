@@ -26,6 +26,19 @@ describe('routeFrameDecision', () => {
     expect(routeFrameDecision({ framed: A, interrupted: true }, input({ route: A2 }))).toBe('fly')
   })
 
+  it('flies when the visitor opens a journey from the list or goes back, even for the first journey', () => {
+    const list: RouteToken = { plan: A.plan, journey: 'list:L:a>b' }
+    const detail: RouteToken = { plan: A.plan, journey: 'detail:L:a>b' }
+    expect(routeFrameDecision({ framed: list, interrupted: false }, input({ route: detail }))).toBe('fly')
+    expect(routeFrameDecision({ framed: detail, interrupted: true }, input({ route: list }))).toBe('fly')
+  })
+
+  it('skips a silent refresh that drops the opened journey back to the list', () => {
+    const list: RouteToken = { plan: A.plan, journey: 'list:L:a>b' }
+    const detail: RouteToken = { plan: A.plan, journey: 'detail:L:c>d' }
+    expect(routeFrameDecision({ framed: detail, interrupted: false }, input({ route: list, silent: true }))).toBe('skip')
+  })
+
   it('flies for a new attempt of the plan', () => {
     expect(routeFrameDecision({ framed: A, interrupted: false }, input({ route: B }))).toBe('fly')
   })

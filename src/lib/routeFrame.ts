@@ -4,12 +4,16 @@
  * caller (EXIT_DISTANCE keeps the view exactly top-down, so this fit is exact).
  */
 import type { StopId } from '../data/schema'
+import { EXIT_DISTANCE } from './focusMachine'
 import type { Viewport } from './framing'
 import type { ScreenRect } from './interiorCamera'
 import type { Station } from './network'
 import type { Ground } from './projection'
 import type { TripLeg } from './route/plan'
 import { spanPoints, type SpanShape, type TripSpan } from './tripSpans'
+
+/** Never closer than just past EXIT_DISTANCE: the view is exactly top-down, and focus drops (the focus machine's test is strict). */
+export const ROUTE_MIN_DISTANCE = EXIT_DISTANCE * (1 + 1e-3)
 
 /** Space kept clear between the route and the free rect's edges, CSS px. */
 export const ROUTE_PAD_PX = 32

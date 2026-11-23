@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import { PerspectiveCamera, Vector3 } from 'three'
 import { interiorFreeRect, type ScreenRect } from './interiorCamera'
 import type { Station } from './network'
 import type { Ground } from './projection'
 import { buildPolyline } from './realtime/polyline'
-import { frameTopDown, legStationPoints, ROUTE_PAD_PX, routeFramePoints } from './routeFrame'
+import { EXIT_DISTANCE } from './focusMachine'
+import { frameTopDown, legStationPoints, ROUTE_MIN_DISTANCE, ROUTE_PAD_PX, routeFramePoints } from './routeFrame'
 import { tiltT } from './tilt'
 import type { SpanShape, TripSpan } from './tripSpans'
 
 const FOV = 35
-const MIN = 1450
+const MIN = ROUTE_MIN_DISTANCE
 const MAX = 500_000
 const PHONE = { width: 390, height: 844 }
 const DESKTOP = { width: 1440, height: 900 }
@@ -84,8 +86,9 @@ describe('frameTopDown', () => {
     expect(mid.x).toBeCloseTo(195, 6)
   })
 
-  it('stays top-down for any route, since the distance never drops under the tilt\'s far end', () => {
+  it('never lands at or under the focus machine\'s exit distance, so focus drops, and stays top-down', () => {
     const f = frame([{ x: 0, z: 0 }, { x: 300, z: 100 }], PHONE, phoneFree)
+    expect(f.distance).toBeGreaterThan(EXIT_DISTANCE)
     expect(tiltT(f.distance)).toBe(0)
   })
 
@@ -97,6 +100,31 @@ describe('frameTopDown', () => {
 
   it('throws on no points', () => {
     expect(() => frame([], PHONE, phoneFree)).toThrow(/at least one point/)
+  })
+})
+
+describe('frameTopDown through a three camera', () => {
+  it.each([
+    ['phone', PHONE, phoneFree],
+    ['desktop', DESKTOP, desktopFree],
+  ])('puts every point inside the padded free rect, %s', (_, viewport, free) => {
+    const pts = [
+      { x: -3500, z: 2100 },
+      { x: 4200, z: -1800 },
+      { x: 300, z: 2600 },
+    ]
+    const f = frame(pts, viewport, free)
+    // As CameraRig places the camera for a top-down flight: straight above the target, a hair south, looking at it.
+    const camera = new PerspectiveCamera(FOV, viewport.width / viewport.height, 1, 1e6)
+    camera.position.set(f.target.x, f.distance, f.target.z + 0.001)
+    camera.lookAt(f.target.x, 0, f.target.z)
+    camera.updateMatrixWorld()
+    camera.updateProjectionMatrix()
+    for (const p of pts) {
+      const ndc = new Vector3(p.x, 0, p.z).project(camera)
+      const px = { x: ((ndc.x + 1) / 2) * viewport.width, y: ((1 - ndc.y) / 2) * viewport.height }
+      expect(inside(px, free, ROUTE_PAD_PX - 0.5)).toBe(true)
+    }
   })
 })
 

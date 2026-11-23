@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
-import { Vector3, type PerspectiveCamera } from 'three'
+import type { PerspectiveCamera } from 'three'
 import { flightProgress } from '../lib/flight'
 import type { FlyRequest } from '../lib/focus'
-import { EXIT_DISTANCE } from '../lib/focusMachine'
 import type { Insets, Viewport } from '../lib/framing'
-import { interiorFreeRect, type ScreenRect } from '../lib/interiorCamera'
+import type { ScreenRect } from '../lib/interiorCamera'
 import type { Network } from '../lib/network'
-import { shouldResnapPoint, type PointLanding } from '../lib/pointResnap'
 import type { Ground } from '../lib/projection'
+import type { TripJourney } from '../lib/route/plan'
 import { prefersReducedMotion } from '../lib/reducedMotion'
-import { frameTopDown, legStationPoints, routeFramePoints } from '../lib/routeFrame'
+import { legStationPoints, routeFramePoints } from '../lib/routeFrame'
 import { routeFrameDecision, type RouteMemo, type RouteToken } from '../lib/routeFrameRule'
 import { useTrainSelection } from '../lib/trainSelection'
 import { useTrip } from '../lib/trip'
 import { journeyKey } from '../lib/tripSelection'
 import { journeySpans, stopStations } from '../lib/tripSpans'
 import { rebaseFlight, type Destination, type Flight, type MapControlsImpl } from './cameraFlight'
+import { freeBottom, landingOf, routeDestination, type RouteFlight } from './routeFlightState'
+import { useRouteReframe } from './useRouteReframe'
 import type { FlightLayout } from './useStationFlights'
+import { useViewMoved } from './useViewMoved'
 
 interface RouteFlightOptions {
   controls: RefObject<MapControlsImpl | null>
@@ -38,74 +40,78 @@ interface RouteFlightOptions {
   insets: Insets
 }
 
-/** The flight this hook started, with what it framed, so a panel or viewport change can reframe it. */
-interface Mine {
-  flight: Flight
-  points: readonly Ground[]
-  reduced: boolean
-  landing: PointLanding
+/**
+ * The points a journey draws: its spans on the map's shapes and its stations. A span that can't be drawn (a stop the
+ * shapes don't reach) falls back to the stations alone, so both ends still show; a journey with no station throws.
+ */
+function journeyPoints(journey: TripJourney, network: Network, stops: ReturnType<typeof stopStations>): Ground[] {
+  const stations = legStationPoints(journey.legs, stops)
+  try {
+    return routeFramePoints(journeySpans(journey.legs, { shapes: network.shapes, stopStations: stops }), network.shapeById, stations)
+  } catch (e) {
+    console.error('Trip route spans failed; framing its stations', e)
+    return stations
+  }
 }
-
-function destination(points: readonly Ground[], l: FlightLayout, fovDeg: number): Destination {
-  const free = interiorFreeRect(l.size, l.insets, l.panel)
-  const { distance, target } = frameTopDown(points, l.size, free, fovDeg, EXIT_DISTANCE, l.maxDistance)
-  return { stationId: null, target: new Vector3(target.x, 0, target.z), distance, azimuth: 0, follows: false }
-}
-
-const landingOf = (dest: Destination, at: number): PointLanding => ({ at, target: { x: dest.target.x, z: dest.target.z }, distance: dest.distance })
 
 /**
  * Frames the whole selected trip route (2q7.45.5) when the trip panel is in front: top-down, north-up, at the smallest
- * distance (EXIT_DISTANCE or more) that fits every point of the journey the map draws in the free rect, once per
- * settled plan and again when the visitor opens or leaves a journey (routeFrameRule.ts). A silent refresh, a train
- * panel or notice in front, a follow, a gesture, another flight, or a gesture or station pick while the plan loaded
- * never move it. Not a fly request: focus drops after landing by the usual rules, and the basemap's location cap is
- * left as it is. A panel or viewport change retargets its flight (a reduced-motion landing re-snaps once just after
- * it, as a point flight does). Returns `interrupt`, which CameraRig calls on every gesture start (stable).
+ * distance (just past EXIT_DISTANCE or more) that fits every point of the journey the map draws in the free rect, once
+ * per settled plan and again when the visitor opens or leaves a journey or its list (routeFrameRule.ts). A silent
+ * refresh, a train panel or notice in front, a follow, a gesture, another flight, or the visitor moving the view (a drag
+ * past the click slop, a pinch, a wheel step, a station pick) while the plan loaded never move it. Not a fly request:
+ * focus drops after landing by the usual rules, and the basemap's location cap is left as it is. A panel or viewport
+ * change retargets its flight, and useRouteReframe reframes after its landing. Returns the landing call CameraRig makes
+ * (stable): any other flight's landing forgets this one.
  */
-export function useRouteFlight({ controls, camera, flight, layout, network, flyRequest, startFlight, following, gesture, tookOver, panel, size, insets }: RouteFlightOptions): { interrupt: () => void } {
-  const { open, plan, selectedJourney } = useTrip()
+export function useRouteFlight({ controls, camera, flight, layout, network, flyRequest, startFlight, following, gesture, tookOver, panel, size, insets }: RouteFlightOptions): (landed: Flight) => void {
+  const { open, ends, plan, selection, selectedJourney } = useTrip()
   const { selectedSummary, notice } = useTrainSelection()
   const front = open && selectedSummary === null && notice === null
   const stops = useMemo(() => stopStations(network.stations), [network])
   const memo = useRef<RouteMemo>({ framed: null, interrupted: false })
   const seenPlan = useRef(plan)
-  const mine = useRef<Mine | null>(null)
+  const mine = useRef<RouteFlight | null>(null)
 
-  const interrupt = useCallback(() => {
+  // The visitor's own move while a plan loads keeps it from framing: a drag, pinch or wheel past the click slop, or a
+  // station pick (a fly request after mount). A plain tap is not one.
+  const moved = useCallback(() => {
     memo.current.interrupted = true
   }, [])
-
-  // The visitor's own move while a plan loads keeps it from framing: a station pick (a fly request after mount).
+  useViewMoved(moved)
   const seenRequest = useRef(flyRequest)
   useEffect(() => {
     if (flyRequest === seenRequest.current) return
     seenRequest.current = flyRequest
     memo.current.interrupted = true
+    mine.current = null
   }, [flyRequest])
+  // A new run starts clean: a plan the cache answers in one commit may never be seen loading, so new ends or the panel
+  // opening reset it too.
   useEffect(() => {
-    if (plan.status === 'loading') memo.current.interrupted = false
+    if (plan.status !== 'ready') memo.current.interrupted = false
   }, [plan])
+  useEffect(() => {
+    memo.current.interrupted = false
+  }, [open, ends.from, ends.to])
 
   // A panel or viewport change reframes the route's flight in the new free rect, at the same pace.
   useEffect(() => {
     const m = mine.current
     const c = controls.current
-    if (!m || !c) return
-    const f = flight.current
-    const dest = destination(m.points, layout.current, camera.fov)
-    if (f === m.flight) {
-      rebaseFlight(f, dest, c, camera, c.getAzimuthalAngle(), flightProgress(f.elapsed, f.duration))
-      m.landing = landingOf(dest, m.landing.at)
-      return
-    }
-    mine.current = null
-    if (!m.reduced) return
-    const now = { now: performance.now(), flying: f !== null, tookOver: tookOver.current, target: c.target, distance: camera.position.distanceTo(c.target) }
-    if (shouldResnapPoint(m.landing, now)) startFlight(dest)
-  }, [panel, size, insets, camera, controls, flight, layout, tookOver, startFlight])
+    if (!m || !c || flight.current !== m.flight) return
+    const l = layout.current
+    const dest = routeDestination(m.points, l, camera.fov)
+    rebaseFlight(m.flight, dest, c, camera, c.getAzimuthalAngle(), flightProgress(m.flight.elapsed, m.flight.duration))
+    m.landing = landingOf(dest, m.landing.at)
+    m.bottom = freeBottom(l)
+    m.width = l.size.width
+    m.height = l.size.height
+  }, [panel, size, insets, camera, controls, flight, layout])
 
-  const journey = selectedJourney === null ? null : journeyKey(selectedJourney)
+  useRouteReframe({ controls, camera, flight, mine, layout, tookOver, following, front, startFlight, panel, size, insets })
+
+  const journey = selectedJourney === null ? null : `${selection.view}:${journeyKey(selectedJourney)}`
   useEffect(() => {
     const silent = plan !== seenPlan.current && plan.status === 'ready' && (plan.trigger === 'tick' || plan.trigger === 'poll')
     seenPlan.current = plan
@@ -117,17 +123,25 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
     memo.current.framed = route
     if (decision === 'skip' || selectedJourney === null) return
     try {
-      const ctx = { shapes: network.shapes, stopStations: stops }
-      const points = routeFramePoints(journeySpans(selectedJourney.legs, ctx), network.shapeById, legStationPoints(selectedJourney.legs, stops))
-      const dest = destination(points, layout.current, camera.fov)
+      const points = journeyPoints(selectedJourney, network, stops)
+      const l = layout.current
+      const dest = routeDestination(points, l, camera.fov)
       startFlight(dest)
       const started = flight.current
-      mine.current = started ? { flight: started, points, reduced: prefersReducedMotion(), landing: landingOf(dest, performance.now()) } : null
+      // Only a flight this call started is ours: with no controls, startFlight starts none.
+      mine.current =
+        started && started !== f
+          ? { flight: started, points, reduced: prefersReducedMotion(), landing: landingOf(dest, performance.now()), landedAt: null, width: l.size.width, height: l.size.height, bottom: freeBottom(l), windowOpen: true, resnapped: false, pending: null }
+          : null
     } catch (e) {
       console.error('Trip route frame failed', e)
     }
     // Only a settled plan, its selected journey and the panel being in front decide; the rest is read as it stands.
   }, [plan, journey, front])
 
-  return { interrupt }
+  return useCallback((landed: Flight) => {
+    const m = mine.current
+    if (m && landed === m.flight) m.landedAt = performance.now()
+    else mine.current = null
+  }, [])
 }
