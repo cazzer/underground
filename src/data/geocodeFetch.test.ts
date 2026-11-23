@@ -33,9 +33,10 @@ describe('parseGeocodeResponse', () => {
     expect(parseGeocodeResponse(body).results).toEqual(rows)
   })
 
-  it('throws SchemaMismatchError for another version, the old one included', () => {
-    expect(() => parseGeocodeResponse({ ...valid(), version: 3 })).toThrow(SchemaMismatchError)
-    expect(() => parseGeocodeResponse({ ...valid(), version: 1 })).toThrow(SchemaMismatchError)
+  it('reads a v1 body as v2 (a Worker not yet deployed), and throws SchemaMismatchError for any other version', () => {
+    const v1 = parseGeocodeResponse({ ...valid(), version: 1, results: [{ ...row, kind: 'street' }] })
+    expect(v1).toMatchObject({ version: 2, results: [{ kind: 'street', source: 'geosearch' }] })
+    for (const version of [0, 3, '2', null]) expect(() => parseGeocodeResponse({ ...valid(), version })).toThrow(SchemaMismatchError)
   })
 
   it.each([

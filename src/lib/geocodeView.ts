@@ -15,7 +15,7 @@ export type GeocodeView =
   | { status: 'ready'; places: readonly GeocodeResult[]; sources: readonly GeocodeSource[] }
   | { status: 'error'; error: GeocodeFailure }
 
-export const GEOCODE_ERROR_TEXT = "Address search isn't available right now."
+export const GEOCODE_ERROR_TEXT = "Street and address search isn't available right now."
 
 const SOURCE_ORDER: readonly GeocodeSource[] = ['geosearch', 'photon', 'osm']
 
@@ -73,7 +73,7 @@ export function searchEmptyText(typed: boolean, stationCount: number, v: Geocode
       // The "Searching…" line covers it; an earlier answer's rows are still listed.
       return null
     case 'ready':
-      return v.places.length === 0 ? 'No stations, streets or places match.' : null
+      return v.places.length === 0 ? 'No stations, streets, addresses or places match.' : null
   }
 }
 

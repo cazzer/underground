@@ -9,8 +9,8 @@ import { multiBoroughNames } from '../lib/labels'
 import type { MarkedPlacement } from '../lib/locate'
 import type { Network } from '../lib/network'
 import type { StationGroup } from '../lib/stationGroups'
-import { placePick, type PlacePick } from '../lib/placeLabel'
-import { searchItems, type SearchItem } from '../lib/searchItems'
+import { nearNote, placePick, type PlacePick } from '../lib/placeLabel'
+import { enterTarget, searchItems, type SearchItem } from '../lib/searchItems'
 import { rowActions } from '../lib/searchRowActions'
 import { searchNav, type NavSpot } from '../lib/searchNav'
 import { buildSearchIndex, SEARCH_LIMIT, searchStations } from '../lib/stationSearch'
@@ -110,6 +110,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
     [results, geo],
   )
   const typed = query.trim() !== ''
+  const target = enterTarget(items, geo)
   const actions = rowActions(onDirections !== undefined)
 
   useImperativeHandle(ref, () => ({
@@ -137,7 +138,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
     if (item.kind === 'station') onDirections(end, { stationId: item.station.id, place: null })
     else {
       const pick = placeOf(item)
-      onDirections(end, { stationId: pick.nearest.id, place: pick.name })
+      onDirections(end, { stationId: pick.nearest.id, place: nearNote(pick) })
     }
     close()
   }
@@ -146,10 +147,10 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
     else dialog.current?.querySelector<HTMLElement>(`[data-row="${spot.row}"][data-col="${spot.col}"]`)?.focus()
   }
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    const first = items[0]
-    if (e.key === 'Enter' && first && !e.nativeEvent.isComposing) {
+    if (e.key === 'Enter' && items.length > 0 && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      choose(first)
+      // A first row from an earlier lookup is not picked: the list is about to change under the typed text.
+      if (target) choose(target)
       return
     }
     const nav = searchNav('input', e, items.length, actions.length)
@@ -243,14 +244,14 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
         </p>
         {!typed && (
           <p id={hintId} className="p-3 text-sm text-ink-dim">
-            {placesOn ? 'Try 14 st, bedford av & n 7, 120 broadway or empire state.' : 'Try a name like 14 st, bedford or times sq.'}
+            {placesOn ? 'Try 14 st, bedford\u00a0av\u00a0&\u00a0n\u00a07, 120 broadway or empire state.' : 'Try a name like 14 st, bedford or times sq.'}
             {onDirections && ' From or To on a result plans a trip.'}
           </p>
         )}
         <SearchResults
           network={network}
           items={items}
-          highlightFirst={inputFocused && typed && items.length > 0}
+          highlightFirst={inputFocused && typed && target !== null}
           actions={actions}
           multiBorough={multiBorough}
           view={geo}

@@ -43,14 +43,14 @@ type Fetcher = Mock<(q: GeocodeQuery) => Promise<SourceOutcome>>
 export interface Harness extends GeocodeDeps {
   fetchGeoSearch: Fetcher
   fetchPhoton: Fetcher
-  searchStreets: Mock<(q: GeocodeQuery) => StreetRows>
+  searchStreets: Mock<(q: GeocodeQuery) => Promise<StreetRows>>
 }
 
 export function harness(gs: SourceOutcome = GS_PLACE, ph: SourceOutcome = PH_KATZ, streets: StreetRows = noStreetRows()): Harness {
   return {
     fetchGeoSearch: vi.fn(async () => gs),
     fetchPhoton: vi.fn(async () => ph),
-    searchStreets: vi.fn(() => streets),
+    searchStreets: vi.fn(async () => streets),
     state: createGeocodeState(Date.now()),
   }
 }

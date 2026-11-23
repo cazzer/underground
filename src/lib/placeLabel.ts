@@ -91,6 +91,11 @@ export interface PlacePick {
   nearest: NearestStation
 }
 
+/** What a trip end's "near …" note calls the place: a street by its full label ("Broadway, Brooklyn", since "Broadway" alone is four streets), anything else by its name. */
+export function nearNote(pick: Pick<PlacePick, 'kind' | 'name' | 'label'>): string {
+  return pick.kind === 'street' ? pick.label : pick.name
+}
+
 function pickKind(word: PlaceText['kindWord']): PlacePick['kind'] {
   return word === 'Address' ? 'address' : word === 'Street' ? 'street' : word === 'Intersection' ? 'intersection' : 'place'
 }

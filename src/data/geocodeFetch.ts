@@ -44,11 +44,14 @@ function parseResult(raw: unknown, index: number): GeocodeResult {
   return { label, kind: kind as GeocodeKind, source: source as GeocodeSource, lat, lon }
 }
 
+/** A v1 body (before the street index) is a valid v2 one without osm rows, so a new client still reads a Worker not yet deployed. */
+const ACCEPTED_VERSIONS: readonly unknown[] = [1, GEOCODE_SCHEMA_VERSION]
+
 /** Checks a /geocode body at the boundary: version, the rows (each field), the attribution and `incomplete`. */
 export function parseGeocodeResponse(raw: unknown): GeocodeResponse {
   if (typeof raw !== 'object' || raw === null) throw new GeocodeParseError('address response is not an object')
   const r = raw as Record<string, unknown>
-  if (r.version !== GEOCODE_SCHEMA_VERSION) {
+  if (!ACCEPTED_VERSIONS.includes(r.version)) {
     throw new SchemaMismatchError(`address schema v${String(r.version)}, client expects v${GEOCODE_SCHEMA_VERSION}; reload`)
   }
   if (!Array.isArray(r.results) || r.results.length > GEOCODE_MAX_RESULTS) throw new GeocodeParseError('address response has bad results')

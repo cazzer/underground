@@ -13,7 +13,7 @@ const SAME_POINT_M = 2
 const TWIN_M = 150
 
 /** Equirectangular distance in meters; fine at city scale. */
-export function distanceM(a: GeocodeResult, b: GeocodeResult): number {
+export function distanceM(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const dy = (b.lat - a.lat) * 110_540
   const dx = (b.lon - a.lon) * 111_320 * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180)
   return Math.hypot(dx, dy)

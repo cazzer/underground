@@ -5,6 +5,7 @@ import { useFocus } from '../lib/focus'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import { markedPlacement } from '../lib/locate'
 import type { ExitLineView } from '../lib/exitView'
+import { nearNote } from '../lib/placeLabel'
 import type { Network } from '../lib/network'
 import type { TransferLineView } from '../lib/transferView'
 import { useTrainSelection } from '../lib/trainSelection'
@@ -191,7 +192,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
         label={GEOCODE_URL ? 'Trip from: search stations and places' : 'Trip from: search stations'}
         placeholder={GEOCODE_URL ? 'From station or address' : 'From station'}
         onChoose={(id) => setEnd('from', id)}
-        onChoosePlace={(p) => setEnd('from', p.nearest.id, p.name)}
+        onChoosePlace={(p) => setEnd('from', p.nearest.id, nearNote(p))}
       />
       <StationSearch
         ref={toSearch}
@@ -200,7 +201,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
         label={GEOCODE_URL ? 'Trip to: search stations and places' : 'Trip to: search stations'}
         placeholder={GEOCODE_URL ? 'To station or address' : 'To station'}
         onChoose={(id) => setEnd('to', id)}
-        onChoosePlace={(p) => setEnd('to', p.nearest.id, p.name)}
+        onChoosePlace={(p) => setEnd('to', p.nearest.id, nearNote(p))}
       />
     </aside>
   )

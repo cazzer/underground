@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GeocodeQuery } from './geocodeQuery'
-import { streetFixture } from './streetFixture'
+import { loadStreetIndex } from './streetIndex'
+import { streetFixture, streetFixtureFile } from './streetFixture'
 import { searchStreets } from './streetSearch'
 
 const index = streetFixture()
@@ -78,6 +79,16 @@ describe('searchStreets: intersections', () => {
     expect(rows.map((c) => c.result.label)).toEqual(['Broadway & W 40 St, Manhattan'])
     expect(rows[0]?.result).toMatchObject({ lat: 40.7551, lon: -73.9866 })
     expect(searchStreets(index, q('broadway & w 40 st')).whole[0]?.result).toMatchObject({ lat: 40.7549, lon: -73.9862 })
+  })
+
+  it('cuts each list to eight rows, intersections and streets together', () => {
+    const streets = Array.from({ length: 12 }, (_, i): [string, 'Bk', 1, [number, number][]] => [`Nine ${i} St`, 'Bk', 1, [[40.7, -74 + i / 1000]]])
+    const crowded = loadStreetIndex({ ...streetFixtureFile(), streets, intersections: [], keys: [['ni', streets.map((_, i) => i)]] })
+    const { whole, partial } = searchStreets(crowded, q('nine'))
+    expect(whole.length + partial.length).toBeLessThanOrEqual(16)
+    expect(whole.length).toBeLessThanOrEqual(8)
+    expect(partial.length).toBeLessThanOrEqual(8)
+    expect(partial).toHaveLength(8)
   })
 
   it('does not join streets that do not cross, or that sit in different boroughs', () => {

@@ -75,7 +75,7 @@ describe('searchEmptyText', () => {
     expect(searchEmptyText(true, 0, { status: 'short' })).toBe('No stations match.')
     expect(searchEmptyText(true, 0, { status: 'error', error: 'busy' })).toBe('No stations match.')
     expect(searchEmptyText(true, 0, { status: 'pending', tier: 0, places: [], sources: [] })).toBeNull()
-    expect(searchEmptyText(true, 0, none)).toBe('No stations, streets or places match.')
+    expect(searchEmptyText(true, 0, none)).toBe('No stations, streets, addresses or places match.')
     expect(searchEmptyText(true, 0, { status: 'ready', places: [row('A', 'place', 'photon')], sources: ['photon'] })).toBeNull()
   })
 })
@@ -87,7 +87,7 @@ describe('the unavailable sentence is spoken once per dialog session', () => {
   it('speaks the first error, then stays silent on repeats until the dialog closes', () => {
     let state = nextErrorSpoken('none', error, true)
     expect(state).toBe('speaking')
-    expect(announcementFor(error, state)).toBe("Address search isn't available right now")
+    expect(announcementFor(error, state)).toBe("Street and address search isn't available right now")
     state = nextErrorSpoken(state, error, true)
     expect(state).toBe('speaking')
     state = nextErrorSpoken(state, pending, true)

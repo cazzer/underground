@@ -6,9 +6,10 @@ import type { GeocodeKind } from './schema'
 import type { StreetIndex } from './streetIndex'
 import { BOROUGH_NAMES } from './streetIndexSchema.ts'
 import { queryKey } from './streetKeys.ts'
-import { approxM, siteFor, splitCrossing, withoutTrailingSeparator } from './streetQuery'
+import { distanceM } from './geocodeMerge'
+import { siteFor, splitCrossing, withoutTrailingSeparator } from './streetQuery'
 
-/** At most this many rows of each list (whole, partial) leave the search; the merge keeps fewer. */
+/** At most this many rows of each list (whole, partial), intersections and streets together, leave the search; the merge keeps fewer. */
 const LIST_MAX = 8
 
 interface Hit {
@@ -54,7 +55,7 @@ function ranked(
     candidate: { result: { label, kind, lat: site[0], lon: site[1], source: 'osm' }, name, key: nameKey(name), address: null },
     score: m.score,
     whole: m.whole,
-    distanceM: focus === null ? 0 : approxM(focus, site[0], site[1]),
+    distanceM: focus === null ? 0 : distanceM(focus, { lat: site[0], lon: site[1] }),
     rank: m.rank,
     label,
   }
@@ -114,6 +115,6 @@ export function searchStreets(index: StreetIndex, query: GeocodeQuery): { whole:
     streetRows(index, text, query.focus),
   ].map((rows) => rows.sort(compare))
   const pick = (whole: boolean): Candidate[] =>
-    lists.flatMap((rows) => rows.filter((r) => r.whole === whole).slice(0, LIST_MAX)).map((r) => r.candidate)
+    lists.flatMap((rows) => rows.filter((r) => r.whole === whole)).slice(0, LIST_MAX).map((r) => r.candidate)
   return { whole: pick(true), partial: pick(false) }
 }

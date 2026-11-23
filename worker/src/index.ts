@@ -5,7 +5,7 @@ import { ENE_SCHEMA_VERSION, RT_SCHEMA_VERSION, FEED_IDS, type FeedId, type Real
 import { fetchGeoSearch, fetchPhoton } from './geocodeUpstream'
 import type { GeocodeQuery } from './geocodeQuery'
 import { serveCached, type CachedRoute } from './serveCached'
-import { STREET_INDEX } from './streetIndexData'
+import { bundledStreetIndex } from './streetIndexData'
 import { searchStreets } from './streetSearch'
 import { createGeocodeState, serveGeocode } from './serveGeocode'
 import { buildSnapshot, type FeedOutcome } from './transform'
@@ -76,7 +76,7 @@ type Handler = (request: Request, ctx: ExecutionContext, origin: string | null, 
 const geocodeDeps = {
   fetchGeoSearch,
   fetchPhoton,
-  searchStreets: (q: GeocodeQuery) => searchStreets(STREET_INDEX, q),
+  searchStreets: async (q: GeocodeQuery) => searchStreets(await bundledStreetIndex(), q),
   state: createGeocodeState(Date.now()),
 }
 

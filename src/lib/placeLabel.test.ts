@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GeocodeResult } from '../data/realtime'
 import type { Station } from './network'
-import { displayCase, distanceText, placePick, placeText } from './placeLabel'
+import { displayCase, distanceText, nearNote, placePick, placeText } from './placeLabel'
 import { toGround } from './projection'
 
 describe('displayCase', () => {
@@ -106,6 +106,13 @@ describe('placePick', () => {
       const r: GeocodeResult = { label: 'Bedford Av & N 7 St, Brooklyn', kind, lat: 40.7074, lon: -74.0113, source: 'osm' }
       expect(placePick(r, placeText(r), stations, groups)).toMatchObject({ name: 'Bedford Av & N 7 St', label: 'Bedford Av & N 7 St, Brooklyn', kind, nearest: { id: 'A' } })
     }
+  })
+
+  it('words a trip end\'s "near" note: a street by its full label, anything else by its name', () => {
+    const pick = (kind: 'street' | 'intersection' | 'address') => ({ kind, name: 'Broadway', label: 'Broadway, Brooklyn' })
+    expect(nearNote(pick('street'))).toBe('Broadway, Brooklyn')
+    expect(nearNote(pick('intersection'))).toBe('Broadway')
+    expect(nearNote(pick('address'))).toBe('Broadway')
   })
 
   it('is null for an empty network', () => {

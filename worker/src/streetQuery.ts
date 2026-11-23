@@ -1,3 +1,4 @@
+import { distanceM } from './geocodeMerge'
 import type { IndexSite } from './streetIndexSchema.ts'
 
 /** "&", "/", "@" and "+", or "and" / "at" as a word of their own. */
@@ -22,13 +23,6 @@ export function withoutTrailingSeparator(text: string): string {
   return text.replace(TRAILING_SEPARATOR, '')
 }
 
-/** Equirectangular meters; fine at city scale. */
-export function approxM(a: { lat: number; lon: number }, lat: number, lon: number): number {
-  const dy = (lat - a.lat) * 110_540
-  const dx = (lon - a.lon) * 111_320 * Math.cos((((a.lat + lat) / 2) * Math.PI) / 180)
-  return Math.hypot(dx, dy)
-}
-
 /**
  * The point a street row answers with: the site nearest the focus, else (no focus) the middle one, the site nearest the mean
  * of its sites, so a long street lands near its centre rather than at its first station.
@@ -41,9 +35,9 @@ export function siteFor(sites: readonly IndexSite[], focus: { lat: number; lon: 
     lon: sites.reduce((sum, s) => sum + s[1], 0) / sites.length,
   }
   let best = first
-  let bestM = approxM(target, first[0], first[1])
+  let bestM = distanceM(target, { lat: first[0], lon: first[1] })
   for (const s of sites) {
-    const d = approxM(target, s[0], s[1])
+    const d = distanceM(target, { lat: s[0], lon: s[1] })
     if (d < bestM) {
       best = s
       bestM = d

@@ -162,9 +162,9 @@ lines and should take milliseconds on 4k nodes (not benchmarked).
 records (a street per borough, a site per nearby station) and 11,512 intersections from the street pin, within 300 m of a station,
 into one JSON module, `worker/data/streetIndex.json`: 689 KB raw, 181 KB gzipped (it first shipped as 64 hash-bucket shards fetched by
 the client, 523 KB gzipped in all; moving it into the Worker kept the typed text off the static host, below). The Worker's bundle
-goes from 180 KiB (34 KiB gzipped) to 922 KiB (220 KiB gzipped), against a 64 MiB limit; `wrangler check startup` (local, warm runs)
-reads 15 to 16 ms of active startup before and 22 to 27 ms after (the JSON parse is about 3 ms and `loadStreetIndex` about 6 ms cold in
-node), against a 1 s limit, and the index adds roughly 3.5 MB of heap. A name is filed under the
+goes from 182 KiB (35 KiB gzipped) to 981 KiB (226 KiB gzipped), against a 64 MiB limit. The index is a dynamic import, loaded on the first
+`/geocode` miss of an isolate, so `wrangler check startup` (local, warm runs) still reads 15 to 16 ms of active startup, as before (a static
+import cost 22 to 27 ms); the JSON parse is about 3 ms and `loadStreetIndex` about 6 ms cold in node, once, and the index holds roughly 3.5 MB of heap. A name is filed under the
 first two characters of each distinctive token (not st, av, a compass letter and the like), spelled as published, canonical and as a long form, so
 a query finds it from any prefix of 2+ characters of that token (a query like "w 4" reads only the "4" key); a key lists at most 108 of the
 3,222 streets, so a query scores about 5 to 108 candidates (under 0.5 ms), never all. An intersection query is split at the first
@@ -200,8 +200,9 @@ invocation logs are off, query strings redacted, traces off; `wrangler tail` may
   index in hash buckets would have shown the Pages log the first two letters of the word typed (measured on the old shards: 247 of
   the 283 two-character keys were pinned exactly), so the index lives in the Worker and nothing about a typed street reaches the
   static host (2q7.14, privacy card underground-2q7.14.1). No page URL ever holds
-  the text typed. Address, place and street search does send it (3+ characters) to our Worker, which, unless the street index
-  answers an intersection alone, passes it on to NYC Planning and, for places, komoot's Photon, from the Worker's address, not the user's. Routing runs on
+  the text typed. Address, place and street search does send it (3+ characters) to our Worker. An intersection the street index finds goes
+  to neither upstream; a street the index finds still goes to NYC Planning's GeoSearch (not to Photon); anything else goes to GeoSearch and,
+  for places, komoot's Photon, and a business-looking name asks both. All from the Worker's address, not the user's. Routing runs on
   the fix in memory, so the rule that no request carries the location holds.
 - Any hosted routing API needs the origin, which breaks that rule; it would need the user to change it,
   plus consent on every request. Not recommended.

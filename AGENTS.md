@@ -358,7 +358,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   "Estimated layout"; the disclosure's focus goes to the station heading if it unmounts while focused), or a dim
   "status unavailable" line; one always-mounted polite sr-only region speaks only a change to the machines out at the station
   whose panel stays open and clears its text after 6 s (`outageAnnounce.ts`, pure; silent on open, station change or stale data)
-  `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a labelled input over lists of result rows (`ResultRow.tsx`: a primary button with `SearchResult.tsx` or `PlaceResult.tsx` content and, in the HUD's search, given `onDirections`, "From" and "To" buttons named "Directions from/to <name>", `lib/searchRowActions.ts`; a directions pick calls `openTrip`, with a place's nearest station and name). It is not a combobox, because a listbox option can't hold buttons. Every button is in Tab order; arrows move focus (`lib/searchNav.ts`: Down from the input, Up/Down between rows, Left/Right/Home/End within one, a printable key back to the input); Enter in the input picks the highlighted first row (the input's description says so, read on focus). A station row shows the name and access icon, the borough on a dim line only for names whose stations span boroughs
+  `SearchButton.tsx` (top bar) opens `StationSearch.tsx`, a full-screen native `<dialog>` (always mounted; the tap handler calls its `open()` so iOS raises the keyboard) with a labelled input over lists of result rows (`ResultRow.tsx`: a primary button with `SearchResult.tsx` or `PlaceResult.tsx` content and, in the HUD's search, given `onDirections`, "From" and "To" buttons named "Directions from/to <name>", `lib/searchRowActions.ts`; a directions pick calls `openTrip`, with a place's nearest station and name). It is not a combobox, because a listbox option can't hold buttons. Every button is in Tab order; arrows move focus (`lib/searchNav.ts`: Down from the input, Up/Down between rows, Left/Right/Home/End within one, a printable key back to the input); Enter in the input picks the highlighted first row (the input's description says so, read on focus); a first row that came from `/geocode` is neither highlighted nor picked while the lookup is pending, since it belongs to the previous text (`enterTarget` in `lib/searchItems.ts`; a station first row always is the current text's). A station row shows the name and access icon, the borough on a dim line only for names whose stations span boroughs
   (`multiBoroughNames` in `labels.ts`), plus route chips, which tell same-borough duplicates apart; choosing a result
   calls `select` (focus then moves to the panel heading; Cancel and Esc return it to the button). Optional `label`
   (dialog name and input label, default "Search stations and places", or "Search stations" with places off), `placeholder` and `onClose` props let the trip panel mount two more
@@ -369,7 +369,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   and `rememberAnswer`: a session memory cache of complete answers only, 50 entries), `data/geocodeFetch.ts` (`geocodeRequestUrl`,
   `parseGeocodeResponse` checking every row at the boundary, `fetchGeocode`: `cache: 'no-store'`, `credentials: 'omit'`, 8 s timeout,
   failures as `GeocodeAnswer` kinds, never an error's message), `lib/geocodeView.ts` (what shows and what the polite region says: one
-  sentence per settled query, "Still searching streets, addresses and places" only after 2 s, the unavailable sentence once per dialog session (`nextErrorSpoken`); `creditSources` drops the bare OSM credit when Photon's, which names OpenStreetMap contributors too, is listed),
+  sentence per settled query, "Still searching streets, addresses and places" only after 2 s, the empty line "No stations, streets, addresses or places match.", the unavailable text "Street and address search isn't available right now.", the unavailable sentence once per dialog session (`nextErrorSpoken`); `creditSources` drops the bare OSM credit when Photon's, which names OpenStreetMap contributors too, is listed),
   `lib/searchItems.ts` (stations, then the Worker's rows in its order as one keyed list: kinds `address`, `place` (an area too), `street`, `intersection`),
   `lib/placeLabel.ts` (`displayCase`: GeoSearch names are UPPERCASE, so an all-caps segment is re-cased; `placeText`, `distanceText`,
   `placePick`: the place's ground point, nearest station and kind; the kind words are Address, Place, Street, Intersection). `SearchResults.tsx` renders them: a "Stations" list and, with places, a "Streets, addresses and places" heading over a second list of `PlaceResult.tsx` rows (the name, then a dim "Brooklyn · Intersection" line that fits at 375 px), each primary button named
@@ -380,7 +380,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   a collapsed station panel nor bumps the collapse seq, and like any point flight it ends a train follow) and shows `PlaceStatus.tsx`
   (`usePlaceLine.ts`): the place's label and "Go to <nearest station> · about 250 m", focus moved onto the sentence, gone with
   the next flight of any kind or the ×; no pin is drawn at the place. In a trip's From or To search a place sets that end to
-  its nearest station and keeps a "near <place>" note (`TripProvider`'s `places`, shown under the end's name and in its spoken text;
+  its nearest station and keeps a "near <place>" note (`nearNote`: the name, or for a street its full label, "near Broadway, Brooklyn"; `TripProvider`'s `places`, shown under the end's name and in its spoken text;
   any station pick, swap aside, clears it); it flies nowhere, and the place is not an exit walking destination. The dialog's keydown stops Escape (the native cancel still closes it), so the HUD's window Esc
   handler never also closes a panel; the HUD's `searchOpen` guard stays. `useKeyboardInset.ts`
   pads the list above the on-screen keyboard. `LinkNotice.tsx` is the "link's station isn't on this map" line (with a Search action) under the
@@ -939,16 +939,17 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     2 places kept for them); `geocodeOutcome.ts` (status, attribution, `incomplete`, the log line, whose `osm` count is the index's
     rows shown; with index rows and every upstream failed the answer is a 200, `incomplete`, never cached; 502 or 503 only with no
     index row either);
-    the street index: `streetIndexData.ts` (imports `../data/streetIndex.json` once per isolate; only `index.ts` and its test import
-    it, so the client never bundles it; about 7 to 10 ms of startup by `wrangler check startup`, 3.5 MB of heap) over `streetIndex.ts` (`loadStreetIndex`: checks
-    the format and every index, throws a fixed message so a bad index fails startup loudly; builds the key map and per-street
+    the street index: `streetIndexData.ts` (`bundledStreetIndex()`: a dynamic import of `../data/streetIndex.json`, kept after the first `/geocode` miss of the isolate, so `/rt` and `/ene` never pay for it
+    (startup stays at the base's 15 to 16 ms by `wrangler check startup`) and a bad index is a 500 through `serveGeocode`'s catch, not a failed startup; only `index.ts` and its test import
+    it, so the client never bundles it; 3.5 MB of heap once loaded) over `streetIndex.ts` (`loadStreetIndex`: checks
+    the format and every index, throws a fixed message so a bad index fails `/geocode` loudly; builds the key map and per-street
     crossings), `streetSearch.ts` (`searchStreets` -> `{ whole, partial }` candidates, source `osm`, label "Name, Borough", an
     intersection "A & B, Borough" in the index's order whatever the typed order; the query's key picks at most about 110 streets to
     score, under 0.5 ms; a query with "&", "/", "@", "+" or the words "and" / "at" looks for intersections first (a separator with nothing after it yet is cut off, so "bedford av &" still finds Bedford Av), the side before the
     separator a finished word, then streets on the whole text; ranked by score, nearness to the focus, street class, label; one
     row per label; a street answers with its site nearest the focus, else its middle one, `streetQuery.ts`), `streetIndexSchema.ts`
     (the file contract and `BOROUGH_NAMES`; types only, safe for the client), `streetKeys.ts`, `nameMatch.ts`, `searchText.ts`;
-    `streetFixture.ts` is the tests' mini index; `clientLimit.ts` (the per-client limit: Cloudflare's Workers Rate Limiting
+    `streetFixture.ts` is the tests' mini index; the helper tests (`searchText`, `nameMatch`, `streetKeys`) run in the Worker's CI (`npm --prefix worker test`), the root `stationSearch` tests cover them only indirectly; `clientLimit.ts` (the per-client limit: Cloudflare's Workers Rate Limiting
     binding `GEOCODE_CLIENT_LIMIT`, 30 per 60 s per client per location, approximate; the key is `CF-Connecting-IP` through `clientKey.ts` (IPv4 and
     IPv4-mapped IPv6 on the full address, other IPv6 on its /64; clients sharing an address, CGNAT or Private Relay, share the
     count); Cloudflare holds the counter and the address is never logged, stored or echoed; fails open, logging one fixed code
@@ -964,8 +965,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   - `fixtures/` recorded feeds for tests (see its README; `ene.json` is the E&E sample, `geocode.json` the GeoSearch and
     Photon answers)
   - `data/streetIndex.json` the generated street index (`npm run data:search:streets`; see the scripts entry above), a plain JSON
-    import that wrangler's bundler inlines: about 690 KB raw, 181 KB gzipped, the Worker's bundle 922 KiB (220 KiB gzipped) against
-    a 64 MiB limit; `npx wrangler check startup` measures its startup
+    import that wrangler's bundler inlines (evaluated lazily): about 690 KB raw, 181 KB gzipped, the Worker's bundle 981 KiB (226 KiB gzipped)
+    against a 64 MiB limit; `npx wrangler check startup` measures its startup (15 to 16 ms, unchanged by the index)
 - `docs/research/`: research notes (`data-sources.md`)
 
 ## Hard rules
@@ -1298,7 +1299,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   centre or a chosen station, never the location fix; the Worker rounds it to 2 decimals and drops it outside the NYC bbox.
   Answers carry `attribution`; the search dialog shows each source's credit under the results that use it (2q7.16). Upstreams see the Worker, never the
   client's IP or headers. `/geocode` refuses a request with no allowed Origin (403).
-- **Address search (2q7.16).** Only `/geocode` carries what the user types in a search dialog (a street or an intersection too, which the Worker answers from its own index, so the text reaches NYC Planning and Photon only for what the index doesn't answer), and only with `VITE_RT_URL` set
+- **Address search (2q7.16).** Only `/geocode` carries what the user types in a search dialog (a street or an intersection too: an intersection the index finds goes to neither upstream, a street the index finds still goes to NYC GeoSearch (not Photon), and anything else goes to GeoSearch and, as before, Photon; a business-looking name always asks both), and only with `VITE_RT_URL` set
   (without it the dialog finds stations only, shows no street search, no disclosure and sends nothing). A request goes 250 ms after the last keystroke,
   for 3 to 100 code points of normalized text, the stale one aborted, with `cache: 'no-store'` and `credentials: 'omit'`; complete
   answers are remembered in memory for the session (no storage, URL or history). The query is never in the page URL, history, storage
@@ -1312,8 +1313,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   which is how the derivative database is offered) is a module of the Worker, not a client file: the client downloads nothing of
   it, and a typed street goes to `/geocode` like any address (so it falls under the Address search rules above, no query logged).
   `/geocode` rows from it carry source `osm` and the credit "© OpenStreetMap contributors" in `attribution`. It is refreshed by
-  `refresh-data.yml` with the rest of the data and deployed by merging to `main`; a malformed committed index fails the Worker's
-  startup (and so `/rt`), which `streetIndexOutputs.test.ts`, the Worker's `streetIndexData.test.ts` and the PR review catch first.
+  `refresh-data.yml` with the rest of the data and deployed by merging to `main`; a malformed committed index fails `/geocode` (a 500, no query logged) and nothing else, which `streetIndexOutputs.test.ts`, the Worker's `streetIndexData.test.ts` and the PR review catch first.
   Contract v2 (`GEOCODE_SCHEMA_VERSION`): an old client against the new Worker reads "address search unavailable" until reload.
 - **Walk shards are fetched only on a user action.** `data/walk/<id>.json` reveals its station id to the static host, so
   `useStationWalk` is called only with a station the user picked, focused or chose as a trip endpoint (never `nearestStation`

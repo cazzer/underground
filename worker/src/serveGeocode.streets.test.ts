@@ -25,7 +25,7 @@ const index = streetFixture()
 /** A harness whose street search is the real one over the fixture index. */
 function withStreets(gs = GS_EMPTY, ph = PH_KATZ): Harness {
   const deps = harness(gs, ph)
-  deps.searchStreets.mockImplementation((q) => searchStreets(index, q))
+  deps.searchStreets.mockImplementation(async (q) => searchStreets(index, q))
   return deps
 }
 
@@ -88,11 +88,31 @@ describe('/geocode with the street index', () => {
 
   it('behaves as before with no street rows', async () => {
     const deps = harness(GS_ADDRESS)
-    deps.searchStreets.mockReturnValue(noStreetRows())
+    deps.searchStreets.mockResolvedValue(noStreetRows())
     const body = await bodyOf(await get(deps, 'q=120+Broadway'))
     expect(deps.fetchPhoton).not.toHaveBeenCalled()
     expect(body.results).toHaveLength(3)
     expect(body.results.every((r) => r.source === 'geosearch')).toBe(true)
+  })
+
+  it('still asks both sources for a business-looking name when the index also found an intersection', async () => {
+    const deps = harness(GS_EMPTY, PH_KATZ)
+    const row = { result: { label: 'Bedford Av & N 7 St, Brooklyn', kind: 'intersection' as const, lat: 40.71784, lon: -73.95773, source: 'osm' as const }, name: 'Bedford Av & N 7 St', key: 'bedford av and n 7 st', address: null }
+    deps.searchStreets.mockResolvedValue({ whole: [row], partial: [] })
+    const body = await bodyOf(await get(deps, "q=Katz's+Deli+%26+N+7+St"))
+    expect(deps.fetchGeoSearch).toHaveBeenCalledTimes(1)
+    expect(deps.fetchPhoton).toHaveBeenCalledTimes(1)
+    expect(body.results.map((r) => r.source)).toEqual(['osm', 'photon'])
+  })
+
+  it('answers 500 internal, logging no query, when the street index cannot load', async () => {
+    const deps = withStreets()
+    deps.searchStreets.mockRejectedValue(new TypeError('street index: wrong format'))
+    const res = await get(deps, 'q=bedford+av+%26+n+7&focus=40.71,-73.96')
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'internal' })
+    expect(deps.fetchGeoSearch).not.toHaveBeenCalled()
+    for (const call of vi.mocked(console.error).mock.calls) expect(String(call[0])).not.toMatch(/bedford|n 7|40\.71/i)
   })
 
   it('never searches the index for a refused, malformed or rate-limited request', async () => {

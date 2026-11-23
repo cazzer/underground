@@ -36,8 +36,8 @@ export function createGeocodeState(now: number): GeocodeState {
 export interface GeocodeDeps {
   fetchGeoSearch(q: GeocodeQuery): Promise<SourceOutcome>
   fetchPhoton(q: GeocodeQuery): Promise<SourceOutcome>
-  /** The Worker's own street and intersection index (2q7.14); local and synchronous, so it takes no upstream budget. */
-  searchStreets(q: GeocodeQuery): StreetRows
+  /** The Worker's own street and intersection index (2q7.14); local, so it takes no upstream budget. It rejects if the index cannot load. */
+  searchStreets(q: GeocodeQuery): Promise<StreetRows>
   state: GeocodeState
   /** The Workers Rate Limiting binding (`env.GEOCODE_CLIENT_LIMIT`); absent means no per-client limit (`clientAllowed`). */
   clientLimit?: RateLimit
@@ -107,16 +107,17 @@ type Outcomes = Record<UpstreamSource, SourceOutcome>
 const unneeded: Outcomes = { geosearch: { status: 'unneeded' }, photon: { status: 'unneeded' } }
 
 /**
- * An intersection hit needs no upstream at all. A business name is OSM's: ask both sources at once. Otherwise GeoSearch,
- * and Photon only if the index and GeoSearch had no hit of the kind asked for (a street row counts).
+ * A business name is OSM's ("Joe's Pizza & Pasta"): ask both sources at once, whatever the index found. Otherwise an
+ * intersection hit needs no upstream at all, and GeoSearch is asked first, with Photon only if the index and GeoSearch
+ * had no hit of the kind asked for (a street row counts).
  */
 async function gather(q: GeocodeQuery, deps: GeocodeDeps, streets: StreetRows): Promise<{ outcomes: Outcomes; photonFirst: boolean }> {
-  const found = streets.whole.length + streets.partial.length
-  if ([...streets.whole, ...streets.partial].some((c) => c.result.kind === 'intersection')) return { outcomes: unneeded, photonFirst: false }
   if (looksLikeBusiness(q.text)) {
     const [geosearch, photon] = await Promise.all([callSource('geosearch', q, deps), callSource('photon', q, deps)])
     return { outcomes: { geosearch, photon }, photonFirst: true }
   }
+  const found = streets.whole.length + streets.partial.length
+  if ([...streets.whole, ...streets.partial].some((c) => c.result.kind === 'intersection')) return { outcomes: unneeded, photonFirst: false }
   const geosearch = await callSource('geosearch', q, deps)
   const satisfied = found > 0 || (geosearch.status === 'ok' && hasSatisfyingHit(geosearch.results.candidates, q.text))
   const photon: SourceOutcome = satisfied ? { status: 'unneeded' } : await callSource('photon', q, deps)
@@ -147,7 +148,7 @@ interface Miss {
 }
 
 async function serveMiss(m: Miss): Promise<Response> {
-  const streets = m.deps.searchStreets(m.query)
+  const streets = await m.deps.searchStreets(m.query)
   const { outcomes, photonFirst } = await gather(m.query, m.deps, streets)
   const result = geocodeAnswer(m.query, outcomes, photonFirst, streets)
   const colo = m.request.cf?.colo
@@ -172,8 +173,8 @@ async function serveMiss(m: Miss): Promise<Response> {
 }
 
 /**
- * GET /geocode: the Origin check, the per-client limit (429), a per-isolate LRU, then the edge cache, then the sources (see `gather`). Never throws. No log
- * line, error or header ever carries the query or the focus.
+ * GET /geocode: the Origin check, the per-client limit (429), a per-isolate LRU, then the edge cache, then the street index
+ * (local), then the upstream sources (see `gather`). Never throws. No log line, error or header ever carries the query or the focus.
  */
 export async function serveGeocode(request: Request, ctx: Ctx, origin: string | null, edge: EdgeCache, deps: GeocodeDeps): Promise<Response> {
   try {

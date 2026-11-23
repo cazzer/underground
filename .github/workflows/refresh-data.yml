@@ -125,6 +125,13 @@ jobs:
       - name: Build
         if: steps.diff.outputs.changed == 'true'
         run: npm run build
+      # The refreshed street index ships inside the Worker, so the Worker's own checks run on it too (its tests load the real file).
+      - name: Worker checks
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          npm --prefix worker ci
+          npm --prefix worker run typecheck
+          npm --prefix worker test
 
       - name: Stage artifact
         if: steps.diff.outputs.changed == 'true'
