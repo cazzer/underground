@@ -14,7 +14,8 @@ import { route } from './route/raptor'
 import { buildRouterTimetable } from './route/timetable'
 import type { RideLeg } from './route/types'
 import { TRACK_OFFSET_M } from './trackOffset'
-import { journeySpans, MAX_STOP_OFFSET_M, rideSpan, stopStations, type RideShapeSpan, type SpanContext, type SpanLeg } from './tripSpans'
+import type { Ground } from './projection'
+import { journeySpans, MAX_STOP_OFFSET_M, rideSpan, spanPoints, stopStations, type RideShapeSpan, type SpanContext } from './tripSpans'
 
 const read = <T>(path: string): T => JSON.parse(readFileSync(`public/data/${path}`, 'utf8')) as T
 const stationsFile = read<StationsFile>('stations.json')
@@ -42,6 +43,20 @@ const timetable = buildRouterTimetable(
 warn.mockRestore()
 
 const isRide = (s: { kind: string }): s is RideShapeSpan => s.kind === 'ride'
+/** Distance from a point to the nearest segment of a polyline. */
+function distanceToLine(line: readonly Ground[], p: Ground): number {
+  let best = Infinity
+  for (let i = 0; i + 1 < line.length; i++) {
+    const a = line[i]!
+    const b = line[i + 1]!
+    const dx = b.x - a.x
+    const dz = b.z - a.z
+    const len2 = dx * dx + dz * dz
+    const t = len2 > 0 ? Math.min(Math.max(((p.x - a.x) * dx + (p.z - a.z) * dz) / len2, 0), 1) : 0
+    best = Math.min(best, Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t)))
+  }
+  return best
+}
 const contains = (pattern: readonly string[], run: readonly string[]): boolean =>
   pattern.some((_, at) => run.every((s, i) => pattern[at + i] === s))
 
@@ -58,34 +73,32 @@ describe('the L08 to 127 plan', { timeout: 60_000 }, () => {
   it.each([
     ['without the hint', unbandedCtx],
     ['with the hint', hintedCtx],
-  ])('draws every ride leg on a shape within the offset limit, %s', (_, ctx) => {
-    const spans = journeySpans(changed!.legs as SpanLeg[], ctx)
+  ])('draws every ride leg on a shape that passes within the offset limit of every stop, %s', (_, ctx) => {
+    const spans = journeySpans(changed!.legs, ctx)
     const drawn = spans.filter(isRide)
     expect(drawn).toHaveLength(rides.length)
     for (const s of drawn) {
       expect(s.d1).toBeGreaterThan(s.d0)
-      expect(s.maxOffsetM).toBeLessThanOrEqual(MAX_STOP_OFFSET_M)
       expect(s.matched).not.toBe('other')
+      const path = ctx.shapes.find((sh) => sh.id === s.shapeId)!
+      const drawnLine = spanPoints(path, s.d0, s.d1)
+      for (const stop of (changed!.legs[s.legIndex] as RideLeg).stops) {
+        const at = stopMap.get(stop)!.pos
+        expect(distanceToLine(drawnLine, at), `${stop} on ${s.shapeId}`).toBeLessThanOrEqual(MAX_STOP_OFFSET_M)
+      }
     }
     expect(spans.every((s) => s.kind !== 'straight')).toBe(true)
-  })
-
-  it('draws the same spans on the banded shapes', () => {
-    const plain = journeySpans(changed!.legs as SpanLeg[], hintedCtx)
-    const withBands = journeySpans(changed!.legs as SpanLeg[], bandedCtx)
-    expect(withBands).toHaveLength(plain.length)
-    plain.forEach((a, i) => {
-      const b = withBands[i]!
-      if (!isRide(a) || !isRide(b)) return expect(b.kind).toBe(a.kind)
-      expect(b.shapeId).toBe(a.shapeId)
-      expect(b.d0).toBeCloseTo(a.d0, 6)
-      expect(b.d1).toBeCloseTo(a.d1, 6)
-    })
   })
 })
 
 describe('the trip-index hint', { timeout: 120_000 }, () => {
   const patterns = Object.entries(tripIndex.patterns)
+  /** Every 2 and 3 stop run of every pattern: where one shape's pattern holds a run and a parallel shape's may not. */
+  const runs = patterns.flatMap(([, p]) =>
+    [2, 3].flatMap((len) =>
+      Array.from({ length: Math.max(0, p.stops.length - len + 1) }, (_, at) => ({ routeId: p.routeId, stops: p.stops.slice(at, at + len) })),
+    ),
+  )
 
   it('resolves every pattern whole to a shape whose pattern holds it', () => {
     for (const [shapeId, p] of patterns) {
@@ -97,20 +110,31 @@ describe('the trip-index hint', { timeout: 120_000 }, () => {
     }
   })
 
-  it('resolves some contiguous runs differently than geometry alone', () => {
-    let runs = 0
-    let differ = 0
-    for (const [, p] of patterns) {
-      for (let at = 0; at + 3 <= p.stops.length; at += 4) {
-        const leg = { routeId: p.routeId, stops: p.stops.slice(at, at + 3) }
-        const hinted = rideSpan(leg, 0, hintedCtx)
-        const plain = rideSpan(leg, 0, unbandedCtx)
-        runs++
-        if (hinted.kind !== 'ride' || plain.kind !== 'ride' || hinted.shapeId !== plain.shapeId) differ++
-      }
+  it('banding the shapes keeps each run on its shape and moves its ends under a metre', () => {
+    expect(runs.length).toBeGreaterThan(10_000)
+    let worst = 0
+    for (const leg of runs) {
+      const a = rideSpan(leg, 0, hintedCtx)
+      const b = rideSpan(leg, 0, bandedCtx)
+      expect(a.kind, leg.stops.join('>')).toBe('ride')
+      expect(b, leg.stops.join('>')).toMatchObject({ kind: 'ride', shapeId: (a as RideShapeSpan).shapeId })
+      const [x, y] = [a as RideShapeSpan, b as RideShapeSpan]
+      worst = Math.max(worst, Math.abs(x.d0 - y.d0), Math.abs(x.d1 - y.d1))
     }
-    expect(runs).toBeGreaterThan(500)
+    expect(worst).toBeLessThan(1)
+  })
+
+  it('resolves some runs to a different shape than geometry alone, and only where the geometry pick lacks the run', () => {
+    let differ = 0
+    for (const leg of runs) {
+      const hinted = rideSpan(leg, 0, hintedCtx)
+      expect(hinted.kind, leg.stops.join('>')).toBe('ride')
+      const plain = rideSpan(leg, 0, unbandedCtx)
+      if (plain.kind !== 'ride' || plain.shapeId === (hinted as RideShapeSpan).shapeId) continue
+      differ++
+      expect(contains(tripIndex.patterns[plain.shapeId]!.stops, leg.stops), `${leg.stops.join('>')} unhinted ${plain.shapeId}`).toBe(false)
+    }
     expect(differ).toBeGreaterThan(0)
-    expect(differ / runs).toBeLessThan(0.5)
+    expect(differ / runs.length).toBeLessThan(0.5)
   })
 })

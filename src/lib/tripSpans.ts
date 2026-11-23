@@ -1,14 +1,18 @@
 /**
  * A trip's legs on the drawn map (2q7.45.2). Pure: a ride leg (a route and its ordered stops) becomes the stretch
  * [d0, d1] of one drawn shape, found by projecting each stop's own station point forward along the candidates; a walk
- * leg becomes the line between its two station points. Works on `network.shapes` or the banded ones alike (resampling
- * adds collinear points only, so distances agree to float noise).
+ * leg becomes the line between its two station points. Works on `network.shapes` or the banded ones alike: both
+ * draw the same ground path, but the banded one's extra vertices and cover can move a projection by up to a metre,
+ * so recompute the spans on the banded paths once they arrive.
  */
 import type { RouteId, ShapeId, StationId, StopId } from '../data/schema'
 import type { Station, ShapePath } from './network'
 import type { Ground } from './projection'
 import { pointAtDistance, projectForward } from './realtime/polyline'
 import type { RideLeg, WalkLeg } from './route/types'
+
+/** Offsets closer than this tie, so float noise between banded and unbanded paths never flips a pick. */
+export const OFFSET_TIE_M = 0.01
 
 /** A stop farther than this from a shape's line does not ride it (parallel lines sit within 150 m, so the hint decides those). */
 export const MAX_STOP_OFFSET_M = 150
@@ -31,8 +35,11 @@ export interface RideShapeSpan {
   d1: number
   /** The largest distance from a stop to the line; the terminal clamp's overshoot shows here. */
   maxOffsetM: number
-  /** `pattern`: the hint holds the leg's stops; `route`: geometry on the route's own shapes; `other`: another route's. */
-  matched: 'pattern' | 'route' | 'other'
+  /**
+   * `pattern`: a shape of the route whose hinted pattern holds the leg's stops; `route`: geometry on the route's own
+   * shapes; `pattern-other`: another route's shape whose hinted pattern holds them; `other`: another route's geometry.
+   */
+  matched: 'pattern' | 'route' | 'pattern-other' | 'other'
 }
 export interface RideStraightSpan {
   kind: 'straight'
@@ -46,6 +53,8 @@ export interface WalkSpan {
   legIndex: number
   fromStationId: StationId
   toStationId: StationId
+  /** Both stations are members of one complex, so the walk is a change inside a station as the UI shows it. */
+  sameComplex: boolean
   from: Ground
   to: Ground
 }
@@ -92,18 +101,18 @@ function fit(shape: SpanShape, points: readonly Ground[]): Fit | null {
   return d1 > d0 ? { shape, d0, d1, maxOffsetM } : null
 }
 
-/** Primary first, then the smallest offset, then the shape id. */
-function better(a: Fit, b: Fit): boolean {
-  if (a.shape.primary !== b.shape.primary) return a.shape.primary
-  if (a.maxOffsetM !== b.maxOffsetM) return a.maxOffsetM < b.maxOffsetM
+/** Primary first (when `primaryFirst`: it means nothing across routes), then the smallest offset, then the shape id. */
+function better(a: Fit, b: Fit, primaryFirst: boolean): boolean {
+  if (primaryFirst && a.shape.primary !== b.shape.primary) return a.shape.primary
+  if (Math.abs(a.maxOffsetM - b.maxOffsetM) > OFFSET_TIE_M) return a.maxOffsetM < b.maxOffsetM
   return a.shape.id < b.shape.id
 }
 
-function bestFit(shapes: readonly SpanShape[], points: readonly Ground[]): Fit | null {
+function bestFit(shapes: readonly SpanShape[], points: readonly Ground[], primaryFirst: boolean): Fit | null {
   let best: Fit | null = null
   for (const shape of shapes) {
     const f = fit(shape, points)
-    if (f && (!best || better(f, best))) best = f
+    if (f && (!best || better(f, best, primaryFirst))) best = f
   }
   return best
 }
@@ -130,14 +139,15 @@ export function rideSpan(leg: Pick<RideLeg, 'routeId' | 'stops'>, legIndex: numb
   const { patterns } = ctx
   const sameDirection = ctx.shapes.filter((s) => s.direction === direction)
   const ofRoute = sameDirection.filter((s) => s.routeId === leg.routeId)
-  const hinted = patterns ? ofRoute.filter((s) => patterns[s.id] !== undefined && containsRun(patterns[s.id]!.stops, leg.stops)) : []
-  const tiers: [RideShapeSpan['matched'], SpanShape[]][] = [
-    ['pattern', hinted],
-    ['route', ofRoute],
-    ['other', sameDirection],
+  const holdsRun = (s: SpanShape): boolean => patterns?.[s.id] !== undefined && containsRun(patterns[s.id]!.stops, leg.stops)
+  const tiers: [RideShapeSpan['matched'], SpanShape[], boolean][] = [
+    ['pattern', ofRoute.filter(holdsRun), true],
+    ['route', ofRoute, true],
+    ['pattern-other', sameDirection.filter(holdsRun), false],
+    ['other', sameDirection, false],
   ]
-  for (const [matched, candidates] of tiers) {
-    const f = bestFit(candidates, points)
+  for (const [matched, candidates, primaryFirst] of tiers) {
+    const f = bestFit(candidates, points, primaryFirst)
     if (f) return { kind: 'ride', legIndex, routeId: leg.routeId, shapeId: f.shape.id, d0: f.d0, d1: f.d1, maxOffsetM: f.maxOffsetM, matched }
   }
   return { kind: 'straight', legIndex, routeId: leg.routeId, points: points.map((p) => ({ x: p.x, z: p.z })) }
@@ -148,7 +158,15 @@ export function walkSpan(leg: Pick<WalkLeg, 'fromStop' | 'toStop' | 'sameStation
   if (leg.sameStation) return null
   const from = stationOf(ctx, leg.fromStop)
   const to = stationOf(ctx, leg.toStop)
-  return { kind: 'walk', legIndex, fromStationId: from.id, toStationId: to.id, from: { x: from.pos.x, z: from.pos.z }, to: { x: to.pos.x, z: to.pos.z } }
+  return {
+    kind: 'walk',
+    legIndex,
+    fromStationId: from.id,
+    toStationId: to.id,
+    sameComplex: from.leadId === to.leadId,
+    from: { x: from.pos.x, z: from.pos.z },
+    to: { x: to.pos.x, z: to.pos.z },
+  }
 }
 
 /** The legs' spans in leg order; a leg that draws nothing is left out (`legIndex` still names its place). */

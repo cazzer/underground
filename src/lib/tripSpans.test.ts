@@ -118,6 +118,23 @@ describe('rideSpan preference', () => {
     const twin = shape('V0', 'X', 'N', false, line(3))
     expect(ride(rideSpan({ routeId: 'X', stops: ['AN', 'CN'] }, 0, ctxOf([near, twin]))).shapeId).toBe('V0')
   })
+
+  it('treats offsets that differ by float noise as equal', () => {
+    const a = shape('V1', 'X', 'N', false, line(3))
+    const b = shape('V2', 'X', 'N', false, line(3 + 1e-12))
+    const c = shape('V0', 'X', 'N', false, line(3 - 1e-12))
+    for (const order of [[a, b], [b, a], [c, b, a], [a, b, c]]) {
+      const id = ride(rideSpan({ routeId: 'X', stops: ['AN', 'CN'] }, 0, ctxOf(order))).shapeId
+      expect(id).toBe(order.includes(c) ? 'V0' : 'V1')
+    }
+  })
+
+  it("orders another route's shapes by offset, not by primary", () => {
+    const farPrimary = shape('Y1', 'Y', 'N', true, line(40))
+    const nearVariant = shape('Y2', 'Y', 'N', false, line(2))
+    const span = ride(rideSpan({ routeId: 'X', stops: ['AN', 'CN'] }, 0, ctxOf([farPrimary, nearVariant])))
+    expect(span).toMatchObject({ shapeId: 'Y2', matched: 'other' })
+  })
 })
 
 describe('rideSpan with the pattern hint', () => {
@@ -133,6 +150,15 @@ describe('rideSpan with the pattern hint', () => {
 
   it('picks the express for a leg that skips B', () => {
     expect(ride(rideSpan({ routeId: 'X', stops: stops.skip }, 0, ctxOf([express, local], patterns)))).toMatchObject({ shapeId: 'E', matched: 'pattern' })
+  })
+
+  it("prefers another route's hinted pattern over its mere geometry", () => {
+    const yExpress = shape('Y1', 'Y', 'N', true, line(0))
+    const yLocal = shape('Y2', 'Y', 'N', false, line(5))
+    const hint = { Y1: { stops: ['AN', 'CN'] }, Y2: { stops: ['AN', 'BN', 'CN'] } }
+    const span = ride(rideSpan({ routeId: 'X', stops: stops.local }, 0, ctxOf([yExpress, yLocal], hint)))
+    expect(span).toMatchObject({ shapeId: 'Y2', matched: 'pattern-other' })
+    expect(ride(rideSpan({ routeId: 'X', stops: stops.local }, 0, ctxOf([yExpress, yLocal]))).matched).toBe('other')
   })
 
   it('falls back to geometry when no hinted pattern holds the run', () => {
@@ -166,9 +192,17 @@ describe('walkSpan and journeySpans', () => {
       legIndex: 1,
       fromStationId: 'A',
       toStationId: 'B',
+      sameComplex: false,
       from: { x: 100, z: 0 },
       to: { x: 500, z: 0 },
     })
+  })
+
+  it('marks a walk between two members of one complex', () => {
+    const members = [{ ...station('A', 100), leadId: 'A' }, { ...station('B', 500), leadId: 'A' }, station('C', 900)]
+    const mctx: SpanContext = { shapes: [], stopStations: stopStations(members) }
+    expect(walkSpan({ fromStop: 'AN', toStop: 'BS', sameStation: false }, 0, mctx)).toMatchObject({ sameComplex: true })
+    expect(walkSpan({ fromStop: 'AN', toStop: 'CS', sameStation: false }, 0, mctx)).toMatchObject({ sameComplex: false })
   })
 
   it('throws on an unknown stop', () => {
