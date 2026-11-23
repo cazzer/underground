@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { FEATURES } from '../config'
 import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
@@ -78,10 +79,9 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const { tripOpen, openTrip, closeTrip, escapeTrip, focusRequest } = useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf })
   // The one rule for which panel the bottom slot shows (panelCollapseState.ts); the trip panel stays mounted under a train or notice.
   const front = frontPanel({ trainShown: trainOpen, noticeShown: noticeOpen, tripOpen, focusedId })
-  // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
-  // heading, else the station panel's, else the Search button; the auto-dismissed notice leaves focus alone. It waits one
-  // frame so a station panel that auto-focus mounts as the train closes is found and wins; it is read once,
-  // so a later auto-focus is not chased.
+  // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's heading, else the
+  // station panel's, else the Search button; the auto-dismissed notice leaves focus alone. It waits one frame so a station
+  // panel that auto-focus mounts as the train closes is found and wins; it is read once, so a later auto-focus is not chased.
   const [focusReturns, setFocusReturns] = useState(0)
   useEffect(() => {
     if (focusReturns === 0) return
@@ -215,7 +215,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             {notice ?? ''}
           </p>
           <FocusAnnouncer network={network} covered={trainOpen || noticeOpen || tripOpen} panel={panel} />
-          <TripAnnouncer network={network} arrivals={arrivals} covered={trainOpen || noticeOpen} focusSiblings={focusSiblings} />
+          {FEATURES.navigation && <TripAnnouncer network={network} arrivals={arrivals} covered={trainOpen || noticeOpen} focusSiblings={focusSiblings} />}
           <LinkNotice
             show={linkNotice.show}
             onDismiss={linkNotice.onDismiss}
@@ -264,7 +264,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
             interior={interior}
             outages={outages}
             lineFilter={lineFilter}
-            onDirections={(end) => openTrip(end, { stationId: focusedId, place: null })}
+            onDirections={FEATURES.navigation ? (end) => openTrip(end, { stationId: focusedId, place: null }) : undefined}
             ref={panel}
             headingRef={stationHeading}
           />
@@ -292,7 +292,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
         onChoose={onSearchChoose}
         onChoosePlace={onSearchChoosePlace}
         onChooseHere={onSearchChooseHere}
-        onDirections={openTrip}
+        onDirections={FEATURES.navigation ? openTrip : undefined}
         onClose={onSearchClosed}
       />
     </div>

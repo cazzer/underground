@@ -26,8 +26,8 @@ interface ArrivalsPanelProps {
   outages: OutagePanelView
   /** The arrivals' line filter, held by the HUD so a train panel covering this one doesn't reset it. */
   lineFilter: LineFilterControl
-  /** "Directions from here" and "Directions to here": open the trip panel with this station as that end. */
-  onDirections: (end: TripEnd) => void
+  /** "Directions from here" and "Directions to here": open the trip panel with this station as that end. Absent when navigation is off: no directions row. */
+  onDirections?: (end: TripEnd) => void
   ref: Ref<HTMLElement>
   /** The heading, or the bar while collapsed: takes focus when a panel that covered this one closes, or after the visitor picks this station from search. */
   headingRef: RefObject<HTMLElement | null>
@@ -72,14 +72,16 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
       <div id={bodyId} hidden={collapsed}>
         {station.otherNames.length > 0 && <p className="mt-1 text-sm text-ink-dim">with {station.otherNames.join(', ')}</p>}
         <PartialAccessNote access={station.access} />
-        <p className="-ml-2 mt-1 flex flex-wrap text-sm">
-          <button type="button" onClick={() => onDirections('from')} className={LINK}>
-            Directions from here
-          </button>
-          <button type="button" onClick={() => onDirections('to')} className={LINK}>
-            Directions to here
-          </button>
-        </p>
+        {onDirections && (
+          <p className="-ml-2 mt-1 flex flex-wrap text-sm">
+            <button type="button" onClick={() => onDirections('from')} className={LINK}>
+              Directions from here
+            </button>
+            <button type="button" onClick={() => onDirections('to')} className={LINK}>
+              Directions to here
+            </button>
+          </p>
+        )}
         <InteriorStatus info={interior} />
         <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
         <ArrivalsList key={`arrivals-${stationId}`} network={network} station={station} source={arrivals} status={live} lineFilter={lineFilter} onFocusLost={() => headingRef.current?.focus()} />
