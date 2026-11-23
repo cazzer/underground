@@ -9,7 +9,7 @@ import { transformAlerts } from '../../worker/src/alerts'
 import type { ServiceAlert } from '../data/realtime'
 import type { RoutesFile, ShapesFile, StationsFile } from '../data/schema'
 import type { PackedDepthsFile } from '../data/stationSchema'
-import { serviceChangeDraw, type ChangeDraw, type ChangeDrawContext } from './changeDraw'
+import { changeDrawable, serviceChangeDraw, type ChangeDraw, type ChangeDrawContext } from './changeDraw'
 import { buildNetwork } from './network'
 import { bandNetwork } from './networkBands'
 import type { Ground } from './projection'
@@ -117,6 +117,10 @@ describe('serviceChangeDraw on the recorded feed', () => {
     warn.mockClear()
     for (const a of alerts) serviceChangeDraw(a, ctx, 'k')
     expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('makes a row a button exactly when it draws something, for every alert of the feed', () => {
+    for (const a of alerts) expect(changeDrawable(a, network.stationById), a.id).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
   })
 
   it('draws nothing for a delay, a notice or an express-to-local change', () => {

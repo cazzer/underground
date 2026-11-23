@@ -88,9 +88,11 @@ interface SceneProps {
   route: TripRouteDraw | null
   /** Its panel is in front (the changes list for a change, the trip panel for a trip): it draws over the dimmed network. */
   routeShown: boolean
+  /** The trip's own route (useTripRoute), for the camera: its frame decisions go on under a change. */
+  tripRoute: TripRouteDraw | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, pathLabels, tripOpen, route, routeShown }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, pathLabels, tripOpen, route, routeShown, tripRoute }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -217,6 +219,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         frame={priorityFrame}
         tripOpen={tripOpen}
         route={route}
+        tripRoute={tripRoute}
       />
       <ViewCenterSource />
       <LocationCapSource cap={locationCap} />

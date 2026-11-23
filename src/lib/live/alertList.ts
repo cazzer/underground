@@ -93,6 +93,17 @@ export function alertListView(alerts: AlertsInput, routeOrder: ReadonlyMap<Route
   return { kind: 'list', now, later }
 }
 
+/**
+ * Where the list shows alert `id`: `now`, `later` (with its start, epoch s), or null when it doesn't (ended, gone, or no
+ * fresh list): a pick of it draws nothing and is dropped.
+ */
+export function listedAs(body: AlertListBody, id: string): { group: 'now' } | { group: 'later'; startS: number } | null {
+  if (body.kind !== 'list') return null
+  if (body.now.some((r) => r.id === id)) return { group: 'now' }
+  const later = body.later.find((r) => r.id === id)
+  return later ? { group: 'later', startS: later.atS ?? 0 } : null
+}
+
 const count = (n: number) => `${n} service change${n === 1 ? '' : 's'}`
 
 /**

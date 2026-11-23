@@ -22,6 +22,12 @@ export type MarkLook = 'trip' | 'change'
 
 const markColor = (look: MarkLook): string => (look === 'change' ? theme.changeSkipMark : theme.exitPath)
 
+/** A trip's marks sit under the trains; a change's over them, so no train hides a skip's cross (renderOrder.ts). */
+const ORDERS: Record<MarkLook, { halo: number; ring: number; dot: number; cross: number }> = {
+  trip: { halo: RENDER_ORDER.tripMarkHalo, ring: RENDER_ORDER.tripMark, dot: RENDER_ORDER.tripMarkDot, cross: RENDER_ORDER.tripMarkDot },
+  change: { halo: RENDER_ORDER.changeMarkHalo, ring: RENDER_ORDER.changeMark, dot: RENDER_ORDER.changeMark, cross: RENDER_ORDER.changeSkipCross },
+}
+
 /**
  * An X filling a skip mark's ring: two arms SKIP_CROSS_WIDTH wide, each reaching SKIP_CROSS_HALF from the center (the
  * ring's inner edge), as one outline (a plus turned 45 degrees), so no part draws twice while it fades. Flat on the ground.
@@ -54,7 +60,7 @@ interface TripMarksProps {
  * at CHANGE_MARK_SHARE of their size). A start under the location reticle grows past it. The marks the focused interior
  * covers draw as a second set that fades by 1 − interiorOpacity, so they go as the interior comes in, not when it loads.
  * A service change's skipped station (role `skip`, look `change`) is a theme.changeSkipMark ring at full size with a
- * cross in it and no dot: the skip reads by shape, not colour alone. No event handlers and not in ScenePicker, so a
+ * cross in it and no dot: the skip reads by shape, not colour alone. A change's marks draw over the trains and cars. No event handlers and not in ScenePicker, so a
  * mark never takes a pick.
  */
 export function TripMarks({ marks, hidden, fix, levels, look }: TripMarksProps) {
@@ -108,6 +114,7 @@ function MarkSet({ marks, covered, fix, levels, look }: MarkSetProps) {
     [geometry],
   )
   const color = markColor(look)
+  const order = ORDERS[look]
   const full = useMemo(() => {
     const c = new Color(color)
     return new Float32Array([c.r, c.g, c.b])
@@ -183,16 +190,16 @@ function MarkSet({ marks, covered, fix, levels, look }: MarkSetProps) {
   // `args` are read once, when a mesh is made, so the count keys it: a new count makes new meshes.
   return (
     <>
-      <instancedMesh key={`halo-${n}`} ref={halo} args={[geometry.halo, undefined, n]} frustumCulled={false} renderOrder={RENDER_ORDER.tripMarkHalo}>
+      <instancedMesh key={`halo-${n}`} ref={halo} args={[geometry.halo, undefined, n]} frustumCulled={false} renderOrder={order.halo}>
         <meshBasicMaterial color={theme.background} transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
-      <instancedMesh key={`ring-${n}`} ref={ring} args={[geometry.ring, undefined, n]} frustumCulled={false} renderOrder={RENDER_ORDER.tripMark}>
+      <instancedMesh key={`ring-${n}`} ref={ring} args={[geometry.ring, undefined, n]} frustumCulled={false} renderOrder={order.ring}>
         <meshBasicMaterial color={color} transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
-      <instancedMesh key={`dot-${n}`} ref={dot} args={[geometry.dot, undefined, n]} frustumCulled={false} renderOrder={RENDER_ORDER.tripMarkDot}>
+      <instancedMesh key={`dot-${n}`} ref={dot} args={[geometry.dot, undefined, n]} frustumCulled={false} renderOrder={order.dot}>
         <meshBasicMaterial color={color} transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
-      <instancedMesh key={`cross-${n}`} ref={cross} args={[geometry.cross, undefined, n]} frustumCulled={false} renderOrder={RENDER_ORDER.changeSkipCross}>
+      <instancedMesh key={`cross-${n}`} ref={cross} args={[geometry.cross, undefined, n]} frustumCulled={false} renderOrder={order.cross}>
         <meshBasicMaterial color={color} transparent depthTest={false} depthWrite={false} />
       </instancedMesh>
     </>

@@ -96,3 +96,27 @@ describe('change tokens', () => {
     expect(routeIsFramed(pick1, pick2)).toBe(false)
   })
 })
+
+/** Applies one decision as useRouteFlight does: anything but none records the route. */
+function step(memo: RouteMemo, over: Partial<RouteInput>): ReturnType<typeof routeFrameDecision> {
+  const d = routeFrameDecision(memo, input(over))
+  if (d !== 'none') memo.framed = over.route === undefined ? A : over.route
+  return d
+}
+
+describe('the trip under a picked change (the list in front: the trip decides with front false)', () => {
+  it('a silent journey swap under the list is recorded, so closing the list frames nothing', () => {
+    const memo: RouteMemo = { framed: A, interrupted: false }
+    expect(step(memo, { route: A, front: false })).toBe('none')
+    expect(step(memo, { route: A2, silent: true, front: false })).toBe('skip')
+    expect(step(memo, { route: A2, front: true })).toBe('none')
+  })
+  it('a plan that first settles under the list never fires later', () => {
+    const memo: RouteMemo = { framed: A, interrupted: false }
+    expect(step(memo, { route: B, front: false })).toBe('skip')
+    expect(step(memo, { route: B, front: true })).toBe('none')
+    const fresh2: RouteMemo = { framed: null, interrupted: false }
+    expect(step(fresh2, { route: A, front: false })).toBe('skip')
+    expect(step(fresh2, { route: A, front: true })).toBe('none')
+  })
+})

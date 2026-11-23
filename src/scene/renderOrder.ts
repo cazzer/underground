@@ -37,8 +37,6 @@ export const RENDER_ORDER = {
   tripWalk: 4.45,
   tripMark: 4.5,
   tripMarkDot: 4.55,
-  // The cross inside a picked service change's skipped-station ring (TripMarks.tsx), over the ring, under the trains.
-  changeSkipCross: 4.56,
   trainHalo: 5,
   trains: 6,
   // The selected train's dot, drawn on its own above the other dots: its rim, a background gap, the dot.
@@ -52,6 +50,12 @@ export const RENDER_ORDER = {
   // it, depth-tested against the bodies so only the band outside each silhouette shows (and a nearer car hides it).
   carRim: 6.51,
   carGap: 6.52,
+  // A picked service change's skipped-station marks (TripMarks.tsx, look 'change'): over every train and car (the
+  // selected car shells included), so no train hides a cross, under the you-are-here reticle: a background halo, the
+  // ring, then the cross. A trip's marks stay at 4.4 to 4.55, under the trains.
+  changeMarkHalo: 6.53,
+  changeMark: 6.535,
+  changeSkipCross: 6.54,
   // While the other trains are still dots (carMix below 1), the same shells draw above those dots, under its own
   // shrinking dot (6.1 to 6.2), before any body, so the bodies paint over their inside.
   selectedCarRim: 6.03,

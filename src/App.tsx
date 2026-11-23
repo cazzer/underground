@@ -20,7 +20,8 @@ import { changeDrawable, changeDrawNote } from './lib/changeDraw'
 import { FocusProvider, useFocus } from './lib/focus'
 import { joinStationChanges } from './lib/live/alertJoin'
 import { alertSkipsOf } from './lib/live/alertSkips'
-import { alertListView } from './lib/live/alertList'
+import { alertListView, listedAs } from './lib/live/alertList'
+import { nyWhen } from './lib/live/nyWhen'
 import { serviceChangeView, type ServiceChangeView } from './lib/live/alertText'
 import { terminalsOf } from './lib/live/routeTerminals'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
@@ -34,7 +35,7 @@ import type { ScreenRect } from './lib/interiorCamera'
 import type { StationPathDraw } from './lib/interiorPath'
 import type { Network } from './lib/network'
 import type { BandedShapes } from './lib/networkBands'
-import { PanelCollapseProvider, usePanelCollapse } from './lib/panelCollapse'
+import { PanelCollapseProvider, usePanelCollapse, usePanelCollapseControls } from './lib/panelCollapse'
 import { TrainSelectionProvider, useTrainSelection } from './lib/trainSelection'
 import { TripProvider, useTrip } from './lib/trip'
 import { tripNamesOf } from './lib/tripView'
@@ -130,7 +131,15 @@ function MapView({ network, bands, live }: MapViewProps) {
   const changeRoute = useChangeRoute({ network, paths, snapshot: alerts.snapshot, pick: changePick, listed: changeList })
   const route = changeRoute?.route ?? tripRoute
   const routeShown = route !== null && (route.kind === 'change' ? front === 'changes' : front === 'trip')
-  const changeNote = changePick ? changeDrawNote(changeRoute) : null
+  // A change not in effect yet says when it starts, so the drawing isn't read as now; a pick the list no longer shows
+  // (ended, gone, data stale) is dropped, so Esc closes the list at once.
+  const picked = changePick ? listedAs(changeList, changePick.alertId) : null
+  const changeNote = picked ? changeDrawNote(changeRoute, picked.group === 'later' ? nyWhen(picked.startS, nowS) : null) : null
+  const { clearChangePick } = usePanelCollapseControls()
+  const stalePick = changePick !== null && picked === null
+  useEffect(() => {
+    if (stalePick) clearChangePick()
+  }, [stalePick, clearChangePick])
   // A complex is one station (the catalog's complex): its other members, for the trip panel and directions.
   const siblingsOf = useCallback(
     (id: string): readonly string[] => network.groupById.get(id)?.memberIds.filter((m) => m !== id) ?? NO_SIBLINGS,
@@ -209,6 +218,7 @@ function MapView({ network, bands, live }: MapViewProps) {
               tripOpen={trip.open}
               route={route}
               routeShown={routeShown}
+              tripRoute={tripRoute}
             />
             {/* Decoration: a crash here shows the map at once. */}
             <ErrorBoundary fallback={null}>

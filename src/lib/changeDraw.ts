@@ -145,29 +145,32 @@ export function serviceChangeDraw(alert: ServiceAlert, ctx: ChangeDrawContext, k
 }
 
 /**
- * Whether a list row can be picked to draw: a skip with a skip set, a part suspension with a listed station, a
- * suspension with a listed station or a whole route. Cheap (no geometry): a pick may still draw nothing
- * (changeDrawNote says so).
+ * Whether a list row can be picked to draw: what serviceChangeDraw draws, by its own rules, without geometry. A skip
+ * with a skip set (it always marks); a suspension, part or whole, with a route that lists two stations or more (a
+ * stretch; one station draws nothing), or for a whole suspension a route named alone that some station serves. Only a
+ * stretch no drawn line holds (warned) can still draw nothing (changeDrawNote says so).
  */
 export function changeDrawable(alert: ServiceAlert, stationById: ReadonlyMap<StationId, Station>): boolean {
-  switch (alertKindOf(alert.type)) {
-    case 'skip':
-      return skipSetsOf(alert, stationById).length > 0
-    case 'part':
-      return alert.entities.some((e) => hasStop(e, stationById))
-    case 'suspended':
-      return alert.entities.some((e) => e.stop === null || hasStop(e, stationById))
-    default:
-      return false
-  }
+  const kind = alertKindOf(alert.type)
+  if (kind === 'skip') return skipSetsOf(alert, stationById).length > 0
+  if (kind !== 'part' && kind !== 'suspended') return false
+  return [...new Set(alert.entities.map((e) => e.route))].some((route) => {
+    const ofRoute = alert.entities.filter((e) => e.route === route)
+    if (ofRoute.some((e) => hasStop(e, stationById))) return informedOf(alert, route, stationById).length >= 2
+    return kind === 'suspended' && ofRoute.some((e) => e.stop === null) && [...stationById.values()].some((st) => st.routeIds.includes(route))
+  })
 }
 
 export const DRAWN_NOTE = 'Drawn from the MTA notice'
 export const PROBABLE_NOTE = `${DRAWN_NOTE} · skipped stops probably as shown`
-export const NOT_DRAWN_NOTE = 'Not drawn on the map: no line matches the notice'
+export const NOT_DRAWN_NOTE = "Can't be drawn on the map"
 
-/** The picked row's dim line: the drawing is ours, from the MTA's notice (and the skips our guess), or nothing drew. */
-export function changeDrawNote(draw: ChangeDraw | null): string {
+/**
+ * The picked row's dim line: the drawing is ours, from the MTA's notice (and the skips our guess), or nothing drew.
+ * `from` is the start of a change not yet in effect ("11:45 PM", nyWhen's wording), so the map isn't read as now.
+ */
+export function changeDrawNote(draw: ChangeDraw | null, from: string | null = null): string {
   if (draw === null) return NOT_DRAWN_NOTE
-  return draw.probable ? PROBABLE_NOTE : DRAWN_NOTE
+  const note = draw.probable ? PROBABLE_NOTE : DRAWN_NOTE
+  return from === null ? note : `${note} · from ${from}`
 }

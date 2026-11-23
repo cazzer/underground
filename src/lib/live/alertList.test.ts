@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AlertEntity, AlertsSnapshot, ServiceAlert } from '../../data/realtime'
 import type { AlertsInput } from './alertJoin'
-import { alertChip, alertListView, laterWhen, type AlertListBody } from './alertList'
+import { alertChip, alertListView, laterWhen, listedAs, type AlertListBody } from './alertList'
 
 /** Epoch seconds of a New York wall time on 2026-11-`day` (EST, UTC-5: the clocks went back on Nov 1). */
 const est = (day: number, hour: number, minute = 0) => Date.UTC(2026, 10, day, hour + 5, minute) / 1000
@@ -193,5 +193,15 @@ describe('alertChip', () => {
   it('counts the ones coming when none is in effect', () => {
     expect(chip({ kind: 'list', now: [], later: [row('a'), row('b')] })).toEqual({ text: '2 service changes later', mark: true })
     expect(chip({ kind: 'list', now: [], later: [row('a')] })).toEqual({ text: '1 service change later', mark: true })
+  })
+})
+
+describe('listedAs', () => {
+  it('finds a row under Now, or under Later with its start, else null', () => {
+    const body = list([alert({ id: 'now' }), alert({ id: 'later', periods: [[NOW + 3600, NOW + 7200]] })])
+    expect(listedAs(body, 'now')).toEqual({ group: 'now' })
+    expect(listedAs(body, 'later')).toEqual({ group: 'later', startS: NOW + 3600 })
+    expect(listedAs(body, 'gone')).toBeNull()
+    expect(listedAs({ kind: 'unknown' }, 'now')).toBeNull()
   })
 })

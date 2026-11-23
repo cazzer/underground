@@ -83,9 +83,9 @@ describe('serviceChangeDraw', () => {
 
 describe('changeDrawable', () => {
   const by = ctx.stationById
-  it('takes skips with a skip set, suspensions with a listed station or a whole route', () => {
+  it('takes skips with a skip set, suspensions with a stretch of two stations or a whole route', () => {
     expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips Bravo St', [at('G2')]), by)).toBe(true)
-    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at('G2')]), by)).toBe(true)
+    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at('G2'), at('G3')]), by)).toBe(true)
     expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at(null)]), by)).toBe(true)
   })
   it('refuses other kinds, a part suspension with no stop, and stations the network lacks', () => {
@@ -93,6 +93,19 @@ describe('changeDrawable', () => {
     expect(changeDrawable(alert('Planned - Part Suspended', 'No [G]', [at(null)]), by)).toBe(false)
     expect(changeDrawable(alert('Planned - Stops Skipped', '[G] skips X', [at('X1')]), by)).toBe(false)
     expect(changeDrawable(alert('Planned - Suspended', 'No [G]', [at('X1')]), by)).toBe(false)
+    expect(changeDrawable(alert('Planned - Part Suspended', 'No [G] at Alpha Av', [at('G1')]), by)).toBe(false)
+    expect(changeDrawable(alert('Planned - Suspended', 'No [Z]', [at(null, null, 'Z')]), by)).toBe(false)
+  })
+  it('agrees with what serviceChangeDraw draws on every synthetic case', () => {
+    const cases = [
+      alert('Planned - Stops Skipped', '[G] skips Bravo St', [at('G2', 'N')]),
+      alert('Planned - Part Suspended', 'No [G] at Alpha Av', [at('G1')]),
+      alert('Planned - Part Suspended', 'No [G]', [at('G1'), at('G3')]),
+      alert('Planned - Suspended', 'No [G]', [at(null)]),
+      alert('Planned - Suspended', 'No [G]', [at('G1'), at(null)]),
+      alert('Delays', 'Delays', [at(null)]),
+    ]
+    for (const a of cases) expect(changeDrawable(a, by), a.header).toBe(serviceChangeDraw(a, ctx, 'k') !== null)
   })
 })
 
@@ -103,10 +116,12 @@ describe('changeDrawNote', () => {
     expect(changeDrawNote(drawn)).toBe(DRAWN_NOTE)
     expect(changeDrawNote(guessed)).toBe(PROBABLE_NOTE)
     expect(changeDrawNote(null)).toBe(NOT_DRAWN_NOTE)
+    expect(changeDrawNote(drawn, '11:45 PM')).toBe('Drawn from the MTA notice · from 11:45 PM')
+    expect(changeDrawNote(null, '11:45 PM')).toBe(NOT_DRAWN_NOTE)
     expect([DRAWN_NOTE, PROBABLE_NOTE, NOT_DRAWN_NOTE]).toEqual([
       'Drawn from the MTA notice',
       'Drawn from the MTA notice · skipped stops probably as shown',
-      'Not drawn on the map: no line matches the notice',
+      "Can't be drawn on the map",
     ])
   })
 })
