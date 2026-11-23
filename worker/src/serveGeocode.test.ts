@@ -54,7 +54,7 @@ describe('caching', () => {
     const ctx = fakeCtx()
     await get(harness(), 'q=barclays+center', edge, ctx)
     await ctx.flush()
-    expect([...edge.store.keys()]).toEqual(['https://w.example/geocode?v=1&q=barclays%20center&f='])
+    expect([...edge.store.keys()]).toEqual(['https://w.example/geocode?v=2&q=barclays%20center&f='])
 
     const fresh = harness()
     const res = await get(fresh, 'q=barclays+center', edge)

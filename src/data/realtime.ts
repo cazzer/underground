@@ -22,8 +22,8 @@ export const RT_URL: string | null = import.meta.env.VITE_RT_URL || null
 export type { EneOutage, EneSnapshot } from '../../worker/src/schema'
 export { ENE_SCHEMA_VERSION } from '../../worker/src/schema'
 
-export type { GeocodeKind, GeocodeResponse, GeocodeResult, GeocodeSource } from '../../worker/src/schema'
-export { GEOCODE_ATTRIBUTION, GEOCODE_MAX_RESULTS, GEOCODE_SCHEMA_VERSION } from '../../worker/src/schema'
+export type { GeocodeKind, GeocodeResponse, GeocodeResult, GeocodeSource, UpstreamSource } from '../../worker/src/schema'
+export { GEOCODE_ATTRIBUTION, GEOCODE_KINDS, GEOCODE_MAX_RESULTS, GEOCODE_SCHEMA_VERSION, GEOCODE_SOURCES } from '../../worker/src/schema'
 // The query normalizer and the bbox come from the Worker too, so the client's minimum length and cache key agree with it.
 export { NYC_BBOX, normalizeQuery } from '../../worker/src/geocodeQuery'
 

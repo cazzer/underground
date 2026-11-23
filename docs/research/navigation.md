@@ -158,22 +158,30 @@ beats LION (one centerline per street). Citywide, the 800 m circles cover 358 km
 5-7 MB in total (UNVERIFIED), but a user fetches one shard per station. A binary-heap A* is about 100
 lines and should take milliseconds on 4k nodes (not benchmarked).
 
-**Street and intersection index (built, 2q7.13):** `npm run data:search:streets` files 3,222 street records (a street per
-borough, a site per nearby station) and 11,512 intersections from the street pin, within 300 m of a station, into 64 FNV-1a
-hash-bucket shards: 523 KB gzipped in total (3.6 MB raw), 27.5 KB the largest shard, median about 7 KB. A name is filed under the
+**Street and intersection index (built, 2q7.13; shipped in the Worker, 2q7.14):** `npm run data:search:streets` files 3,222 street
+records (a street per borough, a site per nearby station) and 11,512 intersections from the street pin, within 300 m of a station,
+into one JSON module, `worker/data/streetIndex.json`: 689 KB raw, 181 KB gzipped (it first shipped as 64 hash-bucket shards fetched by
+the client, 523 KB gzipped in all; moving it into the Worker kept the typed text off the static host, below). The Worker's bundle
+goes from 182 KiB (35 KiB gzipped) to about 922 KiB (220 KiB gzipped), against a 64 MiB limit. The index is parsed at startup, which has
+its own 1 s limit, so `wrangler check startup` (local, warm runs) reads 22 to 27 ms of active startup (15 to 16 before); a lazy load on the
+first `/geocode` miss would put that work into a request, over the Free plan's 10 ms CPU limit; the JSON parse is about 3 ms and `loadStreetIndex` about 6 ms cold in node, once, and the index holds roughly 3.5 MB of heap. A name is filed under the
 first two characters of each distinctive token (not st, av, a compass letter and the like), spelled as published, canonical and as a long form, so
-one fetch finds it from any prefix of 2+ characters of that token (a query like "w 4" reads only the "4" bucket). The borough is the nearest station's, wrong on a few land-border streets.
+a query finds it from any prefix of 2+ characters of that token (a query like "w 4" reads only the "4" key); a key lists at most 108 of the
+3,222 streets, so a query scores about 5 to 108 candidates (under 0.5 ms), never all. An intersection query is split at the first
+"&", "/", "@", "+" or the words "and" / "at"; each side is scored, the pairs joined through each street's crossings. The borough is
+the nearest station's, wrong on a few land-border streets.
 
 **Address index (not built):** Manhattan (63,245 points, 872 streets) is 264 KB gzipped at 1 m; citywide about 4 MB
 (UNVERIFIED), in hash-bucket shards. Dropped on 2026-11-22 (2q7.15 closed as superseded) for the Worker's `/geocode`.
 
 **Address and place search (decided 2026-11-22, 2q7.33 and 2q7.16):** the Worker's `GET /geocode?q=&focus=lat,lon` calls
-NYC GeoSearch (Pelias on PAD, autocomplete) first and, when that has no place-like hit or the query reads like a business
-name, Photon bounded to the NYC bbox. It merges and dedupes them, trims each to `{label, kind, lat, lon, source}`, at most 8,
-drops anything outside the bbox, returns the attribution with the results (NYC Planning; © OpenStreetMap contributors), caches
+the bundled street index first (streets and intersections, local), then NYC GeoSearch (Pelias on PAD, autocomplete) and, when neither has
+a place-like hit or the query reads like a business name, Photon bounded to the NYC bbox; an intersection hit calls neither. Their
+`street` rows are dropped, the index's replace them. It merges and dedupes them, trims each to `{label, kind, lat, lon, source}`, at most 8,
+drops anything outside the bbox, returns the attribution with the results (NYC Planning; © OpenStreetMap contributors, for Photon rows and the street index), caches
 by normalized query for 1 h, rate-limits Photon per isolate and each client (Cloudflare's Workers Rate Limiting binding keyed on
 `CF-Connecting-IP`, 30 per 60 s, checked before the cache; the address is never logged or stored; 2q7.36), logs no query text, and answers only the site's origins. The client
-never calls either service directly. The station search dialog queries it after stations and on-device street matches (3+
+never calls either service directly. The station search dialog queries it after stations (3+
 characters, about 250 ms debounce, stale requests aborted) and says so in one line: "Addresses and places are looked up through
 our server; your location is never sent." `focus` is the map center or the chosen station, never the location fix.
 
@@ -188,14 +196,13 @@ invocation logs are off, query strings redacted, traces off; `wrangler tail` may
 - `/geocode` answers carry no cache-state header, but response timing still hints whether a query was recently searched in
   that isolate (a memory hit is faster than an upstream call).
 - Static shards still reveal a little to GitHub Pages: walk shards are keyed by the station the user
-  picked or focused, never by the fix. A street shard
-  holds about 5 of the 315 keys (283 two-character prefixes and 32 one-character keys; 1 to 10 per bucket), so
-  one request narrows the first distinctive word to those. But a client that fetches the one-character bucket
-  and then the two-character one as the user types sends both, and together they can reveal the first two letters
-  of that word to the Pages log (measured: 247 of the 283 prefixes are pinned exactly, and all 283 when the word
-  starts with a letter). The fetch rule is decided in 2q7.14 (privacy card underground-2q7.14.1). No page URL ever holds
-  the text typed. Address and place search does send it (3+ characters) to our Worker, which passes it on to NYC Planning and,
-  for places, komoot's Photon, from the Worker's address, not the user's. Routing runs on
+  picked or focused, never by the fix. Street and intersection search is not a static shard any more: fetching the
+  index in hash buckets would have shown the Pages log the first two letters of the word typed (measured on the old shards: 247 of
+  the 283 two-character keys were pinned exactly), so the index lives in the Worker and nothing about a typed street reaches the
+  static host (2q7.14, privacy card underground-2q7.14.1). No page URL ever holds
+  the text typed. Address, place and street search does send it (3+ characters) to our Worker. An intersection the street index finds goes
+  to neither upstream; a street the index finds still goes to NYC Planning's GeoSearch (not to Photon); anything else goes to GeoSearch and,
+  for places, komoot's Photon, and a business-looking name asks both. All from the Worker's address, not the user's. Routing runs on
   the fix in memory, so the rule that no request carries the location holds.
 - Any hosted routing API needs the origin, which breaks that rule; it would need the user to change it,
   plus consent on every request. Not recommended.
@@ -214,7 +221,8 @@ underground-ost) and A* to each entrance to pick the best exit; beyond 800 m, a 
 - Generated interiors make routes look more certain than they are; keep the "probably" wording and dashes.
 - The walk-graph total is an extrapolation; the per-shard sizes are measured.
 - GeoSearch publishes no terms or limits (UNVERIFIED) and Photon is best-effort with fair-use throttling; either can
-  vanish or slow down, so station and street search must never wait on them.
+  vanish or slow down, so station search never waits on them, an intersection is answered from the bundled index alone, and a
+  street (which still waits on GeoSearch for its places) survives a failed upstream as an incomplete 200, not an error.
 - The draft pathways feed may only guide a survey, never be a source.
 
 ## Sources

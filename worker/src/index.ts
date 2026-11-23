@@ -3,7 +3,10 @@ import { PREFLIGHT_HEADERS, corsHeaders } from './cors'
 import { transformEne } from './ene'
 import { ENE_SCHEMA_VERSION, RT_SCHEMA_VERSION, FEED_IDS, type FeedId, type RealtimeSnapshot } from './schema'
 import { fetchGeoSearch, fetchPhoton } from './geocodeUpstream'
+import type { GeocodeQuery } from './geocodeQuery'
 import { serveCached, type CachedRoute } from './serveCached'
+import { STREET_INDEX } from './streetIndexData'
+import { searchStreets } from './streetSearch'
 import { createGeocodeState, serveGeocode } from './serveGeocode'
 import { buildSnapshot, type FeedOutcome } from './transform'
 import { fetchAllFeeds, fetchEne } from './upstream'
@@ -70,7 +73,12 @@ export interface WorkerEnv {
 
 type Handler = (request: Request, ctx: ExecutionContext, origin: string | null, env: WorkerEnv) => Promise<Response>
 
-const geocodeDeps = { fetchGeoSearch, fetchPhoton, state: createGeocodeState(Date.now()) }
+const geocodeDeps = {
+  fetchGeoSearch,
+  fetchPhoton,
+  searchStreets: async (q: GeocodeQuery) => searchStreets(STREET_INDEX, q),
+  state: createGeocodeState(Date.now()),
+}
 
 const HANDLERS = new Map<string, Handler>([
   ['/rt', (request, ctx, origin) => serveCached(rtRoute, request, ctx, origin, caches.default)],

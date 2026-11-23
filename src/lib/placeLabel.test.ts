@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GeocodeResult } from '../data/realtime'
 import type { Station } from './network'
-import { displayCase, distanceText, placePick, placeText } from './placeLabel'
+import { displayCase, distanceText, nearNote, placePick, placeText } from './placeLabel'
 import { toGround } from './projection'
 
 describe('displayCase', () => {
@@ -55,6 +55,20 @@ describe('placeText', () => {
   })
 })
 
+describe('street and intersection rows', () => {
+  const osm = (label: string, kind: 'street' | 'intersection'): GeocodeResult => ({ label, kind, lat: 40.71784, lon: -73.95773, source: 'osm' })
+
+  it('read as "Name" over "Borough · Kind", spoken with the kind word, and keep their mixed-case names', () => {
+    expect(placeText(osm('Bedford Av & N 7 St, Brooklyn', 'intersection'))).toEqual({
+      name: 'Bedford Av & N 7 St',
+      detail: 'Brooklyn',
+      kindWord: 'Intersection',
+      spoken: 'Bedford Av & N 7 St, Brooklyn, intersection',
+    })
+    expect(placeText(osm('W 40 St, Manhattan', 'street'))).toMatchObject({ name: 'W 40 St', detail: 'Manhattan', kindWord: 'Street', spoken: 'W 40 St, Manhattan, street' })
+  })
+})
+
 describe('distanceText', () => {
   it('rounds to 50 m, then to 0.1 km', () => {
     expect(distanceText(40)).toBe('about 50 m')
@@ -85,6 +99,20 @@ describe('placePick', () => {
     const r = result('120 BROADWAY, Manhattan')
     const pick = placePick(r, placeText(r), [...stations, member], new Map([['A', group], ['A2', group]]))
     expect(pick?.nearest).toMatchObject({ id: 'A', name: 'Wall St' })
+  })
+
+  it('picks a street or intersection like any place: the point, the nearest station and the kind', () => {
+    for (const kind of ['street', 'intersection'] as const) {
+      const r: GeocodeResult = { label: 'Bedford Av & N 7 St, Brooklyn', kind, lat: 40.7074, lon: -74.0113, source: 'osm' }
+      expect(placePick(r, placeText(r), stations, groups)).toMatchObject({ name: 'Bedford Av & N 7 St', label: 'Bedford Av & N 7 St, Brooklyn', kind, nearest: { id: 'A' } })
+    }
+  })
+
+  it('words a trip end\'s "near" note: a street by its full label, anything else by its name', () => {
+    const pick = (kind: 'street' | 'intersection' | 'address') => ({ kind, name: 'Broadway', label: 'Broadway, Brooklyn' })
+    expect(nearNote(pick('street'))).toBe('Broadway, Brooklyn')
+    expect(nearNote(pick('intersection'))).toBe('Broadway')
+    expect(nearNote(pick('address'))).toBe('Broadway')
   })
 
   it('is null for an empty network', () => {

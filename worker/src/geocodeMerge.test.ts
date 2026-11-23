@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Candidate } from './geocodeCandidate'
 import { geoSearchCandidates, photonCandidates } from './geocodeFixture'
-import { distanceM, hasSatisfyingHit, mergeCandidates } from './geocodeMerge'
+import { combineRows, distanceM, hasSatisfyingHit, mergeCandidates } from './geocodeMerge'
 import { nameKey, queryTokens } from './geocodeText'
 import type { GeocodeKind, GeocodeSource } from './schema'
 
@@ -109,5 +109,29 @@ describe('hasSatisfyingHit', () => {
     expect(hasSatisfyingHit(kinds('address'), 'katz')).toBe(false)
     expect(hasSatisfyingHit(kinds('street'), '120 broadway')).toBe(false)
     expect(hasSatisfyingHit([], '120 broadway')).toBe(false)
+  })
+})
+
+describe('combineRows', () => {
+  const street = (name: string) => cand(name, 40.7, -74, 'osm', 'street')
+  const up = (n: number) => Array.from({ length: n }, (_, i) => cand(`Up ${i}`, 40.7 + i * 0.01, -74, 'geosearch').result)
+  const labelsOf = (rows: { label: string }[]) => rows.map((r) => r.label)
+
+  it('lists whole street rows, then upstream rows, then partial street rows', () => {
+    const rows = combineRows({ whole: [street('A')], partial: [street('P')] }, up(2))
+    expect(labelsOf(rows)).toEqual(['A', 'Up 0', 'Up 1', 'P'])
+  })
+
+  it('keeps at most five whole rows first; the rest wait in front of the partial ones', () => {
+    const whole = ['W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'W6'].map(street)
+    expect(labelsOf(combineRows({ whole, partial: [street('P')] }, up(8)))).toEqual(['W0', 'W1', 'W2', 'W3', 'W4', 'Up 0', 'W5', 'W6'])
+  })
+
+  it('reserves two places for partial rows, fills the 8 with upstream otherwise, and cuts at 8', () => {
+    const partial = ['P0', 'P1', 'P2', 'P3'].map(street)
+    expect(labelsOf(combineRows({ whole: [], partial }, up(8)))).toEqual(['Up 0', 'Up 1', 'Up 2', 'Up 3', 'Up 4', 'Up 5', 'P0', 'P1'])
+    expect(labelsOf(combineRows({ whole: [], partial: [street('P0')] }, up(8)))).toEqual([...up(7).map((r) => r.label), 'P0'])
+    expect(labelsOf(combineRows({ whole: [], partial }, up(2)))).toEqual(['Up 0', 'Up 1', 'P0', 'P1', 'P2', 'P3'])
+    expect(combineRows({ whole: [], partial: [] }, up(10))).toHaveLength(8)
   })
 })

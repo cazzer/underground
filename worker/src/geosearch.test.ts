@@ -54,10 +54,15 @@ describe('trimGeoSearch on synthetic rows', () => {
   })
 
   it('maps layers to kinds', () => {
-    const kinds = ['street', 'neighbourhood', 'borough', 'postalcode', 'venue'].map(
+    const kinds = ['neighbourhood', 'borough', 'postalcode', 'venue'].map(
       (layer) => trimGeoSearch(collection(row({ name: 'X', layer }))).candidates[0]?.result.kind,
     )
-    expect(kinds).toEqual(['street', 'area', 'area', 'area', 'place'])
+    expect(kinds).toEqual(['area', 'area', 'area', 'place'])
+  })
+
+  it('drops a street row: the Worker\'s own street index answers streets', () => {
+    const got = trimGeoSearch(collection(row({ name: 'BEDFORD AVENUE', layer: 'street' })))
+    expect(got).toEqual({ candidates: [], dropped: 1, outside: 0 })
   })
 
   it('throws a fixed-message TypeError on a bad shape', () => {

@@ -65,10 +65,10 @@ describe('parseGeocodeRequest', () => {
 describe('cacheKeyPath', () => {
   it('is stable, and distinct per text and focus', () => {
     const a = cacheKeyPath(ok('q=120+Broadway&focus=40.73,-73.99'))
-    expect(a).toBe('/geocode?v=1&q=120%20broadway&f=40.73,-73.99')
+    expect(a).toBe('/geocode?v=2&q=120%20broadway&f=40.73,-73.99')
     expect(cacheKeyPath(ok('q=120+BROADWAY&focus=40.7301,-73.9899'))).toBe(a)
     expect(cacheKeyPath(ok('q=120+Broadway&focus=40.74,-73.99'))).not.toBe(a)
-    expect(cacheKeyPath(ok('q=120+Broadway&focus=0,0'))).toBe('/geocode?v=1&q=120%20broadway&f=')
+    expect(cacheKeyPath(ok('q=120+Broadway&focus=0,0'))).toBe('/geocode?v=2&q=120%20broadway&f=')
   })
 })
 

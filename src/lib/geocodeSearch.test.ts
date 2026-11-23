@@ -12,7 +12,7 @@ import {
 } from './geocodeSearch'
 
 const response = (label: string, incomplete = false): GeocodeResponse => ({
-  version: 1,
+  version: 2,
   results: [{ label, kind: 'address', lat: 40.7, lon: -74, source: 'geosearch' }],
   attribution: { geosearch: 'x' },
   incomplete,

@@ -15,14 +15,20 @@ export type GeocodeView =
   | { status: 'ready'; places: readonly GeocodeResult[]; sources: readonly GeocodeSource[] }
   | { status: 'error'; error: GeocodeFailure }
 
-export const GEOCODE_ERROR_TEXT = "Address search isn't available right now."
+export const GEOCODE_ERROR_TEXT = "Street and address search isn't available right now."
 
-const SOURCE_ORDER: readonly GeocodeSource[] = ['geosearch', 'photon']
+const SOURCE_ORDER: readonly GeocodeSource[] = ['geosearch', 'photon', 'osm']
 
-/** Streets are the on-device search's (2q7.14); the Worker's other rows show. */
 function shownPlaces(results: readonly GeocodeResult[]): { places: GeocodeResult[]; sources: GeocodeSource[] } {
-  const places = results.filter((r) => r.kind !== 'street')
-  return { places, sources: SOURCE_ORDER.filter((s) => places.some((r) => r.source === s)) }
+  return { places: [...results], sources: SOURCE_ORDER.filter((s) => results.some((r) => r.source === s)) }
+}
+
+/**
+ * The credits to print: Photon's wording already names OpenStreetMap contributors, so the bare OSM credit of the street
+ * index is not printed beside it.
+ */
+export function creditSources(sources: readonly GeocodeSource[]): GeocodeSource[] {
+  return sources.filter((s) => s !== 'osm' || !sources.includes('photon'))
 }
 
 export function geocodeView(m: GeocodeMachine, enabled: boolean, tier: SearchingTier): GeocodeView {
@@ -46,10 +52,10 @@ export function geocodeAnnouncement(v: GeocodeView): string {
     case 'short':
       return ''
     case 'pending':
-      return v.tier === 2 ? 'Still searching addresses and places' : ''
+      return v.tier === 2 ? 'Still searching streets, addresses and places' : ''
     case 'ready':
-      if (v.places.length === 0) return 'No addresses or places match'
-      return v.places.length === 1 ? '1 address or place' : `${v.places.length} addresses and places`
+      if (v.places.length === 0) return 'No streets, addresses or places match'
+      return v.places.length === 1 ? '1 street, address or place' : `${v.places.length} streets, addresses and places`
     case 'error':
       return GEOCODE_ERROR_TEXT.replace(/\.$/, '')
   }
@@ -67,7 +73,7 @@ export function searchEmptyText(typed: boolean, stationCount: number, v: Geocode
       // The "Searching…" line covers it; an earlier answer's rows are still listed.
       return null
     case 'ready':
-      return v.places.length === 0 ? 'No stations or places match.' : null
+      return v.places.length === 0 ? 'No stations, streets, addresses or places match.' : null
   }
 }
 

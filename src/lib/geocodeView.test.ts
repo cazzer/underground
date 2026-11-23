@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { GeocodeResult } from '../data/realtime'
 import { INITIAL_GEOCODE, type GeocodeMachine } from './geocodeSearch'
-import { announcementFor, GEOCODE_ERROR_TEXT, geocodeAnnouncement, geocodeView, nextErrorSpoken, searchEmptyText } from './geocodeView'
+import { announcementFor, creditSources, GEOCODE_ERROR_TEXT, geocodeAnnouncement, geocodeView, nextErrorSpoken, searchEmptyText } from './geocodeView'
 
 const row = (label: string, kind: GeocodeResult['kind'], source: GeocodeResult['source']): GeocodeResult => ({ label, kind, source, lat: 40.7, lon: -74 })
-const shown = (results: GeocodeResult[]) => ({ query: 'q', response: { version: 1 as const, results, attribution: {}, incomplete: false } })
+const shown = (results: GeocodeResult[]) => ({ query: 'q', response: { version: 2 as const, results, attribution: {}, incomplete: false } })
 const machine = (m: Partial<GeocodeMachine>): GeocodeMachine => ({ ...INITIAL_GEOCODE, query: 'q', ...m })
 
 describe('geocodeView', () => {
@@ -13,11 +13,11 @@ describe('geocodeView', () => {
     expect(geocodeView(INITIAL_GEOCODE, true, 0)).toEqual({ status: 'short' })
   })
 
-  it('drops street rows and lists only the sources of the rows kept', () => {
-    const results = [row('A', 'street', 'geosearch'), row('B', 'place', 'photon'), row('C', 'area', 'photon')]
+  it('keeps every row, street index rows included, and lists the sources of the rows in the contract\'s order', () => {
+    const results = [row('A', 'street', 'osm'), row('X', 'intersection', 'osm'), row('B', 'place', 'photon'), row('C', 'area', 'geosearch')]
     const v = geocodeView(machine({ phase: 'settled', shown: shown(results) }), true, 0)
-    expect(v).toMatchObject({ status: 'ready', sources: ['photon'] })
-    expect(v.status === 'ready' && v.places.map((p) => p.label)).toEqual(['B', 'C'])
+    expect(v).toMatchObject({ status: 'ready', sources: ['geosearch', 'photon', 'osm'] })
+    expect(v.status === 'ready' && v.places.map((p) => p.label)).toEqual(['A', 'X', 'B', 'C'])
   })
 
   it('keeps the previous places while pending, with the tier only once loading', () => {
@@ -29,6 +29,15 @@ describe('geocodeView', () => {
 
   it('reports an error', () => {
     expect(geocodeView(machine({ phase: 'settled', error: 'busy' }), true, 0)).toEqual({ status: 'error', error: 'busy' })
+  })
+})
+
+describe('creditSources', () => {
+  it('prints the OSM credit alone, or with GeoSearch, but not beside Photon\'s (which names OpenStreetMap too)', () => {
+    expect(creditSources(['osm'])).toEqual(['osm'])
+    expect(creditSources(['geosearch', 'osm'])).toEqual(['geosearch', 'osm'])
+    expect(creditSources(['geosearch', 'photon', 'osm'])).toEqual(['geosearch', 'photon'])
+    expect(creditSources([])).toEqual([])
   })
 })
 
@@ -44,10 +53,10 @@ describe('geocodeAnnouncement', () => {
   })
 
   it('speaks the slow tier, the count and the error once per state', () => {
-    expect(geocodeAnnouncement({ status: 'pending', tier: 2, places: [], sources: [] })).toBe('Still searching addresses and places')
-    expect(geocodeAnnouncement(ready(1))).toBe('1 address or place')
-    expect(geocodeAnnouncement(ready(3))).toBe('3 addresses and places')
-    expect(geocodeAnnouncement(ready(0))).toBe('No addresses or places match')
+    expect(geocodeAnnouncement({ status: 'pending', tier: 2, places: [], sources: [] })).toBe('Still searching streets, addresses and places')
+    expect(geocodeAnnouncement(ready(1))).toBe('1 street, address or place')
+    expect(geocodeAnnouncement(ready(3))).toBe('3 streets, addresses and places')
+    expect(geocodeAnnouncement(ready(0))).toBe('No streets, addresses or places match')
     expect(geocodeAnnouncement({ status: 'error', error: 'busy' })).toBe(GEOCODE_ERROR_TEXT.slice(0, -1))
     expect(geocodeAnnouncement(ready(3))).toBe(geocodeAnnouncement(ready(3)))
   })
@@ -66,7 +75,7 @@ describe('searchEmptyText', () => {
     expect(searchEmptyText(true, 0, { status: 'short' })).toBe('No stations match.')
     expect(searchEmptyText(true, 0, { status: 'error', error: 'busy' })).toBe('No stations match.')
     expect(searchEmptyText(true, 0, { status: 'pending', tier: 0, places: [], sources: [] })).toBeNull()
-    expect(searchEmptyText(true, 0, none)).toBe('No stations or places match.')
+    expect(searchEmptyText(true, 0, none)).toBe('No stations, streets, addresses or places match.')
     expect(searchEmptyText(true, 0, { status: 'ready', places: [row('A', 'place', 'photon')], sources: ['photon'] })).toBeNull()
   })
 })
@@ -78,7 +87,7 @@ describe('the unavailable sentence is spoken once per dialog session', () => {
   it('speaks the first error, then stays silent on repeats until the dialog closes', () => {
     let state = nextErrorSpoken('none', error, true)
     expect(state).toBe('speaking')
-    expect(announcementFor(error, state)).toBe("Address search isn't available right now")
+    expect(announcementFor(error, state)).toBe("Street and address search isn't available right now")
     state = nextErrorSpoken(state, error, true)
     expect(state).toBe('speaking')
     state = nextErrorSpoken(state, pending, true)
@@ -86,7 +95,7 @@ describe('the unavailable sentence is spoken once per dialog session', () => {
     state = nextErrorSpoken(state, error, true)
     expect(state).toBe('spoken')
     expect(announcementFor(error, state)).toBe('')
-    expect(announcementFor({ status: 'ready', places: [], sources: [] }, state)).toBe('No addresses or places match')
+    expect(announcementFor({ status: 'ready', places: [], sources: [] }, state)).toBe('No streets, addresses or places match')
     expect(nextErrorSpoken(state, error, false)).toBe('none')
   })
 })

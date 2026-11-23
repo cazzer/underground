@@ -171,16 +171,19 @@ stations whose largest connected piece holds under 90% of the walkable length (d
 gaps in OSM; check that list after a refresh) and the totals.
 
 `npm run data:search:streets` (offline) turns the same pin and `public/data/stations.json` into the citywide street and
-intersection search index, 64 hash-bucket shards under `public/data/search/streets/` (`src/data/searchSchema.ts`,
-`src/lib/searchBucket.ts`). Rerun it after `data`, `data:streets:fetch`, a change to the `searchText.ts` synonyms, `GENERIC_TOKENS`
-or `isStreet`; `streetIndexOutputs.test.ts` fails while the files are stale. It keeps the ways `isStreet` accepts (named
+intersection search index, one file, `worker/data/streetIndex.json` (`worker/src/streetIndexSchema.ts`, key rule
+`worker/src/streetKeys.ts`), which the Worker bundles for `/geocode` (2q7.14). Rerun it after `data`, `data:streets:fetch`, a change
+to the `searchText.ts` synonyms (`worker/src/searchText.ts`), `GENERIC_TOKENS` or `isStreet`; `streetIndexOutputs.test.ts` fails
+while the file is stale; `refresh-data.yml` regenerates and commits it with the rest. It keeps the ways `isStreet` accepts (named
 roadways, service ways included, no plazas): one record per borough and street key ("North 7th Street" and "N 7th St" are "N 7 St"),
 with a site per station the street runs nearest to, and one intersection per pair of differently named streets that share a node
 (shared nodes within 100 m count once, so a divided street's two carriageways are one crossing). The borough is the nearest
 `stations.json` station's, which can be wrong on a land border (the build counts the street vertices near one). Coverage is
-the pin's: streets within 300 m of a station point. Caps are in `scripts/lib/budget.ts` (36 KB per shard, 660 KB total gzipped),
-outside the startup budget (it writes only under `search/streets/`). A shard over its cap means 128 buckets, not
-dropped content.
+the pin's: streets within 300 m of a station point. A street is a row of name, borough, class and sites; an intersection two street
+indices and a site; a `keys` table lists, per two-character key, the streets a query with that key scores (at most 108 today), so a
+query never walks all 3,222. The cap is `STREET_INDEX_RAW_CAP_BYTES` in `scripts/lib/budget.ts` (900,000 raw bytes, since a Worker's
+size limit counts the script uncompressed; 689 KB today, 181 KB gzipped). It is outside `public/data`, so never in the startup budget
+and never downloaded by a browser.
 
 ## Access exceptions
 
@@ -272,10 +275,12 @@ bump `TIMETABLE_FORMAT`) or the cap in one reviewed PR; don't loosen a check to 
   The street files built from it (`public/data/streets/`) are ODbL derivatives; their entrance points are MTA data (i9wp-a4ja)
   under the OPEN-NY Terms of Use, which each file's `attribution` says. The walk files (`public/data/walk/`) are ODbL derivatives
   of the same pin and carry the OSM credit only: the anchor is the station's `stations.json` point (MTA GTFS), everything else is OSM.
-  The street search shards (`public/data/search/streets/`) are ODbL derivatives too and carry the OSM credit only; their borough
+  The street index (`worker/data/streetIndex.json`) is an ODbL derivative too and carries the OSM credit only; its borough
   labels come from `stations.json`, which takes them from the MTA Subway Stations dataset (39hk-dx4f, OPEN-NY Terms of Use; joined
-  by `scripts/lib/stationAccess.ts`), and the station id on each site from MTA GTFS; the rest is OSM. The shards keep the OSM-only
-  attribution line.
+  by `scripts/lib/stationAccess.ts`); the rest is OSM (the station ids that sites carried are dropped when packing). It is bundled into the Worker
+  and never served to a browser, so the derivative database is offered the way the other pinned extracts are: the file, the pin it is
+  built from (`streets/`) and the scripts that build it are in this public repository. What `/geocode` answers from it (a street or
+  intersection name and a point) is a produced work, credited "© OpenStreetMap contributors" in the answer's `attribution`.
 - `layout-oracle.json` and `layout-holdout.json` hold facts read from English Wikipedia articles, which are available under
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); each entry names its article and revision.
   No text is copied and the file is not shipped with the site.

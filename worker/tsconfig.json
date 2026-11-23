@@ -11,9 +11,11 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/geocodeFixture.ts", "src/serveHarness.ts"]
+  "exclude": ["src/**/*.test.ts", "src/geocodeFixture.ts", "src/serveHarness.ts", "src/streetFixture.ts"]
 }

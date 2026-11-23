@@ -61,13 +61,18 @@ export interface EneSnapshot {
 }
 
 /** Bump on incompatible shape changes to the /geocode body; also part of its cache keys. */
-export const GEOCODE_SCHEMA_VERSION = 1
+export const GEOCODE_SCHEMA_VERSION = 2
 export const GEOCODE_MAX_RESULTS = 8
-export type GeocodeKind = 'address' | 'place' | 'street' | 'area'
-export type GeocodeSource = 'geosearch' | 'photon'
+export const GEOCODE_KINDS = ['address', 'place', 'street', 'intersection', 'area'] as const
+export type GeocodeKind = (typeof GEOCODE_KINDS)[number]
+/** `osm` is the Worker's own street index (2q7.14); only it makes `street` and `intersection` rows. */
+export const GEOCODE_SOURCES = ['geosearch', 'photon', 'osm'] as const
+export type GeocodeSource = (typeof GEOCODE_SOURCES)[number]
+/** The sources that are fetched, as opposed to searched in the Worker. */
+export type UpstreamSource = Exclude<GeocodeSource, 'osm'>
 
 export interface GeocodeResult {
-  label: string          // "120 BROADWAY, Manhattan"; upstream casing, cleaned, at most 120 code points
+  label: string          // "120 BROADWAY, Manhattan"; upstream casing, cleaned, at most 120 code points; "N 7 St, Brooklyn" for a street, "Bedford Av & N 7 St, Brooklyn" for an intersection
   kind: GeocodeKind
   lat: number            // 5 decimals, inside the NYC bbox
   lon: number
@@ -87,4 +92,5 @@ export type GeocodeErrorCode = 'bad-query' | 'bad-focus' | 'forbidden' | 'rate-l
 export const GEOCODE_ATTRIBUTION: Record<GeocodeSource, string> = {
   geosearch: 'NYC GeoSearch, NYC Department of City Planning',
   photon: '© OpenStreetMap contributors, via komoot Photon',
+  osm: '© OpenStreetMap contributors',
 }

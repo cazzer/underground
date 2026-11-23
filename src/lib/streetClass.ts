@@ -1,7 +1,7 @@
 /** Which OSM ways the street layer treats as streets. Pure: the street-file build (scripts/) and the
  *  client share it, so the entrance join and the drawn streets agree on what a street is.
  *  Loaded by a scripts/ test, so imports use explicit `.ts` paths. */
-import { searchTokens } from './searchText.ts'
+import { searchTokens } from '../../worker/src/searchText.ts'
 
 /** The `highway=` classes a car or pedestrian street can have, drawn and eligible for an entrance's street.
  *  `pedestrian` is here on purpose: a pedestrianised street (Fulton Mall, Stone St) is a street when it is a line.
