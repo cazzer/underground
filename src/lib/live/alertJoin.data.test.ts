@@ -127,10 +127,10 @@ describe('joinStationChanges on the recorded feed', () => {
     expect(group.borough).toBe('M')
   })
 
-  it('reads "runs express from E 180 St to 3 Av-149 St": both ends quoted, 149 St-Hostos (informed, not an end) probably skipped', () => {
+  it('reads "runs express from E 180 St to 3 Av-149 St": both ends quoted, the stations between probably skipped, 149 St-Hostos (listed, but beyond the end) only quoted', () => {
     const t = 1795625000
-    for (const id of ['213', '221']) expect(at(id, t, '35957'), id).toEqual(['35957 otherN 25 now'])
-    for (const id of ['214', '215', '216', '217', '218', '219', '220', '222']) expect(at(id, t, '35957'), id).toEqual(['35957 skippedN? 25 now'])
+    for (const id of ['213', '221', '222']) expect(at(id, t, '35957'), id).toEqual(['35957 otherN 25 now'])
+    for (const id of ['214', '215', '216', '217', '218', '219', '220']) expect(at(id, t, '35957'), id).toEqual(['35957 skippedN? 25 now'])
   })
 
   it('words the direction by terminal for the 7 and the L, and by uptown/downtown for the 1', () => {

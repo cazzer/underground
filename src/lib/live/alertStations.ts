@@ -91,16 +91,45 @@ export function headerNamedStations(header: string, candidates: readonly { id: S
 }
 
 /**
- * The two ends a header gives for "runs express from X to Y" or "express X to Y" (first line only), as the stations it
+ * The ends a header gives for "runs express from X to Y" or "express X to Y" (first line only), as the stations it
  * names among `candidates`; null when it has no such stretch or either end names no candidate.
  */
-export function headerStretchEnds(header: string, candidates: readonly { id: StationId; name: string }[]): StationId[] | null {
+export function headerStretch(header: string, candidates: readonly { id: StationId; name: string }[]): { from: StationId[]; to: StationId[] } | null {
   const line = header.split('\n')[0] ?? ''
   const m = /\bfrom\s+(.+?)\s+to\s+(.+?)(?=\n|;|\. |,| due to | for | while |$)/i.exec(line) ?? /\bexpress\s+(.+?)\s+to\s+(.+?)(?=\n|;|\. |,| due to | for | while |$)/i.exec(line)
   if (!m) return null
   const from = namedIn([canonTokens(m[1]!)], candidates)
   const to = namedIn([canonTokens(m[2]!)], candidates)
-  return from.size > 0 && to.size > 0 ? [...from, ...to] : null
+  return from.size > 0 && to.size > 0 ? { from: [...from], to: [...to] } : null
+}
+
+/** The stations a header's stretch names at its two ends, flat. */
+export function headerStretchEnds(header: string, candidates: readonly { id: StationId; name: string }[]): StationId[] | null {
+  const stretch = headerStretch(header, candidates)
+  return stretch && [...stretch.from, ...stretch.to]
+}
+
+/** How much longer than the straight line from X to Y a station's detour through it may be and still be "between" them. */
+const BETWEEN_RATIO = 1.15
+/** Plus this many meters, so a station beside a short stretch still counts. */
+const BETWEEN_SLACK_M = 150
+
+/**
+ * The informed stations between the stretch's ends, the ends themselves left out: a station is between when going
+ * X to it to Y is at most BETWEEN_RATIO times the straight line X to Y, plus BETWEEN_SLACK_M (straight lines: cheap,
+ * and a stretch of a line is nearly straight at that tolerance). One that lies beyond an end, such as a neighbouring
+ * station the MTA also lists, is not.
+ */
+function stationsBetween(
+  informed: readonly StationId[],
+  stretch: { from: readonly StationId[]; to: readonly StationId[] },
+  posOf: (id: StationId) => { x: number; z: number },
+): StationId[] {
+  const ends = new Set([...stretch.from, ...stretch.to])
+  const dist = (a: StationId, b: StationId) => Math.hypot(posOf(a).x - posOf(b).x, posOf(a).z - posOf(b).z)
+  return informed.filter(
+    (id) => !ends.has(id) && stretch.from.some((x) => stretch.to.some((y) => dist(x, id) + dist(id, y) <= dist(x, y) * BETWEEN_RATIO + BETWEEN_SLACK_M)),
+  )
 }
 
 /**
@@ -147,7 +176,7 @@ export function sharedDirection(directions: readonly (Direction | null)[]): Dire
  * stops are the MTA's list for the route, and its header says which of them are skipped; the stations the header
  * names, out of the informed ones, are the set. When it names none (a wording we can't read), the set is a guess,
  * `probable`: every informed station when there are two or fewer, else all but the two ends of the stretch (the
- * listed stops usually bracket the skipped ones; a header's "from X to Y" gives the ends, else the farthest pair). A stop `stationById` lacks is ignored; an empty set is omitted.
+ * listed stops usually bracket the skipped ones; a header's "from X to Y" gives the ends and keeps the informed stations between them, else the farthest pair are the ends). A stop `stationById` lacks is ignored; an empty set is omitted.
  */
 export function skipSetsOf(alert: ServiceAlert, stationById: ReadonlyMap<StationId, Station>): RouteSkipSet[] {
   if (alertKindOf(alert.type) !== 'skip') return []
@@ -165,9 +194,16 @@ export function skipSetsOf(alert: ServiceAlert, stationById: ReadonlyMap<Station
       stations = named
     } else {
       probable = true
-      // "runs express from X to Y" names the stretch's ends; else the farthest informed pair are the ends (none for two or fewer).
-      const ends: StationId[] = headerStretchEnds(alert.header, candidates) ?? (informed.length <= 2 ? [] : stretchEnds(informed, (id) => stationById.get(id)!.pos))
-      stations = new Set(informed.filter((id) => !ends.includes(id)))
+      // "runs express from X to Y": the informed stations between X and Y (X not needing to be informed); else the farthest
+      // informed pair are the ends (none for two or fewer).
+      const posOf = (id: StationId) => stationById.get(id)!.pos
+      const stretch = headerStretch(alert.header, candidates)
+      if (stretch) {
+        stations = new Set(stationsBetween(informed, stretch, posOf))
+      } else {
+        const ends: StationId[] = informed.length <= 2 ? [] : stretchEnds(informed, posOf)
+        stations = new Set(informed.filter((id) => !ends.includes(id)))
+      }
     }
     if (stations.size === 0) continue
     sets.push({ alertId: alert.id, route, direction: sharedDirection(entities.map((e) => e.direction)), stations, probable, periods: alert.periods })

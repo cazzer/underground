@@ -146,6 +146,12 @@ describe('skipSetsOf with a "from X to Y" header', () => {
     expect(set!.probable).toBe(true)
   })
 
+  it('keeps only the informed stations between the ends: one listed beyond an end is not skipped', () => {
+    // Stations lie on x = 0, 100, 200, 300, 400: Beta to Delta, with Alpha and Epsilon listed beyond.
+    const a = alert({ header: 'Downtown [1] runs express from Beta St to Delta St', entities: ['a', 'b', 'c', 'd', 'e'].map((stop) => ({ route: '1', stop, direction: 'S' as const })) })
+    expect([...skipSetsOf(a, stations)[0]!.stations]).toEqual(['c'])
+  })
+
   it('without it takes the farthest pair, as before', () => {
     const a = alert({ header: 'Downtown [1] runs express', entities: ['b', 'c', 'd'].map((stop) => ({ route: '1', stop, direction: 'S' as const })) })
     expect([...skipSetsOf(a, stations)[0]!.stations]).toEqual(['c'])
