@@ -22,6 +22,9 @@ interface TripExitInput {
   nowS: number
   /** The journey the map draws the way out of: the opened one, else the first. */
   selected: TripJourney | null
+  /** The visitor chose the To station (it was not filled from a location fix, or they have since picked or focused
+   *  it, `fixEnd`): only then are its files fetched. */
+  allowed: boolean
 }
 
 export interface TripExit {
@@ -50,7 +53,8 @@ const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== n
 
 /**
  * The quickest way out at the trip's To station, for the map and the trip panel: once a plan for the panel's ends is
- * ready, the To station's interior and street files load (the visitor chose that station) and every journey ending on a
+ * ready, the To station's interior and street files load (unless the To was filled from the location fix and never
+ * picked or focused since: `allowed`) and every journey ending on a
  * train gets its exit line. Out-of-service machines are avoided; with no fresh outage data nothing counts as closed, and
  * a line that rides a machine says its status is unknown when the station panel would. A complex reads its file id's
  * street file and the alighting member's; the result waits until both settle, so a line never turns from a compass
@@ -61,8 +65,8 @@ const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== n
  * `exitTo(null)` clears it (`exitTo(x)` alone warns and does nothing). Production never fetches a walk graph here.
  * Remove when 2q7.14 supplies the point.
  */
-export function useTripExit({ open, ends, plan, index, ene, nowS, selected }: TripExitInput): TripExit | null {
-  const ready = open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
+export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allowed }: TripExitInput): TripExit | null {
+  const ready = allowed && open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
   const stops = ready && plan.status === 'ready' ? finalRideStops(selectedFirst(plan.journeys, selected)) : []
   // Only the selected journey's own exit draws: one that ends on foot has none, whatever the others do.
   const drawnStop = selected ? drawnExitStop(selected) : null

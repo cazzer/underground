@@ -1,5 +1,6 @@
 /** Which journeys have a way in at the trip's From station: the stops their first trains leave from. Pure. */
 import type { StationId, StopId } from '../data/schema'
+import type { ExitLineView } from './exitView'
 import { stationOfStop } from './live/arrivals'
 import type { TripJourney } from './route/plan'
 
@@ -8,6 +9,10 @@ export interface FirstRideStop {
   stopId: StopId
   tripIds: string[]
 }
+
+/** What the trip panel has for a journey's way in: its line, or that the layout has no entry to the track (every
+ *  entrance to that platform is exit-only, as at 302 and A03 uptown). */
+export type BoardLine = { kind: 'path'; view: ExitLineView } | { kind: 'no-entrance' }
 
 /** The way-in line's key: the journey's first ride and the station it boards at (one trip can be boarded at two
  *  stations by two journeys, only one of them at From). */

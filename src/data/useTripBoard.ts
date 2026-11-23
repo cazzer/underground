@@ -1,12 +1,13 @@
 import { useMemo } from 'react'
-import { boardLineKey, drawnBoardStop, firstRideStops } from '../lib/boardView'
+import { boardLineKey, drawnBoardStop, firstRideStops, type BoardLine } from '../lib/boardView'
 import { quickestEntry, type BoardChoice, type BoardResult } from '../lib/exitChoice'
-import { exitLineView, type ExitLabel, type ExitLineView, type StreetSource } from '../lib/exitView'
+import { exitLineView, type ExitLabel, type StreetSource } from '../lib/exitView'
 import { stationOfStop } from '../lib/live/arrivals'
 import { joinStationOutages, type EneInput } from '../lib/live/eneJoin'
 import type { TripJourney } from '../lib/route/plan'
 import { selectedFirst } from '../lib/tripSelection'
 import { plannable, tripKey, type TripEnds, type TripPlanState } from '../lib/tripView'
+import type { StationInterior } from './stationSchema'
 import { interiorIdOf, type IndexLoad } from './interiorLoad'
 import { useInteriorModel } from './useStationInterior'
 import { useStationStreetsLoad, type StreetLayer } from './useStationStreets'
@@ -35,19 +36,24 @@ export interface TripBoard {
   drawn: BoardChoice | null
   /** The street label naming the drawn way in's entrance, which the map's street labels place first and tint. */
   mapLabel: ExitLabel | null
-  /** The trip panel's way-in line, by `boardLineKey` of a journey's first ride. */
-  lines: ReadonlyMap<string, ExitLineView>
+  /** The trip panel's way-in line (or that there is none on the layout), by `boardLineKey` of a journey's first ride. */
+  lines: ReadonlyMap<string, BoardLine>
 }
 
 /** A route search over interior data: a data error is logged and means no way-in line, never a crashed HUD. */
-function safely(stopId: string, run: () => BoardResult): BoardChoice | null {
+function safely(stopId: string, run: () => BoardResult): BoardResult | null {
   try {
-    const r = run()
-    return r.kind === 'board' ? r : null
+    return run()
   } catch (err) {
     console.error(`Couldn't find the way in at ${stopId}`, err)
     return null
   }
+}
+
+/** No entrance reaches the stop's track even with every machine running. */
+function layoutHasNoEntry(interior: StationInterior, stopId: string): boolean {
+  const r = safely(stopId, () => quickestEntry({ interior, stopId }))
+  return r?.kind === 'none' && r.reason === 'no-entrance'
 }
 
 const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== null && l !== undefined
@@ -82,7 +88,7 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
   const second = fileStreets.layer ? memberStreets.layer : null
   const stopIdsKey = served.map((s) => s.stopId).join(',')
   const choices = useMemo(() => {
-    const out = new Map<string, BoardChoice | null>()
+    const out = new Map<string, BoardResult | null>()
     if (!model || !settled) return out
     const closed = new Set(outKey === '' ? [] : outKey.split(','))
     const streets = first?.file ?? null
@@ -94,16 +100,24 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
   return useMemo(() => {
     if (!model || !interiorId || served.length === 0 || !settled) return null
     const sources: StreetSource[] = [first, second].filter(isLayer).map((l) => ({ file: l.file, labels: l.entrances }))
-    const lines = new Map<string, ExitLineView>()
+    const lines = new Map<string, BoardLine>()
     let mapLabel: ExitLabel | null = null
     served.forEach((stop, i) => {
       const choice = choices.get(stop.stopId)
-      if (!choice) return
-      const view = exitLineView(choice, model.interior, sources, known)
-      if (i === 0 && stop.stopId === drawnStop) mapLabel = view.mapLabel
-      for (const id of stop.tripIds) lines.set(boardLineKey(id, stationOfStop(stop.stopId)), view)
+      let line: BoardLine | null = null
+      if (choice?.kind === 'board') {
+        const view = exitLineView(choice, model.interior, sources, known)
+        if (i === 0 && stop.stopId === drawnStop) mapLabel = view.mapLabel
+        line = { kind: 'path', view }
+      } else if (choice?.kind === 'none' && choice.reason === 'no-entrance' && layoutHasNoEntry(model.interior, stop.stopId)) {
+        // Only when the layout itself has no way in, not when machines out of service closed every one.
+        line = { kind: 'no-entrance' }
+      }
+      if (line) for (const id of stop.tripIds) lines.set(boardLineKey(id, stationOfStop(stop.stopId)), line)
     })
-    return { interiorId, drawn: served[0]!.stopId === drawnStop ? (choices.get(served[0]!.stopId) ?? null) : null, mapLabel, lines }
+    const lead = choices.get(served[0]!.stopId)
+    const drawn = served[0]!.stopId === drawnStop && lead?.kind === 'board' ? lead : null
+    return { interiorId, drawn, mapLabel, lines }
     // `served` is read through servedKey: a refresh with the same stops and trips keeps the result.
   }, [servedKey, drawnStop, interiorId, model, settled, first, second, choices, known])
 }

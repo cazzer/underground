@@ -48,11 +48,11 @@ export interface ExitLineView {
 
 const COMPASS8 = ['east', 'southeast', 'south', 'southwest', 'west', 'northwest', 'north', 'northeast'] as const
 
-/** "the northeast": which way the exit (or entry) lies from the interior's plan center (x east, z south). */
+/** "northeast": which way the exit (or entry) lies from the interior's plan center (x east, z south). */
 function compassOf(interior: StationInterior, point: readonly [number, number]): string {
   const b = interiorBounds(interior)
   const angle = Math.atan2(point[1] - (b.minZ + b.maxZ) / 2, point[0] - (b.minX + b.maxX) / 2)
-  return `the ${COMPASS8[((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8]!}`
+  return COMPASS8[((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8]!
 }
 
 /** One street file and its entrance labels (entranceText.ts). */
@@ -103,6 +103,16 @@ function labelOf(choice: { exit: StreetExit }, interior: StationInterior, source
   return best
 }
 
+/** The machine kinds a way in rides, in the order the rider meets them (its route lists the platform first). */
+function machinesMet(route: { connectorIds: readonly string[] }, interior: StationInterior): ('elevator' | 'escalator')[] {
+  const out: ('elevator' | 'escalator')[] = []
+  for (const id of [...route.connectorIds].reverse()) {
+    const kind = interior.connectors.find((c) => c.id === id)?.kind
+    if ((kind === 'elevator' || kind === 'escalator') && !out.includes(kind)) out.push(kind)
+  }
+  return out
+}
+
 /** The machine kinds a route rides (an exit or a transfer), in a fixed order. */
 export function machinesUsed(route: { connectorIds: readonly string[] }, interior: StationInterior): ('elevator' | 'escalator')[] {
   const kinds = new Set(route.connectorIds.map((id) => interior.connectors.find((c) => c.id === id)?.kind))
@@ -115,7 +125,8 @@ export function machinesUsed(route: { connectorIds: readonly string[] }, interio
  * holds the label's tail, "probably" on an estimated layout, the walk on, and "elevator status unknown" (or
  * escalator) when the route rides one and the station panel would call machine status unknown (`closedKnown` false).
  * The way in at the From station (a `BoardChoice`) reads the same: "Quickest way in: Bedford Av & N 7 St", or with no
- * street label "Quickest way in: from the northeast".
+ * street label "Quickest way in: northeast entrance"; a machine whose status is unknown is named in the order the rider
+ * meets it.
  */
 export function exitLineView(
   choice: ExitChoice | BoardChoice,
@@ -125,9 +136,9 @@ export function exitLineView(
 ): ExitLineView {
   const label = labelOf(choice, interior, sources)
   const board = choice.kind === 'board'
-  const head = label ? label.head : `${board ? 'from' : 'toward'} ${compassOf(interior, choice.exit.point)}`
+  const head = label ? label.head : board ? `${compassOf(interior, choice.exit.point)} entrance` : `toward the ${compassOf(interior, choice.exit.point)}`
   const lead = board ? 'Quickest way in:' : choice.destination === null ? 'Quickest way out:' : label ? 'Exit at' : 'Exit'
-  const unknown = closedKnown ? [] : machinesUsed(choice, interior)
+  const unknown = closedKnown ? [] : board ? machinesMet(choice, interior) : machinesUsed(choice, interior)
   const status = unknown.length > 0 ? `${unknown.join(' and ')} status unknown` : null
   const walk = choice.walk
   const minutes = walk && walkMinutes(walk.seconds)

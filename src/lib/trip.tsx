@@ -6,6 +6,7 @@ import type { TripJourney } from './route/plan'
 import { useFocus } from './focus'
 import { useTrainSelection } from './trainSelection'
 import { journeyKeys, reconcileOpened, tripSelection, type OpenedJourney, type TripSelection } from './tripSelection'
+import { afterFocus, afterPick, fixEndOf } from './tripFix'
 import { activeStepKey } from './tripSteps'
 import { plannable, tripKey, type TripEnds, type TripPlanState } from './tripView'
 
@@ -97,9 +98,9 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   const { focusedId, select, membersOf } = useFocus()
   // Focusing the fix's station is the visitor's own look at it: from then on it counts as chosen (both are leads).
   useEffect(() => {
-    if (fixStation !== null && focusedId === fixStation) setFixStation(null)
+    if (afterFocus(fixStation, focusedId) !== fixStation) setFixStation(null)
   }, [fixStation, focusedId])
-  const fixEnd: TripEnd | null = fixStation === null ? null : ends.from === fixStation ? 'from' : ends.to === fixStation ? 'to' : null
+  const fixEnd = fixEndOf(ends, fixStation)
   const [dropNoteFor, setDropNoteFor] = useState<string | null>(null)
   const dropPlan = useRef<TripPlanState | null>(null)
   const sourceRef = useRef(arrivals)
@@ -199,7 +200,7 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
   const setEnd = useCallback((end: TripEnd, stationId: string, place: string | null = null) => {
     setEnds((e) => (e[end] === stationId ? e : { ...e, [end]: stationId }))
     // A pick is a choice; an end it replaces is no longer one (`fixEnd` is derived from the ends).
-    setFixStation((f) => (f === stationId ? null : f))
+    setFixStation((f) => afterPick(f, stationId))
     setPlaces((p) => (p[end] === place ? p : { ...p, [end]: place }))
   }, [])
   const swap = useCallback(() => {

@@ -76,7 +76,17 @@ function MapView({ network, bands, live }: MapViewProps) {
   const outages = joinPanelOutages(interiorOutages, model?.interior ?? null, interiorSettled, stationEquipment(equipment, focusedId), ene, nowS)
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
-  const tripExit = useTripExit({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, selected: trip.selectedJourney })
+  // Only once the visitor chose the To (an end filled from the fix, then swapped there, waits for a focus or pick).
+  const tripExit = useTripExit({
+    open: trip.open,
+    ends: trip.ends,
+    plan: trip.plan,
+    index: interior.index,
+    ene,
+    nowS,
+    selected: trip.selectedJourney,
+    allowed: trip.fixEnd !== 'to',
+  })
   // The selected journey's ride legs on the drawn lines; drawn (and the network dimmed) while the trip panel is in front.
   const tripRoute = useTripRoute({
     network,

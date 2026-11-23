@@ -93,7 +93,7 @@ describe('the way-in line', () => {
   })
 
   it('falls back to the way it lies from the station without labels', () => {
-    expect(exitLineView(boardOf(interior), interior, [], true).text).toMatch(/^Quickest way in: from the (east|southeast|northeast)$/)
+    expect(exitLineView(boardOf(interior), interior, [], true).text).toMatch(/^Quickest way in: (east|southeast|northeast) entrance$/)
   })
 
   it('says probably, and a machine’s unknown status, as the way out does', () => {
@@ -104,5 +104,14 @@ describe('the way-in line', () => {
     expect(view.spoken).toBe(
       'Quickest way in: Bedford Avenue and North 7 Street, northeast corner. Elevator status unknown. Probably: the station layout is estimated.',
     )
+  })
+
+  it('names machines of unknown status in the order the rider meets them', () => {
+    const ES2: Connector = { ...ST1, id: 'ES2', kind: 'escalator' }
+    const base = station([EL1, ES2])
+    const lifts = { ...base, entrances: [{ ...base.entrances[0]!, connectors: ['ES2'] }] }
+    const into = boardOf(lifts)
+    expect(into.connectorIds).toEqual(['EL1', 'ES2'])
+    expect(exitLineView(into, lifts, [], false).note).toBe('escalator and elevator status unknown')
   })
 })

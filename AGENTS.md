@@ -558,9 +558,12 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     runs along the path, across bands); `exitView.ts` (`finalRideStops`, `exitLineView`: the panel's
     "Quickest way out: Bedford Av & N 7 St" plus a dim note (label tail, "probably", walk, a machine's unknown status),
     and the spoken sentence via `streetSpoken`; for a `BoardChoice` "Quickest way in: Bedford Av & N 7 St", or with no
-    label "Quickest way in: from the northeast"; `machinesUsed`); `boardView.ts` (`drawnBoardStop`, `firstRideStops`: the first
+    label "Quickest way in: northeast entrance", its unknown-status machines in the order the rider meets them; `machinesUsed`);
+    `boardView.ts` (`drawnBoardStop`, `firstRideStops`: the first
     ride's boarding stop when it is at the From complex, none for a journey that walks to another station first;
-    `boardLineKey`, the way-in line's key: first ride's trip id and boarding station); `transferView.ts` (`transferLegs`, `transferLegKey`
+    `boardLineKey`, the way-in line's key: first ride's trip id and boarding station; `BoardLine`, a line or `no-entrance`);
+    `tripFix.ts` (the trip end filled from the location fix: `fixEndOf`, derived from the ends, so a swap moves it and a pick
+    replacing it leaves none; `afterPick`, `afterFocus`: picking or focusing that station chooses it); `transferView.ts` (`transferLegs`, `transferLegKey`
     (`from>to>nextRoute`; only walks `isChangeWalk` calls a change row), `firstTransferDraws` (per interior the first
     journey's change, none when it takes no connector), `transferLineView`: "Stairs up to the N platform · probably",
     one phrase per connector in travel order, merged when repeated; a dim note (a machine's unknown status); the
@@ -834,7 +837,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `TripTransferLine.tsx`, the first Board step its way in (`TripLines.boards`, by `boardLineKey` of the first ride; shown with `TripExitLine`; `hasBoardPath` when the journey has one). A step whose station has no path says so in a dim status
   (`stepStatus` over `layoutOf(stationId, index)` in `interiorLoad.ts`: the index's provenance, `'none'` when unlisted, null while it loads, which says nothing): "No station
   layout" where there is no interior, "No path shown for this change" for a change at a generated one (it has a layout, but they never connect two tracks); Board and Exit at a generated or
-  authored station say nothing (the path may still be loading). `TripPanel` takes one `lines: TripLines` prop (exits, transfers, the station index, boards) from App. Esc in
+  authored station say nothing (the path may still be loading), except at a trip end filled from the location fix and not yet
+  picked or focused (`StepContext.fixPending`, `trip.fixEnd`): with a layout, the first Board step (of a journey starting on a ride)
+  says "Tap to show the way in" and the Exit step "Tap to show the way out" (the tap focuses the station, which lets its files
+  load); and a first Board step whose layout has no way in to the track (`BoardLine` `no-entrance`, only when no machine outage
+  caused it: 302N, A03N) says "No way in on the layout". Each status is also the end of the step's spoken sentence. `TripPanel` takes one `lines: TripLines` prop (exits, transfers, the station index, boards) from App. Esc in
   the detail, one level a press (`escapeTrip`): end the active step (`endStep` clears it only: the station stays focused with its interior and path, the camera and focus stay), then Back, then close (ending a step says "Back to the trip" once, `stepEnds`); a collapsed bar closes. A directions pick closes a train panel or notice in front of it first. No control carries the
   panel's aria-expanded: the picks are actions that move focus in, and Close returns it. Esc moves focus only from inside the
   panel. The trip panel stays mounted (hidden, inert) under a train panel or notice, so its journeys, scroll and focus survive and a
@@ -1401,8 +1408,10 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   each member is part of the station the user opened; never for a fix's nearest station.
 - **Trip exit.** Once a plan for the trip panel's ends is ready, `src/data/useTripExit.ts` loads the To station's interior
   (`useInteriorModel`, the focused interior's cache) and street files (the interior file id's and, for a complex, the
-  alighting member's; `useStationStreetsLoad` tells loading from missing, and the line waits for both). Both trip ends are
-  chosen by the user (a swap counts: the new To was chosen as From), so this fetch reveals nothing they did not pick. It
+  alighting member's; `useStationStreetsLoad` tells loading from missing, and the line waits for both). An end filled from
+  the location fix and never picked or focused since (`trip.fixEnd`, `lib/tripFix.ts`; through a swap or the way-back pick too)
+  fetches nothing until the rider picks or focuses it, for From and To alike (App passes `allowed: trip.fixEnd !== 'to'` here,
+  `!== 'from'` to the trip board); every other end the user chose, so this fetch reveals nothing they did not pick. It
   finds each journey's quickest way out (`quickestExit`, avoiding machines out of service; with no fresh outage data none
   are closed, and the line says the status is unknown only when the station panel would: never while still connecting). The map draws the selected journey's (opened, else the first; one ending on a train) at the To station while the trip panel
   is open, even under a train panel; only once that station is focused. It fetches no walk graph: only the DEV
@@ -1414,7 +1423,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   the location fix (`directionsTrip`'s `fixStation`; `TripProvider`'s `fixStation`/`fixEnd`, kept through later picks and swaps,
   cleared when the visitor picks that station or focuses it) fetches nothing (App's `allowed: trip.fixEnd !== 'from'`), since
   the request would name the fix's nearest station. A journey that walks to another station first gets no way in (that station
-  comes from the plan). Never a walk graph, no dev seam. (A fix-filled From swapped to To is still fetched by the exit: 2q7.48.)
+  comes from the plan). Never a walk graph, no dev seam.
 - **Trip transfers.** While a plan is ready, `src/data/useTripTransfers.ts` loads every hand-authored interior in the index
   (`authoredInteriorIds`, `useInteriorModels`; today 635 and L08, under 5 KB gzipped), not only the change station's, because
   the change station is derived from the plan rather than chosen, and fetching it alone would reveal it. Each change whose two
