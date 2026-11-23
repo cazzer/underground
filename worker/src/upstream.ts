@@ -1,4 +1,4 @@
-import { ENE_TTL_MS, RT_TTL_MS } from './cache'
+import { ALERTS_TTL_MS, ENE_TTL_MS, RT_TTL_MS } from './cache'
 import { decodeFeed } from './decode'
 import { FEED_IDS, type FeedId } from './schema'
 import type { FeedOutcome } from './transform'
@@ -8,6 +8,7 @@ const TIMEOUT_MS = 5000
 const MAX_BYTES = 2 * 1024 * 1024
 
 const ENE_PATH = 'nyct%2Fnyct_ene.json'
+const ALERTS_PATH = 'camsys%2Fsubway-alerts.json'
 
 export const FEED_PATHS: Record<FeedId, string> = {
   '1234567': 'nyct%2Fgtfs',
@@ -114,3 +115,6 @@ async function fetchJson(path: string, ttlMs: number): Promise<JsonFetch> {
 
 /** The outage list as parsed JSON. Never rejects. */
 export const fetchEne = (): Promise<JsonFetch> => fetchJson(ENE_PATH, ENE_TTL_MS)
+
+/** The subway service alerts (about 1 MB, under the 2 MB cap) as parsed JSON. Never rejects. */
+export const fetchAlerts = (): Promise<JsonFetch> => fetchJson(ALERTS_PATH, ALERTS_TTL_MS)

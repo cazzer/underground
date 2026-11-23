@@ -60,6 +60,41 @@ export interface EneSnapshot {
   outages: EneOutage[]    // in effect at generatedAt, one per code, sorted by code
 }
 
+/** Bump on incompatible shape changes to the /alerts body; also part of its edge cache key. */
+export const ALERTS_SCHEMA_VERSION = 1
+/** Alerts with no active period overlapping [generatedAt, generatedAt + this) are left out. */
+export const ALERT_WINDOW_S = 86_400
+export const ALERT_MAX_PERIODS = 4
+export const ALERT_MAX_ENTITIES = 120
+/** A longer header drops the alert: the MTA's text is shown verbatim or not at all, never truncated. */
+export const ALERT_HEADER_MAX_CHARS = 1000
+
+/** [start, end] epoch seconds: a missing start is 0, a missing end null (open-ended). */
+export type AlertPeriod = [start: number, end: number | null]
+
+/** What an alert informs: a route, at a parent stop or on the whole route, in one direction or both. */
+export interface AlertEntity {
+  route: string               // informed_entity.route_id ("1", "7X", "SI")
+  stop: string | null         // informed_entity.stop_id, a parent station id ("116", "R35"); null for the whole route
+  direction: Direction | null // direction_id 0 -> 'N', 1 -> 'S'; absent -> null (both)
+}
+
+export interface ServiceAlert {
+  id: string                  // entity id ("lmm:planned_work:35124")
+  type: string | null         // mercury alert_type, free text ("Planned - Stops Skipped"), at most 80 chars, else null
+  header: string              // header_text's `en` translation, VERBATIM: MTA terms forbid editing it
+  period: string | null       // human_readable_active_period's `en` text, verbatim, at most 200 chars, else null
+  periods: AlertPeriod[]      // those overlapping the window, by start, the first ALERT_MAX_PERIODS; not clipped
+  entities: AlertEntity[]     // deduped, in feed order, the first ALERT_MAX_ENTITIES
+}
+
+export interface AlertsSnapshot {
+  version: typeof ALERTS_SCHEMA_VERSION
+  generatedAt: number         // epoch s, set by the Worker after the fetch settles
+  dropped: number             // malformed alerts skipped
+  alerts: ServiceAlert[]      // sorted by first period start, then id
+}
+
 /** Bump on incompatible shape changes to the /geocode body; also part of its cache keys. */
 export const GEOCODE_SCHEMA_VERSION = 2
 export const GEOCODE_MAX_RESULTS = 8
