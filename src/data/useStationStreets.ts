@@ -229,6 +229,15 @@ export function useStationStreetsLoad(stationId: string | null): { layer: Street
   return { layer: hit?.layer ?? null, settled: hit !== undefined || failedAt.has(key) }
 }
 
+/**
+ * Warms the street layers of `stationIds` (leads; o3r.8's prefetch, from the camera-driven prefetch set only): the
+ * same keys and view-driven retry rule as `useStreetLayers`, so a layer that later draws is already built. A complex
+ * lead's member files go with it. Starts nothing for a key already loaded or loading.
+ */
+export function prefetchStreetLayers(stationIds: readonly string[], membersOf: (id: string) => readonly string[]): void {
+  for (const id of stationIds) request(layerKey(id, membersOf), true)
+}
+
 const NO_LAYERS: readonly StreetLayer[] = Object.freeze([])
 
 /**

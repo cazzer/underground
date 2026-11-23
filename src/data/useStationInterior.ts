@@ -172,6 +172,37 @@ const NO_VIEW_IDS: readonly string[] = Object.freeze([])
 /** View interior files that failed, by id, to the failure's time (performance.now() ms): skipped for VIEW_RETRY_MS. */
 const viewFailedAt = new Map<string, number>()
 
+/** Whether the view interior file `file` failed within VIEW_RETRY_MS: a view or prefetch pass leaves it out. */
+export function interiorFailedRecently(file: string): boolean {
+  return failedRecently(viewFailedAt, file, performance.now())
+}
+
+/** Prefetches in flight, by file id, so a file asked for again while loading attaches no second failure log. */
+const prefetching = new Set<string>()
+
+/**
+ * Warms the cache for the interior files `files` (o3r.8's prefetch, ids from the camera-driven prefetch set only): the
+ * fetch and the model build happen inside the cache, so a view interior later finds the model. A file already loaded,
+ * still being prefetched, or failed within VIEW_RETRY_MS (the failure map the view loader shares) is skipped; a failure
+ * is logged once and counts there. Never aborted, like any interior fetch.
+ */
+export function prefetchInteriors(files: readonly string[]): void {
+  for (const file of files) {
+    if (cache.peek(file) !== undefined || prefetching.has(file) || interiorFailedRecently(file)) continue
+    prefetching.add(file)
+    cache.get(file).then(
+      () => {
+        prefetching.delete(file)
+      },
+      (err: unknown) => {
+        prefetching.delete(file)
+        console.warn(`Prefetch of the interior of station ${file} failed`, err)
+        viewFailedAt.set(file, performance.now())
+      },
+    )
+  }
+}
+
 /**
  * The loaded interiors of the stations in view other than the focused one (o3r.4), in view order, at most `cap` with
  * the focused one counted (`viewInteriorIds`), from the same cache. Fetches only for the ids in `view`, o3r.2's

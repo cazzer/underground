@@ -18,6 +18,8 @@ export interface CoveredStation {
 }
 
 export interface SceneInteriors {
+  /** How many interiors draw at once (viewInteriorCap of the window): the prefetch (o3r.8) warms a couple more. */
+  cap: number
   /** The station leads in view (o3r.2's set, focused first): the street layers draw theirs (o3r.5). */
   view: readonly string[]
   /** The view interior files requested (useViewInteriors), loaded or not: a street layer waits on its marks while its file loads. */
@@ -149,5 +151,5 @@ export function useSceneInteriors(
     }
   }, [])
 
-  return { view, viewFiles, shown, presences, store, onFaded, spans, spansByDeck, hiddenSiblings, covered, hiddenStations, markHidden, veiled }
+  return { cap, view, viewFiles, shown, presences, store, onFaded, spans, spansByDeck, hiddenSiblings, covered, hiddenStations, markHidden, veiled }
 }

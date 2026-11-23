@@ -30,6 +30,7 @@ import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
 import { createViewStationSet } from '../lib/viewStationSet'
 import { LocationCapSource } from './LocationCapSource'
+import { StationPrefetchSource } from './StationPrefetchSource'
 import { ViewStationsSource } from './ViewStationsSource'
 import { ScenePicker } from './ScenePicker'
 import { ScreenVeil } from './ScreenVeil'
@@ -103,6 +104,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const locationCap = useState(createLocationCap)[0]
   /** Written by ViewStationsSource: the station leads in view (empty under the cap), whose interiors draw. */
   const viewStations = useState(createViewStationSet)[0]
+  /** Written by ViewStationsSource too (o3r.8): the wider set whose files are warmed, read only by StationPrefetchSource. */
+  const prefetchStations = useState(createViewStationSet)[0]
   /** The focused interior and those of the stations in view (o3r.4), with their spans and the stations they stand in for. */
   const scene = useSceneInteriors(network, interior, viewStations, index, siblings)
   const { shown, presences, spans, spansByDeck, hiddenStations, hiddenSiblings, covered, markHidden, veiled } = scene
@@ -208,7 +211,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       />
       <ViewCenterSource />
       <LocationCapSource cap={locationCap} />
-      <ViewStationsSource network={network} insets={insets} panel={panel} cap={locationCap} set={viewStations} />
+      <ViewStationsSource network={network} insets={insets} panel={panel} cap={locationCap} set={viewStations} prefetch={prefetchStations} />
+      <StationPrefetchSource set={prefetchStations} index={index} interiorCap={scene.cap} />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
