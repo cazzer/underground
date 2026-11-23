@@ -34,8 +34,10 @@ export interface TripPanelControls {
    * empty, else its heading.
    */
   openTrip: (end: TripEnd, target: DirectionsTarget) => void
-  /** "Close trip" and Esc. */
+  /** "Close trip". */
   closeTrip: () => void
+  /** Esc: back from an opened journey to the list when there is one (and the panel is not a bar), else `closeTrip`. */
+  escapeTrip: () => void
   focusRequest: TripFocusRequest | null
 }
 
@@ -45,10 +47,10 @@ export interface TripPanelControls {
  * one frame later (a station panel underneath has mounted by then) it goes to the station heading, else to Search.
  */
 export function useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf }: TripPanelArgs): TripPanelControls {
-  const { open, ends, places, setOpen, start } = useTrip()
+  const { open, ends, places, setOpen, start, selection, backToList } = useTrip()
   const { focusedId } = useFocus()
   const { selectedSummary, notice, clearTrain, dismissNotice } = useTrainSelection()
-  const { tripRequested } = usePanelCollapseControls()
+  const { tripRequested, tripCollapsed } = usePanelCollapseControls()
   const [focusRequest, setFocusRequest] = useState<TripFocusRequest | null>(null)
   const fix = markedPlacement(locate.state)
   const openTrip = useCallback(
@@ -67,5 +69,10 @@ export function useTripPanel({ locate, panel, stationHeading, searchButton, sibl
     setOpen(false)
     if (hadFocus) requestAnimationFrame(() => (stationHeading.current ?? searchButton.current)?.focus({ preventScroll: true }))
   }, [setOpen, panel, stationHeading, searchButton])
-  return { tripOpen: open, openTrip, closeTrip, focusRequest }
+  // A collapsed panel is a bar with its body hidden: Esc closes it, not an unseen Back.
+  const escapeTrip = useCallback(() => {
+    if (selection.canGoBack && !tripCollapsed) backToList()
+    else closeTrip()
+  }, [selection.canGoBack, tripCollapsed, backToList, closeTrip])
+  return { tripOpen: open, openTrip, closeTrip, escapeTrip, focusRequest }
 }

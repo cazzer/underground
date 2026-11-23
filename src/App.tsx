@@ -64,10 +64,10 @@ function MapView({ network, bands, live }: MapViewProps) {
   const outages = joinPanelOutages(interiorOutages, model?.interior ?? null, interiorSettled, stationEquipment(equipment, focusedId), ene, nowS)
   const trip = useTrip()
   // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
-  const tripExit = useTripExit({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS })
+  const tripExit = useTripExit({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, selected: trip.selectedJourney })
   const names = useMemo(() => tripNamesOf(network), [network])
   // The changes of trains inside hand-authored complexes: described in the trip panel, drawn in their interiors.
-  const tripTransfers = useTripTransfers({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, names })
+  const tripTransfers = useTripTransfers({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, names, selected: trip.selectedJourney })
   const exitDraw = tripExit?.drawn ?? null
   const exitInterior = tripExit?.interiorId ?? null
   // The exit first: where an interior has both (a trip can't change at its To station), the exit wins.

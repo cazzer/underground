@@ -44,13 +44,13 @@ interface TripPanelProps {
 }
 
 /**
- * Plan a trip: From and To by search, then the journeys leaving now, each marked Live, Live and scheduled, or Scheduled. A directions
+ * Plan a trip: From and To by search, then the journeys leaving now as collapsed rows (each marked Live, Live and scheduled, or Scheduled), one of which opens as its own view with Back. A directions
  * pick opens it (a search row's From or To, the station panel's); "Close trip" or Esc closes it. It sits where the
  * station panel does, in front of it and behind a train panel or notice. What a screen reader hears is the HUD's
  * `TripAnnouncer`; the visible message under the ends is hidden from assistive tech to match.
  */
 export function TripPanel({ network, arrivals, locate, covered, headingRef, focusRequest, onClose, exits, transfers, focusSiblings, ref }: TripPanelProps) {
-  const { ends, places, plan, showLoading, setEnd, swap, retry } = useTrip()
+  const { ends, places, plan, showLoading, setEnd, swap, retry, selection, openJourney, backToList, dropNoteShown } = useTrip()
   const { focusedId, select } = useFocus()
   const { selectTrain } = useTrainSelection()
   const fromSearch = useRef<StationSearchHandle>(null)
@@ -162,7 +162,24 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
               Retry
             </button>
           )}
-          <TripJourneys network={network} views={views} onStation={select} drawnKeys={arrivals?.drawnKeys ?? null} onShowTrain={selectTrain} exits={exits} transfers={transfers} />
+          {dropNoteShown && (
+            <p aria-hidden="true" className="mt-2 text-sm text-ink-dim">
+              That trip is no longer offered.
+            </p>
+          )}
+          <TripJourneys
+            network={network}
+            views={views}
+            selection={selection}
+            onOpen={openJourney}
+            onBack={backToList}
+            panelHeading={headingRef}
+            onStation={select}
+            drawnKeys={arrivals?.drawnKeys ?? null}
+            onShowTrain={selectTrain}
+            exits={exits}
+            transfers={transfers}
+          />
         </div>
       </div>
       {more && !collapsed && <div aria-hidden="true" className="pointer-events-none sticky bottom-0 -mx-4 -mb-8 h-8 bg-linear-to-t from-panel to-transparent" />}

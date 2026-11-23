@@ -3,7 +3,7 @@ import type { Connector, StationInterior } from '../data/stationSchema'
 import type { StationStreets, StreetEntrance } from '../data/streetSchema'
 import { entranceTexts } from './entranceText'
 import { quickestExit, type ExitChoice } from './exitChoice'
-import { exitEntranceIndex, exitLineView, finalRideStops, streetSpoken } from './exitView'
+import { drawnExitStop, exitEntranceIndex, exitLineView, finalRideStops, streetSpoken } from './exitView'
 import { fixture } from './interiorFixture'
 import { toGround } from './projection'
 import type { TripJourney, TripLeg } from './route/plan'
@@ -23,6 +23,13 @@ const ride = (tripId: string, alightStop: string): TripLeg => ({
 })
 const walk: TripLeg = { kind: 'walk', fromStop: 'L08N', toStop: 'G29N', sameStation: false, startAt: 0, durationS: 60, endAt: 60 }
 const journey = (...legs: TripLeg[]): TripJourney => ({ departAt: 0, arriveAt: 60, transfers: 0, legs })
+
+describe('drawnExitStop', () => {
+  it("is the last ride's alighting stop, and null for a journey that ends on foot", () => {
+    expect(drawnExitStop(journey(ride('a', 'L08N')))).toBe('L08N')
+    expect(drawnExitStop(journey(ride('a', 'L08N'), walk))).toBeNull()
+  })
+})
 
 describe('finalRideStops', () => {
   it('keeps the distinct last-ride stops in journey order, with their trips; a journey ending on foot has none', () => {

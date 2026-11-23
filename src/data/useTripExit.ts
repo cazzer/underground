@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { chooseExit, quickestExit, type ExitChoice, type ExitResult } from '../lib/exitChoice'
-import { exitLineView, finalRideStops, type ExitLabel, type ExitLineView, type StreetSource } from '../lib/exitView'
+import { drawnExitStop, exitLineView, finalRideStops, type ExitLabel, type ExitLineView, type StreetSource } from '../lib/exitView'
 import { stationOfStop } from '../lib/live/arrivals'
 import { joinStationOutages, type EneInput } from '../lib/live/eneJoin'
 import type { Ground } from '../lib/projection'
+import type { TripJourney } from '../lib/route/plan'
+import { selectedFirst } from '../lib/tripSelection'
 import { plannable, tripKey, type TripEnds, type TripPlanState } from '../lib/tripView'
 import { interiorIdOf, type IndexLoad } from './interiorLoad'
 import { useInteriorModel } from './useStationInterior'
@@ -18,12 +20,14 @@ interface TripExitInput {
   index: IndexLoad
   ene: EneInput
   nowS: number
+  /** The journey the map draws the way out of: the opened one, else the first. */
+  selected: TripJourney | null
 }
 
 export interface TripExit {
   /** The To station's interior file id: the path draws only while that interior is the focused one. */
   interiorId: string
-  /** The way out the map draws: the first journey's that ends on a train; null when it has none. */
+  /** The way out the map draws: the selected journey's; null when it ends on foot. */
   drawn: ExitChoice | null
   /** The street label naming the drawn exit, which the map's street labels place first and tint. */
   mapLabel: ExitLabel | null
@@ -57,9 +61,11 @@ const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== n
  * `exitTo(null)` clears it (`exitTo(x)` alone warns and does nothing). Production never fetches a walk graph here.
  * Remove when 2q7.14 supplies the point.
  */
-export function useTripExit({ open, ends, plan, index, ene, nowS }: TripExitInput): TripExit | null {
+export function useTripExit({ open, ends, plan, index, ene, nowS, selected }: TripExitInput): TripExit | null {
   const ready = open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
-  const stops = ready && plan.status === 'ready' ? finalRideStops(plan.journeys) : []
+  const stops = ready && plan.status === 'ready' ? finalRideStops(selectedFirst(plan.journeys, selected)) : []
+  // Only the selected journey's own exit draws: one that ends on foot has none, whatever the others do.
+  const drawnStop = selected ? drawnExitStop(selected) : null
   const stationId = stops[0] ? stationOfStop(stops[0].stopId) : null
   const interiorId = interiorIdOf(stationId, index)
   // Only the stops the To interior covers (a complex covers every member's).
@@ -123,10 +129,10 @@ export function useTripExit({ open, ends, plan, index, ene, nowS }: TripExitInpu
       const choice = choices.get(stop.stopId)
       if (!choice) return
       const view = exitLineView(choice, model.interior, sources, known)
-      if (i === 0) mapLabel = view.mapLabel
+      if (i === 0 && stop.stopId === drawnStop) mapLabel = view.mapLabel
       for (const id of stop.tripIds) lines.set(id, view)
     })
-    return { interiorId, drawn: choices.get(served[0]!.stopId) ?? null, mapLabel, lines }
+    return { interiorId, drawn: served[0]!.stopId === drawnStop ? (choices.get(served[0]!.stopId) ?? null) : null, mapLabel, lines }
     // `served` is read through servedKey: a refresh with the same stops and trips keeps the result.
-  }, [servedKey, interiorId, model, settled, first, second, choices, known])
+  }, [servedKey, drawnStop, interiorId, model, settled, first, second, choices, known])
 }

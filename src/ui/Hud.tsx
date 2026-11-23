@@ -77,7 +77,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
   const stationHeading = useRef<HTMLElement>(null)
   const tripHeading = useRef<HTMLElement>(null)
   const searchButton = useRef<HTMLButtonElement>(null)
-  const { tripOpen, openTrip, closeTrip, focusRequest } = useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf })
+  const { tripOpen, openTrip, closeTrip, escapeTrip, focusRequest } = useTripPanel({ locate, panel, stationHeading, searchButton, siblingsOf })
   // The one rule for which panel the bottom slot shows (panelCollapseState.ts); the trip panel stays mounted under a train or notice.
   const front = frontPanel({ trainShown: trainOpen, noticeShown: noticeOpen, tripOpen, focusedId })
   // Closing the train panel or the notice (× or Esc) hands focus to the panel underneath: the trip panel's
@@ -168,7 +168,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
     }
   }, [focusedId, trainOpen, noticeOpen, tripOpen, onPanel])
 
-  // Esc closes the front panel: the train panel, then the notice, then the trip panel, then the station's.
+  // Esc closes the front panel: the train panel, then the notice, then the trip panel (an opened journey goes back to the list first), then the station's.
   useEffect(() => {
     // While search is open, Esc belongs to it: one press must not also dismiss a panel.
     if ((!focusedId && !trainOpen && !noticeOpen && !tripOpen) || searchOpen) return
@@ -177,12 +177,12 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, onPa
       if (e.key !== 'Escape' || document.querySelector('dialog:modal')) return
       if (trainOpen) closeTrain()
       else if (noticeOpen) closeNotice()
-      else if (tripOpen) closeTrip()
+      else if (tripOpen) escapeTrip()
       else closeStation()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedId, trainOpen, noticeOpen, tripOpen, searchOpen, closeStation, closeTrain, closeNotice, closeTrip])
+  }, [focusedId, trainOpen, noticeOpen, tripOpen, searchOpen, closeStation, closeTrain, closeNotice, escapeTrip])
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-4 p-4 text-ink">

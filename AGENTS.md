@@ -761,7 +761,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   repeated sentence is spoken again. `TripPanel.tsx` (`aside` "Trip"; the directions pick's focus target (heading or the empty end's row) takes focus; a down chevron instead of × collapses it to a bar, `tripBarText`'s From → To, in the same aside, body hidden and kept; tapping the bar expands it; a "Close trip" text button beside the chevron closes it (no ×, 2q7.34; the collapsed bar has none) and a directions pick reopens or expands it; closing keeps the ends; `useScrollHint.ts` a "more below" fade
   while the capped panel scrolls) with `TripEnds.tsx` (From/To rows take focus, then open their own `StationSearch`; a shortcut that fills an
   end returns focus to that row; "Nearest to you" never offers a From equal to To; "On the map" is not offered, nor announced, for
-  a station sharing a complex with an end, `isTripEnd` in `lib/tripEnds.ts` over the App's `siblingsOf`, the group's other members) and `TripJourneys.tsx` (disclosures, first open; a
+  a station sharing a complex with an end, `isTripEnd` in `lib/tripEnds.ts` over the App's `siblingsOf`, the group's other members) and `TripJourneys.tsx` (2q7.45.1, 2q7.47: the journeys as a
+  list of collapsed rows, soonest arrival first, none open; a row opens that journey as its own detail view, `TripJourneyDetail.tsx` (Back "All trips", an h3 heading, the
+  summary chips and `TripLegs.tsx`' legs and exit line); a plan with one journey opens it directly, with no Back. The opened journey is state in `TripProvider`
+  (`opened: { planKey, key }`, reset when the panel closes; `selection`, `selectedJourney` = opened, else the first, `openJourney`, `backToList`, `dropped`, `dropNoteShown`), and the view
+  is derived from it by the pure rules in `lib/tripSelection.ts` (`journeyKey`, `journeyKeys`, `tripSelection`, `reconcileOpened`, `droppedNote`, `focusAfterViewChange`,
+  `selectedFirst`), so a refresh never flashes a dropped journey: a poll or tick that drops the opened journey returns to the list (or opens the one left) with a dim "That trip is no longer offered."
+  line and one polite `TripAnnouncer` sentence (`droppedNote`). Focus: opening moves it to the detail heading, Back (the button, or Esc while the trip panel is expanded, `escapeTrip` in `useTripPanel`) to that row, and a view that unmounts
+  holding focus (`useFocusLostWithin`) hands it on one frame later, to the panel heading when the row is gone; a collapsed bar's Esc closes the trip. A
   station name calls `select`, the only camera move; a journey ending on a train ends with `TripExitLine.tsx`, its way out: the
   visible text and note aria-hidden, one sr-only sentence, never a live region; a change through a hand-authored complex has
   `TripTransferLine.tsx` under its "Change at …" row, the same way). A directions pick closes a train panel or notice in front of it first. No control carries the
@@ -1287,14 +1294,14 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   alighting member's; `useStationStreetsLoad` tells loading from missing, and the line waits for both). Both trip ends are
   chosen by the user (a swap counts: the new To was chosen as From), so this fetch reveals nothing they did not pick. It
   finds each journey's quickest way out (`quickestExit`, avoiding machines out of service; with no fresh outage data none
-  are closed, and the line says the status is unknown only when the station panel would: never while still connecting). The map draws the first journey's (ending on a train) at the To station while the trip panel
+  are closed, and the line says the status is unknown only when the station panel would: never while still connecting). The map draws the selected journey's (opened, else the first; one ending on a train) at the To station while the trip panel
   is open, even under a train panel; only once that station is focused. It fetches no walk graph: only the DEV
   `__underground.exitTo(x, z | null)` seam aims it at a point (and loads that station's walk graph) until 2q7.14.
 - **Trip transfers.** While a plan is ready, `src/data/useTripTransfers.ts` loads every hand-authored interior in the index
   (`authoredInteriorIds`, `useInteriorModels`; today 635 and L08, under 5 KB gzipped), not only the change station's, because
   the change station is derived from the plan rather than chosen, and fetching it alone would reveal it. Each change whose two
   stops are in one of them gets `chooseTransfer` (machines out avoided as for the exit) and a transfer line; the map draws, per
-  interior, the first journey's change there (none when it is across one platform). The router's change time stays transfers.json's (180 s at
+  interior, the selected journey's change there (none when it is across one platform). The router's change time stays transfers.json's (180 s at
   Union Sq). Revisit fetching all of them above about 8 authored files.
 - **Location never leaves the device.** The location button makes one `getCurrentPosition` per press (no
   `watchPosition`) and keeps the result in memory only: no storage, URL, log or request carries it (the address search's `focus` is

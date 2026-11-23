@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { complexFixture, without, withSlab } from './complexFixture'
 import { chooseTransfer, type TransferChoice } from './interiorTransfer'
 import type { TripJourney, TripLeg } from './route/plan'
-import { firstTransferDraws, isChangeWalk, transferLegKey, transferLegs, transferLineView } from './transferView'
+import { journeyTransferDraws, isChangeWalk, transferLegKey, transferLegs, transferLineView } from './transferView'
 
 const base = complexFixture()
 const NAMES: Record<string, string> = { L03: '14 St-Union Sq', R20: '14 St-Union Sq', '635': '14 St-Union Sq' }
@@ -41,13 +41,28 @@ function choice(interior = base, fromStop = 'U01N', toStop = 'T01S', closed?: Re
   return r
 }
 
-describe('firstTransferDraws', () => {
+describe('journeyTransferDraws', () => {
   const stair = choice()
   const across = choice(base, 'T01N', 'T01S')
-  it('draws per interior the first journey change, and none when that one takes no connector', () => {
-    const legs = [{ file: '635', c: across }, { file: '635', c: stair }, { file: 'L08', c: stair }, { file: 'L08', c: across }]
-    expect(firstTransferDraws(legs, (l) => l.c)).toEqual([{ interiorId: 'L08', choice: stair }])
-    expect(firstTransferDraws([{ file: '635', c: null }, { file: '635', c: stair }], (l) => l.c)).toEqual([])
+  const all = new Set(['a', 'b', 'c', 'd'])
+  it('draws per interior the first listed change, and none when that one takes no connector', () => {
+    const legs = [
+      { file: '635', key: 'a', c: across },
+      { file: '635', key: 'b', c: stair },
+      { file: 'L08', key: 'c', c: stair },
+      { file: 'L08', key: 'd', c: across },
+    ]
+    expect(journeyTransferDraws(legs, all, (l) => l.c)).toEqual([{ interiorId: 'L08', choice: stair }])
+    expect(journeyTransferDraws([{ file: '635', key: 'a', c: null }, { file: '635', key: 'b', c: stair }], all, (l) => l.c)).toEqual([])
+  })
+
+  it("draws only the listed journey's changes", () => {
+    const legs = [
+      { file: '635', key: 'a', c: stair },
+      { file: 'L08', key: 'c', c: stair },
+    ]
+    expect(journeyTransferDraws(legs, new Set(['c']), (l) => l.c)).toEqual([{ interiorId: 'L08', choice: stair }])
+    expect(journeyTransferDraws(legs, new Set(), (l) => l.c)).toEqual([])
   })
 })
 

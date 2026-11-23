@@ -44,15 +44,19 @@ export function transferLegs(journeys: readonly TripJourney[], stationName: (id:
 }
 
 /**
- * The transfer paths the map draws: per interior, the first journey's change there (legs in `transferLegs` order, so
- * the first leg of a file is the earliest journey's), as the exit path is the first journey's. None for an interior
- * when that change takes no connector (across one platform) or found no route.
+ * The transfer paths the map draws for one journey: `keys` are that journey's change keys (`transferLegs([journey])`);
+ * per interior, the first of its changes there, in `legs` order. None for an interior when that change takes no
+ * connector (across one platform) or found no route; legs of other journeys never draw.
  */
-export function firstTransferDraws<L extends { file: string }>(legs: readonly L[], choiceOf: (leg: L) => TransferChoice | null): StationPathDraw[] {
+export function journeyTransferDraws<L extends { file: string; key: string }>(
+  legs: readonly L[],
+  keys: ReadonlySet<string>,
+  choiceOf: (leg: L) => TransferChoice | null,
+): StationPathDraw[] {
   const decided = new Set<string>()
   const out: StationPathDraw[] = []
   for (const leg of legs) {
-    if (decided.has(leg.file)) continue
+    if (!keys.has(leg.key) || decided.has(leg.file)) continue
     decided.add(leg.file)
     const choice = choiceOf(leg)
     if (choice && choice.connectorIds.length > 0) out.push({ interiorId: leg.file, choice })

@@ -29,6 +29,12 @@ export function finalRideStops(journeys: readonly TripJourney[]): FinalRideStop[
   return out
 }
 
+/** The stop a journey's way out starts from: its last ride's alighting stop; null for one that ends on foot. */
+export function drawnExitStop(journey: TripJourney): string | null {
+  const last = journey.legs.at(-1)
+  return last?.kind === 'ride' ? last.alightStop : null
+}
+
 export interface ExitLineView {
   /** The exit entrance for the map's street labels to place first; null for an exit no entrance lists. */
   mapLabel: ExitLabel | null

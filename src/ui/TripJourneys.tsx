@@ -1,15 +1,23 @@
-import { useId, useRef, useState } from 'react'
+import { useCallback, useRef, type RefObject } from 'react'
 import type { ExitLineView } from '../lib/exitView'
 import type { Network } from '../lib/network'
 import type { TransferLineView } from '../lib/transferView'
-import type { JourneyView, LegView, RideLegView } from '../lib/tripView'
-import { RouteChip } from './RouteChip'
-import { TripExitLine } from './TripExitLine'
-import { TripTransferLine } from './TripTransferLine'
+import { focusAfterViewChange, type TripSelection } from '../lib/tripSelection'
+import type { JourneyView } from '../lib/tripView'
+import { JourneyChips, TripJourneyDetail } from './TripJourneyDetail'
+import { useFocusLostWithin } from './useFocusLostWithin'
 
 interface TripJourneysProps {
   network: Network
   views: readonly JourneyView[]
+  /** Which view shows: the list of trips, or one trip's detail. */
+  selection: TripSelection
+  /** A row was pressed: open that journey (by key) as its own view. */
+  onOpen: (key: string) => void
+  /** "All trips" was pressed: back to the list. */
+  onBack: () => void
+  /** The panel's heading: where focus goes when the view that held it is gone and its replacement has no target. */
+  panelHeading: RefObject<HTMLElement | null>
   /** A station name was pressed: the one place the trip panel moves the camera. */
   onStation: (stationId: string) => void
   /** The trips the map draws as trains (keyed as a live ride leg's `tripId`); only those can be shown. */
@@ -22,190 +30,108 @@ interface TripJourneysProps {
   transfers: ReadonlyMap<string, TransferLineView> | null
 }
 
-interface LegProps {
+interface TripListProps {
   network: Network
-  leg: LegView
-  /** The journey mixes live and scheduled trains, so a scheduled one says so. */
-  mixed: boolean
-  drawnKeys: ReadonlySet<string> | null
-  onStation: (stationId: string) => void
-  onShowTrain: (tripId: string) => void
-  transfers: ReadonlyMap<string, TransferLineView> | null
+  views: readonly JourneyView[]
+  onOpen: (key: string) => void
+  onFocusLost: (journeyKey: string | null) => void
 }
 
-interface StationLinkProps {
-  stationId: string
-  name: string
-  onStation: (stationId: string) => void
-}
-
-function StationLink({ stationId, name, onStation }: StationLinkProps) {
+/** One collapsed row per journey, soonest arrival first: when it leaves and arrives, how long, changes, lines and where its times come from. */
+function TripList({ network, views, onOpen, onFocusLost }: TripListProps) {
+  const list = useRef<HTMLOListElement>(null)
+  useFocusLostWithin(list, onFocusLost)
   return (
-    <button
-      type="button"
-      onClick={() => onStation(stationId)}
-      aria-description="Show on map"
-      className="-my-3 inline-flex min-h-11 cursor-pointer items-center text-left underline hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
-    >
-      {name}
-    </button>
+    <ol ref={list} className="mt-2" aria-label="Trips">
+      {views.map((view) => (
+        <li key={view.key} className="border-t border-edge first:border-t-0">
+          <button
+            type="button"
+            data-journey-key={view.key}
+            onClick={() => onOpen(view.key)}
+            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 py-2 text-left hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
+          >
+            <span className="flex min-w-0 flex-col items-start gap-1">
+              <span aria-hidden="true" className="flex flex-wrap gap-x-2 text-base">
+                <span className="whitespace-nowrap">
+                  {view.departClock} → {view.arriveClock} ·
+                </span>
+                <span className="whitespace-nowrap">{view.minutes} min ·</span>
+                <span className="whitespace-nowrap">{view.transfersText.toLowerCase()}</span>
+              </span>
+              <JourneyChips network={network} view={view} className="" />
+              <span className="sr-only">{view.spoken}</span>
+            </span>
+            <span aria-hidden="true" className="shrink-0 text-ink-dim">
+              ›
+            </span>
+          </button>
+        </li>
+      ))}
+    </ol>
   )
-}
-
-interface ShowTrainProps {
-  leg: RideLegView
-  routeName: string
-  /** The leg is live and the map draws its train. */
-  drawn: boolean
-  onShowTrain: (tripId: string) => void
 }
 
 /**
- * Once offered, the button stays: a poll that moves the train off the map leaves it as an aria-disabled no-op (the
- * station panel's arrival rows do the same), so focus is never dropped from under the visitor.
+ * The trip options: a list of collapsed rows, soonest arrival first, where one opens as its own view (its legs and the way
+ * out) with a Back button to the list; a plan with one journey opens it directly, with no Back. Focus follows the change: opening
+ * focuses the detail's heading, Back its row, and a view that goes while it holds focus (a refresh dropped the journey) hands
+ * it to the panel heading.
  */
-function ShowTrain({ leg, routeName, drawn, onShowTrain }: ShowTrainProps) {
-  const offered = useRef(false)
-  if (drawn) offered.current = true
-  if (!offered.current) return null
-  return (
-    <button
-      type="button"
-      aria-disabled={drawn ? undefined : true}
-      aria-label={`Show train, ${routeName} to ${leg.headsign}`}
-      aria-description={drawn ? undefined : "This train isn't on the map right now"}
-      onClick={() => drawn && onShowTrain(leg.tripId)}
-      className="-ml-2 inline-flex min-h-11 cursor-pointer items-center self-start px-2 text-sm underline hover:text-focus focus-visible:outline-2 focus-visible:outline-focus aria-disabled:cursor-default aria-disabled:text-ink-dim aria-disabled:no-underline aria-disabled:hover:text-ink-dim"
-    >
-      Show train
-    </button>
-  )
-}
+export function TripJourneys({ network, views, selection, onOpen, onBack, panelHeading, onStation, drawnKeys, onShowTrain, exits, transfers }: TripJourneysProps) {
+  const root = useRef<HTMLDivElement>(null)
+  const latest = useRef({ view: selection.view, keys: views.map((v) => v.key) })
+  latest.current = { view: selection.view, keys: views.map((v) => v.key) }
 
-function Leg({ network, leg, mixed, drawnKeys, onStation, onShowTrain, transfers }: LegProps) {
-  if (leg.kind === 'change') {
-    const transfer = transfers?.get(leg.transferKey)
-    return (
-      <li>
-        <p className="text-ink-dim">
-          Change at {leg.name}
-          {leg.minutes !== null && ` · ${leg.minutes} min`}
-        </p>
-        {transfer && <TripTransferLine view={transfer} />}
-      </li>
-    )
+  // One frame later the new view has mounted. Not connected: the panel itself went (Close trip moves focus on its own).
+  const moveFocus = useCallback(
+    (leftKey: string | null) => {
+      requestAnimationFrame(() => {
+        const el = root.current
+        if (el === null || !el.isConnected) return
+        const target = focusAfterViewChange(latest.current.view, leftKey, latest.current.keys)
+        const node =
+          target.kind === 'detail'
+            ? el.querySelector<HTMLElement>('[data-detail-heading]')
+            : target.kind === 'row'
+              ? [...el.querySelectorAll<HTMLElement>('button[data-journey-key]')].find((b) => b.dataset.journeyKey === target.key)
+              : panelHeading.current
+        node?.focus({ preventScroll: true })
+      })
+    },
+    [panelHeading],
+  )
+  const open = (key: string) => {
+    onOpen(key)
+    requestAnimationFrame(() => {
+      const heading = root.current?.querySelector<HTMLElement>('[data-detail-heading]')
+      heading?.focus({ preventScroll: true })
+      heading?.closest('[data-journey-key]')?.scrollIntoView({ block: 'nearest' })
+    })
   }
-  if (leg.kind === 'walk') {
-    return (
-      <li className="text-ink-dim">
-        Walk to {leg.to} · {leg.minutes} min
-      </li>
-    )
+  const back = () => {
+    onBack()
+    moveFocus(selection.openedKey)
   }
-  const route = network.routeById.get(leg.routeId)
-  return (
-    <li>
-      <p className="flex items-center gap-2">
-        {route ? <RouteChip route={route} as="span" className="min-w-9 shrink-0 text-center" /> : <span>{leg.routeId}</span>}
-        <span className="min-w-0">
-          <span className="text-ink-dim">to</span> {leg.headsign}
-          {mixed && !leg.live && <span className="text-ink-dim"> · scheduled</span>}
-        </span>
-      </p>
-      <p className="text-sm">
-        Board {leg.board.clock} at <StationLink stationId={leg.board.stationId} name={leg.board.name} onStation={onStation} />
-      </p>
-      <p className="text-sm">
-        {leg.stopsText}, off {leg.alight.clock} at <StationLink stationId={leg.alight.stationId} name={leg.alight.name} onStation={onStation} />
-      </p>
-      <ShowTrain leg={leg} routeName={route?.shortName ?? leg.routeId} drawn={leg.live && drawnKeys?.has(leg.tripId) === true} onShowTrain={onShowTrain} />
-    </li>
-  )
-}
 
-interface JourneyProps {
-  network: Network
-  view: JourneyView
-  open: boolean
-  onToggle: () => void
-  onStation: (stationId: string) => void
-  drawnKeys: ReadonlySet<string> | null
-  onShowTrain: (tripId: string) => void
-  exits: ReadonlyMap<string, ExitLineView> | null
-  transfers: ReadonlyMap<string, TransferLineView> | null
-}
-
-function Journey({ network, view, open, onToggle, onStation, drawnKeys, onShowTrain, exits, transfers }: JourneyProps) {
-  const legsId = useId()
-  const last = view.legs.at(-1)
-  const exit = last?.kind === 'ride' ? exits?.get(last.tripId) : undefined
+  const opened = selection.view === 'detail' ? views.find((v) => v.key === selection.openedKey) : undefined
   return (
-    <li className="border-t border-edge first:border-t-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls={legsId}
-        className="flex min-h-11 w-full cursor-pointer flex-col items-start gap-1 py-2 text-left hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
-      >
-        <span aria-hidden="true" className="flex flex-wrap gap-x-2 text-base">
-          <span className="whitespace-nowrap">
-            {view.departClock} → {view.arriveClock} ·
-          </span>
-          <span className="whitespace-nowrap">{view.minutes} min ·</span>
-          <span className="whitespace-nowrap">{view.transfersText.toLowerCase()}</span>
-        </span>
-        <span aria-hidden="true" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-dim">
-          {view.routes.map((id, i) => {
-            const route = network.routeById.get(id)
-            return route ? <RouteChip key={i} route={route} as="span" className="min-w-7 text-center" /> : <span key={i}>{id}</span>
-          })}
-          <span className="whitespace-nowrap">
-            {view.departAway === 'Now' ? 'Leaves now' : `Leaves in ${view.departAway}`} · {view.sourceText}
-          </span>
-        </span>
-        <span className="sr-only">{view.spoken}</span>
-      </button>
-      <ol id={legsId} hidden={!open} className="flex flex-col gap-2 pb-3 pl-1 text-sm">
-        {view.legs.map((leg, i) => (
-          <Leg
-            key={i}
-            network={network}
-            leg={leg}
-            mixed={view.source === 'mixed'}
-            drawnKeys={drawnKeys}
-            onStation={onStation}
-            onShowTrain={onShowTrain}
-            transfers={transfers}
-          />
-        ))}
-        {exit && <TripExitLine view={exit} />}
-      </ol>
-    </li>
-  )
-}
-
-/** The journeys as disclosures, soonest arrival first; the first starts open, the rest collapsed. */
-export function TripJourneys({ network, views, onStation, drawnKeys, onShowTrain, exits, transfers }: TripJourneysProps) {
-  // Only the ones the visitor toggled are kept; the rest follow the default (the first is open).
-  const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(new Map())
-  if (views.length === 0) return null
-  return (
-    <ol className="mt-2" aria-label="Trips">
-      {views.map((view, i) => (
-        <Journey
-          key={view.key}
+    <div ref={root}>
+      {selection.view === 'list' && <TripList network={network} views={views} onOpen={open} onFocusLost={moveFocus} />}
+      {opened && (
+        <TripJourneyDetail
           network={network}
-          view={view}
-          open={toggled.get(view.key) ?? i === 0}
-          onToggle={() => setToggled((m) => new Map(m).set(view.key, !(m.get(view.key) ?? i === 0)))}
+          view={opened}
+          canGoBack={selection.canGoBack}
+          onBack={back}
+          onFocusLost={moveFocus}
           onStation={onStation}
           drawnKeys={drawnKeys}
           onShowTrain={onShowTrain}
           exits={exits}
           transfers={transfers}
         />
-      ))}
-    </ol>
+      )}
+    </div>
   )
 }
