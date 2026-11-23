@@ -4,6 +4,7 @@ import { BASEMAP } from '../data/basemapConfig'
 import { hiddenSiblingIds, interiorStationIds, type IndexLoad } from '../data/interiorLoad'
 import type { LiveLayer } from '../data/useLive'
 import { createBandView } from '../lib/bandOffset'
+import { createLocationCap } from '../lib/basemap/locationCapHandle'
 import { createStreetMask } from '../lib/basemap/streetMask'
 import type { Insets } from '../lib/framing'
 import { createFollowAnchor } from '../lib/live/followAnchor'
@@ -28,6 +29,7 @@ import { basemapLook } from './basemapLook'
 import { CameraRig } from './CameraRig'
 import type { InteriorModel } from './interiorModel'
 import { LiveTrains } from './LiveTrains'
+import { LocationCapSource } from './LocationCapSource'
 import { ScenePicker } from './ScenePicker'
 import { StationInterior } from './StationInterior'
 import { StationStreets } from './StationStreets'
@@ -93,6 +95,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const tripLevels = useMemo(() => createLevels(theme), [])
   /** Written by StationStreets, read by Basemap: the basemap's roads give way to the focused station's streets. */
   const streetMask = useMemo(createStreetMask, [])
+  /** Driven by LocationCapSource (always mounted), read by Basemap's tile store: the location zoom cap. */
+  const locationCap = useMemo(createLocationCap, [])
   /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
   const interiorSpans = useMemo(
     () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),
@@ -193,10 +197,11 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         tripRoute={tripRoute}
       />
       <ViewCenterSource />
+      <LocationCapSource cap={locationCap} />
       {basemapConfig && (
         // Decoration: a crash here (logged by the boundary, once) draws no basemap instead of blanking the scene.
         <ErrorBoundary fallback={null}>
-          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} tripLevels={tripLevels} />
+          <Basemap config={basemapConfig} stations={network.stations} mask={streetMask} shapes={network.shapes} tripLevels={tripLevels} locationCap={locationCap} />
         </ErrorBoundary>
       )}
     </Canvas>

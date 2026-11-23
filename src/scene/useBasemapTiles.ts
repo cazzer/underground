@@ -3,51 +3,33 @@
  * request comes before the first paint), fed the view each frame, disposed on unmount. Read-only toward the
  * camera: its frame runs at priority 0, after CameraRig, drei's update and the follow have moved it.
  *
- * Location cap (locationCap.ts): a location point flight caps tile zoom at CAP_Z until the user moves the view
- * past the click slop, wheels, pinches or picks a station. Ordering: CameraRig starts the flight in a layout effect
- * and moves the camera only in later frames; the cap is set in a layout effect of the same commit, so it is in
- * force before any frame of the flight, even a reduced-motion one that lands in its first frame. The frame callback
- * applies the latest request again (a no-op once handled) before it feeds the store, so no frame can select tiles
- * for a point flight the store hasn't been capped for. The pointer listeners are passive, on the element MapControls
- * listens on (r3f's connected element, as drei picks it) and the window, never MapControls props (a changed on*
- * prop makes drei reconnect the controls, AGENTS.md). Not lifted by: following a train, keyboard input.
+ * Location cap (useLocationCap.ts, mounted once in Scene whether or not the basemap is): while the shared cap is on,
+ * the store asks for no tile finer than CAP_Z. This hook mirrors the handle onto `store.capZoom` in a layout effect
+ * (the cap's current state first, then each change), so a cap set in the commit of a location flight is in force
+ * before any frame of the flight, even a reduced-motion one that lands in its first frame.
  */
 import { useFrame } from '@react-three/fiber'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { PerspectiveCamera } from 'three'
 import type { BasemapConfig } from '../data/basemapConfig'
 import { createBasemapTiles } from '../data/basemapTiles'
 import type { BasemapTiles } from '../data/basemapTypes'
-import { CAP_Z, capStep, newCap, type CapEvent, type CapState } from '../lib/basemap/locationCap'
+import { CAP_Z } from '../lib/basemap/locationCap'
+import type { LocationCap } from '../lib/basemap/locationCapHandle'
 import { newPose } from '../lib/basemap/reselect'
-import { useFocus, type FlyRequest } from '../lib/focus'
 import type { PackedTracks } from '../lib/routeTracks'
 import type { MapControlsImpl } from './cameraFlight'
-import { useControlsElement, useViewMoves } from './useViewMoves'
 
 /** The idle callback's deadline: tiles start loading by then even if the main thread never idles. */
 const IDLE_TIMEOUT_MS = 2000
 
 type Phase = 'waiting' | 'scheduled' | 'started'
 
-/** Feeds the cap machine one event and tells the store when the cap goes on or off. */
-function stepCap(cap: CapState, store: BasemapTiles, e: CapEvent): void {
-  const was = cap.capped
-  const lifted = capStep(cap, e)
-  if (!was && cap.capped) store.capZoom(CAP_Z)
-  else if (lifted) store.capZoom(null)
-}
-
-export function useBasemapTiles(config: BasemapConfig, tracks: PackedTracks): BasemapTiles {
+export function useBasemapTiles(config: BasemapConfig, tracks: PackedTracks, cap: LocationCap): BasemapTiles {
   const store = useMemo(() => createBasemapTiles(config, tracks), [config, tracks])
-  const el = useControlsElement()
-  const { flyRequest } = useFocus()
-  const latestFly = useRef<FlyRequest | null>(null)
-  const handledFly = useRef<FlyRequest | null>(null)
   const pose = useRef(newPose())
   const phase = useRef<Phase>('waiting')
   const cancelIdle = useRef<(() => void) | null>(null)
-  const cap = useRef(newCap())
 
   useEffect(
     () => () => {
@@ -59,27 +41,10 @@ export function useBasemapTiles(config: BasemapConfig, tracks: PackedTracks): Ba
     [store],
   )
 
-  /** Applies the latest fly request to the cap once; cheap to call every frame. */
-  const applyFly = useCallback(() => {
-    const req = latestFly.current
-    if (req === handledFly.current) return
-    handledFly.current = req
-    // A searched place is the user's pick, like a station: only a location flight sets the cap.
-    if (req?.kind === 'point' && req.source === 'locate') stepCap(cap.current, store, { type: 'pointFlight' })
-    else if (req) stepCap(cap.current, store, { type: 'station' })
-  }, [store])
-
   useLayoutEffect(() => {
-    if (cap.current.capped) store.capZoom(CAP_Z)
-  }, [store])
-
-  useLayoutEffect(() => {
-    latestFly.current = flyRequest
-    applyFly()
-  }, [flyRequest, applyFly])
-
-  const onViewMove = useCallback((e: CapEvent) => stepCap(cap.current, store, e), [store])
-  useViewMoves(el, onViewMove)
+    if (cap.isCapped()) store.capZoom(CAP_Z)
+    return cap.subscribe((capped) => store.capZoom(capped ? CAP_Z : null))
+  }, [store, cap])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -107,7 +72,6 @@ export function useBasemapTiles(config: BasemapConfig, tracks: PackedTracks): Ba
       return
     }
     if (phase.current !== 'started') return
-    applyFly()
     const c = state.controls as MapControlsImpl | null
     if (!c) return
     const p = pose.current

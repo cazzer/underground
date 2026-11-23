@@ -14,6 +14,7 @@ import { classVisibility } from '../lib/basemap/classFade'
 import { edgeFadeFor, NETWORK_FADE_M, NETWORK_PAD_M, sceneBox } from '../lib/basemap/edgeFade'
 import { BASEMAP_CLASSES, isRoadClass, type BasemapClass } from '../lib/basemap/featureClass'
 import { isNoOutline, networkHull } from '../lib/basemap/networkHull'
+import type { LocationCap } from '../lib/basemap/locationCapHandle'
 import { maskInner, type StreetMask } from '../lib/basemap/streetMask'
 import { planPool } from '../lib/basemap/tilePool'
 import type { ShapePath, Station } from '../lib/network'
@@ -62,12 +63,14 @@ interface BasemapProps {
   shapes: readonly ShapePath[]
   /** The trip emphasis (SubwayLines, -0.25): every class dims with the route lines by its `networkDim`. */
   tripLevels: EmphasisLevels
+  /** The shared location cap (useLocationCap, mounted in Scene): the tile store follows it. */
+  locationCap: LocationCap
 }
 
-export function Basemap({ config, stations, mask, shapes, tripLevels }: BasemapProps) {
+export function Basemap({ config, stations, mask, shapes, tripLevels, locationCap }: BasemapProps) {
   // Packed here, so with the basemap off nothing is.
   const tracks = useMemo(() => packTracks(shapes), [shapes])
-  const store = useBasemapTiles(config, tracks)
+  const store = useBasemapTiles(config, tracks, locationCap)
   const maskUniforms = useMemo(createMaskUniforms, [])
   const background = useMemo(() => new Color(theme.background), [])
   const { entries, extent, drawn } = useMemo(() => {

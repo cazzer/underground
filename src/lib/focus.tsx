@@ -112,6 +112,8 @@ export interface UndergroundDevHooks {
   exitTo?: (x: number | null, z?: number) => void
   /** The basemap tile store's counters (useBasemapTiles). */
   basemap?: () => BasemapStats
+  /** Whether the location zoom cap is in force (useLocationCap, always mounted). */
+  locationCapped?: () => boolean
   /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */
   basemapSegments?: () => { distance: number; classes: Record<string, { used: number; capacity: number; visible: boolean }> }
 }
