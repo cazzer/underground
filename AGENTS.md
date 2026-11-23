@@ -15,8 +15,8 @@ pure realtime library. The station panel shows real arrivals. Bedford Av (L08) h
 about 250 more stations have generated ones (labelled "Estimated layout"), shown to everyone since 9wc.5.
 Interiors draw by view, not only by focus (o3r.4): inside 1250 m the interiors of up to `MAX_VIEW_INTERIORS` (3, in
 `lib/viewStations.ts`; 2, `PHONE_VIEW_INTERIORS`, when the window's shorter side is under 600 px: `viewInteriorCap`; the cap is for a
-phone's frame rate) stations in view reveal with no tap or dwell (from `PREFETCH_FAR`, 2500 m = 2 x `REVEAL_FAR`, in, the files of up to
-`MAX_PREFETCH_STATIONS` (6) stations in view are fetched and built ahead of the reveal, o3r.8, so a fast zoom shows them as it
+phone's frame rate) stations in view reveal with no tap or dwell (from `PREFETCH_FAR`, 2500 m = 2 x `REVEAL_FAR`, in, the street files of up to
+`MAX_PREFETCH_STATIONS` (6) stations in view, and the interiors of the interior cap + 2, are fetched and built ahead of the reveal, o3r.8, so a fast zoom shows them as it
 begins; drawing stays gated at 1250 m), the focused one first and counted, each easing in and out over
 250 ms (`lib/presence.ts`); only the focused one has a panel, level labels, the trip's path, outages and the camera framing. With a
 bare station focused (no interior of its own drawn) its neighbours' interiors draw with no veil, so its marker, trains and streets
@@ -601,7 +601,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `chooseViewStations` allocates nothing and leaves its scratch clean. Never takes the location fix or `nearestStation`.
     o3r.8: `PREFETCH_FAR` (2 x `REVEAL_FAR`), `MAX_PREFETCH_STATIONS` (`MAX_VIEW_STATIONS` + 2) and `PREFETCH_EXTRA_INTERIORS` (2);
     `ViewQuery` takes an optional `far` and `max` (defaults `REVEAL_FAR`, `MAX_VIEW_STATIONS`), `newViewScratch(space, max)`,
-    `gateZone(distance, far)` and `viewZones(distance)` (both gates' zones in one number); `viewStationsPrefetch.test.ts`
+    `gateZone(distance, far)` and `viewZones(distance)` (both gates' zones in one number); `viewStationsPrefetch.test.ts`, builders in `viewStationsFixture.ts`.
     `MAX_VIEW_STREETS` (= `MAX_VIEW_STATIONS`, at most `MASK_N`) and `viewStreetIds` (o3r.5: the view's leads but the focused
     one, room kept for it; `viewStreetIds.test.ts`) pick the street layers
   - `projection.ts` lat/lon to scene meters; `tilt.ts` zoom distance to polar angle
@@ -1610,7 +1610,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   stations in the free rect within reach of the target while the camera is under 2500 m (`PREFETCH_FAR`), at most 6 per choice
   (interior files: the cap + 2; street layers: all 6), a choice at most once per 500 ms while moving plus at each zone crossing;
   camera-driven, empty while the location cap is in force, never keyed by the fix or `nearestStation`. A locate flight lands at
-  1450 m, inside the prefetch range, so nothing is fetched until the user moves the view (lifting the cap); then the stations in
+  1450 m, inside the prefetch range, so nothing is fetched until the user moves the view or picks a station or a searched place (lifting the cap); then the stations in
   the free rect up to 2500 m are prefetched.
 - **Member street files are fetched only for a complex lead the user focused or the camera shows** (and the trip's To and
   From complexes, through `useTripExit` and `useTripBoard`): each member is part of the station opened or in view; never for
