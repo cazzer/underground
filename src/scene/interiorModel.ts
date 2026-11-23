@@ -2,7 +2,7 @@ import { Color } from 'three'
 import type { Level, LocalPoint, StationInterior } from '../data/stationSchema'
 import { stationAxis } from '../lib/interiorAxis'
 import { levelFadeShares } from '../lib/interiorFade'
-import { footprintLoopBuffers, interiorFootprint, type Footprint } from '../lib/interiorFootprint'
+import { FOCUS_FRAME_PAD_M, footprintLoopBuffers, interiorFootprint, type Footprint } from '../lib/interiorFootprint'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { outlineSamples, type OutlineSamples } from '../lib/interiorOutline'
 import { interiorDecks, strokeBandOf, trackDecks } from '../lib/interiorDecks'
@@ -55,9 +55,9 @@ export interface InteriorModel {
   /** Points along its platform and slab outlines, group-local x, y (× yScale, before the depth factor), z triples, and
    *  their spacing (`outlineSamples`): the street names keep clear of them on screen. */
   outline: OutlineSamples
-  /** Its ground footprint (interiorFootprint): a neighbour's opens it on a tap (ScenePicker), the focused one's is framed. */
+  /** Its ground footprint (interiorFootprint, FOOTPRINT_PAD_M): a neighbour's opens it on a tap (ScenePicker). */
   footprint: Footprint
-  /** The footprint's loop at street level in theme.stationFocus (InteriorFocusFrame), group-local. */
+  /** The focused one's frame (InteriorFocusFrame): its own wider hull (FOCUS_FRAME_PAD_M) as a loop at street level in theme.stationFocus, group-local. */
   focusFrame: Buffers
 }
 
@@ -196,6 +196,6 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     entrances: interior.entrances.map(({ x, z, type }) => ({ x, z, type })),
     outline: outlineSamples(interior, yScale),
     footprint,
-    focusFrame: footprintLoopBuffers(footprint.hull, [focus.r, focus.g, focus.b]),
+    focusFrame: footprintLoopBuffers(interiorFootprint(interior, yScale, origin, FOCUS_FRAME_PAD_M).hull, [focus.r, focus.g, focus.b]),
   }
 }

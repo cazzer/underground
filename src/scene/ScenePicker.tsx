@@ -2,7 +2,7 @@ import { useThree } from '@react-three/fiber'
 import { type RefObject, useEffect, useMemo, useRef } from 'react'
 import { Vector3 } from 'three'
 import { useFocus } from '../lib/focus'
-import { footprintAt, FOOTPRINT_PICK_MIN_OPACITY } from '../lib/footprintPick'
+import { footprintAt, footprintCounts } from '../lib/footprintPick'
 import type { Footprint } from '../lib/interiorFootprint'
 import { interiorOpacity } from '../lib/interiorReveal'
 import { carMix } from '../lib/live/consist'
@@ -128,8 +128,8 @@ export function ScenePicker({ stations, trainPick, hiddenSiblings, interiors, pr
       return input
     }
     const visible = (i: number): boolean => {
-      const { ids, presences: p } = drawn.current
-      return reveal.opacity * (p.get(ids[i]!)?.value ?? 0) >= FOOTPRINT_PICK_MIN_OPACITY
+      const { ids, focused, presences: p } = drawn.current
+      return footprintCounts(i, focused, reveal.opacity, p.get(ids[i]!)?.value ?? 0)
     }
     /** The neighbour interior under the click (begin() ran): its file id, or null (none, or inside the focused one). */
     const footprintPick = (): string | null => {

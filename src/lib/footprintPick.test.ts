@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { footprintAt, insideFootprint, insidePolygon } from './footprintPick'
+import { footprintAt, footprintCounts, FOOTPRINT_PICK_MIN_OPACITY, insideFootprint, insidePolygon } from './footprintPick'
 import type { Footprint } from './interiorFootprint'
 import type { ToScreen } from './pick'
 import { DEPTH_FLOOR } from './tilt'
@@ -85,6 +85,27 @@ describe('insideFootprint', () => {
 
   it('misses when any vertex is behind the camera', () => {
     expect(insideFootprint(square(), 1, shallowCamera, at(200, 200))).toBe(false)
+  })
+})
+
+describe('footprintCounts', () => {
+  it('counts a neighbour by reveal times presence', () => {
+    expect(footprintCounts(1, 0, 1, 0.6)).toBe(true)
+    expect(footprintCounts(1, 0, 0.8, 0.5)).toBe(false)
+    expect(footprintCounts(1, -1, 1, FOOTPRINT_PICK_MIN_OPACITY)).toBe(true)
+  })
+
+  it('counts the focused footprint by the reveal alone, so it shields while its presence eases in', () => {
+    expect(footprintCounts(0, 0, 1, 0)).toBe(true)
+    expect(footprintCounts(0, 0, 0.5, 0.1)).toBe(true)
+    expect(footprintCounts(0, 0, 0.4, 1)).toBe(false)
+  })
+
+  it('so a tap on a newly focused interior is not passed to the neighbour behind it', () => {
+    const fps = [square(100, 100), square(115, 100)]
+    const presence = [0.05, 1]
+    const counts = (i: number) => footprintCounts(i, 0, 1, presence[i]!)
+    expect(footprintAt(fps, counts, 0, 1, view(), at(215, 200))).toBe(0)
   })
 })
 

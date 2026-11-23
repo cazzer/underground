@@ -4,6 +4,15 @@ import type { ScreenPoint, ToScreen } from './pick'
 /** A drawn interior picks by its footprint only while it is at least this present (reveal opacity × presence). */
 export const FOOTPRINT_PICK_MIN_OPACITY = 0.5
 
+/**
+ * Whether footprint `i` counts for a pick at reveal opacity `reveal` (interiorOpacity) and its interior's `presence`. A
+ * neighbour counts by reveal × presence; the `focused` one by the reveal alone, so while a newly focused interior eases
+ * in (presence.ts, 250 ms) a tap on it is never passed through to a neighbour behind it.
+ */
+export function footprintCounts(i: number, focused: number, reveal: number, presence: number): boolean {
+  return reveal * (i === focused ? 1 : presence) >= FOOTPRINT_PICK_MIN_OPACITY
+}
+
 /** Crossing-number test: is (px, py) inside the polygon of the `n` points of `xs`, `ys` from `offset` on? */
 export function insidePolygon(px: number, py: number, xs: ArrayLike<number>, ys: ArrayLike<number>, n: number, offset = 0): boolean {
   let inside = false

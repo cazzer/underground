@@ -5,6 +5,9 @@ import type { Buffers, Rgb } from './interiorSegments'
 
 /** How far the footprint reaches past the interior's outlines and entrances, meters. */
 export const FOOTPRINT_PAD_M = 6
+/** How far the focused interior's frame (InteriorFocusFrame) stands off them: wider than the pick footprint, so at phone
+ *  zoom the loop clears the entrance squares by a clear gap and doesn't read as a path between them. */
+export const FOCUS_FRAME_PAD_M = 14
 
 /**
  * A drawn interior's ground footprint (o3r.7): the convex hull of its platform and slab outlines and its entrances,

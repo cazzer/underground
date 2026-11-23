@@ -20,8 +20,8 @@ phone's frame rate) stations in view reveal with no tap or dwell (from `PREFETCH
 begins; drawing stays gated at 1250 m), the focused one first and counted, each easing in and out over
 250 ms (`lib/presence.ts`); only the focused one has a panel, level labels, the trip's path, outages and the camera framing. With a
 bare station focused (no interior of its own drawn) its neighbours' interiors draw with no veil, so its marker, trains and streets
-keep full contrast. Beside a neighbour the focused interior is framed (o3r.7): a `theme.stationFocus` loop of its footprint at
-street level, and a tap anywhere on a drawn neighbour's footprint (nothing else in reach) opens that station.
+keep full contrast. Beside a neighbour the focused interior is framed (o3r.7): a `theme.stationFocus` loop at street level, 14 m out
+from its outlines and entrances, and a tap anywhere on a drawn neighbour's footprint (nothing else in reach) opens that station.
 Streets and entrance marks of up to `MAX_VIEW_STREETS` (4) stations in view draw the same way with no tap inside 1250 m, focused
 first (o3r.5), each easing in and out over 250 ms; where two 300 m files overlap each street draws once; a neighbour's
 entrance marks draw a tier dimmer. Their street and entrance labels place in one declutter pass, focused first (o3r.6), a
@@ -364,10 +364,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     darkens once however many reveal and eases in and out on its own
   - `StationInterior.tsx` a drawn station's interior (two line layers per stroke band, up to four bands; for a generated interior every material is dashed (`interiorApproxDash` / `interiorApproxGap`) and per-segment `distances` cut only platform/slab outlines and slab guides; `InteriorVeil.tsx` (look B's footprint veil per interior; look A's plane, in ScreenVeil), level
     labels: plain DOM divs in the canvas container, placed per frame by `useLevelLabels.ts` (not drei `Html`, whose per-label React root unmounts inside a layout-effect cleanup and logged "unmount a root while already rendering" under StrictMode), text with a background-colored `text-shadow` halo instead of a filled chip so strokes show through); `interiorModel.ts` interior JSON to a
-    drawable model (theme colors, labels, camera target; `STEP_RISE_M`; `footprint`, `lib/interiorFootprint.ts`, and its
-    `focusFrame` loop buffers in `theme.stationFocus`); `interiorLook.ts` TEMPORARY look overrides;
+    drawable model (theme colors, labels, camera target; `STEP_RISE_M`; `footprint`, `lib/interiorFootprint.ts`, the 6 m pick
+    footprint, and `focusFrame`, the loop buffers in `theme.stationFocus` of its own wider hull, `FOCUS_FRAME_PAD_M` 14 m,
+    so at phone zoom the loop clears the entrance squares by a clear gap and doesn't read as a path between them); `interiorLook.ts` TEMPORARY look overrides;
     `StationInterior` renders its `children` inside the interior group;
-    `InteriorFocusFrame.tsx` (o3r.7) the focused interior's footprint as a solid `theme.stationFocus` loop at y 0 in its group,
+    `InteriorFocusFrame.tsx` (o3r.7) the focused interior's `focusFrame` as a solid `theme.stationFocus` loop at y 0 in its group,
     `theme.interiorLineWidth`, render order 7.52, only while another interior shows: opacity `interiorOpacity` × its own
     presence × the most present other shown interior's (Scene passes `frame={store}` to the focused one alone); per frame
     allocation-free, written only on change. No neighbour dimming and no neighbour name labels
@@ -690,10 +691,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     station-or-train choice, `withFootprint`: the footprint fallback, asked only when that choice is null), `interiorFootprint.ts`
     (`interiorFootprint`: the convex hull of an interior's platform and slab outlines and entrances grown by `FOOTPRINT_PAD_M`
     (6 m: each point's octagon, so every point sits at least 6 m inside), plus its level span with the street, × yScale;
-    `footprintLoopBuffers`), `footprintPick.ts` (`insidePolygon`, crossing number; `insideFootprint`: the hull extruded
+    `FOCUS_FRAME_PAD_M` 14 m, the focus frame's wider pad; `footprintLoopBuffers`), `footprintPick.ts` (`insidePolygon`, crossing number; `insideFootprint`: the hull extruded
     from its lowest to its highest level at the group's depth scale, projected: top, bottom and each side quad, false when a
     vertex is behind the camera; `footprintAt`: the focused footprint if it holds the click, else the visible other one whose
-    origin projects nearest; `FOOTPRINT_PICK_MIN_OPACITY` 0.5): pure render helpers; `labels.ts`
+    origin projects nearest; `footprintCounts`: a neighbour counts at reveal × presence ≥ `FOOTPRINT_PICK_MIN_OPACITY` 0.5,
+    the focused one at the reveal alone): pure render helpers; `labels.ts`
     HUD text (route chips, schedule date)
   - `interiorGeometry.ts` interior to strong/fine line buffers (levels, outlines, entrances);
     `interiorConnectors.ts` stairs, ramps, walkways (`drawWalkway`: a flat connector between two areas of one level, two strong outline-colored sides, no end caps, dashed on a generated interior or between two approximate slabs), escalators (a zero-run one gets a 30 degree run along the
@@ -1465,8 +1467,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   to its drawn marker at close zoom; a touch with no station in reach (the open station and its hidden siblings, whose markers are hidden, don't count) gets 22 px
   for trains; cars are tested
   along their floor and roof lines. When neither a station nor a train is in reach, a drawn interior's footprint is the
-  target (o3r.7, `withFootprint`, `footprintAt`): its hull as a prism at the current depth factor, for interiors at
-  `interiorOpacity` × presence ≥ 0.5; inside the focused interior's footprint nothing is picked (and no pointer cursor), else
+  target (o3r.7, `withFootprint`, `footprintAt`): its hull as a prism at the current depth factor, for neighbours at
+  `interiorOpacity` × presence ≥ 0.5 and the focused one at `interiorOpacity` ≥ 0.5 alone (`footprintCounts`), so during a
+  newly focused interior's 250 ms ease in a tap on it is never passed to a neighbour behind it; inside the focused interior's footprint nothing is picked (and no pointer cursor), else
   the neighbour's opens (`select` of its file id, which focuses the complex's lead), overlapping ones going to the origin
   projected nearest. Hover shows the pointer over a neighbour's footprint. No meshes carry r3f pointer handlers.
 - Live train dots and cars are instanced too, with per-slot colors (`routeLineColor` like the lines; car

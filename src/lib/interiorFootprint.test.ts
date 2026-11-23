@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
 import { insidePolygon } from './footprintPick'
 import { fixture } from './interiorFixture'
-import { FOOTPRINT_PAD_M, footprintLoopBuffers, interiorFootprint } from './interiorFootprint'
+import { FOCUS_FRAME_PAD_M, FOOTPRINT_PAD_M, footprintLoopBuffers, interiorFootprint } from './interiorFootprint'
 
 const ORIGIN = { x: 500, z: -300 }
 
@@ -57,14 +57,23 @@ describe('interiorFootprint', () => {
     expect(() => interiorFootprint(bare, 2, ORIGIN)).toThrow(/X01/)
   })
 
-  it('is built for every shipped interior, holding all its points', () => {
+  it('holds every point at least the focus frame pad inside the frame hull, past the pick footprint', () => {
+    const interior = fixture()
+    const frame = interiorFootprint(interior, 2, ORIGIN, FOCUS_FRAME_PAD_M)
+    expect(FOCUS_FRAME_PAD_M).toBeGreaterThan(FOOTPRINT_PAD_M)
+    for (const p of pointsOf(interior)) expect(depthInside(p, frame.hull), `${p}`).toBeGreaterThanOrEqual(FOCUS_FRAME_PAD_M - 1e-9)
+  })
+
+  it('is built for every shipped interior, the pick footprint and the frame hull holding all its points', () => {
     const dir = new URL('../../public/data/stations/', import.meta.url)
     const files = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'index.json' && f !== 'equipment.json')
     expect(files.length).toBeGreaterThan(200)
     for (const f of files) {
       const interior = JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as StationInterior
-      const fp = interiorFootprint(interior, 2, ORIGIN)
-      for (const p of pointsOf(interior)) expect(depthInside(p, fp.hull), `${f} ${p}`).toBeGreaterThan(FOOTPRINT_PAD_M - 1e-6)
+      for (const pad of [FOOTPRINT_PAD_M, FOCUS_FRAME_PAD_M]) {
+        const fp = interiorFootprint(interior, 2, ORIGIN, pad)
+        for (const p of pointsOf(interior)) expect(depthInside(p, fp.hull), `${f} ${pad} m ${p}`).toBeGreaterThan(pad - 1e-6)
+      }
     }
   })
 })
