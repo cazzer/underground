@@ -1300,6 +1300,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   A bare station pivots on its own point (a complex on its member nearest the free area's middle) while that point is
   within 100 m of the free area's middle, else on that middle, so a far-off or held station can't swing the view away. Markers and dots rescale with distance
   (`screenScale`) so they stay legible when zoomed out.
+- Inside a keyed r3f list that can reorder (Scene's shown interiors, StationStreets' layers), never declare in JSX a prop
+  that a cached `useFrame` writes (`visible`, a material's `opacity`): r3f re-applies a moved subtree's JSX props, and a
+  frame that skips unchanged values never writes them back (o3r.9). Check the written value in the early return as a backstop.
 - Every `on*` handler passed to `MapControls` (today `onStart` and `onEnd`) stays referentially
   stable (`useCallback` + refs): a changed handler makes drei dispose and reconnect the controls,
   which can lock them mid-drag. Set control limits imperatively in `useFrame` (priority -2, before

@@ -145,7 +145,7 @@ export function StreetLines(props: StreetLinesProps) {
     if (full) writeLineDim(full.material, tripLevels.networkDim)
     if (veiled) writeLineDim(veiled.material, tripLevels.networkDim)
     const last = shown.current
-    // g.visible is checked too: a keyed reorder (a focus change) can reset it behind the cache.
+    // r3f re-applies a moved group's JSX props when the keyed list reorders, so visible stays out of JSX; checked here as a backstop.
     if (o === last.o && share === last.share && own === last.own && g.visible === o > 0) return
     last.o = o
     last.share = share
