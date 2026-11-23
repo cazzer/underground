@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Color } from 'three'
 import { entranceLocal } from '../lib/entranceMarks'
 import { entranceTexts, type EntranceText, type NamedLine } from '../lib/entranceText'
@@ -9,10 +9,12 @@ import { streetBuffers } from '../lib/streetBuffers'
 import { mergeComplexStreets, streetFileIds } from '../lib/streetMerge'
 import { streetLabelSources, type StreetLabelSource } from '../lib/streetRuns'
 import { veiledStreetHex } from '../lib/streetVeil'
+import { failedRecently } from '../lib/viewStations'
 import { theme } from '../theme'
 import { createInteriorCache } from './interiorCache'
 import { HttpError } from './loadNetwork'
 import { loadStationStreets } from './loadStationStreets'
+import { requestDue } from './streetLoadRule'
 import type { StationStreets } from './streetSchema'
 
 const BASE_URL = import.meta.env.BASE_URL
@@ -78,9 +80,6 @@ const VEILED_RGB: Rgb = [VEILED.r, VEILED.g, VEILED.b]
 /** Raw street files, one fetch per file per page load (null: no file, cached; a failure is evicted and retried). */
 const files = createInteriorCache((id) => loadStationStreets(BASE_URL, id))
 
-/** How old a layer that lacks a failed member's entrances is before a focus tries that member again. */
-const PARTIAL_RETRY_MS = 5000
-
 interface Loaded {
   layer: StreetLayer | null
   /** Members whose file failed (not a 404): the layer lacks their entrances. */
@@ -118,22 +117,26 @@ async function loadLayer(ids: readonly string[]): Promise<{ layer: StreetLayer |
   return { layer: buildLayer(ids[0]!, merged.file, merged.extraLines), missing }
 }
 
-// Layers by key (the file ids joined with '+': station ids are alphanumeric), loads in flight, keys whose last load failed.
+// Layers by key (the file ids joined with '+': station ids are alphanumeric), loads in flight, keys whose last load
+// failed (to the failure's time, performance.now() ms), and how many loads of each key have settled.
 const loaded = new Map<string, Loaded>()
 const pending = new Set<string>()
-const failed = new Set<string>()
+const failedAt = new Map<string, number>()
+const settledCount = new Map<string, number>()
 /** Called with a key once a load of it settles: the hooks showing that key re-render. */
 const listeners = new Set<(key: string) => void>()
 
 /**
- * Starts the load of `key` unless it is loaded or loading. A layer missing a member is tried again when a hook asks
- * for it (mount or key change) once it is PARTIAL_RETRY_MS old, so the next focus retries without a retry storm. A retry
- * still missing the same members keeps the old layer object, so nothing rebuilds. A failure is
- * logged here, once per load however many components wait on it, and leaves any older layer in place.
+ * Starts the load of `key` when `requestDue` says so (streetLoadRule.ts): not while loading; a layer missing a member
+ * once it is PARTIAL_RETRY_MS old, so the next focus retries without a retry storm; a failed key at once, or for a
+ * view-driven caller (`viewDriven`) only once its failure is VIEW_RETRY_MS old. A retry still missing the same members
+ * keeps the old layer object, so nothing rebuilds. A failure is logged here, once per load however many components
+ * wait on it, and leaves any older layer in place.
  */
-function request(key: string): void {
+function request(key: string, viewDriven: boolean): void {
   const hit = loaded.get(key)
-  if (pending.has(key) || (hit && !(hit.missing.length > 0 && performance.now() - hit.at >= PARTIAL_RETRY_MS))) return
+  const now = performance.now()
+  if (!requestDue(hit && { missing: hit.missing.length, at: hit.at }, pending.has(key), viewDriven && failedRecently(failedAt, key, now), now)) return
   pending.add(key)
   const ids = key.split('+')
   loadLayer(ids)
@@ -141,43 +144,67 @@ function request(key: string): void {
       (r) => {
         const same = hit && hit.missing.length > 0 && hit.missing.join() === r.missing.join()
         loaded.set(key, { layer: same ? hit.layer : r.layer, missing: r.missing, at: performance.now() })
-        failed.delete(key)
+        failedAt.delete(key)
       },
       (err: unknown) => {
         console.error(`Failed to load the streets of station ${ids[0]}${ids.length > 1 ? ` (complex ${ids.join(', ')})` : ''}`, err)
-        failed.add(key)
+        failedAt.set(key, performance.now())
       },
     )
     .finally(() => {
       pending.delete(key)
+      settledCount.set(key, (settledCount.get(key) ?? 0) + 1)
       for (const listen of listeners) listen(key)
     })
 }
 
-/** The store key of a station's layer: its street file ids, lead first; null for no station. */
-function useLayerKey(stationId: string | null): string | null {
-  const { membersOf } = useFocus()
-  return stationId === null ? null : streetFileIds(stationId, membersOf(stationId)).join('+')
+/** The store key of a station's layer: its street file ids, lead first. */
+function layerKey(stationId: string, membersOf: (id: string) => readonly string[]): string {
+  return streetFileIds(stationId, membersOf(stationId)).join('+')
 }
 
-/** Requests `key` on mount and on a change of it, and re-renders when a load of it settles (a retry by another hook too). */
-function useRequested(key: string | null): void {
+/** The store key of a station's layer; null for no station. */
+function useLayerKey(stationId: string | null): string | null {
+  const { membersOf } = useFocus()
+  return stationId === null ? null : layerKey(stationId, membersOf)
+}
+
+/** How many loads of each key have settled, joined: it changes whenever a load of any of them settles. */
+function settledSignature(keys: readonly string[]): string {
+  return keys.map((k) => settledCount.get(k) ?? 0).join(',')
+}
+
+const NO_KEYS: readonly string[] = Object.freeze([])
+
+/**
+ * Requests `keys` on mount and on a change of them, and re-renders when a load of any of them settles (a retry by
+ * another hook too). Returns their settled signature at render, for a memo over what they hold.
+ */
+function useRequestedKeys(keys: readonly string[], viewDriven: boolean): string {
   const [, setSettles] = useState(0)
-  const seen = key === null ? undefined : loaded.get(key)
-  const failedAtRender = key !== null && failed.has(key)
+  const joined = keys.join(',')
+  const signature = settledSignature(keys)
   useEffect(() => {
-    if (key === null) return
+    if (joined === '') return
+    const watched = joined.split(',')
     const listen = (settledKey: string) => {
-      if (settledKey === key) setSettles((n) => n + 1)
+      if (watched.includes(settledKey)) setSettles((n) => n + 1)
     }
     listeners.add(listen)
-    request(key)
+    for (const key of watched) request(key, viewDriven)
     // A load that settled between this render and now was announced to nobody.
-    if (loaded.get(key) !== seen || failed.has(key) !== failedAtRender) listen(key)
+    if (settledSignature(watched) !== signature) setSettles((n) => n + 1)
     return () => {
       listeners.delete(listen)
     }
-  }, [key])
+    // Only a change of keys asks again; `signature` is the render's snapshot and `viewDriven` is fixed per caller.
+  }, [joined])
+  return signature
+}
+
+/** The focus path's request: a failed key is asked again at once. */
+function useRequested(key: string | null): void {
+  useRequestedKeys(key === null ? NO_KEYS : [key], false)
 }
 
 /**
@@ -201,5 +228,29 @@ export function useStationStreetsLoad(stationId: string | null): { layer: Street
   useRequested(key)
   if (key === null) return { layer: null, settled: true }
   const hit = loaded.get(key)
-  return { layer: hit?.layer ?? null, settled: hit !== undefined || failed.has(key) }
+  return { layer: hit?.layer ?? null, settled: hit !== undefined || failedAt.has(key) }
+}
+
+const NO_LAYERS: readonly StreetLayer[] = Object.freeze([])
+
+/**
+ * The loaded layers of `stationIds` (leads, and only from o3r.2's view set: `viewStreetIds`), in order; loading,
+ * no-file and failed ones left out. Same store and keys as useStationStreets (a complex lead loads and merges its
+ * members' files, part of the station in view), so focusing one reuses its layer. A failed one is asked again only
+ * once VIEW_RETRY_MS old, on a change of the set. The list keeps its identity until a key changes or a load of one
+ * settles.
+ */
+export function useStreetLayers(stationIds: readonly string[]): readonly StreetLayer[] {
+  const { membersOf } = useFocus()
+  const joinedIds = stationIds.join(',')
+  const keys = useMemo(
+    () => (joinedIds === '' ? NO_KEYS : joinedIds.split(',').map((id) => layerKey(id, membersOf))),
+    [joinedIds, membersOf],
+  )
+  const signature = useRequestedKeys(keys, true)
+  return useMemo(() => {
+    const out = keys.flatMap((k) => loaded.get(k)?.layer ?? [])
+    return out.length > 0 ? out : NO_LAYERS
+    // `signature` changes whenever a load of one of the keys settles, the only time `loaded` changes for them.
+  }, [keys, signature])
 }

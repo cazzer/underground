@@ -97,7 +97,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   const anchor = useMemo(createFollowAnchor, [])
   /** Written by SubwayLines at -0.25, read at 0: how far the network (lines, basemap, streets) dims under the trip's route. */
   const tripLevels = useMemo(() => createLevels(theme), [])
-  /** Written by StationStreets, read by Basemap: the basemap's roads give way to the focused station's streets. */
+  /** Written by StationStreets, read by Basemap: the basemap's roads give way to the drawn station street layers. */
   const streetMask = useMemo(createStreetMask, [])
   /** Driven by LocationCapSource (always mounted), read by Basemap's tile store: the location zoom cap. */
   const locationCap = useState(createLocationCap)[0]
@@ -164,6 +164,11 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       <StationStreets
         interior={interior}
         interiorPending={!interior && !focusedMarker}
+        view={scene.view}
+        drawn={scene.drawn}
+        viewFiles={scene.viewFiles}
+        covered={covered}
+        index={index}
         veiled={veiled}
         insets={insets}
         panel={panel}

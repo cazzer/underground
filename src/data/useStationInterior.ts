@@ -178,14 +178,15 @@ const viewFailedAt = new Map<string, number>()
  * camera-driven set: empty from REVEAL_FAR out and while the location cap is in force, and never keyed by the location
  * fix or its nearest station. A file that failed is passed over for VIEW_RETRY_MS (logged once per failure), its slot
  * going to the next station in view. The result keeps its identity while the files and their models stay the same, so
- * a station without an interior entering the view rebuilds nothing. `loading`: a file in the set has not loaded yet.
+ * a station without an interior entering the view rebuilds nothing. `files`: the file ids requested (loaded or not;
+ * a failed one drops out); `loading`: one of them has not loaded yet.
  */
 export function useViewInteriors(
   view: readonly string[],
   focusedId: string | null,
   index: IndexLoad,
   cap: number,
-): { models: readonly InteriorModel[]; loading: boolean } {
+): { models: readonly InteriorModel[]; files: readonly string[]; loading: boolean } {
   // Bumped on a failure, so the next station in view takes its slot.
   const [, setFailures] = useState(0)
   const key = viewInteriorIds(view, focusedId, index, cap, (file) => failedRecently(viewFailedAt, file, performance.now())).join(',')
@@ -200,5 +201,5 @@ export function useViewInteriors(
     return list.length > 0 ? list : NO_VIEW_MODELS
   }, [ids, models])
   // A file asked for and not loaded yet (a failure leaves the ids on the next render).
-  return { models: out, loading: out.length < ids.length }
+  return { models: out, files: ids, loading: out.length < ids.length }
 }

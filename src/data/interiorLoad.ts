@@ -210,6 +210,27 @@ export function drawnInteriors<T extends CoversStations>(
   return out
 }
 
+/**
+ * What a street layer of a station in view (not the focused one, o3r.5) takes from the drawn interiors: the drawn one
+ * covering it (its entrances get no second mark), else none. `pending` while the index loads or while its file is
+ * among those requested (`viewFiles`, useViewInteriors) and not drawn yet: no marks yet, so none flash before it
+ * lands. `clipped` (the route clip, routeClip.ts) only with no interior file to its name (or no index, as for the
+ * focused station): elsewhere its tracks sink under the station, clear of the streets. A station whose file is
+ * listed but not requested (past the cap, or failed lately) draws every mark and whole streets.
+ */
+export function viewStreetInterior<T extends CoversStations>(
+  stationId: string,
+  drawn: readonly T[],
+  viewFiles: readonly string[],
+  index: IndexLoad,
+): { interior: T | null; pending: boolean; clipped: boolean } {
+  const interior = drawn.find((m) => interiorCovers(m, stationId))
+  if (interior) return { interior, pending: false, clipped: false }
+  if (index.status === 'loading') return { interior: null, pending: true, clipped: false }
+  const file = interiorIdOf(stationId, index)
+  return { interior: null, pending: file !== null && viewFiles.includes(file), clipped: file === null }
+}
+
 /** Every station the interiors cover, each once, in order. */
 export function coveredStationIds(models: readonly CoversStations[]): readonly string[] {
   if (models.length === 0) return NO_SIBLINGS

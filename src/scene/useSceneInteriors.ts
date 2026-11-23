@@ -18,6 +18,12 @@ export interface CoveredStation {
 }
 
 export interface SceneInteriors {
+  /** The station leads in view (o3r.2's set, focused first): the street layers draw theirs (o3r.5). */
+  view: readonly string[]
+  /** The interiors drawn now, the focused one first (at most the cap): the street layers take the one covering them. */
+  drawn: readonly InteriorModel[]
+  /** The view interior files requested (useViewInteriors), loaded or not: a street layer waits on its marks while its file loads. */
+  viewFiles: readonly string[]
   /** Every interior mounted: the drawn ones (the focused one first, at most the cap), then any still fading out. */
   shown: readonly InteriorModel[]
   /** Each shown interior's presence, by file id. */
@@ -66,7 +72,7 @@ export function useSceneInteriors(
   const { focusedId } = useFocus()
   const view = useSyncExternalStore(viewSet.subscribe, viewSet.get)
   const cap = useSyncExternalStore(subscribeResize, capNow)
-  const { models: inView, loading: viewLoading } = useViewInteriors(view, focusedId, index, cap)
+  const { models: inView, files: viewFiles, loading: viewLoading } = useViewInteriors(view, focusedId, index, cap)
   const drawn = useMemo(() => drawnInteriors(focused, inView, (id) => network.stationById.has(id), cap), [focused, inView, network, cap])
   const own = focused !== null && drawn[0] === focused ? focused : null
 
@@ -145,5 +151,5 @@ export function useSceneInteriors(
     }
   }, [])
 
-  return { shown, presences, store, onFaded, spans, spansByDeck, hiddenSiblings, covered, hiddenStations, markHidden, veiled }
+  return { view, drawn, viewFiles, shown, presences, store, onFaded, spans, spansByDeck, hiddenSiblings, covered, hiddenStations, markHidden, veiled }
 }

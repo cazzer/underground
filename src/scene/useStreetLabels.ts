@@ -37,6 +37,10 @@ export interface LabelContext {
   ringRadiusM: number
   /** The street-file entrance index of the trip's exit (its label ranks first, tinted the path's color); -1 for none. */
   priorityEntrance: number
+  /** Per nearby station (the `stations` passed in): 1 while its marker isn't drawn; null for all drawn. Bump
+   *  `markersVersion` on any change, so the labels are placed again. */
+  markerHidden: Uint8Array | null
+  markersVersion: number
 }
 
 interface LabelDom {
@@ -56,6 +60,7 @@ interface LabelDom {
   proj: Matrix4
   insets: Insets | null
   levelsVersion: number
+  markersVersion: number
   dirty: boolean
   /** Whether the entrances are measured on two lines (a phone-sized canvas). */
   phone: boolean
@@ -129,8 +134,8 @@ function makeLabel(wrapper: HTMLDivElement, text: string, className: string): HT
   return el
 }
 
-/** The view's inputs changed since the last placement (the camera, canvas, insets, panel, level labels, interior or
- *  focus ring); copies them into the view when they did. */
+/** The view's inputs changed since the last placement (the camera, canvas, insets, panel, level labels, interior,
+ *  focus ring or which station markers are drawn); copies them into the view when they did. */
 function viewChanged(d: LabelDom, camera: PlacementView['camera'], size: { width: number; height: number; left: number; top: number }, ins: Insets, pan: ScreenRect | null, ctx: LabelContext, levels: LabelBlockers): boolean {
   const v = d.view
   const moved =
@@ -146,13 +151,16 @@ function viewChanged(d: LabelDom, camera: PlacementView['camera'], size: { width
     v.interior !== ctx.interior ||
     v.focusRing !== ctx.focusRing ||
     v.priorityEntrance !== ctx.priorityEntrance ||
-    d.levelsVersion !== levels.version
+    d.levelsVersion !== levels.version ||
+    d.markersVersion !== ctx.markersVersion
   if (!moved) return false
   d.dirty = false
   d.cam.copy(camera.matrixWorld)
   d.proj.copy(camera.projectionMatrix)
   d.insets = ins
   d.levelsVersion = levels.version
+  d.markersVersion = ctx.markersVersion
+  v.markerHidden = ctx.markerHidden
   v.width = size.width
   v.height = size.height
   v.left = size.left
@@ -223,6 +231,7 @@ export function useStreetLabels(
       proj: new Matrix4(),
       insets: null,
       levelsVersion: NaN,
+      markersVersion: NaN,
       dirty: true,
       phone: false,
       still: 0,

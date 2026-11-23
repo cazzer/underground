@@ -37,6 +37,27 @@ export function viewInteriorCap(width: number, height: number): number {
   return Math.min(width, height) < PHONE_SIDE_PX ? PHONE_VIEW_INTERIORS : MAX_VIEW_INTERIORS
 }
 
+/** Most station street layers drawn at once (o3r.5), the focused one included: each holds one of the basemap street
+ *  mask's MASK_N slots (streetMask.ts), and the view chooses no more stations than this. */
+export const MAX_VIEW_STREETS = MAX_VIEW_STATIONS
+
+const NO_STREET_IDS: readonly string[] = Object.freeze([])
+
+/**
+ * The station leads in view whose street layers draw beside the focused one's (o3r.5): `view` (o3r.2's leads) in
+ * order, the focused station left out (it draws its own) and each once, at most `max` with the focused one counted.
+ * Only ids in `view` appear, so the street fetches follow the camera and nothing else.
+ */
+export function viewStreetIds(view: readonly StationId[], focusedId: StationId | null, max = MAX_VIEW_STREETS): readonly StationId[] {
+  const room = max - (focusedId === null ? 0 : 1)
+  const out: StationId[] = []
+  for (const id of view) {
+    if (out.length >= room) break
+    if (id !== focusedId && !out.includes(id)) out.push(id)
+  }
+  return out.length > 0 ? out : NO_STREET_IDS
+}
+
 /** A view-driven fetch (an interior, o3r.5's streets) that failed is not tried again for this long, ms. */
 export const VIEW_RETRY_MS = 30_000
 

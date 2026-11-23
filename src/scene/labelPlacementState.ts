@@ -146,6 +146,9 @@ export interface PlacementView {
   ringRadiusM: number
   /** The focused station's point while it draws a focus ring (no interior), else null. */
   focusRing: Ground | null
+  /** Per nearby station (parallel to `LabelPlacement.stations`): 1 while its marker isn't drawn (a view interior stands
+   *  in for it, faded out), so it blocks nothing; null for all drawn. */
+  markerHidden: Uint8Array | null
   /** The loaded interior, whose outlines the street names keep clear of, and its group's y scale. */
   interior: InteriorModel | null
   depthScale: number
@@ -181,6 +184,7 @@ export function newView(camera: PlacementView['camera'], markHalfM: number): Pla
     markerRadiusM: 0,
     ringRadiusM: 0,
     focusRing: null,
+    markerHidden: null,
     interior: null,
     depthScale: 1,
     priorityEntrance: -1,
