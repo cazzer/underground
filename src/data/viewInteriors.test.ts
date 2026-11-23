@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { coveredStationIds, drawnInteriors, viewInteriorIds, type IndexLoad } from './interiorLoad'
+import { coveredStationIds, drawnInteriors, viewInteriorIds, viewStreetInterior, type IndexLoad } from './interiorLoad'
 
 const index: IndexLoad = {
   status: 'ready',
@@ -87,5 +87,34 @@ describe('coveredStationIds', () => {
       'L08',
     ])
     expect(coveredStationIds([])).toEqual([])
+  })
+})
+
+describe('viewStreetInterior', () => {
+  const m = (stationId: string, memberStationIds?: string[]) => ({ stationId, memberStationIds })
+  const union = m('635', ['635', 'L03', 'R20'])
+
+  it('takes the shown interior covering the station (drawn or fading out): marks against it, whole streets', () => {
+    expect(viewStreetInterior('L08', [m('L10'), m('L08')], ['L08'], index)).toEqual({ interior: m('L08'), pending: false, clipped: false })
+  })
+
+  it('takes a drawn complex interior for any of its members', () => {
+    expect(viewStreetInterior('L03', [union], ['635'], index).interior).toBe(union)
+  })
+
+  it('waits on its marks while the index loads', () => {
+    expect(viewStreetInterior('L08', [], [], { status: 'loading' })).toEqual({ interior: null, pending: true, clipped: false })
+  })
+
+  it('waits on its marks while its file is requested and not shown', () => {
+    expect(viewStreetInterior('L03', [], ['635'], index)).toEqual({ interior: null, pending: true, clipped: false })
+  })
+
+  it('draws every mark and whole streets for a listed file not requested (past the cap, or failed lately)', () => {
+    expect(viewStreetInterior('A02', [], ['L10'], index)).toEqual({ interior: null, pending: false, clipped: false })
+  })
+
+  it('clips the streets of a station with no interior file', () => {
+    expect(viewStreetInterior('G22', [], [], index)).toEqual({ interior: null, pending: false, clipped: true })
   })
 })

@@ -5,7 +5,7 @@ import { declutter, LABEL_PAD_PX } from '../lib/labelDeclutter'
 import { RECT, writeRect } from '../lib/labelGeometry'
 import type { Ground } from '../lib/projection'
 import { entranceBoxes, rankEntrances } from './entranceLabelBoxes'
-import { FIXED_RECTS, groundHalfPx, toScreen, type LabelPlacement, type PlacementView } from './labelPlacementState'
+import { FIXED_RECTS, groundHalfPx, neighbourCount, toScreen, type LabelPlacement, type PlacementView } from './labelPlacementState'
 import { markNamedStreets, rankStreets, streetBoxes } from './streetLabelBoxes'
 
 /** Gap the camera framing keeps between the free area and the panel (interiorFreeRect), px. */
@@ -75,7 +75,8 @@ export function exemptExitFromMarks(p: LabelPlacement, view: PlacementView): voi
   for (let i = 0; i < p.entrances.length && i < 32; i++) {
     if (!p.entrances[i]!.members.includes(view.priorityEntrance)) continue
     const exempt = p.bounds.exempt!
-    for (let k = FIXED_RECTS; k < FIXED_RECTS + p.marks.length; k++) exempt[k] = exempt[k]! | (1 << i)
+    const end = FIXED_RECTS + p.marks.length + neighbourCount(p, view)
+    for (let k = FIXED_RECTS; k < end; k++) exempt[k] = exempt[k]! | (1 << i)
     return
   }
 }
@@ -91,9 +92,15 @@ export function placeLabels(p: LabelPlacement, anchor: Ground, view: PlacementVi
   const rects = p.bounds.rects
   let r = FIXED_RECTS
   for (let k = 0; k < p.marks.length; k++) markRect(rects, r++, anchor.x + p.marks[k]!.x, anchor.z + p.marks[k]!.z, view.markHalfM, view, a, b)
+  // The other drawn layers' entrance marks, the same size.
+  const nm = view.neighbourMarks
+  for (let k = 0, n = neighbourCount(p, view); k < n; k++) markRect(rects, r++, nm![2 * k]!, nm![2 * k + 1]!, view.markHalfM, view, a, b)
   // Station markers and the focus ring, sized as drawn now; an entrance whose own mark sits in one ignores it.
   const markerRect = r
-  for (let k = 0; k < p.stations.length; k++) markRect(rects, r++, p.stations[k]!.x, p.stations[k]!.z, view.markerRadiusM, view, a, b)
+  for (let k = 0; k < p.stations.length; k++) {
+    if (view.markerHidden?.[k] === 1) writeRect(rects, r++, 0, 0, 0, 0)
+    else markRect(rects, r++, p.stations[k]!.x, p.stations[k]!.z, view.markerRadiusM, view, a, b)
+  }
   const ring = view.focusRing
   if (ring) markRect(rects, r, ring.x, ring.z, view.ringRadiusM, view, a, b)
   else writeRect(rects, r, 0, 0, 0, 0)

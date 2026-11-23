@@ -3,7 +3,7 @@
  * - the street mask (src/lib/basemap/streetMask.ts): inside any drawn station's street radius (MASK_N discs) a road
  *   fades out as that station's own streets fade in, keeping the least alpha any disc gives it. MASK_GLSL is
  *   maskAlphaAt's twin. Road materials share one MaskUniforms by reference, so one write per frame (Basemap.tsx,
- *   writeMaskUniforms) moves them all; water and parks get their own, left at strength 0.
+ *   writeMaskUniforms) moves them all; water, parks and paths get their own, left at strength 0.
  * - the network fade and the bbox edge (src/lib/basemap/edgeFade.ts): the basemap thins out away from the subway and
  *   stops at the spec bbox. NETWORK_GLSL and EDGE_GLSL are networkAlpha's and edgeAlpha's twins. One ExtentUniforms is
  *   shared by every class; Basemap writes the edge width per frame.
@@ -21,7 +21,7 @@ const OWNER: PatchOwner = { label: 'Basemap shader', file: 'basemapLineMaterial.
 export interface MaskUniforms {
   /** Per slot (MASK_N): center x, z, then the ramp's start and end (maskInner, radius), scene meters. */
   maskDiscs: IUniform<Vector4[]>
-  /** Per slot: its station street layer's opacity; 0 (a free slot) leaves every road as drawn. */
+  /** Per slot: its station street layer's opacity (the reveal times its presence); 0 (a free slot) leaves every road as drawn. */
   maskStrength: IUniform<number[]>
 }
 
@@ -32,13 +32,14 @@ export function createMaskUniforms(): MaskUniforms {
   }
 }
 
-/** Copies the mask's present slots into the uniforms at `strength` (the station layers' opacity); the rest at 0. Allocates nothing. */
+/** Copies the mask's present slots into the uniforms at `strength` (the station layers' reveal) times each slot's own
+ *  strength (its layer's presence); the rest at 0. Allocates nothing. */
 export function writeMaskUniforms(uniforms: MaskUniforms, mask: StreetMask, strength: number): void {
   for (let i = 0; i < MASK_N; i++) {
     const slot = mask.slots[i]!
     if (slot.present) {
       uniforms.maskDiscs.value[i]!.set(slot.x, slot.z, maskInner(slot.radiusM), slot.radiusM)
-      uniforms.maskStrength.value[i] = strength
+      uniforms.maskStrength.value[i] = strength * slot.strength
     } else {
       uniforms.maskStrength.value[i] = 0
     }

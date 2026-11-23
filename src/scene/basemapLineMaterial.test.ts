@@ -2,7 +2,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { describe, expect, it } from 'vitest'
 import { edgeAlpha, networkAlpha } from '../lib/basemap/edgeFade'
 import { networkHull } from '../lib/basemap/networkHull'
-import { claimMaskSlot, createStreetMask, MASK_N, maskAlphaAt, maskInner, releaseMaskSlot, writeMaskSlot, type MaskDisc } from '../lib/basemap/streetMask'
+import { claimMaskSlot, createStreetMask, MASK_N, maskAlphaAt, maskInner, releaseMaskSlot, writeMaskSlot, writeMaskStrength, type MaskDisc } from '../lib/basemap/streetMask'
 import { BAND_UNIFORMS } from './bandLineMaterial'
 import {
   BasemapLineMaterial,
@@ -60,12 +60,16 @@ function maskPort(x: number, z: number, discs: readonly (readonly number[])[], s
 }
 
 /** These discs written through a mask into uniforms (read back as plain arrays), and the discs maskAlphaAt reads. */
-function maskCase(discs: readonly { x: number; z: number; radiusM: number }[], strength: number) {
+function maskCase(discs: readonly { x: number; z: number; radiusM: number; presence?: number }[], strength: number) {
   const mask = createStreetMask()
-  for (const d of discs) writeMaskSlot(mask, claimMaskSlot(mask)!, d.x, d.z, d.radiusM)
+  for (const d of discs) {
+    const slot = claimMaskSlot(mask)!
+    writeMaskSlot(mask, slot, d.x, d.z, d.radiusM)
+    if (d.presence !== undefined) writeMaskStrength(mask, slot, d.presence)
+  }
   const uniforms = createMaskUniforms()
   writeMaskUniforms(uniforms, mask, strength)
-  const twin: MaskDisc[] = discs.map((d) => ({ x: d.x, z: d.z, inner: maskInner(d.radiusM), outer: d.radiusM, strength }))
+  const twin: MaskDisc[] = discs.map((d) => ({ x: d.x, z: d.z, inner: maskInner(d.radiusM), outer: d.radiusM, strength: strength * (d.presence ?? 1) }))
   return { discs: uniforms.maskDiscs.value.map((v) => v.toArray()), strength: uniforms.maskStrength.value, twin }
 }
 
@@ -96,6 +100,8 @@ describe('the GLSL twins', () => {
       [{ x: 0, z: 0, radiusM: 0 }],
       [{ x: 0, z: 0, radiusM: 300 }, { x: 450, z: 0, radiusM: 200 }, { x: -2000, z: 900, radiusM: 50 }],
       [{ x: 0, z: 0, radiusM: 300 }, { x: 450, z: 0, radiusM: 200 }, { x: 0, z: 400, radiusM: 300 }, { x: 5000, z: 5000, radiusM: 300 }],
+      // A layer easing in and one easing out beside a whole one: each slot's own presence.
+      [{ x: 0, z: 0, radiusM: 300, presence: 0.25 }, { x: 450, z: 0, radiusM: 200 }, { x: 0, z: 400, radiusM: 300, presence: 0.8 }],
     ]
     const points = [[0, 0], [100, -50], [260, 0], [330, 0], [400, 0], [450, 120], [0, 300], [-1990, 900], [5, 0], [9000, 9000]] as const
     for (const discs of cases) {
@@ -166,9 +172,14 @@ describe('writeMaskUniforms', () => {
     expect(uniforms.maskDiscs.value[a]!.toArray()).toEqual([10, 20, 230, 300])
     expect(uniforms.maskDiscs.value[b]!.toArray()).toEqual([-500, 40, 80, 150])
     expect(uniforms.maskStrength.value).toEqual([0.7, 0.7, 0, 0])
+    writeMaskStrength(mask, b, 0.5)
+    writeMaskUniforms(uniforms, mask, 0.7)
+    expect(uniforms.maskStrength.value).toEqual([0.7, 0.35, 0, 0])
     releaseMaskSlot(mask, a)
     writeMaskUniforms(uniforms, mask, 0.7)
-    expect(uniforms.maskStrength.value).toEqual([0, 0.7, 0, 0])
+    expect(uniforms.maskStrength.value).toEqual([0, 0.35, 0, 0])
+    // A slot claimed again starts whole.
+    expect(mask.slots[claimMaskSlot(mask)!]!.strength).toBe(1)
     expect(uniforms.maskDiscs.value[b]!.toArray()).toEqual([-500, 40, 80, 150])
   })
 })

@@ -1,203 +1,186 @@
-import { useFrame } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
-import { Color, type Group } from 'three'
-import { interiorCovers, interiorStationIds } from '../data/interiorLoad'
-import { useStationStreets, type StreetLayer } from '../data/useStationStreets'
-import { claimMaskSlot, releaseMaskSlot, writeMaskSlot, type StreetMask } from '../lib/basemap/streetMask'
-import { clipLineBuffers } from '../lib/clipLineBuffers'
-import { entranceMarkBuffers, unmatchedEntrances } from '../lib/entranceMarks'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { interiorCovers, viewStreetInterior, type IndexLoad } from '../data/interiorLoad'
+import { useStationStreets, useStreetLayers, type StreetLayer } from '../data/useStationStreets'
+import { MASK_N, type StreetMask } from '../lib/basemap/streetMask'
+import type { ExitLabel } from '../lib/exitView'
 import { useFocus } from '../lib/focus'
-import { exitEntranceIndex, type ExitLabel } from '../lib/exitView'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
-import { interiorOpacity } from '../lib/interiorReveal'
 import type { LabelBlockers } from '../lib/labelBlockers'
-import type { Rgb } from '../lib/lineBuffers'
-import { DESKTOP_LABEL_RADIUS_M, streetLabelOpacity } from '../lib/streetLabelReveal'
 import type { Network } from '../lib/network'
-import { routeBundles } from '../lib/routeBundles'
-import { buildRouteClip, CLIP_TRACK_REACH_M } from '../lib/routeClip'
-import { localTracks } from '../lib/routeTracks'
-import type { Ground } from '../lib/projection'
-import { depthFactor, depthScaleY } from '../lib/tilt'
+import { admitShown, newPresence, type Presence } from '../lib/presence'
+import { NO_CELL, streetCells } from '../lib/streetCells'
 import type { EmphasisLevels } from '../lib/tripEmphasis'
-import { theme } from '../theme'
-import { writeLineDim } from './bandLineMaterial'
-import { cameraDistance, focusScaleFactor, markerRadiusPx, screenScale } from './cameraDistance'
-import { ENTRANCE_SIZE_M, type InteriorModel } from './interiorModel'
-import { RENDER_ORDER } from './renderOrder'
-import { streetsLook } from './streetsLook'
-import { useEntranceProbe } from './useEntranceProbe'
-import { useLineLayer } from './useLineLayer'
-import { MARKER_MIN_METERS } from './markerShape'
-import { useStreetLabels, type LabelContext } from './useStreetLabels'
-
-// Color(hex) converts sRGB to linear, which is what vertex colors must be.
-const MARK_COLOR = new Color(theme.interiorEntrance)
-const MARK_RGB: Rgb = [MARK_COLOR.r, MARK_COLOR.g, MARK_COLOR.b]
+import { MAX_VIEW_STREETS, viewStreetIds } from '../lib/viewStations'
+import type { PresenceStore } from './InteriorPresence'
+import type { InteriorModel } from './interiorModel'
+import { StreetLabels } from './StreetLabels'
+import { StreetLines } from './StreetLines'
+import type { CoveredStation } from './useSceneInteriors'
 
 interface StationStreetsProps {
   /** The focused station's interior, once loaded: its entrances get no second mark. */
   interior: InteriorModel | null
   /** The focused station has an interior still loading: no marks yet, so none flash before it lands. */
   interiorPending: boolean
-  /** Look A's screen veil is up (any interior drawn, the focused one's or one in view): the streets rest above it, faint. */
-  veiled: boolean
+  /** The station leads in view (o3r.2's set, focused first; empty from REVEAL_FAR out and under the location cap). */
+  view: readonly string[]
+  /** The interiors shown now, drawn or fading out (useSceneInteriors): a station in view takes the one covering it. */
+  shownInteriors: readonly InteriorModel[]
+  /** Each shown interior's presence, by file id. */
+  interiorPresences: ReadonlyMap<string, Presence>
+  /** The view interior files requested, loaded or not: a station in view waits on its marks while its file loads. */
+  viewFiles: readonly string[]
+  /** Stations another drawn interior stands in for: the focused labels ignore a marker it has faded out. */
+  covered: readonly CoveredStation[]
+  /** Which stations have an interior file. */
+  index: IndexLoad
+  /** The interiors' presences: the veil's drawn share picks each layer's stroke. */
+  veil: PresenceStore
   insets: Insets
   panel: ScreenRect | null
   /** The level labels' screen rects, which the street labels keep clear of. */
   labelBlockers: LabelBlockers
-  /** For the station markers the labels keep clear of. */
   network: Network
-  /** A slot is claimed while a layer is drawn, so the basemap's roads give way inside its radius (Basemap.tsx). */
+  /** Each mounted layer claims a slot, so the basemap's roads give way inside its radius (Basemap.tsx). */
   mask: StreetMask
-  /** The entrances of the trip's way out and way in (useTripExit, useTripBoard): the first this layer's file has is
-   *  placed first and tinted; empty for none. */
+  /** The entrances of the trip's way out and way in, which the focused labels place first; empty for none. */
   pathLabels: readonly ExitLabel[]
   /** The trip emphasis (SubwayLines, -0.25): the street lines dim with the route lines by its `networkDim`. */
   tripLevels: EmphasisLevels
 }
 
-/**
- * The focused station's streets, interior or not: fetched on focus, drawn while it stays focused, gone with the
- * focus. Keyed by station, so a new station starts hidden and fades in from its own first frame.
- */
-export function StationStreets({ interior, ...rest }: StationStreetsProps) {
-  const { focusedId } = useFocus()
-  const layer = useStationStreets(focusedId)
-  if (!layer) return null
-  // A complex's interior covers every member: focused on any of them, it is this station's.
-  const own = interiorCovers(interior, layer.stationId) ? interior : null
-  return <StreetLines key={layer.stationId} layer={layer} interior={own} {...rest} />
-}
-
-interface StreetLinesProps extends StationStreetsProps {
-  layer: StreetLayer
-}
-
-/** Stations this far beyond the street label radius still block (their marker reaches in), meters. */
-const STATION_REACH_M = DESKTOP_LABEL_RADIUS_M + 50
-
-/** The stations near the layer whose markers are drawn: not the focused one, nor the members its interior covers
- *  (their markers are hidden with it). */
-function nearbyStations(network: Network, layer: StreetLayer, interior: InteriorModel | null): Ground[] {
-  const hidden = new Set(interior ? interiorStationIds(interior) : [])
-  return network.stations
-    .filter((s) => s.id !== layer.stationId && !hidden.has(s.id))
-    .filter((s) => Math.hypot(s.pos.x - layer.anchor.x, s.pos.z - layer.anchor.z) <= STATION_REACH_M)
-    .map((s) => s.pos)
-}
-
-/**
- * How the streets draw: above the interior veil at the veiled stroke (about 1.9:1, streetVeil.ts) while look A's
- * screen veil is up (any interior drawn), so they rest faint behind it instead of vanishing under it; otherwise under
- * the route lines at full color. `?streets=` forces either order, at full color.
- */
-function streetMode(veiled: boolean): 'under' | 'over' | 'veiled' {
-  if (streetsLook !== 'auto') return streetsLook
-  return veiled ? 'veiled' : 'under'
-}
-
-/**
- * One merged line layer at street level (y = 0) at the station's anchor, and the marks of the entrances the interior
- * doesn't draw, fading in with the interior reveal; then the street and entrance labels.
- */
-function StreetLines({ layer, interior, interiorPending, veiled, insets, panel, labelBlockers, network, mask, pathLabels, tripLevels }: StreetLinesProps) {
-  const group = useRef<Group>(null)
-  const shown = useRef(-1)
-  const labelShown = useRef(0)
-  const labelContext = useRef<LabelContext>({ interior: null, focusRing: null, depthScale: 1, markerRadiusM: 0, ringRadiusM: 0, priorityEntrance: -1 })
-  // The other stations whose markers the labels keep clear of; the focused one draws none, or a focus ring.
-  const stations = useMemo(() => nearbyStations(network, layer, interior), [network, layer, interior])
-  // Which street candidates a subway line runs along, so their labels step clear of its bundle.
-  const bundles = useMemo(() => routeBundles(layer.streets, layer.anchor, network.shapes, STATION_REACH_M), [network, layer])
-  const focused = network.stationById.get(layer.stationId)?.pos ?? null
-  const insetsRef = useRef(insets)
-  const panelRef = useRef(panel)
-  // Read per frame by the labels; synced after commit, before the next frame.
-  useLayoutEffect(() => {
-    insetsRef.current = insets
-    panelRef.current = panel
-  }, [insets, panel])
-  // The street pieces that run under a route line are left out, so none reads as one more track in its bundle. Not
-  // at a station with an interior (loaded or loading): there the tracks sink under it, clear of the streets.
-  // While the station index is still loading, every station counts as pending (focusedMarkerShown), so a station
-  // with none draws its streets whole for that moment and the pieces under its lines pop out once the index lands.
-  // The index is fetched on mount, so only a focus in the page's first moments (a #station link) can show it.
-  const clipped = !interior && !interiorPending
-  const clip = useMemo(
-    () => (clipped ? buildRouteClip(localTracks(network.shapes, layer.anchor, layer.file.radiusM + CLIP_TRACK_REACH_M)) : null),
-    [clipped, network, layer],
-  )
-  const mode = streetMode(veiled)
-  const buffers = useMemo(() => {
-    const base = mode === 'veiled' ? layer.veiledBuffers : layer.buffers
-    return clip ? clipLineBuffers(base, clip) : base
-  }, [mode, layer, clip])
-  const lines = useLineLayer(
-    buffers,
-    mode === 'under' ? RENDER_ORDER.streets : RENDER_ORDER.streetsOver,
-    theme.streetWidth,
-    undefined,
-    { dimmable: true },
-  )
-  const markBuffers = useMemo(() => {
-    if (interiorPending) return null
-    const at = interior && { origin: interior.origin, entrances: interior.entrances }
-    return entranceMarkBuffers(layer.file, unmatchedEntrances(layer.file, layer.anchor, at), ENTRANCE_SIZE_M, MARK_RGB)
-  }, [layer, interior, interiorPending])
-  // The trip path's entrance in this layer's file (any member of a complex shows its own), placed first. A focused
-  // station is the To or the From end, never both, so at most one of the labels is in the file.
-  const priorityEntrance = useMemo(() => {
-    for (const label of pathLabels) {
-      const i = exitEntranceIndex(label, layer.file)
-      if (i >= 0) return i
+/** Every entrance mark of the layers, scene ground x, z pairs; null for none. */
+function marksOf(layers: readonly StreetLayer[]): Float32Array | null {
+  const n = layers.reduce((sum, l) => sum + l.marks.length, 0)
+  if (n === 0) return null
+  const out = new Float32Array(2 * n)
+  let k = 0
+  for (const l of layers) {
+    for (const m of l.marks) {
+      out[k++] = l.anchor.x + m.x
+      out[k++] = l.anchor.z + m.z
     }
-    return -1
-  }, [pathLabels, layer])
-  const marks = useLineLayer(markBuffers, RENDER_ORDER.streetEntrance, theme.interiorFineWidth)
-  useLayoutEffect(() => {
-    // A full mask has logged; this layer then draws over the roads it would mask.
-    const slot = claimMaskSlot(mask)
-    if (slot === null) return
-    writeMaskSlot(mask, slot, layer.anchor.x, layer.anchor.z, layer.file.radiusM)
-    return () => releaseMaskSlot(mask, slot)
-  }, [layer, mask])
-  // A rebuilt layer (the mode changes when the interior lands) starts at full opacity: catch it up.
-  useLayoutEffect(() => {
-    shown.current = -1
-  }, [lines])
+  }
+  return out
+}
 
-  useFrame((state) => {
-    const g = group.current
-    if (!g) return
-    const distance = cameraDistance(state)
-    const o = interiorOpacity(distance)
-    const depth = depthFactor(distance)
-    labelShown.current = streetLabelOpacity(o, depth)
-    const ctx = labelContext.current
-    ctx.interior = interior
-    ctx.focusRing = interior || interiorPending ? null : focused
-    ctx.depthScale = depthScaleY(depth)
-    ctx.priorityEntrance = priorityEntrance
-    // As Stations.tsx and FocusRing.tsx size them at this distance.
-    ctx.markerRadiusM = screenScale(distance, markerRadiusPx(distance), MARKER_MIN_METERS)
-    ctx.ringRadiusM = ctx.markerRadiusM * focusScaleFactor(distance, ctx.markerRadiusM)
-    if (marks && marks.material.opacity !== o) marks.material.opacity = o
-    if (lines) writeLineDim(lines.material, tripLevels.networkDim)
-    if (o === shown.current) return
-    shown.current = o
-    if (lines) lines.material.opacity = o
-    g.visible = o > 0
+/**
+ * The streets and entrance marks of the focused station (fetched on focus) and of up to MAX_VIEW_STREETS - 1 more
+ * station leads in view (o3r.5; fetched only for o3r.2's camera-driven set, `useStreetLayers`), focused first. Each
+ * is a StreetLines keyed by station that eases in and out with its own presence (a leaving one stays mounted, holding
+ * its mask slot, until faded; a joining one waits while the slots are full, `admitShown`) and, once settled, draws only
+ * its power cell where layers overlap (streetCells.ts), so a street two files hold draws once. Only the focused one is labelled
+ * (StreetLabels), clear of the others' marks.
+ */
+export function StationStreets(props: StationStreetsProps) {
+  const { interior, interiorPending, view, shownInteriors, interiorPresences, viewFiles, covered, index, veil } = props
+  const { insets, panel, labelBlockers, network, mask, pathLabels, tripLevels } = props
+  const { focusedId } = useFocus()
+  const focusedLayer = useStationStreets(focusedId)
+  const otherIds = useMemo(() => viewStreetIds(view, focusedId), [view, focusedId])
+  const others = useStreetLayers(otherIds)
+  const wanted = useMemo(() => {
+    const out: StreetLayer[] = focusedLayer ? [focusedLayer] : []
+    for (const l of others) {
+      if (out.length >= MAX_VIEW_STREETS) break
+      if (!out.some((o) => o.stationId === l.stationId)) out.push(l)
+    }
+    return out
+  }, [focusedLayer, others])
+
+  // The mounted layers: the wanted ones admitted while the slots allow, then the leaving ones until faded (adjusted during render).
+  const [shownState, setShown] = useState<readonly StreetLayer[]>([])
+  // The focused station's layer never waits for a slot: the oldest leaving layer goes at once instead.
+  const { drawn, shown } = admitShown(shownState, wanted, MASK_N, focusedLayer != null && wanted[0] === focusedLayer)
+  if (shown !== shownState) setShown(shown)
+  const presences = useState(() => new Map<string, Presence>())[0]
+  for (const l of shown) if (!presences.has(l.stationId)) presences.set(l.stationId, newPresence(l.stationId))
+  useLayoutEffect(() => {
+    for (const id of [...presences.keys()]) if (!shown.some((l) => l.stationId === id)) presences.delete(id)
+    for (const l of shown) presences.get(l.stationId)!.target = drawn.includes(l) ? 1 : 0
   })
-
-  useStreetLabels(layer, stations, bundles, labelShown, labelContext, insetsRef, panelRef, labelBlockers, ENTRANCE_SIZE_M / 2)
-  useEntranceProbe(layer, focused, insets, panel)
-
-  return (
-    <group ref={group} position={[layer.anchor.x, 0, layer.anchor.z]} visible={false}>
-      {lines && <primitive object={lines} />}
-      {marks && <primitive object={marks} />}
-    </group>
+  const onFaded = useCallback(
+    (id: string) => setShown((s) => (presences.get(id)?.target === 0 ? s.filter((l) => l.stationId !== id) : s)),
+    [presences],
   )
+  // Bumped when a joining layer's presence reaches 1, so the cells take it in.
+  const [, setSettles] = useState(0)
+  const onSettled = useCallback(() => setSettles((n) => n + 1), [])
+
+  const drawnKey = drawn.map((l) => l.stationId).join(',')
+  // The cells are cut among the settled layers (drawn, fully in). A joining or leaving layer draws its whole disc while
+  // it eases, over the settled ones, so no street in the overlap dips or pops: only its faded edge band shows doubled
+  // for that moment. A settled layer takes over a leaving one's part at once, and gives up its part to a joining one
+  // only once that one is fully in.
+  const settled = drawn.filter((l) => {
+    const p = presences.get(l.stationId)
+    return p !== undefined && p.target === 1 && p.value === 1
+  })
+  const settledKey = settled.map((l) => l.stationId).join(',')
+  const cells = useMemo(() => {
+    const list = streetCells(settled.map((l) => ({ id: l.stationId, x: l.anchor.x, z: l.anchor.z, radiusM: l.file.radiusM })))
+    return new Map(settled.map((l, i) => [l.stationId, list[i]!]))
+    // The anchors and radii are fixed per station: the ids say it all.
+  }, [settledKey])
+  // `shown` keeps its identity only while every mounted layer object does, so a rebuilt neighbour layer (a member
+  // retried) re-packs its marks; `drawnKey` says which of them are drawn.
+  const neighbourMarks = useMemo(() => marksOf(drawn.filter((l) => l !== focusedLayer)), [shown, drawnKey, focusedLayer])
+
+  const ids = useRef<string[]>([])
+  useEffect(() => {
+    ids.current = drawn.map((l) => l.stationId)
+  }, [drawnKey])
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    window.__underground = { ...window.__underground, streetLayers: () => [...ids.current] }
+    return () => {
+      if (window.__underground) delete window.__underground.streetLayers
+    }
+  }, [])
+
+  return shown.map((layer) => {
+    const isFocused = layer === focusedLayer && drawn.includes(layer)
+    // A complex's interior covers every member: focused on any of them, it is this station's.
+    const own = isFocused && interiorCovers(interior, layer.stationId) ? interior : null
+    const rules = isFocused
+      ? { interior: own, pending: interiorPending, clipped: !own && !interiorPending }
+      : viewStreetInterior(layer.stationId, shownInteriors, viewFiles, index)
+    const presence = presences.get(layer.stationId)!
+    return (
+      <Fragment key={layer.stationId}>
+        <StreetLines
+          layer={layer}
+          focused={isFocused}
+          presence={presence}
+          onFaded={onFaded}
+          onSettled={onSettled}
+          interior={rules.interior}
+          interiorPresence={rules.interior ? (interiorPresences.get(rules.interior.stationId) ?? null) : null}
+          interiorPending={rules.pending}
+          clipped={rules.clipped}
+          cell={cells.get(layer.stationId) ?? NO_CELL}
+          veil={veil}
+          network={network}
+          mask={mask}
+          tripLevels={tripLevels}
+        />
+        {isFocused && (
+          <StreetLabels
+            layer={layer}
+            interior={own}
+            interiorPending={interiorPending}
+            insets={insets}
+            panel={panel}
+            labelBlockers={labelBlockers}
+            network={network}
+            pathLabels={pathLabels}
+            covered={covered}
+            neighbourMarks={neighbourMarks}
+            presence={presence}
+          />
+        )}
+      </Fragment>
+    )
+  })
 }

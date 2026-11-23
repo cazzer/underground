@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classOf } from './featureClass'
+import { BASEMAP_CLASSES, classOf, isMaskedClass } from './featureClass'
 
 describe('classOf', () => {
   it('splits roads by kind', () => {
@@ -45,5 +45,11 @@ describe('classOf', () => {
     expect(classOf('earth', 3, { kind: 'earth' })).toBeNull()
     expect(classOf('roads', 1, { kind: 'highway' })).toBeNull()
     expect(classOf('roads', 2, {})).toBeNull()
+  })
+})
+
+describe('isMaskedClass', () => {
+  it('masks the streets a station layer redraws, never paths, water or parks', () => {
+    expect(BASEMAP_CLASSES.filter(isMaskedClass)).toEqual(['highway', 'major', 'minor'])
   })
 })

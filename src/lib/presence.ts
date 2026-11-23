@@ -52,3 +52,39 @@ export function withoutFaded<T extends HasStationId>(shown: readonly T[], drawn:
   const next = shown.filter((m) => m.stationId !== id)
   return next.length === shown.length ? shown : next
 }
+
+/**
+ * Like mergeShown, for layers that each hold one of `max` slots until they have faded out (the street layers' mask
+ * slots, o3r.5): the previously shown ones that are still `wanted` stay (as the wanted objects, in wanted order), the
+ * rest of `prev` keep fading, and a newly wanted one joins only while the total stays within `max`; the others wait,
+ * in wanted order, until a leaving one fades (`withoutFaded`) and frees its slot. With `firstUrgent` (wanted[0] is the
+ * focused station's) a first one that would wait instead drops the oldest leaving ones at once (the last in `prev`:
+ * a layer that starts to leave sits before those that left earlier), so it never waits. `drawn` is what eases toward
+ * 1, `shown` what is mounted; `prev` itself comes back as `shown` when nothing changed.
+ */
+export function admitShown<T extends HasStationId>(
+  prev: readonly T[],
+  wanted: readonly T[],
+  max: number,
+  firstUrgent = false,
+): { drawn: readonly T[]; shown: readonly T[] } {
+  const has = (list: readonly T[], id: string) => list.some((m) => m.stationId === id)
+  const leaving = prev.filter((m) => !has(wanted, m.stationId))
+  let room = max - leaving.length - wanted.filter((m) => has(prev, m.stationId)).length
+  const first = wanted[0]
+  if (firstUrgent && first && !has(prev, first.stationId)) {
+    while (room <= 0 && leaving.length > 0) {
+      leaving.pop()
+      room++
+    }
+  }
+  const drawn = wanted.filter((m) => {
+    if (has(prev, m.stationId)) return true
+    if (room <= 0) return false
+    room--
+    return true
+  })
+  const next = leaving.length === 0 ? drawn : [...drawn, ...leaving]
+  const shown = next.length === prev.length && next.every((m, i) => m === prev[i]) ? prev : next
+  return { drawn, shown }
+}

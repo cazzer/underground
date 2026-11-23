@@ -118,6 +118,8 @@ export interface UndergroundDevHooks {
   viewStations?: () => readonly string[]
   /** The interior file ids the scene draws now, the focused one first (useSceneInteriors). */
   drawnInteriors?: () => string[]
+  /** The station ids whose street layers draw now, the focused one first (StationStreets). */
+  streetLayers?: () => string[]
   /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */
   basemapSegments?: () => { distance: number; classes: Record<string, { used: number; capacity: number; visible: boolean }> }
 }

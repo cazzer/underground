@@ -19,6 +19,8 @@ export interface MaskSlot {
   z: number
   /** Its file's radius: past it the station layer draws nothing. */
   radiusM: number
+  /** Its layer's own presence (0 to 1, easing in on join and out on leave): the roads give way by the reveal times this. */
+  strength: number
 }
 
 export interface StreetMask {
@@ -29,7 +31,7 @@ export interface StreetMask {
 }
 
 export function createStreetMask(): StreetMask {
-  const slots = Array.from({ length: MASK_N }, (): MaskSlot => ({ claimed: false, present: false, x: 0, z: 0, radiusM: 0 }))
+  const slots = Array.from({ length: MASK_N }, (): MaskSlot => ({ claimed: false, present: false, x: 0, z: 0, radiusM: 0, strength: 1 }))
   return { slots, fullLogged: false }
 }
 
@@ -42,6 +44,7 @@ export function claimMaskSlot(mask: StreetMask): number | null {
     return null
   }
   mask.slots[slot]!.claimed = true
+  mask.slots[slot]!.strength = 1
   return slot
 }
 
@@ -58,6 +61,11 @@ export function writeMaskSlot(mask: StreetMask, slot: number, x: number, z: numb
   s.x = x
   s.z = z
   s.radiusM = radiusM
+}
+
+/** Sets a claimed slot's own strength (its layer's presence, per frame). Throws on a slot not claimed. */
+export function writeMaskStrength(mask: StreetMask, slot: number, strength: number): void {
+  claimedSlot(mask, slot).strength = strength
 }
 
 /** Frees a claimed slot; the roads there come back. Throws on a slot not claimed. */
