@@ -20,7 +20,8 @@ phone's frame rate) stations in view reveal with no tap or dwell, the focused on
 bare station focused (no interior of its own drawn) its neighbours' interiors draw with no veil, so its marker, trains and streets
 keep full contrast.
 Streets and entrance marks of up to `MAX_VIEW_STREETS` (4) stations in view draw the same way with no tap inside 1250 m, focused
-first (o3r.5); where two 300 m files overlap each street draws once; labels stay the focused station's.
+first (o3r.5), each easing in and out over 250 ms; where two 300 m files overlap each street draws once; a neighbour's
+entrance marks draw a tier dimmer; labels stay the focused station's.
 With no `VITE_RT_URL` there is no live data (the HUD says "Live trains off") and no fake motion. The client also polls the
 Worker's `/ene` (a sibling of `/rt`) and the station panel and interior mark elevators and escalators out of service.
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
@@ -171,6 +172,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (vertical exaggeration; default 2) until the 8x4.11 cards are decided; the removal list is in
   `src/scene/interiorLook.ts`
   Street tokens `streetStroke` (faint by color, not alpha) and `streetWidth` draw the station street layers (focused and in view).
+  `interiorEntranceNeighbourMix` (0.5) mixes `interiorEntrance` toward the background (sRGB, mixHex) for the entrance marks
+  of a station in view that isn't focused (3.68:1; at least 1.5:1 and at most half the focused marks' contrast,
+  `src/themeStreets.test.ts`); the focused station's marks keep the full color.
   Default (auto): under the route lines at 0.35 at full color, but above the veil at 7.5, drawn at a fainter stroke
   (1.9:1, `veiledStreetHex` in `src/lib/streetVeil.ts`), while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused).
   TEMPORARY: `?streets=under|over` forces one order until the ost.7 card is decided; the removal list is in
@@ -375,28 +379,38 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     first (o3r.5); each a `StreetLines.tsx` keyed by station. Where layers' discs overlap each draws only its power-diagram
     cell (`src/lib/streetCells.ts`, pure: `streetCells`, `clipToCell`, `inCell`; with equal radii the nearest anchor, so the
     cut sits where both edge fades agree and the basemap mask's least-alpha rule still complements it; re-cut only when a
-    cell's key, its overlapping neighbours, changes; `streetCells.data.test.ts` checks Rector St 139 and R26 draw every
-    street once). A layer in view takes the drawn interior covering it (`viewStreetInterior` in `interiorLoad.ts`: marks
-    wait while its file is requested and unloaded; a listed file past the cap or failed lately draws every mark and whole
-    streets; route clip only with no interior file). One shared reveal: no per-layer fade, so a joining neighbour shows at
-    the current `interiorOpacity`. Labels and `useEntranceProbe` only on the focused layer (`StreetLabels.tsx`). Dev only:
-    `__underground.streetLayers()` (the station ids drawn, focused first). Each
-    layer: one plain LineMaterial layer at y = 0 in a
-    group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` (so it fades in
-    with the reveal and goes with the focus or the view). Street pieces running under a route line are left out
+    cell's key, its overlapping neighbours, changes; `streetCells.data.test.ts` checks that the nearest pair of station
+    leads with street files draws every street once). Each layer has its own `Presence` (`lib/presence.ts`, 250 ms,
+    reduced motion snaps), stepped by its `StreetLines` at -0.25: it eases in on joining the set and out on leaving, a
+    leaving layer staying mounted (and holding its mask slot) until faded. `admitShown` keeps the mounted layers within
+    `MASK_N`: while leaving layers fill the slots a joining one (the focused one too) waits, in view order, until one
+    fades, at most 250 ms. The cells are cut among the settled layers only (drawn and fully in): a joining or leaving
+    layer draws its whole disc while it eases, so nothing in an overlap dips or pops (its faded edge band shows doubled for
+    that moment); a settled layer takes over a leaving one's part at once and gives up its part to a joining one once
+    that one is in. A layer in view takes the shown interior covering it, drawn or fading out (`viewStreetInterior` in
+    `interiorLoad.ts`: marks wait while its file is requested and not shown; a listed file past the cap or failed lately
+    draws every mark and whole streets; route clip only with no interior file); for every layer, the focused one too, the
+    interior's own entrances stand in for the matching marks only while its presence is past one half (both mark sets
+    are built once and switched per frame), so marks neither double while it fades out nor vanish before it fades in.
+    A neighbour's marks draw at `interiorEntranceNeighbourMix`. Labels and `useEntranceProbe` only on the focused layer
+    (`StreetLabels.tsx`, fading with its presence). Dev only: `__underground.streetLayers()` (the station ids drawn,
+    focused first). Each layer: a plain LineMaterial layer at y = 0 in a
+    group at the street file's anchor, `theme.streetStroke` / `streetWidth`, opacity `interiorOpacity` x its presence
+    (so it fades in with the reveal and goes with the focus or the view). Street pieces running under a route line are left out
     (the route clip, see `src/lib/routeClip.ts` below, over `localTracks`: the runs within the file's radius + its reach),
     so no 1 px centerline reads as one more track in a bundle; the labels still name the street. Not while the station
     has an interior (loaded or loading): its tracks sink under it, so the streets above stay whole. Its draw order is auto: above the veil (7.5), built from
     `StreetLayer.veiledBuffers` (the 1.9:1 stroke, fading to the background like the others; material color stays
-    white), while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused); else 0.35 at full color; `streetsLook.ts` TEMPORARY
-    override. It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
+    white), while look A's veil's drawn share (`PresenceStore.veilShare`) is at least one half, so the stroke never
+    changes ahead of the veil; else 0.35 at full color. Both are cut once per layer and the frame shows one, so the
+    switch re-cuts nothing; `streetsLook.ts` TEMPORARY override (one stroke only). It also draws a fine `theme.interiorEntrance` square (`ENTRANCE_SIZE_M` from interiorModel.ts) at each
     street-file entrance the interior doesn't draw itself (`src/lib/entranceMarks.ts`: no interior entrance within
     1.5 m on the scene ground with the same type; none while an interior is still loading;
     `entranceMarks.data.test.ts` checks L08 adds none), and calls `useStreetLabels.ts`: one aria-hidden wrapper div
     in the canvas container (z-index 0, its opacity the labels' fade) holding a div per label, with the level labels'
     halo `LABEL_HALO`. Placement (`streetLabelPlacement.ts` over `labelPlacementState.ts`, `entranceLabelBoxes.ts`,
     `streetLabelBoxes.ts`, then `labelDeclutter.ts` in two passes) runs only on a frame where the camera, canvas,
-    insets, panel, level labels, interior, focus ring or opacity changed, last placement's spot tried first, and once
+    insets, panel, level labels, interior, focus ring, drawn station markers, neighbour marks or opacity changed, last placement's spot tried first, and once
     more after 10 still frames for the labels that weren't on their first spot. Entrances first (`text-ink`, normal
     case; on a phone, shorter side under 600 px, on two lines, street part then the rest), ranked elevators, then
     labels no other entrance shares, then each head house's best (entrances within 25 m) before any second, then
@@ -410,16 +424,19 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     run with the most on-screen points within 150 m on a phone / 250 m on a desktop (250 m on a phone too for a
     street an entrance label names; last placement's run while it has at most one fewer), nearest the station first,
     falling back to the other runs. Every label keeps clear of the header, footer, panel (+8 px), every entrance
-    mark, the other stations' markers within 300 m that are still drawn (a covered station whose marker its view
-    interior has faded out, `interiorOpacity` x presence at 1 as Stations.tsx collapses it, blocks nothing: a per-frame
-    `LabelContext.markerHidden` flag, `markersVersion` replaces, no DOM rebuild; neighbours' entrance marks don't block,
-    o3r.6) and the focus ring (sized as Stations.tsx and FocusRing.tsx draw
+    mark (its own layer's, and every other drawn layer's, `LabelContext.neighbourMarks`, scene ground x, z pairs, the
+    placement's rects grown by `ensureNeighbourRoom` only when they outnumber its room), the other stations' markers
+    within 300 m that are still drawn (a covered station whose marker its view interior has faded out, `interiorOpacity`
+    x presence at 1 as Stations.tsx collapses it, blocks nothing: a per-frame `LabelContext.markerHidden` flag; a change
+    to it or to the neighbour marks bumps `markersVersion`, which places the labels again without rebuilding the DOM)
+    and the focus ring (sized as Stations.tsx and FocusRing.tsx draw
     them now; an entrance ignores a marker its own mark sits in), and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, a slot claimed by each interior that has labels, today the focused one alone (`claimBlockerSlot` / `releaseBlockerSlot`, `BLOCKER_SLOTS` 3, `MAX_LEVEL_BLOCKERS` 16 each; the street labels read every slot; the label divs are `aria-hidden`),
     at priority 0 each frame; read a frame late); street names also keep clear of the interior's outlines
     (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing). Sized after mount,
     after `document.fonts.ready` and when a resize flips phone and desktop sizes; opacity `streetLabelOpacity` (the level labels' depth gate)
-    While mounted each `StreetLines` claims one slot of Scene's `StreetMask` (4 layers at most = `MASK_N`; one shared strength) (`claimMaskSlot`, `writeMaskSlot` with anchor and file
-    radius, `releaseMaskSlot`; `MASK_N` 4 slots, a full mask logs once and returns no slot), which the basemap's roads give way to
+    While mounted each `StreetLines` claims one slot of Scene's `StreetMask` (`claimMaskSlot`, `writeMaskSlot` with anchor
+    and file radius, `writeMaskStrength` per frame with its presence, `releaseMaskSlot`; `MASK_N` 4 slots, at most 4
+    layers mounted, `admitShown`; a full mask logs once and returns no slot), which the basemap's roads give way to
   - `useLocationCap.ts` / `LocationCapSource.tsx` the location zoom cap's driver (the fly request in a layout effect, pointer
     events through `useViewMoves`), run once by Scene inside the Canvas whether or not the basemap is; the shared handle is
     `lib/basemap/locationCapHandle.ts` (`isCapped()`, `subscribe`), which Scene creates and passes to Basemap
@@ -449,12 +466,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     are sized by the `NET_EDGES` define), then smoothstep
     to 0 over 7 km more; the network's bounding box would sit outside the bbox once padded), the bbox edge (`EDGE_GLSL` /
     `edgeAlpha`: 0 at the spec bbox, in over `edgeFadeFor(distance)`, 4% of the camera distance held to 100 m..3 km and
-    written per frame, so a station near the edge keeps its streets close in), and for roads the street mask
+    written per frame, so a station near the edge keeps its streets close in), and for the street classes the street mask
     (`MASK_GLSL` / `maskAlphaAt`, over `maskAlpha` per disc): inside a drawn station's street radius they fade out as its
-    streets fade in, the exact complement of that layer's 70 m edge fade, at the station layer's `interiorOpacity`. The mask
-    is `MASK_N` (4) discs in fixed uniform arrays (`maskDiscs` vec4 x, z, ramp start, radius; `maskStrength` per slot, 0 when
-    free; `writeMaskUniforms` per frame), a loop sized by the `MASK_N` define like `NET_EDGES`, read from one interpolated
-    ground point (`vGround`); overlapping discs keep the least alpha. Only the focused station claims one today. Scene wraps it in an
+    streets fade in, the exact complement of that layer's 70 m edge fade, at the station layer's `interiorOpacity` times
+    its presence (`MaskSlot.strength`). The mask
+    is `MASK_N` (4) discs in fixed uniform arrays (`maskDiscs` vec4 x, z, ramp start, radius; `maskStrength` per slot, the
+    reveal times the slot's strength, 0 when free; `writeMaskUniforms` per frame), a loop sized by the `MASK_N` define like
+    `NET_EDGES`, read from one interpolated ground point (`vGround`); overlapping discs keep the least alpha. Masked: the
+    highway, major and minor roads only (`isMaskedClass` in `featureClass.ts`); paths, water and parks never, since a
+    station layer draws no footway or park path. Scene wraps it in an
     `ErrorBoundary` with a null fallback: a crash there logs once and draws no basemap. Dev only:
     `__underground.basemapSegments()` (camera distance, per-class used/capacity/visible) and a `basemap:apply`
     performance measure per tile-set change
@@ -978,8 +998,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/data/loadStationStreets.ts` fetches `public/data/streets/<id>.json` (contract `src/data/streetSchema.ts`) and
   checks its outer shape; a 404 is null with one warning (cached for the session), other failures reject (evicted,
   retried on the next focus). `useStationStreets.ts` loads the focused station's file on focus, and through
-  `useStreetLayers(ids)` the in-view leads' (same store and keys, so a focus reuses the layer; a failed view key is asked
-  again only once `VIEW_RETRY_MS` old, `requestDue` in `streetLoadRule.ts`; the layer cache is unbounded), never at
+  `useStreetLayers(ids)` the in-view leads' (same store and keys, so a focus reuses the layer; a failed view key, or one
+  missing a member, is asked again only once `VIEW_RETRY_MS` old, `requestDue` in `streetLoadRule.ts`; the layer cache is unbounded), never at
   startup, into a cached `StreetLayer`; for a complex's lead (`membersOf`, lead first) it also loads each member's file
   and merges them (`src/lib/streetMerge.ts`, `streetFileIds`, `mergeComplexStreets`): the lead's file plus every member
   entrance no earlier file has (same type within 1.5 m on the ground), moved to the lead's frame, the lead's own first
