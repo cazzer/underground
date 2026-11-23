@@ -1,16 +1,6 @@
-import { addDays, nyDate } from '../realtime/serviceDate'
+import { nyDate } from '../realtime/serviceDate'
 import type { MachineOutage, OutageJoin } from './eneJoin'
-
-const NY_TIME = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true })
-const NY_WEEKDAY = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' })
-const NY_MONTH_DAY = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })
-
-/** "6 AM" or "6:30 AM" in New York time (the AM/PM is needed: an outage can last a day). */
-function nyTime(epochS: number): string {
-  const part = (type: Intl.DateTimeFormatPartTypes) => NY_TIME.formatToParts(epochS * 1000).find((p) => p.type === type)!.value
-  const minute = part('minute')
-  return `${part('hour')}${minute === '00' ? '' : `:${minute}`} ${part('dayPeriod')}`
-}
+import { nyTime, nyWhen } from './nyWhen'
 
 /**
  * When a machine is due back, as the words after "back": "about 6 AM" later today (New York days),
@@ -18,14 +8,7 @@ function nyTime(epochS: number): string {
  */
 export function nyReturnLabel(returnAt: number, nowS: number): string | null {
   if (returnAt <= nowS) return null
-  const day = nyDate(returnAt)
-  const today = nyDate(nowS)
-  if (day === today) return `about ${nyTime(returnAt)}`
-  if (day === addDays(today, 1)) return `tomorrow ${nyTime(returnAt)}`
-  for (let n = 2; n <= 6; n++) {
-    if (day === addDays(today, n)) return `${NY_WEEKDAY.format(returnAt * 1000)} ${nyTime(returnAt)}`
-  }
-  return NY_MONTH_DAY.format(returnAt * 1000)
+  return nyDate(returnAt) === nyDate(nowS) ? `about ${nyTime(returnAt)}` : nyWhen(returnAt, nowS)
 }
 
 const KIND_NAME = { elevator: 'Elevator', escalator: 'Escalator' } as const

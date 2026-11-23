@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
-import { ENE_MAX_AGE_S } from '../lib/live/eneJoin'
-import { applyEnePoll, ENE_POLL_MS, INITIAL_ENE_STATE, type EnePollState } from '../lib/live/enePoll'
+import { useEffect, useMemo, useState } from 'react'
+import { ENE_POLICY, ENE_POLL_MS } from '../lib/live/enePoll'
 import { devEneCodes, devEneSnapshot } from './eneDevFixture'
-import { fetchEne, type EneFetchResult } from './eneFetch'
+import { fetchEne } from './eneFetch'
 import type { EneOutage, EneSnapshot } from './realtime'
+import { useWorkerPoll, type WorkerPollConfig } from './useWorkerPoll'
 
 export interface EneFeed {
   /** True when outages are being polled (or faked by `?ene=` in dev); false means nothing here is news. */
@@ -21,105 +21,33 @@ export interface EneFeed {
 /** Dev only: `?ene=EL358,EL359` fakes a snapshot with those machines out, with or without a Worker. */
 const DEV_CODES = import.meta.env.DEV ? devEneCodes(window.location.search) : null
 
-/**
- * The republish that flips a snapshot to stale comes this long after `generatedAt + ENE_MAX_AGE_S` by the device clock:
- * the join measures age on the /rt live clock, which can run a poll's worth (about 15 s) behind it.
- */
-const EXPIRY_SLACK_S = 20
+const ENE_POLL: WorkerPollConfig<EneSnapshot> = { fetch: fetchEne, policy: ENE_POLICY }
 
-const index = (snapshot: EneSnapshot | null): EneFeed['byCode'] => snapshot && new Map(snapshot.outages.map((o) => [o.code, o]))
+/** The `?ene=` fake: a fresh snapshot now and every poll interval. Null outside dev or without the parameter. */
+function useDevSnapshot(): EneSnapshot | null {
+  const [snapshot, setSnapshot] = useState<EneSnapshot | null>(null)
+  useEffect(() => {
+    if (!DEV_CODES) return
+    const publish = () => setSnapshot(devEneSnapshot(DEV_CODES, Date.now() / 1000))
+    publish()
+    const timer = window.setInterval(publish, ENE_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [])
+  return snapshot
+}
 
 /**
- * Polls the Worker's /ene one request at a time: every ENE_POLL_MS when healthy, with jittered backoff on failure
- * (decisions are pure, in lib/live/enePoll.ts). A hidden tab stops polling, aborting the request in flight;
- * becoming visible polls at once unless one finished within the last ENE_POLL_MS. Each such return also publishes a
- * fresh object, so the panel re-checks the snapshot's age. Every failure is logged. Idle when `url` is null.
+ * Polls the Worker's /ene (`useWorkerPoll`: every ENE_POLL_MS, backoff, a hidden tab stops, a republish when the
+ * snapshot goes stale; decisions are pure, in lib/live/enePoll.ts). Idle when `url` is null; the dev `?ene=` fake
+ * replaces the poll.
  */
 export function useEne(url: string | null): EneFeed {
-  const [feed, setFeed] = useState<EneFeed>({ configured: url !== null || DEV_CODES !== null, snapshot: null, byCode: null, failures: 0, schemaMismatch: false })
-
-  useEffect(() => {
-    if (DEV_CODES) {
-      const publish = () => {
-        const snapshot = devEneSnapshot(DEV_CODES, Date.now() / 1000)
-        setFeed({ configured: true, snapshot, byCode: index(snapshot), failures: 0, schemaMismatch: false })
-      }
-      publish()
-      const timer = window.setInterval(publish, ENE_POLL_MS)
-      return () => window.clearInterval(timer)
-    }
-    if (!url) return
-    let state: EnePollState = INITIAL_ENE_STATE
-    let timer: number | undefined
-    let controller: AbortController | null = null
-    /** When the last poll finished (an aborted one never does), for the return from a hidden tab. */
-    let lastDoneMs = -Infinity
-    let byCode = index(state.snapshot)
-    let byCodeOf: EneSnapshot | null = state.snapshot
-    let expiry: number | undefined
-
-    const publish = () => {
-      if (state.snapshot !== byCodeOf) {
-        byCodeOf = state.snapshot
-        byCode = index(byCodeOf)
-      }
-      setFeed({ configured: true, snapshot: state.snapshot, byCode, failures: state.failures, schemaMismatch: state.schemaMismatch })
-      // The panel reads the age at render time, and nothing else may render when the data goes stale: republish then.
-      window.clearTimeout(expiry)
-      if (state.snapshot === null) return
-      const inMs = (state.snapshot.generatedAt + ENE_MAX_AGE_S + EXPIRY_SLACK_S - Date.now() / 1000) * 1000
-      if (inMs > 0) expiry = window.setTimeout(publish, inMs)
-    }
-    const schedule = (ms: number) => {
-      window.clearTimeout(timer)
-      timer = window.setTimeout(poll, ms)
-    }
-
-    async function poll(): Promise<void> {
-      controller?.abort()
-      const own = (controller = new AbortController())
-      let result: EneFetchResult
-      try {
-        result = await fetchEne(url!, own.signal)
-      } catch (err) {
-        // fetchEne only throws for our own abort (hidden tab, unmount, a newer poll); anything else is a failure.
-        if (own.signal.aborted) return
-        result = { ok: false, warming: false, schemaMismatch: false, error: err instanceof Error ? err.message : String(err), retryAfterS: null }
-      }
-      if (own.signal.aborted) return
-      lastDoneMs = performance.now()
-      const step = applyEnePoll(state, result, Math.random, Date.now() / 1000)
-      state = step.next
-      if (step.log) console[step.log.level](step.log.message, url)
-      if (step.publish) publish()
-      schedule(step.delayMs)
-    }
-
-    const resume = () => {
-      publish()
-      const sinceMs = performance.now() - lastDoneMs
-      if (sinceMs >= ENE_POLL_MS) void poll()
-      else schedule(ENE_POLL_MS - sinceMs)
-    }
-    const onVisibility = () => {
-      if (document.hidden) {
-        controller?.abort()
-        window.clearTimeout(timer)
-        window.clearTimeout(expiry)
-      } else {
-        resume()
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibility)
-    if (!document.hidden) void poll()
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility)
-      controller?.abort()
-      window.clearTimeout(timer)
-      window.clearTimeout(expiry)
-    }
-  }, [url])
-
-  return feed
+  const polled = useWorkerPoll(DEV_CODES ? null : url, ENE_POLL)
+  const dev = useDevSnapshot()
+  const snapshot = DEV_CODES ? dev : polled.snapshot
+  const byCode = useMemo(() => (snapshot ? new Map(snapshot.outages.map((o) => [o.code, o])) : null), [snapshot])
+  return useMemo(
+    () => ({ configured: url !== null || DEV_CODES !== null, snapshot, byCode, failures: DEV_CODES ? 0 : polled.failures, schemaMismatch: DEV_CODES ? false : polled.schemaMismatch }),
+    [url, snapshot, byCode, polled],
+  )
 }

@@ -1,4 +1,4 @@
-import { ENE_TTL_MS, RT_TTL_MS } from './cache'
+import { ALERTS_TTL_MS, ENE_TTL_MS, RT_TTL_MS } from './cache'
 import { decodeFeed } from './decode'
 import { FEED_IDS, type FeedId } from './schema'
 import type { FeedOutcome } from './transform'
@@ -8,6 +8,7 @@ const TIMEOUT_MS = 5000
 const MAX_BYTES = 2 * 1024 * 1024
 
 const ENE_PATH = 'nyct%2Fnyct_ene.json'
+const ALERTS_PATH = 'camsys%2Fsubway-alerts.json'
 
 export const FEED_PATHS: Record<FeedId, string> = {
   '1234567': 'nyct%2Fgtfs',
@@ -92,21 +93,28 @@ export async function fetchAllFeeds(): Promise<Record<FeedId, FeedOutcome>> {
   return Object.fromEntries(FEED_IDS.map((id, i) => [id, outcomes[i]])) as Record<FeedId, FeedOutcome>
 }
 
-export type EneFetch =
-  | { ok: true; json: unknown; cacheStatus: string | null }
+export type JsonFetch =
+  | { ok: true; json: unknown; bytes: number; cacheStatus: string | null }
   | { ok: false; error: string; cacheStatus: string | null }
 
 /**
- * The outage list as parsed JSON. Never rejects. The upstream content-type is the literal
+ * One upstream JSON file, parsed. Never rejects. The upstream content-type is the literal
  * `${header.s3FileType}` (broken on their side), so it is ignored; the body is parsed as UTF-8 JSON.
+ * `bytes` is the body's size, for the counts-only log line.
  */
-export async function fetchEne(): Promise<EneFetch> {
-  const got = await fetchBytes(ENE_PATH, ENE_TTL_MS / 1000)
+async function fetchJson(path: string, ttlMs: number): Promise<JsonFetch> {
+  const got = await fetchBytes(path, ttlMs / 1000)
   if (!got.ok) return got
   try {
     const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(got.bytes)
-    return { ok: true, json: JSON.parse(text), cacheStatus: got.cacheStatus }
+    return { ok: true, json: JSON.parse(text), bytes: got.bytes.byteLength, cacheStatus: got.cacheStatus }
   } catch (e) {
     return { ok: false, error: `parse failed: ${describe(e)}`, cacheStatus: got.cacheStatus }
   }
 }
+
+/** The outage list as parsed JSON. Never rejects. */
+export const fetchEne = (): Promise<JsonFetch> => fetchJson(ENE_PATH, ENE_TTL_MS)
+
+/** The subway service alerts (about 1 MB, under the 2 MB cap) as parsed JSON. Never rejects. */
+export const fetchAlerts = (): Promise<JsonFetch> => fetchJson(ALERTS_PATH, ALERTS_TTL_MS)

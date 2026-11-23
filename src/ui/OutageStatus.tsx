@@ -1,55 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { OutagePanelBody, OutagePanelView } from '../lib/live/eneText'
 import { outageAnnouncement, outageSeen, type OutageSeen } from '../lib/live/outageAnnounce'
+import { DisclosureToggle } from './DisclosureToggle'
 
 /** The first line of the block when an outage takes away an accessible station's only step-free way out. */
 export const NO_STEP_FREE_TEXT = 'No step-free access now'
 /** How long the announcement text stays in its live region after it is spoken. */
 const ANNOUNCEMENT_MS = 6000
-
-interface ToggleProps {
-  expanded: boolean
-  count: number
-  controls: string
-  onToggle: () => void
-  /** Called when the button goes away while it has focus. */
-  onFocusLost: () => void
-}
-
-/** "Out of service (N)": the one control that opens and closes the rows, so toggling keeps focus. */
-function Toggle({ expanded, count, controls, onToggle, onFocusLost }: ToggleProps) {
-  const button = useRef<HTMLButtonElement>(null)
-  const lost = useRef(onFocusLost)
-  useLayoutEffect(() => {
-    lost.current = onFocusLost
-  })
-  // The layout cleanup of an unmounting child runs before React removes its node, so focus can still be read.
-  // Empty deps: it must run only on unmount, however the parent's callback changes.
-  useLayoutEffect(
-    () => () => {
-      if (button.current !== null && button.current === document.activeElement) lost.current()
-    },
-    [],
-  )
-  return (
-    <button
-      ref={button}
-      type="button"
-      aria-expanded={expanded}
-      aria-controls={expanded ? controls : undefined}
-      onClick={onToggle}
-      className="-mx-2 flex min-h-11 w-[calc(100%+1rem)] cursor-pointer items-center justify-between gap-2 px-2 text-xs text-ink hover:text-focus focus-visible:outline-2 focus-visible:outline-focus"
-    >
-      <span className="flex items-center gap-2">
-        <span aria-hidden="true" className="size-2 shrink-0 bg-status-error" />
-        Out of service ({count})
-      </span>
-      <span aria-hidden="true" className="text-ink-dim">
-        {expanded ? '−' : '+'}
-      </span>
-    </button>
-  )
-}
 
 interface OutageListProps {
   body: OutagePanelBody
@@ -71,7 +28,7 @@ function OutageList({ body, noStepFree, onFocusLost }: OutageListProps) {
   return (
     <div className="mt-2 text-xs">
       {noStepFree && <p className="mb-1 text-ink">{NO_STEP_FREE_TEXT}</p>}
-      <Toggle expanded={expanded} count={body.rows.length} controls={listId} onToggle={() => setExpanded((e) => !e)} onFocusLost={onFocusLost} />
+      <DisclosureToggle label="Out of service" markClass="bg-status-error" expanded={expanded} count={body.rows.length} controls={listId} onToggle={() => setExpanded((e) => !e)} onFocusLost={onFocusLost} />
       {expanded && (
         <ul id={listId} aria-label="Out of service" className="mt-1 space-y-1.5">
           {body.rows.map((row) => (
@@ -132,18 +89,19 @@ interface OutageStatusProps {
 }
 
 /**
- * The station panel's out-of-service machines: a closed "Out of service (N)" disclosure over the rows, or a dim
- * "status unavailable" line. One polite screen-reader-only region stays mounted and speaks only a change to the
- * machines out at the station already open.
+ * One polite screen-reader-only region that speaks only a change to the machines out at the station already open.
+ * Mounted outside the panel's collapsible body, so it still speaks while the panel is collapsed to its bar.
  */
-export function OutageStatus({ view, stationId, onFocusLost }: OutageStatusProps) {
+export function OutageAnnouncer({ view, stationId }: Pick<OutageStatusProps, 'view' | 'stationId'>) {
   const announcement = useOutageAnnouncement(stationId, view)
   return (
-    <>
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-        {announcement}
-      </div>
-      <OutageList key={`${stationId}|${view.body.kind}`} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
-    </>
+    <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      {announcement}
+    </div>
   )
+}
+
+/** The station panel's out-of-service machines: a closed "Out of service (N)" disclosure over the rows, or a dim "status unavailable" line. */
+export function OutageStatus({ view, stationId, onFocusLost }: OutageStatusProps) {
+  return <OutageList key={`${stationId}|${view.body.kind}`} body={view.body} noStepFree={view.noStepFree} onFocusLost={onFocusLost} />
 }

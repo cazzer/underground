@@ -1,7 +1,8 @@
-import { ENE_TTL_MS, RT_TTL_MS } from './cache'
+import { transformAlerts } from './alerts'
+import { ALERTS_TTL_MS, ENE_TTL_MS, RT_TTL_MS } from './cache'
 import { PREFLIGHT_HEADERS, corsHeaders } from './cors'
 import { transformEne } from './ene'
-import { ENE_SCHEMA_VERSION, RT_SCHEMA_VERSION, FEED_IDS, type FeedId, type RealtimeSnapshot } from './schema'
+import { ALERTS_SCHEMA_VERSION, ENE_SCHEMA_VERSION, RT_SCHEMA_VERSION, FEED_IDS, type FeedId, type RealtimeSnapshot } from './schema'
 import { fetchGeoSearch, fetchPhoton } from './geocodeUpstream'
 import type { GeocodeQuery } from './geocodeQuery'
 import { serveCached, type CachedRoute } from './serveCached'
@@ -9,7 +10,7 @@ import { STREET_INDEX } from './streetIndexData'
 import { searchStreets } from './streetSearch'
 import { createGeocodeState, serveGeocode } from './serveGeocode'
 import { buildSnapshot, type FeedOutcome } from './transform'
-import { fetchAllFeeds, fetchEne } from './upstream'
+import { fetchAlerts, fetchAllFeeds, fetchEne } from './upstream'
 
 function logMiss(request: Request, snapshot: RealtimeSnapshot, outcomes: Record<FeedId, FeedOutcome>): void {
   const feeds = FEED_IDS.map((id) => ({ id, ...snapshot.feeds[id] }))
@@ -65,6 +66,34 @@ const eneRoute: CachedRoute = {
   state: { memo: null, refreshingSince: null, failedUntil: null },
 }
 
+const alertsRoute: CachedRoute = {
+  cachePath: `/alerts?v=${ALERTS_SCHEMA_VERSION}`,
+  ttlMs: ALERTS_TTL_MS,
+  async build(request) {
+    const upstream = await fetchAlerts()
+    if (!upstream.ok) throw new Error(`alerts upstream: ${upstream.error}`)
+    // Taken after the fetch: Workers' clock only advances on I/O.
+    const { snapshot, outsideWindow, entitiesDropped, entitiesCut, periodsCut } = transformAlerts(upstream.json, Math.floor(Date.now() / 1000))
+    // Counts only. A jump in `dropped` is how an upstream format change shows up; `bytes` watches the 2 MB cap.
+    console.log(
+      JSON.stringify({
+        event: 'alerts-miss',
+        colo: request.cf?.colo,
+        alerts: snapshot.alerts.length,
+        dropped: snapshot.dropped,
+        outsideWindow,
+        entitiesDropped,
+        entitiesCut,
+        periodsCut,
+        bytes: upstream.bytes,
+        upstreamCache: upstream.cacheStatus,
+      }),
+    )
+    return JSON.stringify(snapshot)
+  },
+  state: { memo: null, refreshingSince: null, failedUntil: null },
+}
+
 /** Bindings from wrangler.jsonc. Optional, so a missing one is handled (no per-client limit, logged once), not a crash. */
 export interface WorkerEnv {
   /** The `ratelimits` entry /geocode's per-client limit reads (`clientLimit.ts`). */
@@ -83,6 +112,7 @@ const geocodeDeps = {
 const HANDLERS = new Map<string, Handler>([
   ['/rt', (request, ctx, origin) => serveCached(rtRoute, request, ctx, origin, caches.default)],
   ['/ene', (request, ctx, origin) => serveCached(eneRoute, request, ctx, origin, caches.default)],
+  ['/alerts', (request, ctx, origin) => serveCached(alertsRoute, request, ctx, origin, caches.default)],
   [
     '/geocode',
     (request, ctx, origin, env) =>

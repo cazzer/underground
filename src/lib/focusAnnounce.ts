@@ -22,7 +22,7 @@ export function shouldAnnounce({ focusedId, covered, focusInPanelAtEntry, focusI
   return focusedId !== null && !covered && !(!focusInPanelAtEntry && focusInPanelNow)
 }
 
-/** Live-region text for a newly focused station: the name alone. */
-export function focusAnnouncement(stationName: string): string {
-  return `Showing ${stationName}`
+/** Live-region text for a newly focused station: the name, then the sentence saying it is skipped now when it is (08r.4). */
+export function focusAnnouncement(stationName: string, skipSpoken = ''): string {
+  return skipSpoken === '' ? `Showing ${stationName}` : `Showing ${stationName}. ${skipSpoken}`
 }

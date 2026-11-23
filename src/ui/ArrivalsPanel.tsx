@@ -1,5 +1,6 @@
 import { useCallback, useId, useMemo, type Ref, type RefObject } from 'react'
 import type { ArrivalsSource } from '../lib/live/arrivals'
+import type { ServiceChangeView } from '../lib/live/alertText'
 import type { OutagePanelView } from '../lib/live/eneText'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { useStationStreets } from '../data/useStationStreets'
@@ -11,7 +12,8 @@ import { PartialAccessNote, StationName } from './AccessIcon'
 import { ArrivalsList } from './ArrivalsList'
 import { EntranceList } from './EntranceList'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
-import { OutageStatus } from './OutageStatus'
+import { OutageAnnouncer, OutageStatus } from './OutageStatus'
+import { ServiceChangeAnnouncer, ServiceChangeStatus } from './ServiceChangeStatus'
 import { CollapseButton, ExpandBar } from './PanelBar'
 import type { LineFilterControl } from './useLineFilter'
 import { usePanelToggle } from './usePanelToggle'
@@ -24,6 +26,8 @@ interface ArrivalsPanelProps {
   interior: InteriorStatusInfo
   /** Elevators and escalators out of service at the focused station. */
   outages: OutagePanelView
+  /** The MTA service changes that concern the focused station (skips, suspensions, notices). */
+  changes: ServiceChangeView
   /** The arrivals' line filter, held by the HUD so a train panel covering this one doesn't reset it. */
   lineFilter: LineFilterControl
   /** "Directions from here" and "Directions to here": open the trip panel with this station as that end. Absent when navigation is off: no directions row. */
@@ -36,7 +40,7 @@ interface ArrivalsPanelProps {
 const LINK =
   'flex min-h-11 cursor-pointer items-center px-2 text-ink-dim underline hover:text-ink focus-visible:outline-2 focus-visible:outline-focus'
 
-export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, lineFilter, onDirections, ref, headingRef }: ArrivalsPanelProps) {
+export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, changes, lineFilter, onDirections, ref, headingRef }: ArrivalsPanelProps) {
   // The street file loads on focus only (the scene's streets share it through the cache); nothing shows until it is in.
   const streets = useStationStreets(stationId)
   // The merged station's members all count as "listing" the station, so another member's elevators rank like the lead's own.
@@ -48,7 +52,9 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
   const station = network.groupById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   const access = accessLabel(station.access)
-  const barLabel = `Arrivals at ${station.name}${access === null ? '' : `, ${access}${outages.noStepFree ? '; no step-free access now' : ''}.`}`
+  // Said after the name (and its access words) only when this station is skipped right now, so a rider hears it first.
+  const skipSaid = changes.skipSpoken
+  const barLabel = `Arrivals at ${station.name}${access === null ? '' : `, ${access}${outages.noStepFree ? '; no step-free access now' : ''}.`}${skipSaid === '' ? '' : `${access === null ? '. ' : ' '}${skipSaid}`}`
   return (
     <aside
       ref={ref}
@@ -65,10 +71,14 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
         <div className="flex items-start justify-between gap-3">
           <h2 ref={setHeading} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
             <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} />
+            {skipSaid !== '' && <>{' '}<span className="sr-only">{skipSaid}</span></>}
           </h2>
           <CollapseButton label="Collapse station panel" controls={bodyId} onCollapse={collapse} />
         </div>
       )}
+      {/* Outside the body, which is hidden when collapsed: a hidden live region says nothing. */}
+      <OutageAnnouncer view={outages} stationId={stationId} />
+      <ServiceChangeAnnouncer view={changes} stationId={stationId} />
       <div id={bodyId} hidden={collapsed}>
         {station.otherNames.length > 0 && <p className="mt-1 text-sm text-ink-dim">with {station.otherNames.join(', ')}</p>}
         <PartialAccessNote access={station.access} />
@@ -84,6 +94,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
         )}
         <InteriorStatus info={interior} />
         <OutageStatus view={outages} stationId={stationId} onFocusLost={() => headingRef.current?.focus()} />
+        <ServiceChangeStatus view={changes} stationId={stationId} routeById={network.routeById} onFocusLost={() => headingRef.current?.focus()} />
         <ArrivalsList key={`arrivals-${stationId}`} network={network} station={station} source={arrivals} status={live} lineFilter={lineFilter} onFocusLost={() => headingRef.current?.focus()} />
         <EntranceList entrances={streets?.entrances ?? null} listsStation={listsStation} />
       </div>

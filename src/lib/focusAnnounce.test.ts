@@ -21,5 +21,6 @@ describe('shouldAnnounce', () => {
 describe('focusAnnouncement', () => {
   it('is the station name alone', () => {
     expect(focusAnnouncement('Bedford Av')).toBe('Showing Bedford Av')
+    expect(focusAnnouncement('125 St', 'The downtown 1 train skips this station now.')).toBe('Showing 125 St. The downtown 1 train skips this station now.')
   })
 })
