@@ -374,6 +374,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing). Sized after mount,
     after `document.fonts.ready` and when a resize flips phone and desktop sizes; opacity `streetLabelOpacity` (the level labels' depth gate)
     While mounted it writes Scene's `StreetMask` (anchor and file radius), which the basemap's roads give way to
+  - `useLocationCap.ts` / `LocationCapSource.tsx` the location zoom cap's driver (the fly request in a layout effect, pointer
+    events through `useViewMoves`), run once by Scene inside the Canvas whether or not the basemap is; the shared handle is
+    `lib/basemap/locationCapHandle.ts` (`isCapped()`, `subscribe`), which Scene creates and passes to Basemap
   - `Basemap.tsx` the citywide basemap: `useBasemapTiles` plus six class layers (`basemapLayer.ts`: one LineSegments2
     over a pooled buffer per class, tiles in `lib/basemap/tilePool.ts` order so a new tile set rewrites and uploads
     only from the first moved tile; it grows on demand and shrinks after `SHRINK_AFTER_S` (2 s) under a quarter full,
@@ -1479,7 +1482,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   `src/scene/useLocationCap.ts`, run by `LocationCapSource.tsx` which Scene always mounts, so it exists with no basemap pin or
   `?basemap=off`; it applies the fly request in a layout effect, so the cap is in force before any frame of the flight, even a
   reduced-motion one, and takes pointer events through `useViewMoves.ts`; dev `__underground.locationCapped()`). `useBasemapTiles.ts`
-  mirrors it onto `store.capZoom`, and view-driven station fetches (o3r) read the same handle. Following a train or keyboard
+  mirrors it onto `store.capZoom`, and view-driven station fetches (o3r) will read the same handle. Following a train or keyboard
   input doesn't lift it. Tiles already loaded still draw.
 - **Realtime has no lat/lon.** Vehicle positions are stop-relative, so dots are
   interpolated along shapes from TripUpdate times and scheduled segment run times.

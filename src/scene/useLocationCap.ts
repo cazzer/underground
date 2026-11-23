@@ -11,7 +11,7 @@
  * (r3f's connected element, as drei picks it) and the window, never MapControls props (a changed on* prop makes drei
  * reconnect the controls, AGENTS.md). Not lifted by: following a train, keyboard input.
  */
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { CapEvent } from '../lib/basemap/locationCap'
 import type { LocationCap } from '../lib/basemap/locationCapHandle'
 import { useFocus, type FlyRequest } from '../lib/focus'
@@ -33,7 +33,7 @@ export function useLocationCap(cap: LocationCap): void {
   const onViewMove = useCallback((e: CapEvent) => cap.step(e), [cap])
   useViewMoves(el, onViewMove)
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!import.meta.env.DEV) return
     window.__underground = { ...window.__underground, locationCapped: () => cap.isCapped() }
     return () => {

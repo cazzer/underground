@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createLocationCap } from './locationCapHandle'
 
 describe('createLocationCap', () => {
@@ -20,6 +20,21 @@ describe('createLocationCap', () => {
     cap.step({ type: 'wheel' })
     expect(cap.isCapped()).toBe(false)
     expect(seen).toEqual([true, false])
+  })
+
+  it('keeps its state and runs later listeners when one throws', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const cap = createLocationCap()
+    const seen: boolean[] = []
+    cap.subscribe(() => {
+      throw new Error('boom')
+    })
+    cap.subscribe((c) => seen.push(c))
+    expect(() => cap.step({ type: 'pointFlight' })).not.toThrow()
+    expect(cap.isCapped()).toBe(true)
+    expect(seen).toEqual([true])
+    expect(errors).toHaveBeenCalledTimes(1)
+    errors.mockRestore()
   })
 
   it('stops calling a listener once unsubscribed', () => {

@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { BASEMAP } from '../data/basemapConfig'
 import { hiddenSiblingIds, interiorStationIds, type IndexLoad } from '../data/interiorLoad'
 import type { LiveLayer } from '../data/useLive'
@@ -96,7 +96,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
   /** Written by StationStreets, read by Basemap: the basemap's roads give way to the focused station's streets. */
   const streetMask = useMemo(createStreetMask, [])
   /** Driven by LocationCapSource (always mounted), read by Basemap's tile store: the location zoom cap. */
-  const locationCap = useMemo(createLocationCap, [])
+  const locationCap = useState(createLocationCap)[0]
   /** The loaded interior's platform spans, unioned over a complex's members: the track fades and cars lift along all of them. */
   const interiorSpans = useMemo(
     () => (interior ? memberSpans(network.platformSpans, interiorStationIds(interior)) : null),

@@ -11,7 +11,7 @@ export type CapListener = (capped: boolean) => void
 export interface LocationCap {
   /** Whether the cap is in force now. */
   isCapped(): boolean
-  /** Calls `listener` each time the cap goes on (true) or is lifted (false), not on events that change nothing. Returns the unsubscribe. */
+  /** Calls `listener` each time the cap goes on (true) or is lifted (false), not on events that change nothing. Returns the unsubscribe. Listeners must not throw (one that does is logged and skipped). */
   subscribe(listener: CapListener): () => void
   /** Feeds the machine one event (the scene hook's job). */
   step(e: CapEvent): void
@@ -20,8 +20,15 @@ export interface LocationCap {
 export function createLocationCap(): LocationCap {
   const state = newCap()
   const listeners = new Set<CapListener>()
+  // Each listener runs on its own, so one that throws (a bug, logged) never stops the others or the caller's effect.
   const emit = () => {
-    for (const l of [...listeners]) l(state.capped)
+    for (const l of listeners) {
+      try {
+        l(state.capped)
+      } catch (err) {
+        console.error('Location cap listener threw', err)
+      }
+    }
   }
   return {
     isCapped: () => state.capped,
