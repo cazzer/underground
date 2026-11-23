@@ -1,4 +1,5 @@
 import { useEffect, useRef, type Ref } from 'react'
+import type { AlertSkips } from '../lib/live/alertSkips'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { LiveStatus } from '../lib/live/liveStatus'
 import type { TrainSummary } from '../lib/live/trainSummary'
@@ -42,11 +43,13 @@ interface TrainPanelProps {
   onFollow: () => void
   onUnfollow: () => void
   onClose: () => void
+  /** The MTA's skip alerts: a next stop this train's route and direction skip is struck through. */
+  skips: AlertSkips | null
   ref: Ref<HTMLElement>
 }
 
 /** The selected train: its route and where it is headed. Sits where the station panel does, over it. */
-export function TrainPanel({ network, summary, trip, source, status, focusKey, following, onFollow, onUnfollow, onClose, ref }: TrainPanelProps) {
+export function TrainPanel({ network, summary, trip, source, status, focusKey, following, onFollow, onUnfollow, onClose, skips, ref }: TrainPanelProps) {
   const heading = useRef<HTMLHeadingElement>(null)
   // Two frames late: after a touch tap the browser's compatibility mouse events land on the canvas and would
   // blur a heading focused at once.
@@ -93,7 +96,7 @@ export function TrainPanel({ network, summary, trip, source, status, focusKey, f
           {following ? 'Stop' : 'Follow train'}
         </button>
       </div>
-      <TrainStops key={trip?.key} network={network} trip={trip} source={source} status={status} />
+      <TrainStops key={trip?.key} network={network} trip={trip} source={source} status={status} skips={skips} />
     </aside>
   )
 }

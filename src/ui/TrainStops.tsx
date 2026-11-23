@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { markSkips, skipAt, skipStopText, trainLine, type AlertSkips, type SkippableStop } from '../lib/live/alertSkips'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import { clockNow } from '../lib/live/clock'
 import type { LiveStatus } from '../lib/live/liveStatus'
@@ -9,7 +10,6 @@ import {
   stopEta,
   stopEtaSpoken,
   tripTimesDelayed,
-  type TrainStop,
 } from '../lib/live/trainStops'
 import type { Network } from '../lib/network'
 import type { LiveTrip } from '../lib/realtime/prepareTrips'
@@ -22,13 +22,32 @@ const COLLAPSED_ROWS = 3
 const CUT_SHORT_NOTE = 'Times shown up to 30 min ahead'
 
 interface StopRowProps {
-  stop: TrainStop
+  stop: SkippableStop
   nowS: number
 }
 
-/** One stop: name, clock and minutes in shared columns. The visible times are hidden from screen readers, which get one phrase. */
+/**
+ * One stop: name, clock and minutes in shared columns. The visible times are hidden from screen readers, which get one
+ * phrase. A stop the MTA's notice says this train skips is struck through with no times, a dim "skips · per MTA
+ * notice" under it (never the strike alone), and one sentence for a screen reader; a guessed skip ("probably")
+ * keeps its row and times under the same note.
+ */
 function StopRow({ stop, nowS }: StopRowProps) {
   const eta = stopEta(stop.time, nowS)
+  const text = stop.skip === null ? null : skipStopText(stop.name, stop.skip)
+  if (stop.skip === 'skips' && text !== null) {
+    return (
+      <li className="col-span-3 py-1.5">
+        <span aria-hidden="true" className="block min-w-0 leading-tight text-ink-dim line-through">
+          {stop.name}
+        </span>
+        <span aria-hidden="true" className="block text-xs text-ink-dim">
+          {text.note}
+        </span>
+        <span className="sr-only">{text.spoken}</span>
+      </li>
+    )
+  }
   // A train standing at the stop past its predicted time says only "Now"; one waiting for a time still ahead
   // (a terminal, a held train) shows that time.
   const nowOnly = stop.standing && eta.away === 'Now'
@@ -41,7 +60,15 @@ function StopRow({ stop, nowS }: StopRowProps) {
       <span aria-hidden="true" className="text-right font-mono tabular-nums">
         {eta.away}
       </span>
-      <span className="sr-only">, {stopEtaSpoken(eta)}</span>
+      {text !== null && (
+        <span aria-hidden="true" className="col-span-3 text-xs text-ink-dim">
+          {text.note}
+        </span>
+      )}
+      <span className="sr-only">
+        , {stopEtaSpoken(eta)}
+        {text !== null && `, ${text.spoken}`}
+      </span>
     </li>
   )
 }
@@ -83,6 +110,8 @@ interface TrainStopsProps {
   trip: LiveTrip | null
   source: ArrivalsSource | null
   status: LiveStatus
+  /** The MTA's skip alerts: a next stop this train's route and direction skip is struck through. */
+  skips: AlertSkips | null
 }
 
 /**
@@ -90,7 +119,7 @@ interface TrainStopsProps {
  * here, so a tick re-renders this list and nothing else. The list is not a live region (it would announce
  * every tick); only the state lines are, and that region stays mounted so a change of text is announced.
  */
-export function TrainStops({ network, trip, source, status }: TrainStopsProps) {
+export function TrainStops({ network, trip, source, status, skips }: TrainStopsProps) {
   const [tick, setTick] = useState(0)
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
@@ -103,20 +132,22 @@ export function TrainStops({ network, trip, source, status }: TrainStopsProps) {
   const focusHeading = useCallback(() => heading.current?.focus({ preventScroll: true }), [])
 
   // `tick` is not read: it is what makes this recompute against the advancing clock.
-  const { nowS, stops, delayed, terminal } = useMemo(() => {
-    if (!source || !trip) return { nowS: 0, stops: null, delayed: false, terminal: undefined }
+  const { nowS, stops, delayed, terminal, line } = useMemo(() => {
+    if (!source || !trip) return { nowS: 0, stops: null, delayed: false, terminal: undefined, line: null }
     const now = clockNow(source.offsetS, performance.now())
     return {
       nowS: now,
       stops: nextStops(trip.trip, trip.feed, now, (id) => network.stationById.get(id)?.name),
       delayed: tripTimesDelayed(source.snapshot, trip.feed, source.failures, now),
       terminal: source.lookup.patterns[trip.shapeId]?.stops.at(-1),
+      line: trainLine(trip, network.routeById, source.lookup.patterns),
     }
   }, [source, trip, network, tick])
 
   const view = deriveTrainStopsView(status, stops, delayed)
   const stateLines = view.kind === 'message' ? [view.text] : view.notes
-  const all = view.kind === 'rows' ? view.stops : []
+  const markOf = (id: string) => (line === null || line.route === null ? null : skipAt(skips, line.route, line.direction, [id], nowS))
+  const all = view.kind === 'rows' ? markSkips(view.stops, markOf) : []
   const rows = expanded ? all : all.slice(0, COLLAPSED_ROWS)
   const showToggle = all.length > COLLAPSED_ROWS
   // The cut-off note belongs under the last known stop, so only once that row is on screen.
@@ -133,9 +164,9 @@ export function TrainStops({ network, trip, source, status }: TrainStopsProps) {
         Next stops
       </h3>
       <div role="status" aria-live="polite">
-        {stateLines.map((line) => (
-          <p key={line} className="mt-1 text-xs text-ink-dim">
-            {line}
+        {stateLines.map((text) => (
+          <p key={text} className="mt-1 text-xs text-ink-dim">
+            {text}
           </p>
         ))}
       </div>
