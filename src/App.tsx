@@ -17,6 +17,7 @@ import { useTripTransfers } from './data/useTripTransfers'
 import { usePlaceLine } from './ui/usePlaceLine'
 import { FocusProvider, useFocus } from './lib/focus'
 import { joinStationChanges } from './lib/live/alertJoin'
+import { alertSkipsOf } from './lib/live/alertSkips'
 import { serviceChangeView, type ServiceChangeView } from './lib/live/alertText'
 import { terminalsOf } from './lib/live/routeTerminals'
 import { eneNowS, joinStationOutages } from './lib/live/eneJoin'
@@ -84,6 +85,8 @@ function MapView({ network, bands, live }: MapViewProps) {
   const outages = joinPanelOutages(interiorOutages, model?.interior ?? null, interiorSettled, stationEquipment(equipment, focusedId), ene, nowS)
   // The MTA's service changes at the focused station (its group: any member's stops), listed in its panel.
   const alerts = useAlerts(ALERTS_URL)
+  // The skip sets of the same snapshot, for the train panel's stops and the arrivals rows.
+  const skips = useMemo(() => alertSkipsOf(alerts.snapshot, alerts.schemaMismatch, network.stationById), [alerts.snapshot, alerts.schemaMismatch, network])
   const routeOrder = useMemo(() => new Map(network.routes.map((r, i) => [r.id, i])), [network])
   const terminalOf = useMemo(() => terminalsOf(network.shapes, network.stations), [network])
   const focusedGroup = focusedId ? network.groupById.get(focusedId) : undefined
@@ -212,6 +215,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           interior={{ load: interior.load, onRetry: interior.retry }}
           outages={outagePanelView(outages, nowS, noStepFree)}
           changes={changes}
+          skips={skips}
           tripLines={tripLines}
           focusSiblings={focusSiblings}
           siblingsOf={siblingsOf}

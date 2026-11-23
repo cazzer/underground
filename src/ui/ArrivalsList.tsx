@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type FocusEvent } from 'react'
+import { skipAt, stationHasSkip, type AlertSkips } from '../lib/live/alertSkips'
 import { arrivalsAt, type ArrivalsSource } from '../lib/live/arrivals'
 import { arrivalGroupCount, arrivalGroupKey, COLLAPSED_ARRIVALS, soonestSections } from '../lib/live/arrivalsCollapse'
 import { deriveArrivalsView } from '../lib/live/arrivalsView'
@@ -27,6 +28,8 @@ interface ArrivalsListProps {
   station: StationGroup
   source: ArrivalsSource | null
   status: LiveStatus
+  /** The MTA's skip alerts: a row whose route and direction skip this station says so. */
+  skips: AlertSkips | null
   /** The line filter, kept above the panel so a train panel covering this one doesn't reset it. */
   lineFilter: LineFilterControl
   /** Takes focus when a row, a line chip or the "Show all" button that has it goes away (a poll, or the panel unstacked). */
@@ -47,7 +50,7 @@ function focusedGroup(target: EventTarget | null): string | null {
  * and "Show all N destinations", which then scrolls by whole rows (useListScroll). Key it by station so a new
  * station starts collapsed.
  */
-export function ArrivalsList({ network, station, source, status, lineFilter, onFocusLost }: ArrivalsListProps) {
+export function ArrivalsList({ network, station, source, status, skips, lineFilter, onFocusLost }: ArrivalsListProps) {
   const { selectTrain } = useTrainSelection()
   const stacked = useStackedPanel()
   const [expanded, setExpanded] = useState(false)
@@ -153,7 +156,7 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
           className="relative -mx-1 overflow-y-auto overscroll-contain px-1 focus-visible:outline-2 focus-visible:outline-focus"
         >
           <div className="grid">
-            {collapsed && <CollapsedSizer />}
+            {collapsed && <CollapsedSizer note={stationHasSkip(skips, station.routeIds, station.memberIds, nowS)} />}
             <div
               ref={list}
               id={listId}
@@ -171,6 +174,7 @@ export function ArrivalsList({ network, station, source, status, lineFilter, onF
                       network={network}
                       nowS={nowS}
                       drawnKeys={source?.drawnKeys ?? NO_KEYS}
+                      skip={skipAt(skips, g.routeId, g.direction, station.memberIds, nowS)}
                       onSelect={selectTrain}
                       onFocusLost={onFocusLost}
                     />

@@ -4,6 +4,7 @@ import { useFocus } from '../lib/focus'
 import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { scheduleLabel } from '../lib/labels'
+import type { AlertSkips } from '../lib/live/alertSkips'
 import type { ServiceChangeView } from '../lib/live/alertText'
 import type { ArrivalsSource } from '../lib/live/arrivals'
 import type { OutagePanelView } from '../lib/live/eneText'
@@ -49,6 +50,8 @@ interface HudProps {
   outages: OutagePanelView
   /** The focused station's service changes (MTA alerts), shown in its panel. */
   changes: ServiceChangeView
+  /** The MTA's skip alerts, for the train panel's stops and the arrivals rows. */
+  skips: AlertSkips | null
   /** Reports where the station panel sits (viewport px), or null when it closes. */
   onPanel: (rect: ScreenRect | null) => void
   /** The location button's state and actions. */
@@ -65,7 +68,7 @@ interface HudProps {
   siblingsOf: (stationId: string) => readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, changes, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, changes, skips, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const lineFilter = useLineFilter(focusedId)
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
@@ -231,6 +234,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
             onFollow={follow}
             onUnfollow={unfollow}
             onClose={closeTrain}
+            skips={skips}
             ref={panel}
           />
         )}
@@ -244,6 +248,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
             interior={interior}
             outages={outages}
             changes={changes}
+            skips={skips}
             lineFilter={lineFilter}
             onDirections={FEATURES.navigation ? (end) => openTrip(end, { stationId: focusedId, place: null }) : undefined}
             ref={panel}
