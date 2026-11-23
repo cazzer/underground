@@ -100,7 +100,11 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
     const o = interiorOpacity(distance) * presence.value
     // The levels separate with the tilt (y only: dashes are object-space, so x/z never rescale).
     const depth = depthFactor(distance)
-    if (o === shown.current && depth === shownDepth.current && layers === shownLayers.current) return
+    // r3f re-applies a moved subtree's JSX props when the keyed list reorders (a focus change), so visible stays out of
+    // JSX; it and the look-B veil's declared opacity are checked here as a backstop against that reset.
+    const veilMat = veil.current ? (veil.current.material as MeshBasicMaterial) : null
+    const veilOk = !veilMat || veilMat.opacity === interiorLook.veilOpacity * veilWeight(o, depth)
+    if (o === shown.current && depth === shownDepth.current && layers === shownLayers.current && g.visible === o > 0 && veilOk) return
     shown.current = o
     shownDepth.current = depth
     shownLayers.current = layers
@@ -114,7 +118,7 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
     if (mid1Fine) mid1Fine.material.opacity = o
     if (overStrong) overStrong.material.opacity = o
     if (overFine) overFine.material.opacity = o
-    if (veil.current) (veil.current.material as MeshBasicMaterial).opacity = interiorLook.veilOpacity * veilWeight(o, depth)
+    if (veilMat) veilMat.opacity = interiorLook.veilOpacity * veilWeight(o, depth)
     labelShown.current = labelOpacity(o, depth)
   })
 
@@ -124,7 +128,7 @@ export function StationInterior({ model, network, outOfService, labelBlockers, p
 
   return (
     <>
-      <group ref={group} position={[model.origin.x, 0, model.origin.z]} visible={false}>
+      <group ref={group} position={[model.origin.x, 0, model.origin.z]}>
       {model.hull && <InteriorVeil ref={veil} hull={model.hull} />}
       {fine && <primitive object={fine} />}
       {strong && <primitive object={strong} />}
