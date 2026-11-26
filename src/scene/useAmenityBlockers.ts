@@ -29,7 +29,8 @@ export function clearAmenityBlockers(blockers: LabelBlockers, slot: number | nul
 /**
  * Writes the screen rect (canvas px) of each mark's plate on screen into the slot, the first MAX_LEVEL_BLOCKERS in mark
  * order, so the street labels keep clear of them; bumps the version only on a change. The plate's four corners are
- * projected, yawed by `az` as the frame drew them, half size `plateM`. Allocation-free (per frame).
+ * projected, yawed by `az` as the frame drew them, half size `plateM`; marks farther than `reachM` from the view's
+ * `target` (on either axis) are skipped unprojected. Allocation-free (per frame).
  */
 export function writeAmenityBlockers(
   blockers: LabelBlockers,
@@ -40,6 +41,8 @@ export function writeAmenityBlockers(
   height: number,
   az: number,
   plateM: number,
+  target: { x: number; z: number },
+  reachM: number,
 ): void {
   if (slot === null) return
   const c = Math.cos(az) * plateM
@@ -48,6 +51,8 @@ export function writeAmenityBlockers(
   let count = 0
   let changed = false
   for (let i = 0; i < f.marks.length && count < MAX_LEVEL_BLOCKERS; i++) {
+    // Far past the view's target a mark can't be on screen: skip its projections.
+    if (Math.abs(f.x[i]! - target.x) > reachM || Math.abs(f.z[i]! - target.z) > reachM) continue
     let left = Infinity
     let top = Infinity
     let right = -Infinity

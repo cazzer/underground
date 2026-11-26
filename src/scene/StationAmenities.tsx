@@ -34,6 +34,12 @@ const ORDERS: Record<Tier, { plate: number; glyph: number }> = {
 interface HasAzimuth {
   getAzimuthalAngle?: () => number
 }
+interface HasTarget {
+  target: { x: number; z: number }
+}
+const ORIGIN = { x: 0, z: 0 }
+/** Marks within this many camera distances of the view's target may be on screen (the tilt's horizon guard is 1.5). */
+const BLOCKER_REACH = 2
 
 interface StationAmenitiesProps {
   network: Network
@@ -183,7 +189,8 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
         }
       }
     }
-    writeAmenityBlockers(blockers, slot.current, frame, state.camera, state.size.width, state.size.height, az, scratch.sizes.plate)
+    const target = (state.controls as HasTarget | null)?.target ?? ORIGIN
+    writeAmenityBlockers(blockers, slot.current, frame, state.camera, state.size.width, state.size.height, az, scratch.sizes.plate, target, BLOCKER_REACH * d)
   })
 
   if (marks.length === 0) return null

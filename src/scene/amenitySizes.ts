@@ -1,4 +1,5 @@
-import { markCentre, type PlateProbe } from '../lib/amenityPlacement'
+import { markCentre, plateReach, type PlateProbe } from '../lib/amenityPlacement'
+import type { Ground } from '../lib/projection'
 import { focusScaleFactor, markerRadiusPx, screenScale, tripMarkRadiusPx } from './cameraDistance'
 import { MARKER_MIN_METERS, TRIP_MARK_HALO, TRIP_MARK_MIN_METERS } from './markerShape'
 
@@ -43,11 +44,12 @@ export function markSizesInto(out: MarkSizes, d: number, tripVisible: boolean): 
 /** The view distances a bearing is scored at: the landing's range, near and far end of the levels' separation. */
 const PROBE_DISTANCES = [500, 1000]
 
-/** A row of `count` plates, north-up, at each PROBE_DISTANCES: what clearBearing scores a bearing by. */
-export function plateProbes(count: number): PlateProbe[] {
+/** A row of `count` plates along `dir`, north-up, at each PROBE_DISTANCES: what clearBearing scores a bearing by. */
+export function plateProbes(count: number, dir: Ground): PlateProbe[] {
   const s = newMarkSizes()
   return PROBE_DISTANCES.flatMap((d) => {
     markSizesInto(s, d, false)
-    return Array.from({ length: count }, (_, k): PlateProbe => ({ along: markCentre(k, s.clear, s.plate, s.gap), half: s.plate }))
+    const reach = plateReach(s.plate, dir, 0)
+    return Array.from({ length: count }, (_, k): PlateProbe => ({ along: markCentre(k, s.clear, reach, s.gap), half: s.plate }))
   })
 }

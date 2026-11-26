@@ -3,7 +3,7 @@
  * how far it has mixed toward the background, written into the instanced meshes' arrays. Allocation-free once built.
  */
 import { AMENITY_ORDER, type AmenityKind } from '../lib/amenityGlyphs'
-import { markCentre, type AmenityMark } from '../lib/amenityPlacement'
+import { markCentre, plateReach, type AmenityMark } from '../lib/amenityPlacement'
 import { dimLineRgbInto, type Rgb3 } from '../lib/lineDim'
 import { writeChordMatrix, writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Presence } from '../lib/presence'
@@ -87,7 +87,8 @@ export function frameChanged(f: AmenityFrame, d: number, az: number, depth: numb
  * Writes every mark's matrices in both tiers (yawed by the camera azimuth `az`, so the glyph's up runs up the screen;
  * its height × `depth`), and the instance colors of any mark whose presence changed: the under copy mixes toward the
  * background by the presence, the over copy by 1 − presence, and a copy fully mixed collapses to scale 0 (plate too).
- * A covered mark slides out from the marker's clearance to the interior's hull reach as the presence eases in.
+ * A covered mark slides out from the marker's clearance to the interior's hull reach as the presence eases in; the row
+ * spaces its plates by how far each, yawed, reaches along the bearing, so no corner crosses the marker.
  * Returns whether any color was written.
  */
 export function writeAmenityFrame(
@@ -116,7 +117,7 @@ export function writeAmenityFrame(
     const m = f.marks[i]!
     const p = presenceOf(f, i)
     const clear = f.cover[i] ? sizes.clear + (Math.max(f.reach[i]!, sizes.clear) - sizes.clear) * p : sizes.clear
-    const along = markCentre(m.k, clear, sizes.plate, sizes.gap)
+    const along = markCentre(m.k, clear, plateReach(sizes.plate, m.dir, az), sizes.gap)
     const x = m.pos.x + m.dir.x * along
     const z = m.pos.z + m.dir.z * along
     f.x[i] = x

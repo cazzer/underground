@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AmenitiesFile } from '../data/amenitiesSchema'
-import { amenityMarks, BEARINGS, clearBearing, hullReach, markCentre, segmentDistance, squareDistance, trackSegments, type PlateProbe } from './amenityPlacement'
+import { amenityMarks, BEARINGS, clearBearing, hullReach, markCentre, plateReach, segmentDistance, squareDistance, trackSegments, type PlateProbe } from './amenityPlacement'
 import type { Footprint } from './interiorFootprint'
 
 const O = { x: 1000, z: 2000 }
@@ -9,6 +9,7 @@ const N = BEARINGS[0]!
 /** Two plates of half 4 m at 11 and 20 m out, roughly a pair at a 500 m view. */
 const PROBES: PlateProbe[] = [{ along: 11, half: 4 }, { along: 20, half: 4 }]
 const probes = (count: number) => PROBES.slice(0, count)
+const fixed = () => PROBES
 
 describe('segmentDistance', () => {
   it('is 0 for crossing segments and the nearest end otherwise', () => {
@@ -26,22 +27,22 @@ describe('segmentDistance', () => {
 
 describe('clearBearing', () => {
   it('prefers north with nothing near', () => {
-    expect(clearBearing(O, trackSegments([line(500, 500, 600, 600)]), [], PROBES)).toEqual(N)
+    expect(clearBearing(O, trackSegments([line(500, 500, 600, 600)]), [], fixed)).toEqual(N)
   })
 
   it('turns east off a north-south track pair', () => {
     const segs = trackSegments([line(-4.7, -300, -4.7, 300), line(4.7, 300, 4.7, -300)])
-    expect(clearBearing(O, segs, [], PROBES)).toEqual({ x: 1, z: 0 })
+    expect(clearBearing(O, segs, [], fixed)).toEqual({ x: 1, z: 0 })
   })
 
   it('keeps north beside an east-west track', () => {
     const segs = trackSegments([line(-300, 4.7, 300, 4.7), line(300, -4.7, -300, -4.7)])
-    expect(clearBearing(O, segs, [], PROBES)).toEqual(N)
+    expect(clearBearing(O, segs, [], fixed)).toEqual(N)
   })
 
   it('dodges another station marker to the north', () => {
     const segs = trackSegments([line(-300, 4.7, 300, 4.7)])
-    const got = clearBearing(O, segs, [{ x: O.x, z: O.z - 25 }], PROBES)
+    const got = clearBearing(O, segs, [{ x: O.x, z: O.z - 25 }], fixed)
     expect(got).not.toEqual(N)
     expect(got.z).toBeLessThan(0)
   })
@@ -87,6 +88,12 @@ describe('hullReach and markCentre', () => {
     expect(hullReach(fp, O, N)).toBeCloseTo(20)
     expect(hullReach(fp, O, { x: 1, z: 0 })).toBeCloseTo(15)
     expect(hullReach(fp, O, { x: -1, z: 0 })).toBeCloseTo(-5)
+  })
+
+  it('reaches a yawed plate farther along a diagonal', () => {
+    expect(plateReach(2, N, 0)).toBeCloseTo(2)
+    expect(plateReach(2, BEARINGS[1]!, 0)).toBeCloseTo(2 * Math.SQRT2)
+    expect(plateReach(2, BEARINGS[1]!, Math.PI / 4)).toBeCloseTo(2)
   })
 
   it('rows the plates one gap apart past the clearance', () => {

@@ -120,13 +120,13 @@ export function squareDistance(x0: number, z0: number, x1: number, z1: number, c
 }
 
 /**
- * The bearing (one of BEARINGS) whose plates (`probes`: the marks' plates north-up at a few view distances) keep
+ * The bearing (one of BEARINGS) whose plates (`probes` of it: the marks' plates north-up at a few view distances) keep
  * farthest from every track segment (`segments`, trackSegments' layout) and from every other station point less
  * STATION_PAD_M, within NEAR_M; of those within TIE_M (or half the best) of it, the first in preference order. With
  * nothing near, north. Plates, not a line, so a bearing running between a line's two direction tracks (4.7 m off each)
  * counts as blocked, while one crossing them just past the marker counts as clear.
  */
-export function clearBearing(origin: Ground, segments: Float32Array, others: readonly Ground[], probes: readonly PlateProbe[]): Ground {
+export function clearBearing(origin: Ground, segments: Float32Array, others: readonly Ground[], probes: (dir: Ground) => readonly PlateProbe[]): Ground {
   const near: number[] = []
   for (let o = 0; o < segments.length; o += 4) {
     const x0 = segments[o]! - origin.x
@@ -139,7 +139,7 @@ export function clearBearing(origin: Ground, segments: Float32Array, others: rea
   const points = others.flatMap((p) => (Math.abs(p.x - origin.x) <= NEAR_M && Math.abs(p.z - origin.z) <= NEAR_M ? [p.x - origin.x, p.z - origin.z] : []))
   const scores = BEARINGS.map((dir) => {
     let best = NEAR_M
-    for (const { along, half } of probes) {
+    for (const { along, half } of probes(dir)) {
       const cx = dir.x * along
       const cz = dir.z * along
       for (let o = 0; o < near.length; o += 4) best = Math.min(best, squareDistance(near[o]!, near[o + 1]!, near[o + 2]!, near[o + 3]!, cx, cz, half))
@@ -166,7 +166,7 @@ export function amenityMarks(
   amenities: AmenitiesFile,
   segments: Float32Array,
   stations: readonly { id: string; pos: Ground }[],
-  probes: (count: number) => readonly PlateProbe[],
+  probes: (count: number, dir: Ground) => readonly PlateProbe[],
 ): AmenityMark[] {
   const out: AmenityMark[] = []
   for (const g of groups) {
@@ -174,7 +174,7 @@ export function amenityMarks(
     if (kinds.length === 0) continue
     const own = new Set(g.memberIds)
     const others = stations.flatMap((s) => (own.has(s.id) ? [] : [s.pos]))
-    const dir = clearBearing(g.pos, segments, others, probes(kinds.length))
+    const dir = clearBearing(g.pos, segments, others, (d) => probes(kinds.length, d))
     kinds.forEach((kind, k) => out.push({ stationId: g.id, memberIds: g.memberIds, kind, k, pos: g.pos, dir }))
   }
   return out
@@ -189,8 +189,16 @@ export function hullReach(footprint: Footprint, origin: Ground, dir: Ground): nu
   return reach
 }
 
-/** The k-th mark's centre along its bearing, meters from the station point: past `clearM`, a gap, then plates of half
- *  size `halfM` one gap apart. */
+/** The k-th mark's centre along its bearing, meters from the station point: past `clearM`, a gap, then plates reaching
+ *  `halfM` along the bearing either side of their centres, one gap apart. */
 export function markCentre(k: number, clearM: number, halfM: number, gapM: number): number {
   return clearM + gapM + halfM + k * (2 * halfM + gapM)
+}
+
+/** How far a square plate of half size `half`, yawed by azimuth `az` (its local x east-ish at 0), reaches from its
+ *  centre along unit `dir`: `half` along an axis, up to √2 × `half` on a diagonal. */
+export function plateReach(half: number, dir: Ground, az: number): number {
+  const c = Math.cos(az)
+  const s = Math.sin(az)
+  return half * (Math.abs(dir.x * c - dir.z * s) + Math.abs(dir.x * s + dir.z * c))
 }

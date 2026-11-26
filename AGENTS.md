@@ -39,6 +39,7 @@ panel at an added stop says "[D] stops here (runs local)". A reroute shows only 
 header's "between X and Y"), each a plain ring, and no path ("Stations named in the MTA notice · the new route isn't drawn").
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
 With the Worker configured the search dialog also finds streets, intersections ("Bedford Av & N 7 St"), addresses and places through `/geocode` (2q7.16, 2q7.14; none of it without `VITE_RT_URL`).
+Inside 1250 m every station `amenities.json` lists draws small 3D amenity marks on the map beside its marker or its interior (enp.5).
 Trip planning is behind `FEATURES.navigation` (`src/config.ts`), off by default; `?nav=1` turns it on for that page load.
 
 ## Stack
@@ -222,6 +223,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (0.35: a suspended stretch's route colour mixed this far toward the background, at least 1.45x its dimmed route, 1.51x
   for SI, and 2:1 on the background, 2.04:1 SI) and `changeSuspendedDashPx` / `GapPx` (5 / 4, CSS px at the view's target).
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
+  Amenity tokens (enp.5, themeAmenity.test.ts): `amenityMark` (ink, the extruded pictograms' tops) and `amenitySideShade` (0.55, a
+  linear multiplier for their walls, baked as vertex colors); tops and walls each at least 3:1 on the background, the walls at least
+  1.3:1 under the tops, and apart from the focus, location, pin, exit and rim colors, also under simulated red-green color blindness.
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `CameraRig.tsx` MapControls,
@@ -359,6 +363,23 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `PlacePin.tsx` the searched place's pin (a diamond outline and centre dot, `placePinShape.ts`, inside a thin background halo band, constant screen size, `theme.placePin`; no event handlers; Scene mounts it while the place line shows);
+    `StationAmenities.tsx` (enp.5, in a null-fallback ErrorBoundary, not keyed) the amenity marks of every station group `amenities.json`
+    lists (App's `useAmenities`, through Scene; not the view set, so it fetches nothing and never pops with the view's ranking): per
+    amenity a flat background plate (`plateGeometry`) and an extruded `theme.amenityMark` prism per `GLYPHS` piece (`glyphGeometry` in
+    `amenityGeometry.ts`: tops, then outward walls shaded `amenitySideShade`, no bottom, in the glyph's far-to-near piece order so a
+    nearer piece paints over a farther one with depth testing off), in a row along the station's clear bearing (`lib/amenityPlacement.ts`)
+    just past its marker; the glyph `AMENITY_HALF_PX` 7 px half (3.5 m floor), plate `PLATE_HALF` 1.2 of it, a 3 px gap (1 m floor)
+    (`amenitySizes.ts`); height × `depthScaleY(depthFactor(d))`, so flat top-down; yawed to the controls' azimuth (`writeChordMatrix`) so
+    it reads upright at any turn; opacity `interiorOpacity(d)` (nothing from 1250 m out, the group hidden). The first plate clears the
+    marker as the focus ring draws it, or the trip mark's halo while the trip shows; a mark whose station a shown interior covers
+    slides out to that interior's footprint hull reach along the bearing plus the focus frame's extra 8 m (`hullReach`) as its presence
+    eases in, and cross-fades from its copy under the veil (4.57 plate, 4.6 glyph) to one over it (7.61, 7.62) by instance colors mixed
+    toward the background (`dimLineRgbInto`), a copy fully mixed collapsing to scale 0. Six InstancedMeshes (plate, restroom, csc per
+    tier), two shared materials (opacity written only on change, never a JSX prop); per frame (`amenityFrame.ts`) matrices only when the
+    distance, azimuth, depth, trip flag or a presence changed, colors only when a presence did; allocation-free. It claims one
+    `LabelBlockers` slot (`useAmenityBlockers.ts`: each on-screen plate's projected rect, the first 16) so the street labels keep clear.
+    No handlers, not in ScenePicker. Dev only: `__underground.amenityMarks()` (`useAmenityProbe.ts`: per mark station, kind, tier,
+    ground, px, plate half px, opacity);
     `cameraDistance.ts` helpers; `renderOrder.ts` (also `strokeOrders` and `spanCarOrders`, the per-band and per-deck orders)
   - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms, one layer
     per platform deck (LiveTrains keeps three, splitting the spans with `deckSpans`; deck k's layer holds deck k of every
@@ -488,7 +509,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     x presence at 1 as Stations.tsx collapses it, blocks nothing: a per-frame `LabelContext.markerHidden` flag; a change
     to it bumps `markersVersion`, which places the labels again without rebuilding the DOM)
     and the focus ring (sized as Stations.tsx and FocusRing.tsx draw
-    them now; an entrance ignores a marker its own mark sits in), and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, a slot claimed by each interior that has labels, today the focused one alone (`claimBlockerSlot` / `releaseBlockerSlot`, `BLOCKER_SLOTS` 3, `MAX_LEVEL_BLOCKERS` 16 each; the street labels read every slot; the label divs are `aria-hidden`),
+    them now; an entrance ignores a marker its own mark sits in), and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, a slot claimed by each interior that has labels, today the focused one alone (`claimBlockerSlot` / `releaseBlockerSlot`, `BLOCKER_SLOTS` 4: one per view interior plus one the amenity marks hold, `MAX_LEVEL_BLOCKERS` 16 each, `writeBlocker`; the street labels read every slot; the label divs are `aria-hidden`),
     at priority 0 each frame; read a frame late); street names also keep clear of every drawn interior's outlines
     (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing; the first
     `MAX_LABEL_INTERIORS`). Each run of blocked rects (the fixed ones, each layer's marks, the markers and ring, each
@@ -635,6 +656,13 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     polygons in [-1, 1], y up, far to near: pieces sharing an x run top to bottom, so enp.5 can extrude them flat; restroom: two figures,
     octagon heads, a rectangle torso and a dress, two legs each; csc: an "i"), `amenityKinds`, `groupAmenities` (a complex's union, the first
     member's center entrance); `amenityGlyphs.test.ts` holds the shape rules
+  - `amenityPlacement.ts` (enp.5, pure) the amenity marks' ground layout: `amenityMarks` (per listed group, its kinds in order, one row
+    along `clearBearing`), `trackSegments` (distinct tracks once), `clearBearing` (of 16 bearings, north preferred, then NE, NW, E, W,
+    SE, SW, S, then the half-winds: the one whose plates, north-up squares at a 500 and a 1000 m view (`plateProbes` in
+    scene/amenitySizes.ts), keep farthest from track segments and other station points less 6 m, within 80 m; a near-tie within 3 m (at
+    most half the best) goes to the earlier), `hullReach`, `markCentre`, `plateReach` (a yawed plate's reach along the bearing);
+    `amenityPlacement.data.test.ts`: all groups in one pass at load (30 to 50 ms in node, main thread); at 500 m the first plate clears every track by 1 m at 66 of 68 groups
+    (Grand Central 0.4 m; Fulton St touches one)
   - `stationGroups.ts` a complex as one station (`StationGroup`: the lead's id, point, borough and leadId; the most common member name,
     `otherNames` the rest; routes and stops the union; `groupAccess`: all full is full, else a partly accessible note naming the fully
     accessible routes and each partial member's own; `stationLeads` validates stations.json `complexes`); `Network.stationGroups`
@@ -1497,13 +1525,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`), a service change's suspended stretch 2.15 (`TripLines.tsx`, dashed), a straight-drawn trip ride 2.2 (`TripDashes.tsx`),
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo 4.4, trip walks 4.45
   (`TripDashes.tsx`; 7.55 above the veil while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused) and it reveals), trip mark ring 4.5 and dot 4.55
-  (`TripMarks.tsx`), train halo 5,
+  (`TripMarks.tsx`), amenity plate 4.57 and glyph 4.6 (`StationAmenities.tsx`), train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   a picked service change's skip marks 6.53 (halo), 6.535 (ring) and 6.54 (cross; over every train and car, TripMarks.tsx),
   you-are-here reticle 6.55, the place pin's halo 6.57 and the pin 6.58, the focused interior's footprint frame 7.52 (over the veil and the
   veiled streets, under the trip's walks over the veil; `InteriorFocusFrame.tsx`), street-file entrance marks 7.6 (above the veil at 7, under the interior strokes),
+  a covered station's amenity plate 7.61 and glyph 7.62 (cross-fading from 4.57 / 4.6 by that interior's presence),
   above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
   at a multi-deck interior the band between decks 9.53 (fine) and 9.54 (strong) and the next deck's cars 9.55 to
   9.565 (a third deck: 9.57 to 9.595; `strokeOrders`, `spanCarOrders`),
