@@ -37,6 +37,11 @@ export const RENDER_ORDER = {
   tripWalk: 4.45,
   tripMark: 4.5,
   tripMarkDot: 4.55,
+  // A station's amenity marks (StationAmenities.tsx): the plate, then the extruded glyph, over the trip marks, under
+  // the train halos (a passing train covers them, like the station markers). A mark whose station a shown interior
+  // covers cross-fades to its copy above the veil (amenityPlateOver, amenityOver).
+  amenityPlate: 4.57,
+  amenity: 4.6,
   trainHalo: 5,
   trains: 6,
   // The selected train's dot, drawn on its own above the other dots: its rim, a background gap, the dot.
@@ -86,6 +91,9 @@ export const RENDER_ORDER = {
   // 7.5), so they read like the way out's walk outside.
   tripWalkOver: 7.55,
   streetEntrance: 7.6,
+  // The amenity marks of a station a shown interior covers, above the veil like its entrance marks, under its strokes.
+  amenityPlateOver: 7.61,
+  amenityOver: 7.62,
   interiorFine: 8,
   interior: 9,
   // Trains on a revealed station's platforms (its deepest deck's, spanCarOrders), redrawn above the veil and those

@@ -1,0 +1,219 @@
+import { useFrame } from '@react-three/fiber'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Color, DynamicDrawUsage, MeshBasicMaterial, type Group, type InstancedMesh } from 'three'
+import type { AmenitiesFile } from '../data/amenitiesSchema'
+import { interiorStationIds } from '../data/interiorLoad'
+import { AMENITY_ORDER, GLYPHS, type AmenityKind } from '../lib/amenityGlyphs'
+import { amenityMarks, hullReach, trackSegments } from '../lib/amenityPlacement'
+import { FOCUS_FRAME_PAD_M, FOOTPRINT_PAD_M } from '../lib/interiorFootprint'
+import { interiorOpacity } from '../lib/interiorReveal'
+import type { LabelBlockers } from '../lib/labelBlockers'
+import { srgb01 } from '../lib/lineDim'
+import type { Network } from '../lib/network'
+import type { Presence } from '../lib/presence'
+import { depthFactor, depthScaleY } from '../lib/tilt'
+import type { EmphasisLevels } from '../lib/tripEmphasis'
+import { theme } from '../theme'
+import { frameChanged, newAmenityFrame, TIERS, writeAmenityFrame, type AmenityFrame, type Tier, type TierArrays } from './amenityFrame'
+import { glyphGeometry, plateGeometry } from './amenityGeometry'
+import { markSizesInto, newMarkSizes, plateProbes } from './amenitySizes'
+import { cameraDistance } from './cameraDistance'
+import type { InteriorModel } from './interiorModel'
+import { RENDER_ORDER } from './renderOrder'
+import { clearAmenityBlockers, useAmenityBlockerSlot, writeAmenityBlockers } from './useAmenityBlockers'
+import { useAmenityProbe, type AmenityView } from './useAmenityProbe'
+
+const BACKGROUND = srgb01(theme.background)
+/** How far a covered mark's clearance reaches past the pick footprint: out to the focused interior's frame loop. */
+const FRAME_EXTRA_M = FOCUS_FRAME_PAD_M - FOOTPRINT_PAD_M
+const ORDERS: Record<Tier, { plate: number; glyph: number }> = {
+  under: { plate: RENDER_ORDER.amenityPlate, glyph: RENDER_ORDER.amenity },
+  over: { plate: RENDER_ORDER.amenityPlateOver, glyph: RENDER_ORDER.amenityOver },
+}
+
+interface HasAzimuth {
+  getAzimuthalAngle?: () => number
+}
+
+interface StationAmenitiesProps {
+  network: Network
+  /** The amenities file once loaded; null draws nothing. */
+  amenities: AmenitiesFile | null
+  /** Every shown interior (useSceneInteriors) and its presence: a mark whose station one covers moves past its hull. */
+  shown: readonly InteriorModel[]
+  presences: ReadonlyMap<string, Presence>
+  /** This frame's trip look: while the trip's marks show, the first plate keeps clear of their halo. */
+  levels: EmphasisLevels
+  /** The street labels keep clear of the marks on screen (one slot). */
+  blockers: LabelBlockers
+}
+
+type Meshes = Record<Tier, { plate: InstancedMesh | null; glyph: Record<AmenityKind, InstancedMesh | null> }>
+
+/**
+ * Every listed station's amenity marks (enp.5): a background plate and an extruded `theme.amenityMark` pictogram
+ * (amenityGlyphs' pieces) per amenity, in a row along the station's clear bearing (amenityPlacement.ts) just past its
+ * marker, inside 1250 m only, fading in with the interiors (interiorOpacity). Flat top-down (height × the depth factor),
+ * yawed to the camera azimuth so each reads upright. A mark whose station a shown interior covers slides out past that
+ * interior's hull as its presence eases in, cross-fading from its copy under the veil (4.57, 4.6) to one over it
+ * (7.61, 7.62). Instanced, depth testing off, no handlers (never picked); matrices are rewritten only when the view or
+ * a presence changes, materials' opacity only on change, never as JSX props (o3r.9).
+ */
+export function StationAmenities({ network, amenities, shown, presences, levels, blockers }: StationAmenitiesProps) {
+  const group = useRef<Group>(null)
+  const meshes = useRef<Meshes>({
+    under: { plate: null, glyph: { restroom: null, csc: null } },
+    over: { plate: null, glyph: { restroom: null, csc: null } },
+  })
+  const segments = useMemo(() => trackSegments(network.shapes), [network])
+  const marks = useMemo(
+    () => (amenities ? amenityMarks(network.stationGroups, amenities, segments, network.stations, plateProbes) : []),
+    [network, amenities, segments],
+  )
+  const frame = useMemo(() => newAmenityFrame(marks), [marks])
+  const frameRef = useRef<AmenityFrame | null>(null)
+  frameRef.current = frame
+  // Which shown interior covers each mark's station, and how far its hull reaches along the mark's bearing.
+  useLayoutEffect(() => {
+    const covers = shown.map((m) => ({ ids: new Set(interiorStationIds(m)), model: m }))
+    frame.marks.forEach((mark, i) => {
+      const hit = covers.find((c) => mark.memberIds.some((id) => c.ids.has(id)))
+      frame.cover[i] = hit ? (presences.get(hit.model.stationId) ?? null) : null
+      frame.reach[i] = hit ? hullReach(hit.model.footprint, mark.pos, mark.dir) + FRAME_EXTRA_M : 0
+    })
+    frame.last.d = NaN
+  }, [frame, shown, presences])
+
+  const geometry = useMemo(
+    () => ({ plate: plateGeometry(), restroom: glyphGeometry(GLYPHS.restroom, theme.amenitySideShade), csc: glyphGeometry(GLYPHS.csc, theme.amenitySideShade) }),
+    [],
+  )
+  const material = useMemo(
+    () => ({
+      plate: new MeshBasicMaterial({ color: theme.background, transparent: true, depthTest: false, depthWrite: false }),
+      glyph: new MeshBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false }),
+    }),
+    [],
+  )
+  useEffect(
+    () => () => {
+      for (const g of Object.values(geometry)) g.dispose()
+      material.plate.dispose()
+      material.glyph.dispose()
+    },
+    [geometry, material],
+  )
+  const markRgb = useMemo(() => {
+    const c = new Color(theme.amenityMark)
+    return new Float32Array([c.r, c.g, c.b])
+  }, [])
+  const scratch = useMemo(() => ({ rgb: new Float32Array(3), sizes: newMarkSizes(), tiers: null as Record<Tier, TierArrays> | null }), [])
+  const view = useRef<AmenityView>({ opacity: 0, sizes: scratch.sizes })
+  const slot = useAmenityBlockerSlot(blockers)
+  useAmenityProbe(frameRef, view)
+
+  // Usage, colors and the tiers' arrays before the first frame (the shader compiles with instance colors only if set).
+  useLayoutEffect(() => {
+    const g = group.current
+    if (g) g.visible = false
+    const arrays = {} as Record<Tier, TierArrays>
+    for (const tier of TIERS) {
+      const m = meshes.current[tier]
+      const plate = m.plate
+      if (!plate) return
+      plate.instanceMatrix.setUsage(DynamicDrawUsage)
+      const glyph = {} as Record<AmenityKind, Float32Array>
+      const color = {} as Record<AmenityKind, Float32Array>
+      for (const kind of AMENITY_ORDER) {
+        const mesh = m.glyph[kind]
+        if (!mesh) {
+          glyph[kind] = new Float32Array(0)
+          color[kind] = new Float32Array(0)
+          continue
+        }
+        mesh.instanceMatrix.setUsage(DynamicDrawUsage)
+        const c = new Color(theme.amenityMark)
+        for (let j = 0; j < mesh.count; j++) mesh.setColorAt(j, c)
+        mesh.instanceColor!.needsUpdate = true
+        glyph[kind] = mesh.instanceMatrix.array as Float32Array
+        color[kind] = mesh.instanceColor!.array as Float32Array
+      }
+      arrays[tier] = { plate: plate.instanceMatrix.array as Float32Array, glyph, color }
+    }
+    scratch.tiers = arrays
+    frame.drawnP.fill(NaN)
+    frame.last.d = NaN
+    return () => {
+      scratch.tiers = null
+    }
+  }, [frame, scratch])
+
+  useFrame((state) => {
+    const g = group.current
+    const tiers = scratch.tiers
+    if (!g || !tiers) return
+    const d = cameraDistance(state)
+    const op = interiorOpacity(d)
+    view.current.opacity = op
+    if (op <= 0) {
+      if (g.visible) g.visible = false
+      clearAmenityBlockers(blockers, slot.current)
+      return
+    }
+    if (!g.visible) g.visible = true
+    if (material.glyph.opacity !== op) {
+      material.glyph.opacity = op
+      material.plate.opacity = op
+    }
+    const az = (state.controls as HasAzimuth | null)?.getAzimuthalAngle?.() ?? 0
+    const depth = depthScaleY(depthFactor(d))
+    const trip = levels.tripVisible
+    if (frameChanged(frame, d, az, depth, trip)) {
+      markSizesInto(scratch.sizes, d, trip)
+      const colored = writeAmenityFrame(frame, tiers, scratch.sizes, d, az, depth, trip, markRgb, BACKGROUND, scratch.rgb)
+      const m = meshes.current
+      for (let t = 0; t < TIERS.length; t++) {
+        const tier = m[TIERS[t]!]
+        tier.plate!.instanceMatrix.needsUpdate = true
+        for (let k = 0; k < AMENITY_ORDER.length; k++) {
+          const mesh = tier.glyph[AMENITY_ORDER[k]!]
+          if (!mesh) continue
+          mesh.instanceMatrix.needsUpdate = true
+          if (colored) mesh.instanceColor!.needsUpdate = true
+        }
+      }
+    }
+    writeAmenityBlockers(blockers, slot.current, frame, state.camera, state.size.width, state.size.height, az, scratch.sizes.plate)
+  })
+
+  if (marks.length === 0) return null
+  return (
+    <group ref={group}>
+      {TIERS.map((tier) => (
+        <group key={tier}>
+          <instancedMesh
+            ref={(m: InstancedMesh | null) => {
+              meshes.current[tier].plate = m
+            }}
+            args={[geometry.plate, material.plate, marks.length]}
+            frustumCulled={false}
+            renderOrder={ORDERS[tier].plate}
+          />
+          {AMENITY_ORDER.map((kind) =>
+            frame.byKind[kind].length === 0 ? null : (
+              <instancedMesh
+                key={kind}
+                ref={(m: InstancedMesh | null) => {
+                  meshes.current[tier].glyph[kind] = m
+                }}
+                args={[geometry[kind], material.glyph, frame.byKind[kind].length]}
+                frustumCulled={false}
+                renderOrder={ORDERS[tier].glyph}
+              />
+            ),
+          )}
+        </group>
+      ))}
+    </group>
+  )
+}

@@ -2,8 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef, type RefObject } from 'react'
 import { Vector3, type Group } from 'three'
 import type { LevelLabel } from '../lib/interiorFraming'
-import { claimBlockerSlot, MAX_LEVEL_BLOCKERS, releaseBlockerSlot, type LabelBlockers } from '../lib/labelBlockers'
-import { RECT } from '../lib/labelGeometry'
+import { claimBlockerSlot, MAX_LEVEL_BLOCKERS, releaseBlockerSlot, writeBlocker, type LabelBlockers } from '../lib/labelBlockers'
 import { clearLabelTop } from '../lib/labelKeepOut'
 
 /** A background-colored halo instead of a filled chip, so strokes show through; the street labels share it. */
@@ -161,17 +160,3 @@ export function useLevelLabels(
   })
 }
 
-/** Writes packed rect `r` and says whether it changed. */
-function writeBlocker(rects: Float32Array, r: number, left: number, top: number, right: number, bottom: number): boolean {
-  const o = r * RECT
-  // Float32 storage: compare after the write's rounding.
-  const was0 = rects[o]
-  const was1 = rects[o + 1]
-  const was2 = rects[o + 2]
-  const was3 = rects[o + 3]
-  rects[o] = left
-  rects[o + 1] = top
-  rects[o + 2] = right
-  rects[o + 3] = bottom
-  return rects[o] !== was0 || rects[o + 1] !== was1 || rects[o + 2] !== was2 || rects[o + 3] !== was3
-}

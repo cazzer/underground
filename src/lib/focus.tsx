@@ -105,6 +105,17 @@ export interface StreetLabelsProbe {
   samples: number
 }
 
+/** One amenity mark as last drawn (StationAmenities' useAmenityProbe). */
+export interface AmenityMarkProbe {
+  stationId: string
+  kind: 'restroom' | 'csc'
+  tier: 'under' | 'over' | 'both'
+  ground: Ground
+  px: { x: number; y: number }
+  halfPx: number
+  opacity: number
+}
+
 /** Dev-only console and Playwright hooks; each provider adds and removes only its own. */
 export interface UndergroundDevHooks {
   /** The focused station's street layer probe (useEntranceProbe), while it has a streets file. */
@@ -135,6 +146,8 @@ export interface UndergroundDevHooks {
   /** The street label pass's counts and timings; `reset` clears the timings after reading them. */
   streetLabels?: (reset?: boolean) => StreetLabelsProbe
   /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */
+  /** Every station amenity mark as last drawn (useAmenityProbe): empty until the amenities file loads. */
+  amenityMarks?: () => AmenityMarkProbe[]
   basemapSegments?: () => { distance: number; classes: Record<string, { used: number; capacity: number; visible: boolean }> }
 }
 

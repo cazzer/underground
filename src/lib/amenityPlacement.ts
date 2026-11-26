@@ -165,7 +165,7 @@ export function amenityMarks(
   groups: readonly StationLike[],
   amenities: AmenitiesFile,
   segments: Float32Array,
-  stations: readonly StationLike[],
+  stations: readonly { id: string; pos: Ground }[],
   probes: (count: number) => readonly PlateProbe[],
 ): AmenityMark[] {
   const out: AmenityMark[] = []

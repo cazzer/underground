@@ -187,6 +187,7 @@ function MapView({ network, bands, live }: MapViewProps) {
               route={route}
               routeShown={routeShown}
               tripRoute={tripRoute}
+              amenities={amenities.state === 'ready' ? amenities.index : null}
             />
             {/* Decoration: a crash here shows the map at once. */}
             <ErrorBoundary fallback={null}>
