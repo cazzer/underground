@@ -4,7 +4,7 @@ import { Color, DynamicDrawUsage, MeshBasicMaterial, type Group, type InstancedM
 import type { AmenitiesFile } from '../data/amenitiesSchema'
 import { interiorStationIds } from '../data/interiorLoad'
 import { AMENITY_ORDER, GLYPHS, type AmenityKind } from '../lib/amenityGlyphs'
-import { amenityMarks, hullReach, trackSegments } from '../lib/amenityPlacement'
+import { amenityMarks, coveredRow, trackSegments } from '../lib/amenityPlacement'
 import { FOCUS_FRAME_PAD_M, FOOTPRINT_PAD_M } from '../lib/interiorFootprint'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { LabelBlockers } from '../lib/labelBlockers'
@@ -61,7 +61,7 @@ type Meshes = Record<Tier, { plate: InstancedMesh | null; glyph: Record<AmenityK
  * (amenityGlyphs' pieces) per amenity, in a row along the station's clear bearing (amenityPlacement.ts) just past its
  * marker, inside 1250 m only, fading in with the interiors (interiorOpacity). Flat top-down (height × the depth factor),
  * yawed to the camera azimuth so each reads upright. A mark whose station a shown interior covers slides out past that
- * interior's hull as its presence eases in, cross-fading from its copy under the veil (4.57, 4.6) to one over it
+ * interior's hull, off the side nearest its middle (coveredRow), as its presence eases in, cross-fading from its copy under the veil (4.57, 4.6) to one over it
  * (7.61, 7.62). Instanced, depth testing off, no handlers (never picked); matrices are rewritten only when the view or
  * a presence changes, materials' opacity only on change, never as JSX props (o3r.9).
  */
@@ -79,13 +79,18 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
   const frame = useMemo(() => newAmenityFrame(marks), [marks])
   const frameRef = useRef<AmenityFrame | null>(null)
   frameRef.current = frame
-  // Which shown interior covers each mark's station, and how far its hull reaches along the mark's bearing.
+  // Which shown interior covers each mark's station, and where its row goes past that hull (coveredRow).
   useLayoutEffect(() => {
     const covers = shown.map((m) => ({ ids: new Set(interiorStationIds(m)), model: m }))
     frame.marks.forEach((mark, i) => {
       const hit = covers.find((c) => mark.memberIds.some((id) => c.ids.has(id)))
       frame.cover[i] = hit ? (presences.get(hit.model.stationId) ?? null) : null
-      frame.reach[i] = hit ? hullReach(hit.model.footprint, mark.pos, mark.dir) + FRAME_EXTRA_M : 0
+      const past = hit ? coveredRow(hit.model.footprint) : null
+      frame.coverOX[i] = past?.origin.x ?? 0
+      frame.coverOZ[i] = past?.origin.z ?? 0
+      frame.coverX[i] = past?.dir.x ?? 0
+      frame.coverZ[i] = past?.dir.z ?? 0
+      frame.reach[i] = past ? past.reach + FRAME_EXTRA_M : 0
     })
     frame.last.d = NaN
   }, [frame, shown, presences])

@@ -372,8 +372,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     (`amenitySizes.ts`); height × `depthScaleY(depthFactor(d))`, so flat top-down; yawed to the controls' azimuth (`writeChordMatrix`) so
     it reads upright at any turn; opacity `interiorOpacity(d)` (nothing from 1250 m out, the group hidden). The first plate clears the
     marker as the focus ring draws it, or the trip mark's halo while the trip shows; a mark whose station a shown interior covers
-    slides out to that interior's footprint hull reach along the bearing plus the focus frame's extra 8 m (`hullReach`) as its presence
-    eases in, and cross-fades from its copy under the veil (4.57 plate, 4.6 glyph) to one over it (7.61, 7.62) by instance colors mixed
+    slides (a straight blend by the presence) to a row just off that interior's footprint hull, from the hull's middle along the
+    bearing it reaches least plus the focus frame's extra 8 m (`coveredRow`), as the presence eases in, and cross-fades from its copy under the veil (4.57 plate, 4.6 glyph) to one over it (7.61, 7.62) by instance colors mixed
     toward the background (`dimLineRgbInto`), a copy fully mixed collapsing to scale 0. Six InstancedMeshes (plate, restroom, csc per
     tier), two shared materials (opacity written only on change, never a JSX prop); per frame (`amenityFrame.ts`) matrices only when the
     distance, azimuth, depth, trip flag or a presence changed, colors only when a presence did; allocation-free. It claims one
@@ -660,7 +660,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     along `clearBearing`), `trackSegments` (distinct tracks once), `clearBearing` (of 16 bearings, north preferred, then NE, NW, E, W,
     SE, SW, S, then the half-winds: the one whose plates, north-up squares at a 500 and a 1000 m view (`plateProbes` in
     scene/amenitySizes.ts), keep farthest from track segments and other station points less 6 m, within 80 m; a near-tie within 3 m (at
-    most half the best) goes to the earlier), `hullReach`, `markCentre`, `plateReach` (a yawed plate's reach along the bearing);
+    most half the best) goes to the earlier), `hullReach`, `coveredRow` (a covered row's start, bearing and reach), `markCentre`, `plateReach` (a yawed plate's reach along the bearing);
     `amenityPlacement.data.test.ts`: all groups in one pass at load (30 to 50 ms in node, main thread); at 500 m the first plate clears every track by 1 m at 66 of 68 groups
     (Grand Central 0.4 m; Fulton St touches one)
   - `stationGroups.ts` a complex as one station (`StationGroup`: the lead's id, point, borough and leadId; the most common member name,

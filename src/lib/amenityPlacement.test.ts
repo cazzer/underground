@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AmenitiesFile } from '../data/amenitiesSchema'
-import { amenityMarks, BEARINGS, clearBearing, hullReach, markCentre, plateReach, segmentDistance, squareDistance, trackSegments, type PlateProbe } from './amenityPlacement'
+import { amenityMarks, BEARINGS, clearBearing, coveredRow, hullReach, markCentre, plateReach, segmentDistance, squareDistance, trackSegments, type PlateProbe } from './amenityPlacement'
 import type { Footprint } from './interiorFootprint'
 
 const O = { x: 1000, z: 2000 }
@@ -88,6 +88,14 @@ describe('hullReach and markCentre', () => {
     expect(hullReach(fp, O, N)).toBeCloseTo(20)
     expect(hullReach(fp, O, { x: 1, z: 0 })).toBeCloseTo(15)
     expect(hullReach(fp, O, { x: -1, z: 0 })).toBeCloseTo(-5)
+  })
+
+  it('starts a covered row at the hull middle, off its long side, north first on a tie', () => {
+    // A hull 10 m wide and 40 m long north-south, centred on the station: east and west reach 5 m, north and south 20 m.
+    const long: Footprint = { originX: O.x, originZ: O.z, hull: [[-5, -20], [5, -20], [5, 20], [-5, 20]], yLow: 0, yHigh: 0 }
+    expect(coveredRow(long)).toEqual({ origin: O, dir: { x: 1, z: 0 }, reach: 5 })
+    const square: Footprint = { ...long, originX: O.x + 30, hull: [[-10, -10], [10, -10], [10, 10], [-10, 10]] }
+    expect(coveredRow(square)).toEqual({ origin: { x: O.x + 30, z: O.z }, dir: N, reach: 10 })
   })
 
   it('reaches a yawed plate farther along a diagonal', () => {

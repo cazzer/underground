@@ -189,6 +189,28 @@ export function hullReach(footprint: Footprint, origin: Ground, dir: Ground): nu
   return reach
 }
 
+/**
+ * Where a covered station's row starts past its interior: from the middle of the footprint's hull (its vertices'
+ * mean), along the bearing (of BEARINGS) in which the hull reaches least, so the marks sit just off the interior's
+ * nearest side to its middle (a long platform hull puts them off its long side, clear of the tracks leaving its ends,
+ * and a complex's marks by the whole interior, not by its lead's own platform); of those within TIE_M, the first in
+ * preference order.
+ */
+export function coveredRow(footprint: Footprint): { origin: Ground; dir: Ground; reach: number } {
+  let x = 0
+  let z = 0
+  for (const [hx, hz] of footprint.hull) {
+    x += hx
+    z += hz
+  }
+  const n = Math.max(footprint.hull.length, 1)
+  const origin = { x: footprint.originX + x / n, z: footprint.originZ + z / n }
+  const reaches = BEARINGS.map((dir) => hullReach(footprint, origin, dir))
+  const least = Math.min(...reaches)
+  const i = reaches.findIndex((r) => r <= least + TIE_M)
+  return { origin, dir: BEARINGS[i]!, reach: reaches[i]! }
+}
+
 /** The k-th mark's centre along its bearing, meters from the station point: past `clearM`, a gap, then plates reaching
  *  `halfM` along the bearing either side of their centres, one gap apart. */
 export function markCentre(k: number, clearM: number, halfM: number, gapM: number): number {

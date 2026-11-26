@@ -13,6 +13,9 @@ import type { MarkSizes } from './amenitySizes'
 const PLATE_Y = 0.25
 const GLYPH_Y = 0.3
 
+/** Scratch for the covered bearing (plateReach takes a Ground). */
+const cdir = { x: 0, z: 0 }
+
 /** The tier a copy draws in: under the veil with the street layers, or over it beside an interior's own marks. */
 export const TIERS = ['under', 'over'] as const
 export type Tier = (typeof TIERS)[number]
@@ -26,7 +29,12 @@ export interface AmenityFrame {
   slot: Int32Array
   /** Per mark, the shown interior covering its station (its presence), or null. */
   cover: (Presence | null)[]
-  /** Per mark, how far that interior's hull (plus the focus frame's extra pad) reaches along its bearing, meters. */
+  /** Per covered mark, its row's start and bearing past that interior (coveredRow) and how far the hull, plus the
+   *  focus frame's extra pad, reaches along it from there, meters. */
+  coverOX: Float32Array
+  coverOZ: Float32Array
+  coverX: Float32Array
+  coverZ: Float32Array
   reach: Float32Array
   /** Per mark, the presence its matrices and colors were last written at (NaN: rewrite). */
   drawnP: Float32Array
@@ -54,6 +62,10 @@ export function newAmenityFrame(marks: readonly AmenityMark[]): AmenityFrame {
     byKind,
     slot,
     cover: marks.map(() => null),
+    coverOX: new Float32Array(marks.length),
+    coverOZ: new Float32Array(marks.length),
+    coverX: new Float32Array(marks.length),
+    coverZ: new Float32Array(marks.length),
     reach: new Float32Array(marks.length),
     drawnP: new Float32Array(marks.length).fill(NaN),
     x: new Float32Array(marks.length),
@@ -87,8 +99,8 @@ export function frameChanged(f: AmenityFrame, d: number, az: number, depth: numb
  * Writes every mark's matrices in both tiers (yawed by the camera azimuth `az`, so the glyph's up runs up the screen;
  * its height × `depth`), and the instance colors of any mark whose presence changed: the under copy mixes toward the
  * background by the presence, the over copy by 1 − presence, and a copy fully mixed collapses to scale 0 (plate too).
- * A covered mark slides out from the marker's clearance to the interior's hull reach as the presence eases in; the row
- * spaces its plates by how far each, yawed, reaches along the bearing, so no corner crosses the marker.
+ * A covered mark slides from its place beside the marker to its place past the interior's hull (coveredRow) as the presence eases in; a row spaces its plates by how far each, yawed, reaches along its bearing, so no
+ * corner crosses the marker.
  * Returns whether any color was written.
  */
 export function writeAmenityFrame(
@@ -116,10 +128,18 @@ export function writeAmenityFrame(
   for (let i = 0; i < f.marks.length; i++) {
     const m = f.marks[i]!
     const p = presenceOf(f, i)
-    const clear = f.cover[i] ? sizes.clear + (Math.max(f.reach[i]!, sizes.clear) - sizes.clear) * p : sizes.clear
-    const along = markCentre(m.k, clear, plateReach(sizes.plate, m.dir, az), sizes.gap)
-    const x = m.pos.x + m.dir.x * along
-    const z = m.pos.z + m.dir.z * along
+    const along = markCentre(m.k, sizes.clear, plateReach(sizes.plate, m.dir, az), sizes.gap)
+    let x = m.pos.x + m.dir.x * along
+    let z = m.pos.z + m.dir.z * along
+    if (p > 0) {
+      const cx = f.coverX[i]!
+      const cz = f.coverZ[i]!
+      cdir.x = cx
+      cdir.z = cz
+      const out = markCentre(m.k, Math.max(f.reach[i]!, sizes.clear), plateReach(sizes.plate, cdir, az), sizes.gap)
+      x += (f.coverOX[i]! + cx * out - x) * p
+      z += (f.coverOZ[i]! + cz * out - z) * p
+    }
     f.x[i] = x
     f.z[i] = z
     const j = f.slot[i]!
