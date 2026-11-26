@@ -379,7 +379,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     1250 m out, the group hidden). The row clears the marker as the focus ring draws it, or the trip mark's halo while the trip shows.
     A mark whose station a shown interior covers slides (a straight blend by the presence) to a row just off that interior's
     footprint hull plus the focus frame's extra 8 m (`useAmenityCovers.ts` over `lib/amenityCovered.ts`' `coveredRow`, chosen when
-    the shown interiors, the canvas size or the panel's rect change), and hands off from its copy under the veil to one over
+    the shown interiors or the canvas size change, or the panel is first measured; never on a panel resize), and hands off from its copy under the veil to one over
     it, both always at full ink (`tierShare`: the over glyph grows to full size by half way and its plate draws only then, the
     under copy whole until that point, so the ink never dips below the dimmer copy; `amenityFrame.test.ts`), a part at share 0 collapsing to
     scale 0. Six InstancedMeshes (plate, restroom, csc per tier), two shared materials (opacity written only on change, never a JSX
