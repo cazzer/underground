@@ -36,6 +36,14 @@ be accurate.
   when a machine's exact location is not known, and some are plainly wrong (25 machines are over 500 m
   from their station; EL100 is at Jay St, 15 km from 149 St-Hostos). Place machines from their `serving` text, not from `lat`/`lon`.
 
+- `stations/customer-service-centers.json`: the 30 subway stations the MTA's "Customer Service Centers" page lists
+  (https://www.mta.info/contact-us/customer-service-centers, retrieved 2026-11-26), hand-copied: each entry has the
+  catalog `gtfsStopId` and `name`, the page's own `pageName` and `entrance` text, and `hours` only where it is not
+  24/7 (St George, Staten Island Railway, S31). For a complex the entry is one member: the one whose catalog name
+  and the page's entrance street agree, else the lowest stop id; the build will expand it to every member. Not an
+  open dataset and not from the MTA's data feeds (terms not reviewed); there is no refresh path, so it goes stale
+  until someone rereads the page. `scripts/lib/customerServiceCenters.ts` parses it and its test ties every id and
+  name to `catalog/stations.json`. Not shipped yet. UI wording: "Customer service center · staffed 24/7", never "booth".
 - `stations/layout-oracle.json`: 62 stations (and 13 complexes or multi-level ones the classifier should
   decline) with their platform type, platform and track counts and whether a mezzanine exists, each with
   the English Wikipedia article title and revision id it was read from. The tuning set for
