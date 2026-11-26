@@ -1,5 +1,9 @@
-import { accessLabel } from '../lib/labels'
+import type { AmenityKind } from '../lib/amenityGlyphs'
+import { accessLabel, amenityLabel, spokenAfterName } from '../lib/labels'
 import type { StationAccessInfo } from '../lib/network'
+import { AmenityIcons } from './AmenityIcon'
+
+const NO_AMENITIES: readonly AmenityKind[] = []
 
 interface AccessGlyphProps {
   className: string
@@ -48,24 +52,32 @@ interface StationNameProps extends AccessIconProps {
   name: string
   /** An outage leaves the station with no step-free way out right now: the hidden text says so after the label. */
   noStepFreeNow?: boolean
+  /** The station's amenities (restroom, customer service center), drawn after the access glyph; the card context only. */
+  amenities?: readonly AmenityKind[]
+  /** The customer service center's entrance text, said after the amenity words. */
+  cscEntrance?: string | null
 }
 
 /**
- * The station name, then its access icon; the last word and the icon wrap together, so the icon never sits
- * alone. Screen readers get ", <accessLabel>." as hidden text instead of the icon, so a heading or option name
- * is real text with fixed punctuation. A search row also shows a partly accessible station's note after the icon.
+ * The station name, then its access icon and amenity glyphs; the last word and the icons wrap together, so an icon
+ * never sits alone. Screen readers get ", <accessLabel>." and " <amenityLabel>." as hidden text instead of the
+ * icons, so a heading or option name is real text with fixed punctuation. A search row shows no amenities, and
+ * shows a partly accessible station's note after the icon.
  */
-export function StationName({ name, access, context, noStepFreeNow = false }: StationNameProps) {
+export function StationName({ name, access, context, noStepFreeNow = false, amenities = NO_AMENITIES, cscEntrance = null }: StationNameProps) {
   const label = accessLabel(access)
-  if (label === null) return name
+  const kinds = context === 'card' ? amenities : NO_AMENITIES
+  const amenityWords = amenityLabel(kinds, cscEntrance)
+  if (label === null && amenityWords === null) return name
   const cut = name.lastIndexOf(' ') + 1
   return (
     <>
       {name.slice(0, cut)}
       <span className="whitespace-nowrap">
         {name.slice(cut)}
-        <AccessIcon access={access} context={context} />
-        <span className="sr-only">, {label}{noStepFreeNow ? "; no step-free access now" : ""}.</span>
+        {label !== null && <AccessIcon access={access} context={context} />}
+        <AmenityIcons kinds={kinds} />
+        <span className="sr-only">{spokenAfterName(label, noStepFreeNow, amenityWords)}</span>
       </span>
       {context === 'row' && access.note && (
         <span aria-hidden="true" className="text-xs text-ink-dim">

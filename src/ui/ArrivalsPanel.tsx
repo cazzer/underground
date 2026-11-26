@@ -6,10 +6,13 @@ import type { OutagePanelView } from '../lib/live/eneText'
 import type { LiveStatus as LiveStatusValue } from '../lib/live/liveStatus'
 import { useStationStreets } from '../data/useStationStreets'
 import { listsStationFn } from '../lib/entranceList'
-import { accessLabel } from '../lib/labels'
+import type { AmenitiesFile } from '../data/amenitiesSchema'
+import { groupAmenities } from '../lib/amenityGlyphs'
+import { accessLabel, amenityLabel, spokenAfterName } from '../lib/labels'
 import type { Network } from '../lib/network'
 import type { TripEnd } from '../lib/trip'
 import { PartialAccessNote, StationName } from './AccessIcon'
+import { CscNote } from './AmenityIcon'
 import { ArrivalsList } from './ArrivalsList'
 import { EntranceList } from './EntranceList'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
@@ -33,6 +36,8 @@ interface ArrivalsPanelProps {
   skips: AlertSkips | null
   /** The arrivals' line filter, held by the HUD so a train panel covering this one doesn't reset it. */
   lineFilter: LineFilterControl
+  /** The station amenities (restrooms, customer service centers), or null until loaded (or when the load failed): no glyphs. */
+  amenities: AmenitiesFile | null
   /** "Directions from here" and "Directions to here": open the trip panel with this station as that end. Absent when navigation is off: no directions row. */
   onDirections?: (end: TripEnd) => void
   ref: Ref<HTMLElement>
@@ -43,7 +48,7 @@ interface ArrivalsPanelProps {
 const LINK =
   'flex min-h-11 cursor-pointer items-center px-2 text-ink-dim underline hover:text-ink focus-visible:outline-2 focus-visible:outline-focus'
 
-export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, changes, skips, lineFilter, onDirections, ref, headingRef }: ArrivalsPanelProps) {
+export function ArrivalsPanel({ network, stationId, live, arrivals, interior, outages, changes, skips, lineFilter, amenities, onDirections, ref, headingRef }: ArrivalsPanelProps) {
   // The street file loads on focus only (the scene's streets share it through the cache); nothing shows until it is in.
   const streets = useStationStreets(stationId)
   // The merged station's members all count as "listing" the station, so another member's elevators rank like the lead's own.
@@ -57,7 +62,9 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
   const access = accessLabel(station.access)
   // Said after the name (and its access words) only when this station is skipped right now, so a rider hears it first.
   const skipSaid = changes.skipSpoken
-  const barLabel = `Arrivals at ${station.name}${access === null ? '' : `, ${access}${outages.noStepFree ? '; no step-free access now' : ''}.`}${skipSaid === '' ? '' : `${access === null ? '. ' : ' '}${skipSaid}`}`
+  const { kinds, cscEntrance } = groupAmenities(amenities?.stations ?? {}, memberIds)
+  const nameSaid = spokenAfterName(access, outages.noStepFree, amenityLabel(kinds, cscEntrance))
+  const barLabel = `Arrivals at ${station.name}${nameSaid}${skipSaid === '' ? '' : `${nameSaid === '' ? '. ' : ' '}${skipSaid}`}`
   return (
     <aside
       ref={ref}
@@ -67,13 +74,13 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
       {collapsed ? (
         <ExpandBar ref={setHeading} label={barLabel} controls={bodyId} onExpand={expand}>
           <span aria-hidden="true">
-            <StationName name={station.name} access={station.access} context="card" />
+            <StationName name={station.name} access={station.access} context="card" amenities={kinds} />
           </span>
         </ExpandBar>
       ) : (
         <div className="flex items-start justify-between gap-3">
           <h2 ref={setHeading} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
-            <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} />
+            <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} amenities={kinds} cscEntrance={cscEntrance} />
             {skipSaid !== '' && <>{' '}<span className="sr-only">{skipSaid}</span></>}
           </h2>
           <CollapseButton label="Collapse station panel" controls={bodyId} onCollapse={collapse} />
@@ -85,6 +92,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
       <div id={bodyId} hidden={collapsed}>
         {station.otherNames.length > 0 && <p className="mt-1 text-sm text-ink-dim">with {station.otherNames.join(', ')}</p>}
         <PartialAccessNote access={station.access} />
+        <CscNote entrance={cscEntrance} />
         {onDirections && (
           <p className="-ml-2 mt-1 flex flex-wrap text-sm">
             <button type="button" onClick={() => onDirections('from')} className={LINK}>

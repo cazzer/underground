@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import type { StationsFile } from '../data/schema'
-import { accessLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel, updatedLabel } from './labels'
+import { accessLabel, amenityLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel, spokenAfterName, updatedLabel } from './labels'
 import { stationAccess } from './network'
 
 describe('routeChipLabel', () => {
@@ -96,5 +96,39 @@ describe('updatedLabel', () => {
   it('formats the update time in New York time', () => {
     // 2026-11-21 19:41:00 UTC is 2:41 PM in New York (EST).
     expect(updatedLabel(Date.UTC(2026, 10, 21, 19, 41) / 1000)).toBe('updated 2:41 PM')
+  })
+})
+
+describe('amenityLabel', () => {
+  it('says nothing for a station with none', () => {
+    expect(amenityLabel([])).toBeNull()
+    expect(amenityLabel([], 'Enter at 14 St and 4 Av')).toBeNull()
+  })
+
+  it('names each amenity, a restroom only as listed', () => {
+    expect(amenityLabel(['restroom'])).toBe('Restroom listed by the MTA')
+    expect(amenityLabel(['csc'])).toBe('Customer service center, staffed 24/7')
+    expect(amenityLabel(['restroom', 'csc'])).toBe('Restroom listed by the MTA; customer service center, staffed 24/7')
+  })
+
+  it("adds the customer service center's entrance in the MTA's words", () => {
+    expect(amenityLabel(['csc'], 'Enter at 95 St and Broadway')).toBe('Customer service center, staffed 24/7, enter at 95 St and Broadway')
+    expect(amenityLabel(['restroom', 'csc'], 'Enter at 42 St and Park Av')).toBe(
+      'Restroom listed by the MTA; customer service center, staffed 24/7, enter at 42 St and Park Av',
+    )
+    expect(amenityLabel(['restroom'], 'Enter at 42 St and Park Av')).toBe('Restroom listed by the MTA')
+  })
+})
+
+describe('spokenAfterName', () => {
+  it('is empty with no access label and no amenities', () => {
+    expect(spokenAfterName(null, false, null)).toBe('')
+  })
+
+  it('says the access label, then the amenities, as sentences', () => {
+    expect(spokenAfterName('Accessible station', false, null)).toBe(', Accessible station.')
+    expect(spokenAfterName('Accessible station', true, null)).toBe(', Accessible station; no step-free access now.')
+    expect(spokenAfterName('Accessible station', false, 'Restroom listed by the MTA')).toBe(', Accessible station. Restroom listed by the MTA.')
+    expect(spokenAfterName(null, false, 'Restroom listed by the MTA')).toBe('. Restroom listed by the MTA.')
   })
 })
