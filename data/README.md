@@ -26,7 +26,7 @@ be accurate.
   `stationId` (the E&E station MRN without leading zeros) and `complexId`; envelopes and OSM ways
   carry no station key. `catalog/amenities.json` (dataset 6yjv-fk7g, restrooms of the latest month only, `{ id, type, stationId, month }`;
   `stationId` is the MTA station id, one member's for a complex; no hours, ADA status or open/closed state, and the source's point is
-  the station's, not the restroom's) is not read by any build yet and is not in `CATALOG_FILES`; re-pin just it with
+  the station's, not the restroom's) is read by `npm run data:stations` (it builds `public/data/stations/amenities.json`; it is not in `CATALOG_FILES`, which is the generator's), so rerun that after a re-pin or `amenitiesOutputs.test.ts` fails; re-pin just it with
   `npm run data:catalog:fetch -- --only amenities.json`, by hand, like the rest of the catalog. `catalog/stations.json` is also read by `npm run data` (borough and ADA status
   for `public/data/stations.json`) together with `stations/access-exceptions.json`; after a catalog refresh, run `npm run data:access` (offline). `npm run data:stations` reads
   `stations.json`, `entrances.json`, `equipment.json`, `osm-platforms.json` and `osm-tracks.json` (with the
@@ -46,7 +46,7 @@ be accurate.
   the build must expand it through the complex. Not an open dataset and not from the MTA's data feeds (terms not
   reviewed); there is no refresh path, so it goes stale until someone rereads the page.
   `scripts/lib/customerServiceCenters.ts` parses it and its test ties every id and name to `catalog/stations.json` and
-  checks that no two entries share a complex. Not shipped yet. UI wording: "Customer service center · staffed 24/7",
+  checks that no two entries share a complex. `npm run data:stations` ships it in `public/data/stations/amenities.json`. UI wording: "Customer service center · staffed 24/7",
   never "booth".
 - `stations/layout-oracle.json`: 62 stations (and 13 complexes or multi-level ones the classifier should
   decline) with their platform type, platform and track counts and whether a mezzanine exists, each with

@@ -8,7 +8,8 @@
 export const AMENITIES_FORMAT = 1
 
 export interface StationAmenities {
-  /** How many public restrooms the source lists in the station's complex (the source says nothing of where, or whether one is open). */
+  /** How many public restroom rows the source lists in the station's complex (the source says nothing of where, or whether one is open).
+   *  The rows look like one per room (52 of 59 MRNs have 2), so the UI shows presence only and never the count. */
   restrooms?: number
   /** A staffed 24/7 customer service center in the complex; `entrance` is the MTA page's own text ("Enter at 42 St and 7 Av"). */
   csc?: { entrance: string }

@@ -3,11 +3,11 @@ import type { StationIndex, StationInterior } from '../../src/data/stationSchema
 import { membersOf } from './stationMembers.ts'
 
 export const INDEX_FILE = 'index.json'
-/** The files in public/data/stations/ that are not <id>.json interiors. */
 /** public/data/stations/equipment.json: the lazily loaded elevator and escalator index (scripts/lib/equipmentIndex.ts). */
 export const EQUIPMENT_FILE = 'equipment.json'
 /** public/data/stations/amenities.json: the on-demand restroom and customer service center list (scripts/lib/amenitiesIndex.ts). */
 export const AMENITIES_FILE = 'amenities.json'
+/** The files in public/data/stations/ that are not <id>.json interiors. */
 export const NOT_INTERIOR_FILES: ReadonlySet<string> = new Set([INDEX_FILE, EQUIPMENT_FILE, AMENITIES_FILE])
 
 /** Entries are inserted in id order, but a JS object lists integer-like keys ("101") first, numerically,

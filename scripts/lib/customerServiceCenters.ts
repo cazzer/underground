@@ -1,7 +1,7 @@
 /** The MTA's subway Customer Service Centers (data/stations/customer-service-centers.json), copied by
  *  hand from https://www.mta.info/contact-us/customer-service-centers. Not an open dataset: the page
  *  is the only source and the list has no refresh path, so it goes stale. Every entry is staffed 24/7
- *  (the page's own words); a center with other hours is left out. Nothing ships from it yet. */
+ *  (the page's own words); a center with other hours is left out. `npm run data:stations` ships it in public/data/stations/amenities.json. */
 import { list, onlyKeys, record, text } from './check.ts'
 
 export interface CustomerServiceCenter {

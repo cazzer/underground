@@ -102,7 +102,7 @@ so dev and preview serve under that path.
   `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
   `-- --only amenities.json` re-pins just `catalog/amenities.json` (dataset 6yjv-fk7g, restrooms of the latest month, MTA data under
-  OPEN-NY; no build reads it yet and it is not in `CATALOG_FILES`; the source has no hours or open status and gives the station's point).
+  OPEN-NY; `data:stations` reads it for `stations/amenities.json` (not through `CATALOG_FILES`, which is the generator's), so a re-pin needs a `data:stations` rerun or `amenitiesOutputs.test.ts` fails; the source has no hours or open status and gives the station's point).
 - `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
   within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
   `streetsData.test.ts` checks it. Rerun `data:streets`, `data:walk` and `data:search:streets` after it.
