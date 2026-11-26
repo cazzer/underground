@@ -8,11 +8,11 @@ import { useStationStreets } from '../data/useStationStreets'
 import { listsStationFn } from '../lib/entranceList'
 import type { AmenitiesFile } from '../data/amenitiesSchema'
 import { groupAmenities } from '../lib/amenityGlyphs'
-import { accessLabel, amenityLabel, spokenAfterName } from '../lib/labels'
+import { accessLabel, accessSpoken, amenityLabel, spokenSentences } from '../lib/labels'
 import type { Network } from '../lib/network'
 import type { TripEnd } from '../lib/trip'
 import { PartialAccessNote, StationName } from './AccessIcon'
-import { CscNote } from './AmenityIcon'
+import { AmenityNote } from './AmenityIcon'
 import { ArrivalsList } from './ArrivalsList'
 import { EntranceList } from './EntranceList'
 import { InteriorStatus, type InteriorStatusInfo } from './InteriorStatus'
@@ -60,11 +60,11 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
   const station = network.groupById.get(stationId)
   if (!station) throw new Error(`Arrivals panel for unknown station "${stationId}"`)
   const access = accessLabel(station.access)
-  // Said after the name (and its access words) only when this station is skipped right now, so a rider hears it first.
-  const skipSaid = changes.skipSpoken
   const { kinds, cscEntrance } = groupAmenities(amenities?.stations ?? {}, memberIds)
-  const nameSaid = spokenAfterName(access, outages.noStepFree, amenityLabel(kinds, cscEntrance))
-  const barLabel = `Arrivals at ${station.name}${nameSaid}${skipSaid === '' ? '' : `${nameSaid === '' ? '. ' : ' '}${skipSaid}`}`
+  // Said after the name and its access words: the skip notice (only when this station is skipped right now, so a
+  // rider hears it first), then the amenities.
+  const alsoSaid = [changes.skipSpoken, amenityLabel(kinds)]
+  const barLabel = `Arrivals at ${station.name}${accessSpoken(access, outages.noStepFree)}${spokenSentences(access !== null, alsoSaid)}`
   return (
     <aside
       ref={ref}
@@ -80,8 +80,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
       ) : (
         <div className="flex items-start justify-between gap-3">
           <h2 ref={setHeading} tabIndex={-1} className="text-lg leading-tight outline-none focus-visible:outline-2 focus-visible:outline-focus">
-            <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} amenities={kinds} cscEntrance={cscEntrance} />
-            {skipSaid !== '' && <>{' '}<span className="sr-only">{skipSaid}</span></>}
+            <StationName name={station.name} access={station.access} context="card" noStepFreeNow={outages.noStepFree} amenities={kinds} alsoSaid={alsoSaid} />
           </h2>
           <CollapseButton label="Collapse station panel" controls={bodyId} onCollapse={collapse} />
         </div>
@@ -92,7 +91,7 @@ export function ArrivalsPanel({ network, stationId, live, arrivals, interior, ou
       <div id={bodyId} hidden={collapsed}>
         {station.otherNames.length > 0 && <p className="mt-1 text-sm text-ink-dim">with {station.otherNames.join(', ')}</p>}
         <PartialAccessNote access={station.access} />
-        <CscNote entrance={cscEntrance} />
+        <AmenityNote kinds={kinds} cscEntrance={cscEntrance} />
         {onDirections && (
           <p className="-ml-2 mt-1 flex flex-wrap text-sm">
             <button type="button" onClick={() => onDirections('from')} className={LINK}>

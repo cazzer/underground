@@ -28,7 +28,8 @@ const LEG_TOP = -0.45
 /**
  * Each glyph's pieces, far to near: wherever two pieces share some x, the later one lies wholly below the earlier
  * (so a flat glyph drawn with y as depth paints right in this order; enp.5 extrudes these pieces).
- * Restroom: a man (rectangle torso, two legs) and a woman (a dress widening down, two legs), side by side.
+ * Restroom: a man (rectangle torso over a narrower block of legs) and a woman (a dress widening down over a block
+ * of legs), side by side; the legs are one block each, since a gap between them smears at 16 px.
  * Customer service: an "i" (square dot, stem with a serif, wide foot).
  */
 export const GLYPHS: Record<AmenityKind, readonly GlyphPiece[]> = {
@@ -37,10 +38,8 @@ export const GLYPHS: Record<AmenityKind, readonly GlyphPiece[]> = {
     octagon(0.5, HEAD_Y, HEAD_R),
     rect(-0.8, -0.2, -0.2, 0.34),
     [[0.12, LEG_TOP], [0.88, LEG_TOP], [0.66, 0.34], [0.34, 0.34]],
-    rect(-0.76, -0.92, -0.56, -0.2),
-    rect(-0.44, -0.92, -0.24, -0.2),
-    rect(0.3, -0.92, 0.44, LEG_TOP),
-    rect(0.56, -0.92, 0.7, LEG_TOP),
+    rect(-0.7, -0.92, -0.3, -0.2),
+    rect(0.32, -0.92, 0.68, LEG_TOP),
   ],
   csc: [
     rect(-0.2, 0.5, 0.2, 0.9),

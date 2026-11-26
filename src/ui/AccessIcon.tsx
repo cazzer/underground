@@ -1,9 +1,10 @@
 import type { AmenityKind } from '../lib/amenityGlyphs'
-import { accessLabel, amenityLabel, spokenAfterName } from '../lib/labels'
+import { accessLabel, accessSpoken, spokenSentences } from '../lib/labels'
 import type { StationAccessInfo } from '../lib/network'
 import { AmenityIcons } from './AmenityIcon'
 
 const NO_AMENITIES: readonly AmenityKind[] = []
+const NO_SENTENCES: readonly string[] = []
 
 interface AccessGlyphProps {
   className: string
@@ -52,23 +53,23 @@ interface StationNameProps extends AccessIconProps {
   name: string
   /** An outage leaves the station with no step-free way out right now: the hidden text says so after the label. */
   noStepFreeNow?: boolean
-  /** The station's amenities (restroom, customer service center), drawn after the access glyph; the card context only. */
+  /** The station's amenity glyphs (restroom, customer service center), drawn after the access glyph; the card context only. Their words are the caller's, in `alsoSaid`. */
   amenities?: readonly AmenityKind[]
-  /** The customer service center's entrance text, said after the amenity words. */
-  cscEntrance?: string | null
+  /** Whole sentences said after the access words, in order (a skip notice, then the amenities' `amenityLabel`); empty ones are left out. */
+  alsoSaid?: readonly (string | null)[]
 }
 
 /**
  * The station name, then its access icon and amenity glyphs; the last word and the icons wrap together, so an icon
- * never sits alone. Screen readers get ", <accessLabel>." and " <amenityLabel>." as hidden text instead of the
- * icons, so a heading or option name is real text with fixed punctuation. A search row shows no amenities, and
- * shows a partly accessible station's note after the icon.
+ * never sits alone. Screen readers get ", <accessLabel>." and then `alsoSaid` as hidden text instead of the icons,
+ * so a heading or option name is real text with fixed punctuation. A search row shows no amenities, and shows a
+ * partly accessible station's note after the icon.
  */
-export function StationName({ name, access, context, noStepFreeNow = false, amenities = NO_AMENITIES, cscEntrance = null }: StationNameProps) {
+export function StationName({ name, access, context, noStepFreeNow = false, amenities = NO_AMENITIES, alsoSaid = NO_SENTENCES }: StationNameProps) {
   const label = accessLabel(access)
   const kinds = context === 'card' ? amenities : NO_AMENITIES
-  const amenityWords = amenityLabel(kinds, cscEntrance)
-  if (label === null && amenityWords === null) return name
+  const said = accessSpoken(label, noStepFreeNow) + spokenSentences(label !== null, alsoSaid)
+  if (said === '' && kinds.length === 0) return name
   const cut = name.lastIndexOf(' ') + 1
   return (
     <>
@@ -77,7 +78,7 @@ export function StationName({ name, access, context, noStepFreeNow = false, amen
         {name.slice(cut)}
         {label !== null && <AccessIcon access={access} context={context} />}
         <AmenityIcons kinds={kinds} />
-        <span className="sr-only">{spokenAfterName(label, noStepFreeNow, amenityWords)}</span>
+        {said !== '' && <span className="sr-only">{said}</span>}
       </span>
       {context === 'row' && access.note && (
         <span aria-hidden="true" className="text-xs text-ink-dim">

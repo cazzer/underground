@@ -39,35 +39,36 @@ export function accessLabel(access: StationAccessInfo): string | null {
   return null
 }
 
-const AMENITY_WORDS: Record<AmenityKind, string> = {
-  restroom: 'restroom listed by the MTA',
-  csc: 'customer service center, staffed 24/7',
+/**
+ * What a station's amenity glyphs say in its heading and bar, the kinds only, as one sentence: "The MTA lists a
+ * restroom here.", "Customer service center." or both. Null with none. Never a restroom's count, hours, access or
+ * open status; the note under the heading (`AmenityNote`) gives the hedge, the hours and the entrance.
+ */
+export function amenityLabel(kinds: readonly AmenityKind[]): string | null {
+  const restroom = kinds.includes('restroom')
+  const csc = kinds.includes('csc')
+  if (restroom && csc) return 'The MTA lists a restroom and a customer service center here.'
+  if (restroom) return 'The MTA lists a restroom here.'
+  if (csc) return 'Customer service center.'
+  return null
+}
+
+/** The hidden text right after a station's name: ", <access>." (with "; no step-free access now" when an outage says so), or nothing. */
+export function accessSpoken(access: string | null, noStepFreeNow: boolean): string {
+  return access === null ? '' : `, ${access}${noStepFreeNow ? '; no step-free access now' : ''}.`
 }
 
 /**
- * What a station's amenity glyphs say, as one sentence without its full stop: "Restroom listed by the MTA; customer
- * service center, staffed 24/7, enter at 42 St and Park Av". Null with none. The restroom is only what the MTA lists:
- * never its count, hours, access or whether it is open. The entrance is the MTA page's own "Enter at …" text.
+ * Whole sentences said after a station's name and its access words, in order (empty ones left out): each after a
+ * space, the first after ". " when no access words came before it, so the name ends as a sentence too.
  */
-export function amenityLabel(kinds: readonly AmenityKind[], cscEntrance: string | null = null): string | null {
-  if (kinds.length === 0) return null
-  const parts = kinds.map((kind) => {
-    const words = AMENITY_WORDS[kind]
-    if (kind !== 'csc' || cscEntrance === null) return words
-    return `${words}, ${cscEntrance.charAt(0).toLowerCase()}${cscEntrance.slice(1)}`
-  })
-  const sentence = parts.join('; ')
-  return sentence.charAt(0).toUpperCase() + sentence.slice(1)
-}
-
-/**
- * The hidden text after a station's name in its heading and bar: ", <access>." then " <amenities>." (". <amenities>."
- * with no access label), so the name, its access and its amenities read as fixed sentences. Empty with neither.
- */
-export function spokenAfterName(access: string | null, noStepFreeNow: boolean, amenities: string | null): string {
-  const accessSaid = access === null ? '' : `, ${access}${noStepFreeNow ? '; no step-free access now' : ''}.`
-  const amenitiesSaid = amenities === null ? '' : `${access === null ? '.' : ''} ${amenities}.`
-  return accessSaid + amenitiesSaid
+export function spokenSentences(afterAccess: boolean, sentences: readonly (string | null)[]): string {
+  let out = ''
+  for (const sentence of sentences) {
+    if (sentence === null || sentence === '') continue
+    out += `${out === '' && !afterAccess ? '. ' : ' '}${sentence}`
+  }
+  return out
 }
 
 /**

@@ -1,8 +1,8 @@
 /**
  * public/data/stations/amenities.json, written by scripts/build-stations.ts from the pinned restroom list (data.ny.gov
  * 6yjv-fk7g, one month) and the hand-copied Customer Service Centers page: which stations have a public restroom and
- * which a customer service center, expanded to every member of the station's complex. It is fetched on demand (not at
- * startup, so it has its own size cap rather than the startup budget). MTA data under the OPEN-NY Terms of Use, not ODbL.
+ * which a customer service center, expanded to every member of the station's complex. The client fetches it once on mount
+ * (`useAmenities`, after the startup files, so it has its own size cap rather than the startup budget). MTA data under the OPEN-NY Terms of Use, not ODbL.
  * No imports: the scripts load this file with a `.ts` path.
  */
 export const AMENITIES_FORMAT = 1

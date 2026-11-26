@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import type { StationsFile } from '../data/schema'
-import { accessLabel, amenityLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel, spokenAfterName, updatedLabel } from './labels'
+import { accessLabel, accessSpoken, amenityLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel, spokenSentences, updatedLabel } from './labels'
 import { stationAccess } from './network'
 
 describe('routeChipLabel', () => {
@@ -102,33 +102,39 @@ describe('updatedLabel', () => {
 describe('amenityLabel', () => {
   it('says nothing for a station with none', () => {
     expect(amenityLabel([])).toBeNull()
-    expect(amenityLabel([], 'Enter at 14 St and 4 Av')).toBeNull()
   })
 
-  it('names each amenity, a restroom only as listed', () => {
-    expect(amenityLabel(['restroom'])).toBe('Restroom listed by the MTA')
-    expect(amenityLabel(['csc'])).toBe('Customer service center, staffed 24/7')
-    expect(amenityLabel(['restroom', 'csc'])).toBe('Restroom listed by the MTA; customer service center, staffed 24/7')
-  })
-
-  it("adds the customer service center's entrance in the MTA's words", () => {
-    expect(amenityLabel(['csc'], 'Enter at 95 St and Broadway')).toBe('Customer service center, staffed 24/7, enter at 95 St and Broadway')
-    expect(amenityLabel(['restroom', 'csc'], 'Enter at 42 St and Park Av')).toBe(
-      'Restroom listed by the MTA; customer service center, staffed 24/7, enter at 42 St and Park Av',
-    )
-    expect(amenityLabel(['restroom'], 'Enter at 42 St and Park Av')).toBe('Restroom listed by the MTA')
+  it('names the kinds only, a restroom as the MTA lists it', () => {
+    expect(amenityLabel(['restroom'])).toBe('The MTA lists a restroom here.')
+    expect(amenityLabel(['csc'])).toBe('Customer service center.')
+    expect(amenityLabel(['restroom', 'csc'])).toBe('The MTA lists a restroom and a customer service center here.')
   })
 })
 
-describe('spokenAfterName', () => {
-  it('is empty with no access label and no amenities', () => {
-    expect(spokenAfterName(null, false, null)).toBe('')
+describe('accessSpoken', () => {
+  it('says the access label, and an outage that takes step-free access away', () => {
+    expect(accessSpoken(null, false)).toBe('')
+    expect(accessSpoken('Accessible station', false)).toBe(', Accessible station.')
+    expect(accessSpoken('Accessible station', true)).toBe(', Accessible station; no step-free access now.')
+  })
+})
+
+describe('spokenSentences', () => {
+  const skip = 'The downtown 1 train skips this station now.'
+  const amenities = 'The MTA lists a restroom here.'
+
+  it('is empty with nothing to say', () => {
+    expect(spokenSentences(true, [])).toBe('')
+    expect(spokenSentences(false, ['', null])).toBe('')
   })
 
-  it('says the access label, then the amenities, as sentences', () => {
-    expect(spokenAfterName('Accessible station', false, null)).toBe(', Accessible station.')
-    expect(spokenAfterName('Accessible station', true, null)).toBe(', Accessible station; no step-free access now.')
-    expect(spokenAfterName('Accessible station', false, 'Restroom listed by the MTA')).toBe(', Accessible station. Restroom listed by the MTA.')
-    expect(spokenAfterName(null, false, 'Restroom listed by the MTA')).toBe('. Restroom listed by the MTA.')
+  it('says each sentence in order after a space', () => {
+    expect(spokenSentences(true, [skip, amenities])).toBe(` ${skip} ${amenities}`)
+    expect(spokenSentences(true, ['', amenities])).toBe(` ${amenities}`)
+  })
+
+  it('ends the name as a sentence when no access words came first', () => {
+    expect(spokenSentences(false, [skip, amenities])).toBe(`. ${skip} ${amenities}`)
+    expect(spokenSentences(false, ['', amenities])).toBe(`. ${amenities}`)
   })
 })
