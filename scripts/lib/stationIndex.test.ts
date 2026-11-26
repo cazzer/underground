@@ -41,4 +41,9 @@ describe('buildStationIndex', () => {
   it('throws on the id "index", which would collide with the index file', () => {
     expect(() => buildStationIndex([interior('index')])).toThrow(/"index"/)
   })
+
+  it('throws on the ids "equipment" and "amenities", which would collide with the on-demand files', () => {
+    expect(() => buildStationIndex([interior('equipment')])).toThrow(/"equipment"/)
+    expect(() => buildStationIndex([interior('amenities')])).toThrow(/"amenities"/)
+  })
 })

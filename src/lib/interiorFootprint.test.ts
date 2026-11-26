@@ -66,7 +66,7 @@ describe('interiorFootprint', () => {
 
   it('is built for every shipped interior, the pick footprint and the frame hull holding all its points', () => {
     const dir = new URL('../../public/data/stations/', import.meta.url)
-    const files = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'index.json' && f !== 'equipment.json')
+    const files = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'index.json' && f !== 'equipment.json' && f !== 'amenities.json')
     expect(files.length).toBeGreaterThan(200)
     for (const f of files) {
       const interior = JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as StationInterior

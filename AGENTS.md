@@ -88,7 +88,9 @@ so dev and preview serve under that path.
   committed `public/data/shapes.json` and `stations.json` (a hand-authored station wins; it prints each skipped
   candidate with its reason and each dropped source row), write `public/data/stations/equipment.json` (every revenue elevator and
   escalator of the catalog's E&E inventory with the stations that list each, a complex's machines under every member; fetched on the
-  first station focus, so outside the startup budget with its own 16 KB gzip cap), and pack `public/data/station-depths.json` (every interior's
+  first station focus, so outside the startup budget with its own 16 KB gzip cap), write `public/data/stations/amenities.json` (public
+  restrooms from the pinned `catalog/amenities.json` and the 24/7 customer service centers of `data/stations/customer-service-centers.json`, per station, a complex's under every
+  member; fetched on demand, so outside the startup budget with its own 4 KB gzip cap), and pack `public/data/station-depths.json` (every interior's
   platform tracks and rail heights; it counts toward the shared 60 KB budget). It prints a `WARNING:` line listing
   interior tracks no drawn line rides (packed as no track, so the client stays quiet about them), and fails if any
   track packs more than 2 m off its runs. Offline.
@@ -1268,7 +1270,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   merge (its connector half, with the walkway and `area` rules and the containment check, is `lib/stationConnectors.ts`);
   `lib/stationMembers.ts` the complex helpers (`membersOf`, `trackOwner`, `checkMembers`; the client has its own copy
   in `interiorLoad.ts`); `lib/complexFixture.ts` the tests' two-member complex; `lib/stationProvenance.ts` (`markGenerated`: authored to generated, depth sources, archetype and
-  confidence) and `lib/stationIndex.ts` (`buildStationIndex`, `NOT_INTERIOR_FILES`) and `lib/equipmentIndex.ts` (`buildEquipmentIndex`, `cleanServing`: `stations/equipment.json` from the catalog) are pure, and `build-stations.ts`
+  confidence) and `lib/stationIndex.ts` (`buildStationIndex`, `NOT_INTERIOR_FILES`) and `lib/equipmentIndex.ts` (`buildEquipmentIndex`, `cleanServing`: `stations/equipment.json` from the catalog) and `lib/amenitiesIndex.ts` (`buildAmenitiesIndex`: `stations/amenities.json`) are pure, and `build-stations.ts`
   joins the generated stations to the authored ones (hand-authored wins); `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)
   - Archetype classifier (offline, nothing ships): `lib/archetype.ts` (`classifyStation`: facts to archetype,
     params, confidence and a reason per deduction; `INTERIOR_MIN_CONFIDENCE` 0.7), `stationFacts.ts` (its input
@@ -1658,7 +1660,7 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   its interior is `stations/<file>.json`), validated as a plain id naming a listed non-alias entry. The client fetches it on mount, after the startup files and not
   render-blocking, so it is outside the 60 KB startup budget and has its own cap (the build fails above 8 KB
   gzipped); a station not listed never fetches an interior, and until it loads (or if it fails, retried on the next
-  focus change) no station shows an interior panel. The object's key order lists integer-like ids first; don't rely on it. `index` and `equipment` are not valid station ids (`stations/index.json` and `stations/equipment.json` share the directory).
+  focus change) no station shows an interior panel. The object's key order lists integer-like ids first; don't rely on it. `index`, `equipment` and `amenities` are not valid station ids (`stations/index.json`, `stations/equipment.json` and `stations/amenities.json` share the directory).
 - `public/data/stations/equipment.json` (`EquipmentIndexFile`, `src/data/equipmentSchema.ts`, format 1) lists every revenue
   elevator and escalator of the pinned E&E inventory by equipment code (`machines`: `kind` and the inventory's `serving` text, cleaned,
   never truncated) and, per GTFS station, the codes of every machine in its complex (`stations`: a complex's machines under every
@@ -1667,6 +1669,18 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   Terms of Use (no OSM content). Fetched on the first station focus and only while `/ene` is configured, so it is outside the 60 KB
   startup budget with its own cap (the build fails above 16 KB gzipped; 13.0 KB today). Non-revenue machines, machines with no
   station and codes the Worker's `/ene` reader would reject are left out and logged. Key order is not an API.
+- `public/data/stations/amenities.json` (`AmenitiesFile`, `src/data/amenitiesSchema.ts`, format 1, enp.3) lists, per GTFS station, the amenities
+  in its complex (`stations`: `restrooms`, the count of public restrooms the pinned data.ny.gov 6yjv-fk7g snapshot lists, and `csc`,
+  `{ entrance }`, a staffed 24/7 customer service center with the mta.info page's own entrance text), expanded to every member of the
+  station's complex through the catalog (a restroom row's MRN can cover several GTFS stops; a center names one stop, not necessarily the
+  lead; every member gets the same entry; a station with neither has no key). The source says nothing of where in the station a restroom
+  is or whether it is open. Built by `data:stations` (`scripts/lib/amenitiesIndex.ts`, offline, from `data/stations/catalog/amenities.json`,
+  `data/stations/customer-service-centers.json` and the committed stations.json; a row at a station the catalog lacks, a repeated id, mixed
+  months or two centers in one complex fail the build, a complex stations.json lacks is logged and left out). It carries
+  `restroomsUpdatedAt`, `restroomsMonth` and `cscRetrievedAt` and no build time (`amenitiesOutputs.test.ts` compares it exactly), and
+  is MTA data under the OPEN-NY Terms of Use plus the MTA's public Customer Service Centers page (no OSM content); `attribution` names both.
+  Fetched on demand by the client (a later ticket, enp.4), so it is outside the 60 KB startup budget with its own cap (the build fails
+  above 4 KB gzipped; 1.1 KB today: 91 stations with restrooms, 51 with a center, 101 in all). Key order is not an API.
 - `public/data/station-depths.json` (`PackedDepthsFile`, format 2) is packed from every interior, authored and
   generated, by the same build (`scripts/lib/depthsPack.ts`), small enough for the startup budget. A complex file
   contributes one entry per member (each track goes to the member whose id is the longest prefix of its stop).
@@ -1818,7 +1832,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`; the supplemented zip becomes `timetable/dated/` in each Pages deploy, never in git (`npm run data:dated`). The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.2 KB today,
-  about 800 B of headroom; the depths file is about 1.6 KB of it; `route/transfers.json` is on demand, in the trip planner's chunk, with its own cap); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), 16 KB for `public/data/stations/equipment.json`; the Worker's `worker/data/streetIndex.json` is outside `public/data` and has a raw cap of its own).
+  about 800 B of headroom; the depths file is about 1.6 KB of it; `route/transfers.json` is on demand, in the trip planner's chunk, with its own cap); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), 16 KB for `public/data/stations/equipment.json`, 4 KB for `public/data/stations/amenities.json`; the Worker's `worker/data/streetIndex.json` is outside `public/data` and has a raw cap of its own).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow
