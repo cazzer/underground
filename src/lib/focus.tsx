@@ -145,9 +145,9 @@ export interface UndergroundDevHooks {
   streetLayers?: () => string[]
   /** The street label pass's counts and timings; `reset` clears the timings after reading them. */
   streetLabels?: (reset?: boolean) => StreetLabelsProbe
-  /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */
-  /** Every station amenity mark as last drawn (useAmenityProbe): empty until the amenities file loads. */
+  /** Every station amenity mark as last drawn (useAmenityProbe): empty until the amenities layout is done. */
   amenityMarks?: () => AmenityMarkProbe[]
+  /** The camera distance the basemap last faded by and, per class, segments drawn, buffer capacity and whether it draws (Basemap.tsx). */
   basemapSegments?: () => { distance: number; classes: Record<string, { used: number; capacity: number; visible: boolean }> }
 }
 

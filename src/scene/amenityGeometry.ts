@@ -3,7 +3,7 @@ import type { GlyphPiece } from '../lib/amenityGlyphs'
 import { PLATE_HALF } from './amenitySizes'
 
 /** A glyph's extrusion height in glyph units (its half width is 1), before the depth factor flattens it. */
-export const AMENITY_HEIGHT = 0.45
+export const AMENITY_HEIGHT = 0.14
 /** A plate corner's chamfer, in glyph units. */
 const PLATE_CHAMFER = 0.3
 

@@ -223,9 +223,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (0.35: a suspended stretch's route colour mixed this far toward the background, at least 1.45x its dimmed route, 1.51x
   for SI, and 2:1 on the background, 2.04:1 SI) and `changeSuspendedDashPx` / `GapPx` (5 / 4, CSS px at the view's target).
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
-  Amenity tokens (enp.5, themeAmenity.test.ts): `amenityMark` (ink, the extruded pictograms' tops) and `amenitySideShade` (0.55, a
-  linear multiplier for their walls, baked as vertex colors); tops and walls each at least 3:1 on the background, the walls at least
-  1.3:1 under the tops, and apart from the focus, location, pin, exit and rim colors, also under simulated red-green color blindness.
+  Amenity tokens (enp.5, themeAmenity.test.ts): `amenityMark` (the dim ink `inkDim`, the extruded pictograms' tops, so they sit back
+  from the station markers) and `amenitySideShade` (0.6, a linear multiplier for their walls, baked as vertex colors); tops and walls
+  each at least 3:1 on the background, the walls at least 1.3:1 under the tops, and apart from the focus, location, pin, exit and rim
+  colors, also under simulated red-green color blindness (below MIN_CVD_DISTANCE only for the exit path, 0.057, and the rim, 0.035,
+  each a line or ring, pinned as such: `CVD_FLOOR`).
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `CameraRig.tsx` MapControls,
@@ -364,22 +366,29 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `PlacePin.tsx` the searched place's pin (a diamond outline and centre dot, `placePinShape.ts`, inside a thin background halo band, constant screen size, `theme.placePin`; no event handlers; Scene mounts it while the place line shows);
     `StationAmenities.tsx` (enp.5, in a null-fallback ErrorBoundary, not keyed) the amenity marks of every station group `amenities.json`
-    lists (App's `useAmenities`, through Scene; not the view set, so it fetches nothing and never pops with the view's ranking): per
-    amenity a flat background plate (`plateGeometry`) and an extruded `theme.amenityMark` prism per `GLYPHS` piece (`glyphGeometry` in
-    `amenityGeometry.ts`: tops, then outward walls shaded `amenitySideShade`, no bottom, in the glyph's far-to-near piece order so a
-    nearer piece paints over a farther one with depth testing off), in a row along the station's clear bearing (`lib/amenityPlacement.ts`)
-    just past its marker; the glyph `AMENITY_HALF_PX` 7 px half (3.5 m floor), plate `PLATE_HALF` 1.2 of it, a 3 px gap (1 m floor)
-    (`amenitySizes.ts`); height × `depthScaleY(depthFactor(d))`, so flat top-down; yawed to the controls' azimuth (`writeChordMatrix`) so
-    it reads upright at any turn; opacity `interiorOpacity(d)` (nothing from 1250 m out, the group hidden). The first plate clears the
-    marker as the focus ring draws it, or the trip mark's halo while the trip shows; a mark whose station a shown interior covers
-    slides (a straight blend by the presence) to a row just off that interior's footprint hull, from the hull's middle along the
-    bearing it reaches least plus the focus frame's extra 8 m (`coveredRow`), as the presence eases in, and cross-fades from its copy under the veil (4.57 plate, 4.6 glyph) to one over it (7.61, 7.62) by instance colors mixed
-    toward the background (`dimLineRgbInto`), a copy fully mixed collapsing to scale 0. Six InstancedMeshes (plate, restroom, csc per
-    tier), two shared materials (opacity written only on change, never a JSX prop); per frame (`amenityFrame.ts`) matrices only when the
-    distance, azimuth, depth, trip flag or a presence changed, colors only when a presence did; allocation-free. It claims one
-    `LabelBlockers` slot (`useAmenityBlockers.ts`: each on-screen plate's projected rect, the first 16) so the street labels keep clear.
-    No handlers, not in ScenePicker. Dev only: `__underground.amenityMarks()` (`useAmenityProbe.ts`: per mark station, kind, tier,
-    ground, px, plate half px, opacity);
+    lists (App's `useAmenities`, through Scene; not the view set, so it fetches nothing and never pops with the view's ranking),
+    laid out in idle time (`useAmenityLayout.ts`: requestIdleCallback, a 16 ms timeout without it; the track grid a few shapes a
+    slice, then a few groups a slice, each slice at most `SLICE_MS` 3 ms past its first step; no marks until done): per amenity a flat
+    background plate (`plateGeometry`) and an extruded `theme.amenityMark` prism per `GLYPHS` piece (`glyphGeometry` in
+    `amenityGeometry.ts`: per piece its outward walls shaded `amenitySideShade`, then its top, no bottom, pieces in the glyph's
+    far-to-near order so a nearer piece paints over a farther one with depth testing off; `AMENITY_HEIGHT` 0.14 glyph units). A
+    station's marks run in a row across the screen in the panel's order (`rowCentreInto` in `lib/amenityPlacement.ts`), one 3 px gap
+    apart, anchored on its clear bearing just past its marker; the glyph `AMENITY_HALF_PX` 9 px half (3.5 m floor), plate
+    `PLATE_HALF` 1.35 of it, a 3 px gap (1 m floor) (`amenitySizes.ts`); height × `depthScaleY(depthFactor(d))`, so flat top-down;
+    yawed to the controls' azimuth (`writeChordMatrix`) so it reads upright at any turn; opacity `interiorOpacity(d)` (nothing from
+    1250 m out, the group hidden). The row clears the marker as the focus ring draws it, or the trip mark's halo while the trip shows.
+    A mark whose station a shown interior covers slides (a straight blend by the presence) to a row just off that interior's
+    footprint hull plus the focus frame's extra 8 m (`useAmenityCovers.ts` over `lib/amenityCovered.ts`' `coveredRow`, chosen when
+    the shown interiors or the canvas size change, reading the insets and panel then), and cross-fades from its copy under the veil
+    to one over it: each tier's plate scales by its share and its glyph mixes toward the background by the rest (`tierShare`: the
+    under copy whole to half way, the over copy whole from half way, so one is always at full ink), a copy at share 0 collapsing to
+    scale 0. Six InstancedMeshes (plate, restroom, csc per tier), two shared materials (opacity written only on change, never a JSX
+    prop), stable ref callbacks; per frame (`amenityFrame.ts`) matrices only when the distance, azimuth, depth, trip flag or a
+    presence changed, colors only when a presence did; allocation-free. It claims one `LabelBlockers` slot (`useAmenityBlockers.ts`:
+    the projected rects of the 16 on-screen plates nearest the view's target) so the street labels keep clear. No handlers, not in
+    ScenePicker. Dev only: `__underground.amenityMarks()` (`useAmenityProbe.ts`: per mark station, kind, tier, ground, px, plate half
+    px, opacity). Not yet obstacles: the street files' entrance squares (none before those load), the banded lines' offset, a start
+    mark grown round the location reticle;
     `cameraDistance.ts` helpers; `renderOrder.ts` (also `strokeOrders` and `spanCarOrders`, the per-band and per-deck orders)
   - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms, one layer
     per platform deck (LiveTrains keeps three, splitting the spans with `deckSpans`; deck k's layer holds deck k of every
@@ -656,15 +665,23 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/lib/`: pure logic
   - `amenityGlyphs.ts` (enp.4, pure) the amenity glyphs: `AmenityKind` ('restroom', 'csc'), `AMENITY_ORDER`, `GLYPHS` (convex CCW
     polygons in [-1, 1], y up, far to near: pieces sharing an x run top to bottom, so enp.5 can extrude them flat; restroom: two figures,
-    octagon heads, a rectangle torso and a dress, each over one block of legs; csc: an "i"; `AmenityIcons` cuts each SVG's viewBox to the glyph's own width), `amenityKinds`, `groupAmenities` (a complex's union, the first
+    octagon heads over a 0.2 neck, a rectangle torso and a dress, each over one block of legs; csc: an "i", its dot 0.3 clear of the stem; `AmenityIcons` cuts each SVG's viewBox to the glyph's own width), `amenityKinds`, `groupAmenities` (a complex's union, the first
     member's center entrance); `amenityGlyphs.test.ts` holds the shape rules
-  - `amenityPlacement.ts` (enp.5, pure) the amenity marks' ground layout: `amenityMarks` (per listed group, its kinds in order, one row
-    along `clearBearing`), `trackSegments` (distinct tracks once), `clearBearing` (of 16 bearings, north preferred, then NE, NW, E, W,
-    SE, SW, S, then the half-winds: the one whose plates, north-up squares at a 500 and a 1000 m view (`plateProbes` in
-    scene/amenitySizes.ts), keep farthest from track segments and other station points less 6 m, within 80 m; a near-tie within 3 m (at
-    most half the best) goes to the earlier), `hullReach`, `coveredRow` (a covered row's start, bearing and reach), `markCentre`, `plateReach` (a yawed plate's reach along the bearing);
-    `amenityPlacement.data.test.ts`: all groups in one pass at load (30 to 50 ms in node, main thread); at 500 m the first plate clears every track by 1 m at 66 of 68 groups
-    (Grand Central 0.4 m; Fulton St touches one)
+  - `amenityPlacement.ts` (enp.5, pure) the amenity marks' ground layout: `groupMarks` / `amenityMarks` (per listed group, its kinds
+    in order, `k` of `n` in one row), `clearBearing` (of 16 bearings, north preferred, then NE, NW, E, W, SE, SW, S, then the
+    half-winds: the one whose row, north-up squares at a 500 and a 1000 m view (`plateProbes` in scene/amenitySizes.ts), keeps farthest
+    from track segments near (`trackGrid.ts`: the distinct tracks in 100 m cells, built a shape at a time, `addShape`, `segmentsNear`)
+    and other station points less 6 m, within 80 m; a near-tie within 3 m (at most half the best) goes to the earlier), `rowCentreInto`
+    (a row across the screen: its first plate on the anchor when the bearing points right on screen, its last when left, its middle
+    straight up or down, pushed out so no plate comes nearer than the anchor), `hullReach`, `bandReach` (the hull within a lateral
+    band), `plateReach` (a yawed plate's reach along the bearing); `amenityCovered.ts` `coveredRow` (a covered row: from the hull's
+    middle along the bearing whose band reach is least plus the frame's 8 m, among those whose every plate a landing on the interior,
+    landingAzimuth and frameInterior at LANDING_DISTANCE as interiorFlight lands, shows inside the free rect less 4 px; `fits` false
+    when none does) and `orbitProjector` (an orbit camera's ground-to-screen, checked against three's). `amenityPlacement.data.test.ts`:
+    each shape and group in a few ms (the grid about 13 ms in all, the slowest group about 6 ms cold); at 500 m every plate of a row
+    clears every track by 1 m at 65 of 68 groups (Grand Central and Fulton St touch one, 14 St-Union Sq 1.0 m);
+    `amenityCovered.data.test.ts`: every covered row of a listed interior (Union Sq, Woodlawn and 11 generated) lands inside the free
+    rect at a 390x844 phone with its station panel open and at 1440x900
   - `stationGroups.ts` a complex as one station (`StationGroup`: the lead's id, point, borough and leadId; the most common member name,
     `otherNames` the rest; routes and stops the union; `groupAccess`: all full is full, else a partly accessible note naming the fully
     accessible routes and each partial member's own; `stationLeads` validates stations.json `complexes`); `Network.stationGroups`
@@ -1527,14 +1544,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`), a service change's suspended stretch 2.15 (`TripLines.tsx`, dashed), a straight-drawn trip ride 2.2 (`TripDashes.tsx`),
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo 4.4, trip walks 4.45
   (`TripDashes.tsx`; 7.55 above the veil while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused) and it reveals), trip mark ring 4.5 and dot 4.55
-  (`TripMarks.tsx`), amenity plate 4.57 and glyph 4.6 (`StationAmenities.tsx`), train halo 5,
+  (`TripMarks.tsx`), amenity plate 4.57, csc glyph 4.6 and restroom glyph 4.605 (`StationAmenities.tsx`), train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   a picked service change's skip marks 6.53 (halo), 6.535 (ring) and 6.54 (cross; over every train and car, TripMarks.tsx),
   you-are-here reticle 6.55, the place pin's halo 6.57 and the pin 6.58, the focused interior's footprint frame 7.52 (over the veil and the
   veiled streets, under the trip's walks over the veil; `InteriorFocusFrame.tsx`), street-file entrance marks 7.6 (above the veil at 7, under the interior strokes),
-  a covered station's amenity plate 7.61 and glyph 7.62 (cross-fading from 4.57 / 4.6 by that interior's presence),
+  a covered station's amenity plate 7.61 and glyphs 7.62 (csc) and 7.625 (restroom) (cross-fading from 4.57 to 4.605 by that interior's presence),
   above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
   at a multi-deck interior the band between decks 9.53 (fine) and 9.54 (strong) and the next deck's cars 9.55 to
   9.565 (a third deck: 9.57 to 9.595; `strokeOrders`, `spanCarOrders`),

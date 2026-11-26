@@ -4,6 +4,10 @@ import { claimBlockerSlot, MAX_LEVEL_BLOCKERS, releaseBlockerSlot, writeBlocker,
 import type { AmenityFrame } from './amenityFrame'
 
 const corner = new Vector3()
+/** The marks nearest the target, in order, ranked before projecting: twice the slot's room, for those off screen. */
+const RANKED = MAX_LEVEL_BLOCKERS * 2
+const rankedIdx = new Int32Array(RANKED)
+const rankedD = new Float32Array(RANKED)
 
 /** Holds one LabelBlockers slot while mounted (null when every slot is held). */
 export function useAmenityBlockerSlot(blockers: LabelBlockers): React.RefObject<number | null> {
@@ -27,8 +31,8 @@ export function clearAmenityBlockers(blockers: LabelBlockers, slot: number | nul
 }
 
 /**
- * Writes the screen rect (canvas px) of each mark's plate on screen into the slot, the first MAX_LEVEL_BLOCKERS in mark
- * order, so the street labels keep clear of them; bumps the version only on a change. The plate's four corners are
+ * Writes the screen rect (canvas px) of each mark's plate on screen into the slot, the MAX_LEVEL_BLOCKERS nearest the
+ * view's target, so the street labels keep clear of them; bumps the version only on a change. The plate's four corners are
  * projected, yawed by `az` as the frame drew them, half size `plateM`; marks farther than `reachM` from the view's
  * `target` (on either axis) are skipped unprojected. Allocation-free (per frame).
  */
@@ -48,11 +52,28 @@ export function writeAmenityBlockers(
   const c = Math.cos(az) * plateM
   const s = Math.sin(az) * plateM
   const base = slot * MAX_LEVEL_BLOCKERS
+  // Rank the marks within reach by ground distance to the target (insertion into a short sorted list).
+  let ranked = 0
+  for (let i = 0; i < f.marks.length; i++) {
+    const dx = f.x[i]! - target.x
+    const dz = f.z[i]! - target.z
+    // Far past the view's target a mark can't be on screen: skip it unranked.
+    if (Math.abs(dx) > reachM || Math.abs(dz) > reachM) continue
+    const d2 = dx * dx + dz * dz
+    if (ranked === RANKED && d2 >= rankedD[RANKED - 1]!) continue
+    let at = ranked < RANKED ? ranked++ : RANKED - 1
+    while (at > 0 && rankedD[at - 1]! > d2) {
+      rankedD[at] = rankedD[at - 1]!
+      rankedIdx[at] = rankedIdx[at - 1]!
+      at--
+    }
+    rankedD[at] = d2
+    rankedIdx[at] = i
+  }
   let count = 0
   let changed = false
-  for (let i = 0; i < f.marks.length && count < MAX_LEVEL_BLOCKERS; i++) {
-    // Far past the view's target a mark can't be on screen: skip its projections.
-    if (Math.abs(f.x[i]! - target.x) > reachM || Math.abs(f.z[i]! - target.z) > reachM) continue
+  for (let r = 0; r < ranked && count < MAX_LEVEL_BLOCKERS; r++) {
+    const i = rankedIdx[r]!
     let left = Infinity
     let top = Infinity
     let right = -Infinity

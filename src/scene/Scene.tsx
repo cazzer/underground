@@ -180,7 +180,7 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       {placePin && <PlacePin ground={placePin} />}
       {/* Decoration: a crash (logged) draws no amenity marks instead of blanking the scene. */}
       <ErrorBoundary fallback={null}>
-        <StationAmenities network={network} amenities={amenities} shown={shown} presences={presences} levels={tripLevels} blockers={labelBlockers} />
+        <StationAmenities network={network} amenities={amenities} shown={shown} presences={presences} levels={tripLevels} blockers={labelBlockers} insets={insets} panel={panel} />
       </ErrorBoundary>
       <StationStreets
         interior={interior}

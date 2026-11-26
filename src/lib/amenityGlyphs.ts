@@ -21,8 +21,10 @@ function octagon(cx: number, cy: number, r: number): GlyphPiece {
   })
 }
 
-const HEAD_Y = 0.66
-const HEAD_R = 0.22
+const HEAD_Y = 0.7
+const HEAD_R = 0.2
+/** The torso's and the dress's top: a 0.2 neck under the heads, so the two don't merge when the map tilts them. */
+const BODY_TOP = 0.3
 const LEG_TOP = -0.45
 
 /**
@@ -30,21 +32,22 @@ const LEG_TOP = -0.45
  * (so a flat glyph drawn with y as depth paints right in this order; enp.5 extrudes these pieces).
  * Restroom: a man (rectangle torso over a narrower block of legs) and a woman (a dress widening down over a block
  * of legs), side by side; the legs are one block each, since a gap between them smears at 16 px.
- * Customer service: an "i" (square dot, stem with a serif, wide foot).
+ * Customer service: an "i" (square dot, stem with a serif, wide foot), the dot 0.3 clear of the stem.
+ * Every feature and gap is at least about 0.2 units, so the extruded marks (enp.5) still read apart when tilted.
  */
 export const GLYPHS: Record<AmenityKind, readonly GlyphPiece[]> = {
   restroom: [
     octagon(-0.5, HEAD_Y, HEAD_R),
     octagon(0.5, HEAD_Y, HEAD_R),
-    rect(-0.8, -0.2, -0.2, 0.34),
-    [[0.12, LEG_TOP], [0.88, LEG_TOP], [0.66, 0.34], [0.34, 0.34]],
+    rect(-0.8, -0.2, -0.2, BODY_TOP),
+    [[0.12, LEG_TOP], [0.88, LEG_TOP], [0.66, BODY_TOP], [0.34, BODY_TOP]],
     rect(-0.7, -0.92, -0.3, -0.2),
     rect(0.32, -0.92, 0.68, LEG_TOP),
   ],
   csc: [
-    rect(-0.2, 0.5, 0.2, 0.9),
-    rect(-0.2, -0.62, 0.2, 0.3),
-    rect(-0.48, 0.06, -0.2, 0.3),
+    rect(-0.2, 0.55, 0.2, 0.92),
+    rect(-0.2, -0.62, 0.2, 0.25),
+    rect(-0.48, 0, -0.2, 0.25),
     rect(-0.48, -0.9, 0.48, -0.62),
   ],
 }

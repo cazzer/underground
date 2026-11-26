@@ -152,7 +152,7 @@ export interface Theme {
   changeSuspendedDashPx: number
   changeSuspendedGapPx: number
   /** A station's amenity marks on the map (StationAmenities.tsx, enp.5): extruded pictograms on a background plate, the
-   *  tops in `amenityMark` and the sides that linear multiple of it; both 3:1 on the background, apart from the focus,
+   *  tops in `amenityMark` (the dim ink, so they sit back from the station markers) and the sides that linear multiple of it; both 3:1 on the background, apart from the focus,
    *  location, pin, exit and rim colors, also under simulated red-green color blindness (themeAmenity.test.ts). */
   amenityMark: string
   amenitySideShade: number
@@ -231,8 +231,8 @@ export const THEMES = {
     changeSuspendedDim: 0.35,
     changeSuspendedDashPx: 5,
     changeSuspendedGapPx: 4,
-    amenityMark: '#e6f6ff',
-    amenitySideShade: 0.55,
+    amenityMark: '#8fb4de',
+    amenitySideShade: 0.6,
   },
 } as const satisfies Record<string, Theme>
 

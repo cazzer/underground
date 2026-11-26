@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { AmenitiesFile } from '../data/amenitiesSchema'
-import { amenityMarks, BEARINGS, clearBearing, coveredRow, hullReach, markCentre, plateReach, segmentDistance, squareDistance, trackSegments, type PlateProbe } from './amenityPlacement'
+import { plateProbes } from '../scene/amenitySizes'
+import { amenityMarks, bandReach, BEARINGS, clearBearing, hullReach, plateReach, rowCentreInto, segmentDistance, squareDistance } from './amenityPlacement'
 import type { Footprint } from './interiorFootprint'
+import { segmentsNear, trackGrid } from './trackGrid'
 
 const O = { x: 1000, z: 2000 }
 const line = (x0: number, z0: number, x1: number, z1: number) => ({ points: [{ x: O.x + x0, z: O.z + z0 }, { x: O.x + x1, z: O.z + z1 }] })
 const N = BEARINGS[0]!
-/** Two plates of half 4 m at 11 and 20 m out, roughly a pair at a 500 m view. */
-const PROBES: PlateProbe[] = [{ along: 11, half: 4 }, { along: 20, half: 4 }]
-const probes = (count: number) => PROBES.slice(0, count)
-const fixed = () => PROBES
+const E = { x: 1, z: 0 }
+/** A row of two, as the scene scores one. */
+const pair = (dir: { x: number; z: number }) => plateProbes(2, dir)
+const probes = plateProbes
 
 describe('segmentDistance', () => {
   it('is 0 for crossing segments and the nearest end otherwise', () => {
@@ -27,29 +29,31 @@ describe('segmentDistance', () => {
 
 describe('clearBearing', () => {
   it('prefers north with nothing near', () => {
-    expect(clearBearing(O, trackSegments([line(500, 500, 600, 600)]), [], fixed)).toEqual(N)
+    expect(clearBearing(O, trackGrid([line(500, 500, 600, 600)]), [], pair)).toEqual(N)
   })
 
   it('turns east off a north-south track pair', () => {
-    const segs = trackSegments([line(-4.7, -300, -4.7, 300), line(4.7, 300, 4.7, -300)])
-    expect(clearBearing(O, segs, [], fixed)).toEqual({ x: 1, z: 0 })
+    const grid = trackGrid([line(-4.7, -300, -4.7, 300), line(4.7, 300, 4.7, -300)])
+    expect(clearBearing(O, grid, [], pair)).toEqual(E)
   })
 
   it('keeps north beside an east-west track', () => {
-    const segs = trackSegments([line(-300, 4.7, 300, 4.7), line(300, -4.7, -300, -4.7)])
-    expect(clearBearing(O, segs, [], fixed)).toEqual(N)
+    const grid = trackGrid([line(-300, 4.7, 300, 4.7), line(300, -4.7, -300, -4.7)])
+    expect(clearBearing(O, grid, [], pair)).toEqual(N)
   })
 
   it('dodges another station marker to the north', () => {
-    const segs = trackSegments([line(-300, 4.7, 300, 4.7)])
-    const got = clearBearing(O, segs, [{ x: O.x, z: O.z - 25 }], fixed)
-    expect(got).not.toEqual(N)
-    expect(got.z).toBeLessThan(0)
+    const grid = trackGrid([line(-300, 4.7, 300, 4.7)])
+    expect(clearBearing(O, grid, [], pair)).toEqual(N)
+    expect(clearBearing(O, grid, [{ x: O.x, z: O.z - 25 }], pair)).not.toEqual(N)
   })
 
-  it('counts a shape with the same ground path once', () => {
+  it('grids a shape with the same ground path once, and finds a long segment from any cell it crosses', () => {
     const a = line(-4.7, -300, -4.7, 300)
-    expect(trackSegments([a, { points: [...a.points] }]).length).toBe(4)
+    const grid = trackGrid([a, { points: [...a.points] }])
+    expect(grid.segments.length).toBe(4)
+    expect(segmentsNear(grid, { x: O.x, z: O.z + 250 }, 10)).toEqual([-4.7, -550, -4.7, 50].map((v) => expect.closeTo(v, 3)))
+    expect(segmentsNear(grid, { x: O.x + 500, z: O.z }, 80)).toEqual([])
   })
 })
 
@@ -67,35 +71,36 @@ describe('amenityMarks', () => {
   const stations = [a, { id: 'B', pos: { x: O.x, z: O.z - 20 }, memberIds: ['B'] }, c]
 
   it('unions a complex members kinds in order, one row per group, and skips unlisted groups', () => {
-    const marks = amenityMarks([a, c], file({ B: { csc: { entrance: 'x' } }, A: { restrooms: 2 } }), new Float32Array(0), stations, probes)
-    expect(marks.map((m) => [m.stationId, m.kind, m.k])).toEqual([
-      ['A', 'restroom', 0],
-      ['A', 'csc', 1],
+    const marks = amenityMarks([a, c], file({ B: { csc: { entrance: 'x' } }, A: { restrooms: 2 } }), trackGrid([]), stations, probes)
+    expect(marks.map((m) => [m.stationId, m.kind, m.k, m.n])).toEqual([
+      ['A', 'restroom', 0, 2],
+      ['A', 'csc', 1, 2],
     ])
     // Its own member B (20 m north) doesn't push the row off north.
     expect(marks[0]!.dir).toEqual(N)
   })
 
   it('draws nothing for a restroom count of 0', () => {
-    expect(amenityMarks([c], file({ C: { restrooms: 0 } }), new Float32Array(0), stations, probes)).toEqual([])
+    expect(amenityMarks([c], file({ C: { restrooms: 0 } }), trackGrid([]), stations, probes)).toEqual([])
   })
 })
 
-describe('hullReach and markCentre', () => {
+describe('hullReach, plateReach and the row', () => {
   const fp: Footprint = { originX: O.x + 10, originZ: O.z, hull: [[-5, -20], [5, -20], [5, 20], [-5, 20]], yLow: -10, yHigh: 0 }
 
   it('measures the hull along a bearing from the station point', () => {
     expect(hullReach(fp, O, N)).toBeCloseTo(20)
-    expect(hullReach(fp, O, { x: 1, z: 0 })).toBeCloseTo(15)
+    expect(hullReach(fp, O, E)).toBeCloseTo(15)
     expect(hullReach(fp, O, { x: -1, z: 0 })).toBeCloseTo(-5)
   })
 
-  it('starts a covered row at the hull middle, off its long side, north first on a tie', () => {
-    // A hull 10 m wide and 40 m long north-south, centred on the station: east and west reach 5 m, north and south 20 m.
-    const long: Footprint = { originX: O.x, originZ: O.z, hull: [[-5, -20], [5, -20], [5, 20], [-5, 20]], yLow: 0, yHigh: 0 }
-    expect(coveredRow(long)).toEqual({ origin: O, dir: { x: 1, z: 0 }, reach: 5 })
-    const square: Footprint = { ...long, originX: O.x + 30, hull: [[-10, -10], [10, -10], [10, 10], [-10, 10]] }
-    expect(coveredRow(square)).toEqual({ origin: { x: O.x + 30, z: O.z }, dir: N, reach: 10 })
+  it('measures the hull within a lateral band, into a corner', () => {
+    // An L: 40 m north-south on the west, 40 m east-west on the south; north of the origin's east side is open.
+    const ell: Footprint = { originX: O.x, originZ: O.z, hull: [[-20, 20], [20, 20], [20, 10], [-10, -20], [-20, -20]], yLow: 0, yHigh: 0 }
+    expect(bandReach(ell, O, N, -25, 25)).toBeCloseTo(20)
+    // Within x 10..15 only the slanted edge reaches north: from z 10 at x 20 to z -20 at x -10, so z 0..5 there.
+    expect(bandReach(ell, O, N, 10, 15)).toBeCloseTo(0)
+    expect(bandReach(ell, O, N, 30, 40)).toBe(-Infinity)
   })
 
   it('reaches a yawed plate farther along a diagonal', () => {
@@ -104,8 +109,28 @@ describe('hullReach and markCentre', () => {
     expect(plateReach(2, BEARINGS[1]!, Math.PI / 4)).toBeCloseTo(2)
   })
 
-  it('rows the plates one gap apart past the clearance', () => {
-    expect(markCentre(0, 6, 4, 1)).toBe(11)
-    expect(markCentre(1, 6, 4, 1)).toBe(20)
+  const at = (k: number, dir: { x: number; z: number }, az: number) => rowCentreInto({ x: 0, z: 0 }, k, 2, { x: 0, z: 0 }, dir, 6, 4, 1, az)
+
+  it('runs a row across the screen, centred above a north bearing, in order left to right', () => {
+    // Plates 8 m wide one 1 m gap apart, 6 + 1 + 4 m north of the marker, either side of it.
+    expect(at(0, N, 0)).toEqual({ x: expect.closeTo(-4.5), z: expect.closeTo(-11) })
+    expect(at(1, N, 0)).toEqual({ x: expect.closeTo(4.5), z: expect.closeTo(-11) })
+  })
+
+  it('starts a row on a bearing pointing right and ends it on one pointing left, never nearer the marker', () => {
+    expect(at(0, E, 0)).toEqual({ x: expect.closeTo(11), z: expect.closeTo(0) })
+    expect(at(1, E, 0).x).toBeCloseTo(20)
+    expect(at(1, { x: -1, z: 0 }, 0).x).toBeCloseTo(-11)
+    expect(at(0, { x: -1, z: 0 }, 0).x).toBeCloseTo(-20)
+    // Turned half way round, the screen's right is west: the same east bearing now ends the row.
+    expect(at(1, E, Math.PI).x).toBeCloseTo(11)
+    for (const dir of BEARINGS) {
+      for (const az of [0, 0.7, 2, -2.5]) {
+        for (const k of [0, 1]) {
+          const c = at(k, dir, az)
+          expect(c.x * dir.x + c.z * dir.z).toBeGreaterThanOrEqual(6 + 1 + plateReach(4, dir, az) - 1e-9)
+        }
+      }
+    }
   })
 })

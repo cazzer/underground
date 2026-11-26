@@ -2,10 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, DynamicDrawUsage, MeshBasicMaterial, type Group, type InstancedMesh } from 'three'
 import type { AmenitiesFile } from '../data/amenitiesSchema'
-import { interiorStationIds } from '../data/interiorLoad'
 import { AMENITY_ORDER, GLYPHS, type AmenityKind } from '../lib/amenityGlyphs'
-import { amenityMarks, coveredRow, trackSegments } from '../lib/amenityPlacement'
-import { FOCUS_FRAME_PAD_M, FOOTPRINT_PAD_M } from '../lib/interiorFootprint'
+import type { Insets } from '../lib/framing'
+import type { ScreenRect } from '../lib/interiorCamera'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { LabelBlockers } from '../lib/labelBlockers'
 import { srgb01 } from '../lib/lineDim'
@@ -16,19 +15,19 @@ import type { EmphasisLevels } from '../lib/tripEmphasis'
 import { theme } from '../theme'
 import { frameChanged, newAmenityFrame, TIERS, writeAmenityFrame, type AmenityFrame, type Tier, type TierArrays } from './amenityFrame'
 import { glyphGeometry, plateGeometry } from './amenityGeometry'
-import { markSizesInto, newMarkSizes, plateProbes } from './amenitySizes'
+import { markSizesInto, newMarkSizes } from './amenitySizes'
 import { cameraDistance } from './cameraDistance'
 import type { InteriorModel } from './interiorModel'
 import { RENDER_ORDER } from './renderOrder'
 import { clearAmenityBlockers, useAmenityBlockerSlot, writeAmenityBlockers } from './useAmenityBlockers'
+import { useAmenityCovers } from './useAmenityCovers'
+import { useAmenityLayout } from './useAmenityLayout'
 import { useAmenityProbe, type AmenityView } from './useAmenityProbe'
 
 const BACKGROUND = srgb01(theme.background)
-/** How far a covered mark's clearance reaches past the pick footprint: out to the focused interior's frame loop. */
-const FRAME_EXTRA_M = FOCUS_FRAME_PAD_M - FOOTPRINT_PAD_M
-const ORDERS: Record<Tier, { plate: number; glyph: number }> = {
-  under: { plate: RENDER_ORDER.amenityPlate, glyph: RENDER_ORDER.amenity },
-  over: { plate: RENDER_ORDER.amenityPlateOver, glyph: RENDER_ORDER.amenityOver },
+const ORDERS: Record<Tier, { plate: number } & Record<AmenityKind, number>> = {
+  under: { plate: RENDER_ORDER.amenityPlate, csc: RENDER_ORDER.amenityCsc, restroom: RENDER_ORDER.amenityRestroom },
+  over: { plate: RENDER_ORDER.amenityPlateOver, csc: RENDER_ORDER.amenityCscOver, restroom: RENDER_ORDER.amenityRestroomOver },
 }
 
 interface HasAzimuth {
@@ -52,48 +51,53 @@ interface StationAmenitiesProps {
   levels: EmphasisLevels
   /** The street labels keep clear of the marks on screen (one slot). */
   blockers: LabelBlockers
+  /** The HUD's bands and the station panel: a covered row is chosen to show in the free rect a landing leaves. */
+  insets: Insets
+  panel: ScreenRect | null
 }
 
 type Meshes = Record<Tier, { plate: InstancedMesh | null; glyph: Record<AmenityKind, InstancedMesh | null> }>
 
 /**
  * Every listed station's amenity marks (enp.5): a background plate and an extruded `theme.amenityMark` pictogram
- * (amenityGlyphs' pieces) per amenity, in a row along the station's clear bearing (amenityPlacement.ts) just past its
- * marker, inside 1250 m only, fading in with the interiors (interiorOpacity). Flat top-down (height × the depth factor),
- * yawed to the camera azimuth so each reads upright. A mark whose station a shown interior covers slides out past that
- * interior's hull, off the side nearest its middle (coveredRow), as its presence eases in, cross-fading from its copy under the veil (4.57, 4.6) to one over it
- * (7.61, 7.62). Instanced, depth testing off, no handlers (never picked); matrices are rewritten only when the view or
+ * (amenityGlyphs' pieces) per amenity, in a row across the screen anchored on the station's clear bearing
+ * (amenityPlacement.ts, laid out in idle time by useAmenityLayout) just past its marker, inside 1250 m only, fading in
+ * with the interiors (interiorOpacity). Flat top-down (height × the depth factor), yawed to the camera azimuth so each
+ * reads upright. A mark whose station a shown interior covers slides to a row just off that interior's hull
+ * (useAmenityCovers) as its presence eases in, cross-fading from its copy under the veil (4.57 to 4.605) to one over
+ * it (7.61 to 7.625). Instanced, depth testing off, no handlers (never picked); matrices are rewritten only when the view or
  * a presence changes, materials' opacity only on change, never as JSX props (o3r.9).
  */
-export function StationAmenities({ network, amenities, shown, presences, levels, blockers }: StationAmenitiesProps) {
+export function StationAmenities({ network, amenities, shown, presences, levels, blockers, insets, panel }: StationAmenitiesProps) {
   const group = useRef<Group>(null)
   const meshes = useRef<Meshes>({
     under: { plate: null, glyph: { restroom: null, csc: null } },
     over: { plate: null, glyph: { restroom: null, csc: null } },
   })
-  const segments = useMemo(() => trackSegments(network.shapes), [network])
-  const marks = useMemo(
-    () => (amenities ? amenityMarks(network.stationGroups, amenities, segments, network.stations, plateProbes) : []),
-    [network, amenities, segments],
-  )
+  const marks = useAmenityLayout(network, amenities)
   const frame = useMemo(() => newAmenityFrame(marks), [marks])
   const frameRef = useRef<AmenityFrame | null>(null)
   frameRef.current = frame
-  // Which shown interior covers each mark's station, and where its row goes past that hull (coveredRow).
-  useLayoutEffect(() => {
-    const covers = shown.map((m) => ({ ids: new Set(interiorStationIds(m)), model: m }))
-    frame.marks.forEach((mark, i) => {
-      const hit = covers.find((c) => mark.memberIds.some((id) => c.ids.has(id)))
-      frame.cover[i] = hit ? (presences.get(hit.model.stationId) ?? null) : null
-      const past = hit ? coveredRow(hit.model.footprint) : null
-      frame.coverOX[i] = past?.origin.x ?? 0
-      frame.coverOZ[i] = past?.origin.z ?? 0
-      frame.coverX[i] = past?.dir.x ?? 0
-      frame.coverZ[i] = past?.dir.z ?? 0
-      frame.reach[i] = past ? past.reach + FRAME_EXTRA_M : 0
-    })
-    frame.last.d = NaN
-  }, [frame, shown, presences])
+  useAmenityCovers(frame, shown, presences, insets, panel)
+  // Stable ref callbacks, one per mesh, so a re-render doesn't detach and reattach them.
+  const refs = useMemo(() => {
+    const out = {} as Record<Tier, { plate: (m: InstancedMesh | null) => void } & Record<AmenityKind, (m: InstancedMesh | null) => void>>
+    for (const tier of TIERS) {
+      const slots = meshes.current[tier]
+      out[tier] = {
+        plate: (m) => {
+          slots.plate = m
+        },
+        restroom: (m) => {
+          slots.glyph.restroom = m
+        },
+        csc: (m) => {
+          slots.glyph.csc = m
+        },
+      }
+    }
+    return out
+  }, [])
 
   const geometry = useMemo(
     () => ({ plate: plateGeometry(), restroom: glyphGeometry(GLYPHS.restroom, theme.amenitySideShade), csc: glyphGeometry(GLYPHS.csc, theme.amenitySideShade) }),
@@ -204,9 +208,7 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
       {TIERS.map((tier) => (
         <group key={tier}>
           <instancedMesh
-            ref={(m: InstancedMesh | null) => {
-              meshes.current[tier].plate = m
-            }}
+            ref={refs[tier].plate}
             args={[geometry.plate, material.plate, marks.length]}
             frustumCulled={false}
             renderOrder={ORDERS[tier].plate}
@@ -215,12 +217,10 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
             frame.byKind[kind].length === 0 ? null : (
               <instancedMesh
                 key={kind}
-                ref={(m: InstancedMesh | null) => {
-                  meshes.current[tier].glyph[kind] = m
-                }}
+                ref={refs[tier][kind]}
                 args={[geometry[kind], material.glyph, frame.byKind[kind].length]}
                 frustumCulled={false}
-                renderOrder={ORDERS[tier].glyph}
+                renderOrder={ORDERS[tier][kind]}
               />
             ),
           )}
