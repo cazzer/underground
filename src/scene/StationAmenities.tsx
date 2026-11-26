@@ -7,7 +7,6 @@ import type { Insets } from '../lib/framing'
 import type { ScreenRect } from '../lib/interiorCamera'
 import { interiorOpacity } from '../lib/interiorReveal'
 import type { LabelBlockers } from '../lib/labelBlockers'
-import { srgb01 } from '../lib/lineDim'
 import type { Network } from '../lib/network'
 import type { Presence } from '../lib/presence'
 import { depthFactor, depthScaleY } from '../lib/tilt'
@@ -24,7 +23,6 @@ import { useAmenityCovers } from './useAmenityCovers'
 import { useAmenityLayout } from './useAmenityLayout'
 import { useAmenityProbe, type AmenityView } from './useAmenityProbe'
 
-const BACKGROUND = srgb01(theme.background)
 const ORDERS: Record<Tier, { plate: number } & Record<AmenityKind, number>> = {
   under: { plate: RENDER_ORDER.amenityPlate, csc: RENDER_ORDER.amenityCsc, restroom: RENDER_ORDER.amenityRestroom },
   over: { plate: RENDER_ORDER.amenityPlateOver, csc: RENDER_ORDER.amenityCscOver, restroom: RENDER_ORDER.amenityRestroomOver },
@@ -64,7 +62,7 @@ type Meshes = Record<Tier, { plate: InstancedMesh | null; glyph: Record<AmenityK
  * (amenityPlacement.ts, laid out in idle time by useAmenityLayout) just past its marker, inside 1250 m only, fading in
  * with the interiors (interiorOpacity). Flat top-down (height × the depth factor), yawed to the camera azimuth so each
  * reads upright. A mark whose station a shown interior covers slides to a row just off that interior's hull
- * (useAmenityCovers) as its presence eases in, cross-fading from its copy under the veil (4.57 to 4.605) to one over
+ * (useAmenityCovers) as its presence eases in, handing off from its copy under the veil (4.57 to 4.605) to one over
  * it (7.61 to 7.625). Instanced, depth testing off, no handlers (never picked); matrices are rewritten only when the view or
  * a presence changes, materials' opacity only on change, never as JSX props (o3r.9).
  */
@@ -118,11 +116,7 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
     },
     [geometry, material],
   )
-  const markRgb = useMemo(() => {
-    const c = new Color(theme.amenityMark)
-    return new Float32Array([c.r, c.g, c.b])
-  }, [])
-  const scratch = useMemo(() => ({ rgb: new Float32Array(3), sizes: newMarkSizes(), tiers: null as Record<Tier, TierArrays> | null }), [])
+  const scratch = useMemo(() => ({ sizes: newMarkSizes(), tiers: null as Record<Tier, TierArrays> | null }), [])
   const view = useRef<AmenityView>({ opacity: 0, sizes: scratch.sizes })
   const slot = useAmenityBlockerSlot(blockers)
   useAmenityProbe(frameRef, view)
@@ -138,12 +132,10 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
       if (!plate) return
       plate.instanceMatrix.setUsage(DynamicDrawUsage)
       const glyph = {} as Record<AmenityKind, Float32Array>
-      const color = {} as Record<AmenityKind, Float32Array>
       for (const kind of AMENITY_ORDER) {
         const mesh = m.glyph[kind]
         if (!mesh) {
           glyph[kind] = new Float32Array(0)
-          color[kind] = new Float32Array(0)
           continue
         }
         mesh.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -151,9 +143,8 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
         for (let j = 0; j < mesh.count; j++) mesh.setColorAt(j, c)
         mesh.instanceColor!.needsUpdate = true
         glyph[kind] = mesh.instanceMatrix.array as Float32Array
-        color[kind] = mesh.instanceColor!.array as Float32Array
       }
-      arrays[tier] = { plate: plate.instanceMatrix.array as Float32Array, glyph, color }
+      arrays[tier] = { plate: plate.instanceMatrix.array as Float32Array, glyph }
     }
     scratch.tiers = arrays
     frame.drawnP.fill(NaN)
@@ -185,7 +176,7 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
     const trip = levels.tripVisible
     if (frameChanged(frame, d, az, depth, trip)) {
       markSizesInto(scratch.sizes, d, trip)
-      const colored = writeAmenityFrame(frame, tiers, scratch.sizes, d, az, depth, trip, markRgb, BACKGROUND, scratch.rgb)
+      writeAmenityFrame(frame, tiers, scratch.sizes, d, az, depth, trip)
       const m = meshes.current
       for (let t = 0; t < TIERS.length; t++) {
         const tier = m[TIERS[t]!]
@@ -194,7 +185,6 @@ export function StationAmenities({ network, amenities, shown, presences, levels,
           const mesh = tier.glyph[AMENITY_ORDER[k]!]
           if (!mesh) continue
           mesh.instanceMatrix.needsUpdate = true
-          if (colored) mesh.instanceColor!.needsUpdate = true
         }
       }
     }

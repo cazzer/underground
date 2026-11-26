@@ -367,7 +367,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `PlacePin.tsx` the searched place's pin (a diamond outline and centre dot, `placePinShape.ts`, inside a thin background halo band, constant screen size, `theme.placePin`; no event handlers; Scene mounts it while the place line shows);
     `StationAmenities.tsx` (enp.5, in a null-fallback ErrorBoundary, not keyed) the amenity marks of every station group `amenities.json`
     lists (App's `useAmenities`, through Scene; not the view set, so it fetches nothing and never pops with the view's ranking),
-    laid out in idle time (`useAmenityLayout.ts`: requestIdleCallback, a 16 ms timeout without it; the track grid a few shapes a
+    laid out in idle time (`useAmenityLayout.ts`: requestIdleCallback with a 500 ms timeout, a 16 ms setTimeout without it; the track grid a few shapes a
     slice, then a few groups a slice, each slice at most `SLICE_MS` 3 ms past its first step; no marks until done): per amenity a flat
     background plate (`plateGeometry`) and an extruded `theme.amenityMark` prism per `GLYPHS` piece (`glyphGeometry` in
     `amenityGeometry.ts`: per piece its outward walls shaded `amenitySideShade`, then its top, no bottom, pieces in the glyph's
@@ -379,9 +379,9 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     1250 m out, the group hidden). The row clears the marker as the focus ring draws it, or the trip mark's halo while the trip shows.
     A mark whose station a shown interior covers slides (a straight blend by the presence) to a row just off that interior's
     footprint hull plus the focus frame's extra 8 m (`useAmenityCovers.ts` over `lib/amenityCovered.ts`' `coveredRow`, chosen when
-    the shown interiors or the canvas size change, reading the insets and panel then), and cross-fades from its copy under the veil
-    to one over it: each tier's plate scales by its share and its glyph mixes toward the background by the rest (`tierShare`: the
-    under copy whole to half way, the over copy whole from half way, so one is always at full ink), a copy at share 0 collapsing to
+    the shown interiors, the canvas size or the panel's rect change), and hands off from its copy under the veil to one over
+    it, both always at full ink (`tierShare`: the over glyph grows to full size by half way and its plate draws only then, the
+    under copy whole until that point, so the ink never dips below the dimmer copy; `amenityFrame.test.ts`), a part at share 0 collapsing to
     scale 0. Six InstancedMeshes (plate, restroom, csc per tier), two shared materials (opacity written only on change, never a JSX
     prop), stable ref callbacks; per frame (`amenityFrame.ts`) matrices only when the distance, azimuth, depth, trip flag or a
     presence changed, colors only when a presence did; allocation-free. It claims one `LabelBlockers` slot (`useAmenityBlockers.ts`:

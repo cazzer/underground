@@ -8,6 +8,9 @@ import { plateProbes } from './amenitySizes'
 /** The most a slice of the layout may run, ms, before it yields to the next idle period. */
 const SLICE_MS = 3
 
+/** A slice runs by this long after it was asked for even on a page that never idles. */
+const IDLE_TIMEOUT_MS = 500
+
 const NO_MARKS: readonly AmenityMark[] = []
 
 type Idle = (run: (deadline: { timeRemaining: () => number }) => void) => number
@@ -16,7 +19,7 @@ type CancelIdle = (id: number) => void
 /** requestIdleCallback where there is one (not Safari), else a 16 ms timeout with a fixed slice. */
 function idleApi(): { request: Idle; cancel: CancelIdle } {
   if (typeof window.requestIdleCallback === 'function') {
-    return { request: (run) => window.requestIdleCallback(run), cancel: (id) => window.cancelIdleCallback(id) }
+    return { request: (run) => window.requestIdleCallback(run, { timeout: IDLE_TIMEOUT_MS }), cancel: (id) => window.cancelIdleCallback(id) }
   }
   return { request: (run) => window.setTimeout(() => run({ timeRemaining: () => SLICE_MS }), 16), cancel: (id) => window.clearTimeout(id) }
 }

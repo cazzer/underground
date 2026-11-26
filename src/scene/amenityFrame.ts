@@ -1,10 +1,9 @@
 /**
- * The amenity marks' per-frame state and writers (StationAmenities.tsx): where each mark lies, which tier draws it and
- * how far it has mixed toward the background, written into the instanced meshes' arrays. Allocation-free once built.
+ * The amenity marks' per-frame state and writers (StationAmenities.tsx): where each mark lies and how much of each
+ * tier's copy draws, written into the instanced meshes' matrices. Allocation-free once built.
  */
 import { AMENITY_ORDER, type AmenityKind } from '../lib/amenityGlyphs'
 import { rowCentreInto, type AmenityMark } from '../lib/amenityPlacement'
-import { dimLineRgbInto, type Rgb3 } from '../lib/lineDim'
 import { writeChordMatrix, writeInstanceMatrix } from '../lib/markerMatrices'
 import type { Presence } from '../lib/presence'
 import type { MarkSizes } from './amenitySizes'
@@ -39,7 +38,7 @@ export interface AmenityFrame {
   coverX: Float32Array
   coverZ: Float32Array
   reach: Float32Array
-  /** Per mark, the presence its matrices and colors were last written at (NaN: rewrite). */
+  /** Per mark, the presence its matrices were last written at (NaN: rewrite). */
   drawnP: Float32Array
   /** Per mark, its centre on the ground, as last written. */
   x: Float32Array
@@ -78,23 +77,28 @@ export function newAmenityFrame(marks: readonly AmenityMark[]): AmenityFrame {
   }
 }
 
-/** The arrays one tier writes: its plates' matrices and, per kind, its glyphs' matrices and instance colors. */
+/** The arrays one tier writes: its plates' matrices and, per kind, its glyphs' matrices. */
 export interface TierArrays {
   plate: Float32Array
   glyph: Record<AmenityKind, Float32Array>
-  color: Record<AmenityKind, Float32Array>
 }
 
 /** A mark's presence now: its covering interior's, else 0 (bare). */
 export const presenceOf = (f: AmenityFrame, i: number): number => f.cover[i]?.value ?? 0
 
 /**
- * How much of a tier's copy shows at presence `p`, 0..1: the under copy stays whole to half way and the over copy is
- * whole from half way, so mid blend one of the two is always at full ink and the mark never dims or blinks.
+ * How a tier's copy draws at presence `p` (both always at full ink; only the veil and the reveal fade them): the over
+ * copy's glyph grows from nothing to full size by half way (`glyph`, its scale share) and its plate draws only once
+ * the glyph is full size, so it never knocks out the under glyph before the same shape covers it; the under copy
+ * stays whole until then, and is gone from there. So at any p the mark shows one whole copy at full ink.
  */
-export function tierShare(tier: number, p: number): number {
-  return Math.min(Math.max(tier === 0 ? 2 * (1 - p) : 2 * p, 0), 1)
+export function tierShare(tier: number, p: number): { glyph: number; plate: number } {
+  const over = Math.min(Math.max(2 * p, 0), 1)
+  if (tier === 1) return over === 1 ? FULL : over === 0 ? NONE : { glyph: over, plate: 0 }
+  return over < 1 ? FULL : NONE
 }
+const FULL = { glyph: 1, plate: 1 } as const
+const NONE = { glyph: 0, plate: 0 } as const
 
 /**
  * Says whether anything a mark draws from changed since the last write: the view (distance, azimuth, depth, the trip's
@@ -109,11 +113,9 @@ export function frameChanged(f: AmenityFrame, d: number, az: number, depth: numb
 
 /**
  * Writes every mark's matrices in both tiers (yawed by the camera azimuth `az`, so the glyph's up runs up the screen;
- * its height × `depth`) and the instance colors of any mark whose presence changed. Each tier's plate is scaled by
- * its share (tierShare) and its glyph mixed toward the background by the rest, a copy at share 0 collapsing to scale
- * 0, so the over copy's plate grows under its glyph rather than knocking out the under glyph at once. A row runs across the screen
- * (rowCentreInto); a covered mark slides from its row beside the marker to its row past the interior's hull
- * (coveredRow) as the presence eases in. Returns whether any color was written.
+ * its height × `depth`), each tier's glyph and plate scaled by its share (tierShare), a part at share 0 collapsing to
+ * scale 0. A row runs across the screen (rowCentreInto); a covered mark slides from its row beside the marker to its
+ * row past the interior's hull (coveredRow) as the presence eases in. No colors: both tiers draw at full ink.
  */
 export function writeAmenityFrame(
   f: AmenityFrame,
@@ -123,10 +125,7 @@ export function writeAmenityFrame(
   az: number,
   depth: number,
   trip: boolean,
-  mark: Rgb3 | Float32Array,
-  background: Rgb3,
-  rgb: Float32Array,
-): boolean {
+): void {
   const l = f.last
   l.d = d
   l.az = az
@@ -135,7 +134,6 @@ export function writeAmenityFrame(
   const ux = Math.sin(az)
   const uz = Math.cos(az)
   const s = sizes.glyph
-  let colored = false
   for (let i = 0; i < f.marks.length; i++) {
     const m = f.marks[i]!
     const p = presenceOf(f, i)
@@ -158,19 +156,13 @@ export function writeAmenityFrame(
       const share = tierShare(ti, p)
       const t = tiers[TIERS[ti]!]
       const glyph = t.glyph[m.kind]
-      if (share <= 0) {
-        writeInstanceMatrix(t.plate, i, x, PLATE_Y, z, 0)
-        writeInstanceMatrix(glyph, j, x, GLYPH_Y, z, 0)
-      } else {
-        writeChordMatrix(t.plate, i, x, PLATE_Y, z, ux, 0, uz, s * share, 1, s * share)
-        writeChordMatrix(glyph, j, x, GLYPH_Y, z, ux, 0, uz, s, s * depth, s)
-      }
-      if (p !== f.drawnP[i]) {
-        t.color[m.kind].set(dimLineRgbInto(rgb, mark, background, 1 - share), j * 3)
-        colored = true
-      }
+      if (share.plate > 0) writeChordMatrix(t.plate, i, x, PLATE_Y, z, ux, 0, uz, s, 1, s)
+      else writeInstanceMatrix(t.plate, i, x, PLATE_Y, z, 0)
+      if (share.glyph > 0) {
+        const g = s * share.glyph
+        writeChordMatrix(glyph, j, x, GLYPH_Y, z, ux, 0, uz, g, g * depth, g)
+      } else writeInstanceMatrix(glyph, j, x, GLYPH_Y, z, 0)
     }
     f.drawnP[i] = p
   }
-  return colored
 }

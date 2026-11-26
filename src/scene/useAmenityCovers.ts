@@ -18,8 +18,8 @@ const FOV_DEG = 35
 /**
  * Which shown interior covers each mark's station (its presence) and where the mark's row goes past that hull
  * (coveredRow: just off the hull plus FRAME_EXTRA_M, on a side a landing on the interior shows in the free rect),
- * written into `frame` before the next frame. Rechosen when the shown interiors or the canvas size change; the insets
- * and panel are read then, not watched, so a panel growing never moves a row.
+ * written into `frame` before the next frame. Rechosen when the shown interiors, the canvas size or the panel's rect
+ * change (the insets are read then).
  */
 export function useAmenityCovers(
   frame: AmenityFrame,
@@ -32,6 +32,9 @@ export function useAmenityCovers(
   const height = useThree((s) => s.size.height)
   const hud = useRef({ insets, panel })
   hud.current = { insets, panel }
+  // The panel's rect, as a key: a row is rechosen when it is first measured or moves, so none is chosen against a
+  // free rect without the panel.
+  const panelKey = panel ? `${panel.left},${panel.top},${panel.right},${panel.bottom}` : 'none'
   useLayoutEffect(() => {
     const viewport = { width, height }
     const view = { viewport, free: interiorFreeRect(viewport, hud.current.insets, hud.current.panel), fovDeg: FOV_DEG }
@@ -54,5 +57,5 @@ export function useAmenityCovers(
       frame.reach[i] = row?.reach ?? 0
     })
     frame.last.d = NaN
-  }, [frame, shown, presences, width, height])
+  }, [frame, shown, presences, width, height, panelKey])
 }

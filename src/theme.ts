@@ -152,8 +152,11 @@ export interface Theme {
   changeSuspendedDashPx: number
   changeSuspendedGapPx: number
   /** A station's amenity marks on the map (StationAmenities.tsx, enp.5): extruded pictograms on a background plate, the
-   *  tops in `amenityMark` (the dim ink, so they sit back from the station markers) and the sides that linear multiple of it; both 3:1 on the background, apart from the focus,
-   *  location, pin, exit and rim colors, also under simulated red-green color blindness (themeAmenity.test.ts). */
+   *  tops in `amenityMark` (`inkDim`, so they sit back from the station markers) and the sides that linear multiple of
+   *  it; both 3:1 on the background and apart from the focus, location, pin, exit and rim colors (themeAmenity.test.ts).
+   *  As a red-green dichromat sees them the exit path and the selected-train rim come nearer than the usual floor; the
+   *  shape tells them apart there (a dashed line through an interior, a ring round a moving train, against a
+   *  pictogram on a plate), so those two floors are relaxed to what blueprint measures. */
   amenityMark: string
   amenitySideShade: number
 }
@@ -163,6 +166,8 @@ export const MACHINE_DEPTH_FADE_SHARE = 0.5
 
 /** Shared by the status color and the interior's out-of-service machines, which mark the same thing. */
 const statusError = '#ff6b6b'
+/** The dim ink: HUD secondary text, and the amenity marks on the map. */
+const inkDim = '#8fb4de'
 const mono = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
 
 export const THEMES = {
@@ -190,7 +195,7 @@ export const THEMES = {
     statusWarn: '#ffd166',
     statusError,
     ink: '#e6f6ff',
-    inkDim: '#8fb4de',
+    inkDim,
     panel: 'rgba(11, 33, 71, 0.82)',
     panelBorder: '#5ce1ff',
     fontSans: mono,
@@ -231,7 +236,7 @@ export const THEMES = {
     changeSuspendedDim: 0.35,
     changeSuspendedDashPx: 5,
     changeSuspendedGapPx: 4,
-    amenityMark: '#8fb4de',
+    amenityMark: inkDim,
     amenitySideShade: 0.6,
   },
 } as const satisfies Record<string, Theme>
