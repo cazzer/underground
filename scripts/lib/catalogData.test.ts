@@ -61,6 +61,7 @@ describe('the pinned catalog', () => {
     for (const a of amenities.rows) expect(stationIds.has(a.stationId), `amenity ${a.id} station ${a.stationId}`).toBe(true)
     expect(new Set(amenities.rows.map((a) => a.month)).size).toBe(1)
     expect(amenities.url).toContain(amenities.rows[0]!.month)
+    expect(amenities.url).toContain('PUBLIC_RESTROOM')
   })
   it('has unique keys', () => {
     expect(new Set(amenities.rows.map((a) => a.id)).size).toBe(amenities.rows.length)

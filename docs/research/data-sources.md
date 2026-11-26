@@ -90,7 +90,7 @@ Files that matter:
 | GTFS | One coordinate per station | No levels, pathways, or entrances |
 | NY Open Data: Subway Stations [`39hk-dx4f`](https://data.ny.gov/Transportation/MTA-Subway-Stations/39hk-dx4f/about_data) | `gtfs_stop_id`, `complex_id`, `structure` (Subway/Elevated/Open Cut/…), ADA per direction | No layout |
 | Subway Entrances and Exits 2024 [`i9wp-a4ja`](https://data.ny.gov/Transportation/MTA-Subway-Entrances-and-Exits-2024/i9wp-a4ja/about_data) | Entrance lat/lon, type (Stair, Elevator, Escalator, …), entry/exit, `gtfs_stop_id` | Static; no link to mezzanine or platform |
-| Subway Station Amenities `6yjv-fk7g` (monthly snapshots since May 2026; 6 months of ~115 `PUBLIC_RESTROOM` rows, 59 stations, then countdown clocks, help points, turnstiles and so on) | Per row `amenity_id`, `amenity_type`, `station_mrn`, `month`, plus the station's name, lines, borough and point. We pin restrooms of the latest month only (`catalog/amenities.json`, no build reads it yet; re-pinned by hand with `npm run data:catalog:fetch -- --only amenities.json`) | The overview PDF: counts "reflect asset inventory rather than availability", the dataset "does not capture real-time operational status", only in-service assets are listed; the coordinates are the station's, "not necessarily the exact physical location of the amenity"; no hours or ADA status. A complex is keyed by one member's MRN (the same number as `catalog/stations.json` `stationId`, unpadded). Months overlap, so older months add nothing to a latest-month pin. OPEN-NY terms, attribution MTA |
+| Subway Station Amenities `6yjv-fk7g` (monthly snapshots since May 2026; every month so far lists the same 115 `PUBLIC_RESTROOM` rows (same amenity ids) at 59 stations, alongside 10 other amenity types: countdown clocks, help points, turnstiles and so on) | Per row `amenity_id`, `amenity_type`, `station_mrn`, `month`, plus the station's name, lines, borough and point. We pin restrooms of the latest month only (`catalog/amenities.json`, no build reads it yet; re-pinned by hand with `npm run data:catalog:fetch -- --only amenities.json`) | The overview PDF: counts "reflect asset inventory rather than availability", the dataset "does not capture real-time operational status", only in-service assets are listed; the coordinates are the station's, "not necessarily the exact physical location of the amenity"; no hours or ADA status. A complex is keyed by one member's MRN (the same number as `catalog/stations.json` `stationId`, unpadded). Older months add nothing to a latest-month pin while the restroom list stays the same. OPEN-NY terms, attribution MTA |
 | E&E Asset Inventory `94fv-bak7` (updated daily) | Lat/lon per machine, `escalator_rise` (messy units), mezzanine/platform/street access flags | Messy units; MRN station codes |
 | MTA E&E feeds: `nyct%2Fnyct_ene_equipments.json`, `nyct%2Fnyct_ene.json` (outages), `…_upcoming.json` | 707 machines with `elevatorsgtfsstopid`. The `serving` text gives topology, e.g. Bedford EL359 "…to mezzanine", EL358 "mezzanine to platform". Live outages. | Free text; no stairs. The outage feed needs no API key (checked 2026-11-22), but its content-type is the literal `${header.s3FileType}` (never check it), and `isupcomingoutage` is unreliable (started outages flagged `Y`, overdue ones `N`) |
 | OSM (Overpass) | `railway=platform` closed polygons with `level`; `railway=subway` tracks; entrances; some `highway=steps` | No mezzanine/corridor areas; steps mostly lack levels |
@@ -142,7 +142,7 @@ All five are ADA-accessible in `39hk-dx4f`.
 `npm run data:catalog:fetch` pins five data.ny.gov datasets, plus OSM platform and track ways, into
 `data/stations/catalog/` (sizes and counts: `data/README.md`). The `license` field in each dataset's
 view metadata (`https://data.ny.gov/api/views/<id>.json`) is **not set** for any of them, so the
-governing terms are the site-wide OPEN-NY Terms of Use. Rows updated are as of the 2026-11-21 fetch.
+governing terms are the site-wide OPEN-NY Terms of Use. Rows updated are as of the 2026-11-21 fetch (`6yjv-fk7g`: fetched and its PDF read 2026-11-26).
 
 | Dataset | Title | License field | Attribution | Rows updated | Overview PDF, "Limitations of Data Use" |
 |---|---|---|---|---|---|
@@ -152,7 +152,7 @@ governing terms are the site-wide OPEN-NY Terms of Use. Rows updated are as of t
 | `6yjv-fk7g` | MTA Subway Station Amenities: Beginning May 2026 | none | same | 2026-11-01 (monthly) | "There are no limitations on the data at this time." |
 | `vkng-7ivg` | MTA Subway and Rail Station Envelopes | none | same | 2025-08-26 | "There are no limitations on the data at this time." It says the polygons are "for informational purposes only" |
 
-The overview PDFs (read 2026-11-21 from data.ny.gov) state no usage limit that conflicts with our use.
+The overview PDFs (read 2026-11-21 from data.ny.gov; `6yjv-fk7g`'s on 2026-11-26) state no usage limit that conflicts with our use.
 Two data-quality notes from them matter for the catalog: the E&E "X Coordinate" and "Y Coordinate"
 are "the center of the subway station if the exact location of the subway elevator or escalator
 asset is not known", and the entrances dataset is "a point-in-time dataset as of August 2024" with

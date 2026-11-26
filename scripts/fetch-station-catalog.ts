@@ -76,7 +76,7 @@ async function main(): Promise<void> {
     console.log(`${name}: ${(bytes / 1000).toFixed(0)} KB`)
     if (bytes > MAX_FILE_BYTES) throw new Error(`${name} is ${bytes} bytes, over the ${MAX_FILE_BYTES} byte budget; nothing written`)
   }
-  console.log(`total: ${(total / 1000).toFixed(0)} KB`)
+  console.log(`total: ${(total / 1000).toFixed(0)} KB${only === null ? '' : ` (${only} only; the other catalog files are not counted)`}`)
   if (total > MAX_TOTAL_BYTES) throw new Error(`catalog is ${total} bytes, over the ${MAX_TOTAL_BYTES} byte budget; nothing written`)
   mkdirSync(DIR, { recursive: true })
   for (const { name, text } of rendered) writeFileSync(new URL(`${name}.tmp`, DIR), text)

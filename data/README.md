@@ -27,7 +27,7 @@ be accurate.
   carry no station key. `catalog/amenities.json` (dataset 6yjv-fk7g, restrooms of the latest month only, `{ id, type, stationId, month }`;
   `stationId` is the MTA station id, one member's for a complex; no hours, ADA status or open/closed state, and the source's point is
   the station's, not the restroom's) is not read by any build yet and is not in `CATALOG_FILES`; re-pin just it with
-  `npm run data:catalog:fetch -- --only amenities.json`, by hand (it is not part of the daily refresh). `catalog/stations.json` is also read by `npm run data` (borough and ADA status
+  `npm run data:catalog:fetch -- --only amenities.json`, by hand, like the rest of the catalog. `catalog/stations.json` is also read by `npm run data` (borough and ADA status
   for `public/data/stations.json`) together with `stations/access-exceptions.json`; after a catalog refresh, run `npm run data:access` (offline). `npm run data:stations` reads
   `stations.json`, `entrances.json`, `equipment.json`, `osm-platforms.json` and `osm-tracks.json` (with the
   committed `public/data/shapes.json` and `stations.json`) to generate interiors; `envelopes.json` is not used. Those same `stations.json` and `equipment.json` also build
