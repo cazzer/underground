@@ -168,7 +168,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 
 ## Directory map
 - `src/main.tsx`, `src/App.tsx`, `src/index.css`: entry, root layout, Tailwind + theme CSS vars
-- `src/config.ts`: build-time feature switches, plain constants (no remote flag service). `FEATURES.navigation` (default
+- `src/config.ts`: feature switches, plain constants (no remote flag service) plus `?nav=` read at load. `FEATURES.navigation` (default
   false, 2q7.51; `?nav=1`, `on` or `true` turns it on for that page load, `resolveNavigation`, 2q7.52): off, the HUD offers no directions (no From/To on search rows, no "Directions from/to here", no trip panel or
   `TripAnnouncer`), so the trip never opens and nothing trip-only draws or loads (the router chunk, timetables, transfers,
   the trip's interiors and street files; `tripPatterns()` loads only as `useNormalStops`' fallback, below); search, its flights and the location row are unchanged. True restores navigation.
