@@ -1,7 +1,7 @@
 {
   "source": "https://www.mta.info/contact-us/customer-service-centers",
   "retrievedAt": "2026-11-26",
-  "about": "Hand-copied from the MTA page; not an open dataset. Staffed 24/7 by NYCT station agents per the page, except where an entry has hours.",
+  "about": "Hand-copied from the MTA page; not an open dataset. Staffed 24/7 by NYCT station agents per the page; every entry is 24/7. St George (Staten Island Railway, weekdays only) and 3 Stone St (an office) are left out.",
   "centers": [
     {"gtfsStopId":"120","name":"96 St","pageName":"96 St","entrance":"Enter at 95 St and Broadway"},
     {"gtfsStopId":"125","name":"59 St-Columbus Circle","pageName":"59 St-Columbus Circle","entrance":"Enter at 58 St and 8 Av"},
@@ -31,7 +31,6 @@
     {"gtfsStopId":"H11","name":"Far Rockaway-Mott Av","pageName":"Far Rockaway-Mott Av","entrance":"Enter at Mott Av and Beach 22 St"},
     {"gtfsStopId":"L17","name":"Myrtle-Wyckoff Avs","pageName":"Myrtle-Wyckoff Avs","entrance":"Enter at Wyckoff Av and Palmetto St"},
     {"gtfsStopId":"L29","name":"Canarsie-Rockaway Pkwy","pageName":"Canarsie-Rockaway Pkwy","entrance":"Enter at Rockaway Pkwy and Glenwood Rd"},
-    {"gtfsStopId":"R36","name":"36 St","pageName":"36 St","entrance":"Enter at 36 St and 4 Av"},
-    {"gtfsStopId":"S31","name":"St George","pageName":"St. George","hours":"5:30 a.m.-9 p.m., Monday-Friday, except holidays"}
+    {"gtfsStopId":"R36","name":"36 St","pageName":"36 St","entrance":"Enter at 36 St and 4 Av"}
   ]
 }

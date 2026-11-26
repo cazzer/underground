@@ -409,16 +409,19 @@ Both are called only by the Worker's `GET /geocode` (never by the client), with 
 
 - **Source:** https://www.mta.info/contact-us/customer-service-centers, retrieved 2026-11-26 (through WebFetch; curl is blocked
   by Akamai). It lists 29 subway stations (grouped by borough, each with an "Enter at X and Y" line) "open 24/7", "staffed 24/7 by
-  New York City Transit station agents", plus St George on Staten Island (5:30 a.m.-9 p.m., Monday-Friday, except holidays) and
-  3 Stone St in Lower Manhattan (an office, 9 a.m.-5 p.m.; not a station, left out).
-- **Hand-authored** into `data/stations/customer-service-centers.json` (30 entries, St George included with `hours`), because no
-  open dataset of 24-hour booths exists. This is MTA website content, not the open-data feeds (OPEN-NY terms do not obviously
-  cover it) and its terms are not reviewed; a licensing card will be filed before anything from it ships.
-- Since 2023 station agents work outside the booths, so say "customer service center", never "booth". UI wording:
-  "Customer service center · staffed 24/7".
+  New York City Transit station agents", plus two entries that are not 24/7 and are left out: St George on Staten Island (Staten
+  Island Railway, 5:30 a.m.-9 p.m., Monday-Friday, except holidays) and 3 Stone St in Lower Manhattan (an office, 9 a.m.-5 p.m.,
+  not a station).
+- **Hand-authored** into `data/stations/customer-service-centers.json` (29 entries), because no open dataset of 24-hour booths
+  exists. This is MTA website content, not the open-data feeds (OPEN-NY terms do not obviously cover it) and its terms are not
+  reviewed; a licensing card will be filed before anything from it ships.
+- Station agents now work outside the booths, per the MTA press release
+  https://new.mta.info/press-release/mta-announces-station-agents-begin-assisting-riders-outside-of-booths-week (the 2023
+  rollout; the page 301s to www.mta.info and answered 403 to automated fetch, so its text was not read here). So say "customer
+  service center", never "booth". UI wording: "Customer service center · staffed 24/7".
 - **No refresh path.** The page is the only source; the file goes stale as centers open or close. Reread the page and bump
-  `retrievedAt` by hand. `customerServiceCenters.test.ts` fails if a stop id or name stops matching the pinned catalog, which
-  catches renames but not a changed list.
+  `retrievedAt` by hand. `customerServiceCenters.test.ts` fails if a stop id or name stops matching the pinned catalog or two
+  entries share a complex, which catches renames but not a changed list.
 
 ## 6. Static-hosting fit and pipeline
 
