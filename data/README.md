@@ -19,12 +19,15 @@ be accurate.
 - `stations/<id>.sources.json`: pinned extracts of the public sources, written only by
   `npm run data:stations:fetch -- --station <id>`. Each section records its query or URL, when it
   was fetched, and the source's own update time or version. The build never touches the network.
-- `stations/catalog/{stations,entrances,equipment,envelopes,osm-platforms,osm-tracks}.json`: citywide
-  pinned extracts (all 496 stations, 2,120 entrance rows, 759 E&E machines, 475 NYCT station
+- `stations/catalog/{stations,entrances,equipment,amenities,envelopes,osm-platforms,osm-tracks}.json`: citywide
+  pinned extracts (all 496 stations, 2,120 entrance rows, 759 E&E machines, 115 public restrooms at 59 stations, 475 NYCT station
   envelopes, and OSM platform and subway-track ways within 250 to 300 m of a station), written only
   by `npm run data:catalog:fetch`. Station, entrance and equipment rows share the keys `gtfsStopId`,
   `stationId` (the E&E station MRN without leading zeros) and `complexId`; envelopes and OSM ways
-  carry no station key. `catalog/stations.json` is also read by `npm run data` (borough and ADA status
+  carry no station key. `catalog/amenities.json` (dataset 6yjv-fk7g, restrooms of the latest month only, `{ id, type, stationId, month }`;
+  `stationId` is the MTA station id, one member's for a complex; no hours, ADA status or open/closed state, and the source's point is
+  the station's, not the restroom's) is not read by any build yet and is not in `CATALOG_FILES`; re-pin just it with
+  `npm run data:catalog:fetch -- --only amenities.json`, by hand (it is not part of the daily refresh). `catalog/stations.json` is also read by `npm run data` (borough and ADA status
   for `public/data/stations.json`) together with `stations/access-exceptions.json`; after a catalog refresh, run `npm run data:access` (offline). `npm run data:stations` reads
   `stations.json`, `entrances.json`, `equipment.json`, `osm-platforms.json` and `osm-tracks.json` (with the
   committed `public/data/shapes.json` and `stations.json`) to generate interiors; `envelopes.json` is not used. Those same `stations.json` and `equipment.json` also build
@@ -120,7 +123,8 @@ two mezzanines), which need hand authoring. Every position the template places i
    `osm-platforms.json` and `osm-tracks.json` for headroom) and the total is under 5 MB.
 2. Re-check the OPEN-NY Terms of Use and the datasets' overview PDFs for changes (links and quotes
    in `../docs/research/data-sources.md` §5.1).
-3. Review the diff of `stations/catalog/`. The E&E file changes most often (new machines).
+3. Review the diff of `stations/catalog/`. The E&E file changes most often (new machines). The amenities file changes
+   when a newer month is published (the dataset keeps every month; we pin the latest month's restrooms).
 4. Run `npm run data:access` (offline, no GTFS download) so `public/data/stations.json` picks up
    borough and ADA changes (`stationAccess.test.ts` fails while it is stale). If it names a GTFS
    station with no catalog row, or a catalog row with no GTFS station, edit
@@ -265,8 +269,8 @@ bump `TIMETABLE_FORMAT`) or the cap in one reviewed PR; don't loosen a check to 
 - The `osm` section of `*.sources.json` is © OpenStreetMap contributors, available under the
   ODbL 1.0 (see `../public/data/LICENSE-ODbL.md`).
 - The `entrances` and `equipment` sections are MTA data from data.ny.gov (datasets i9wp-a4ja and
-  94fv-bak7), as are `catalog/stations.json`, `catalog/entrances.json`, `catalog/equipment.json` and
-  `catalog/envelopes.json` (39hk-dx4f, i9wp-a4ja, 94fv-bak7, vkng-7ivg). Attribution: Metropolitan
+  94fv-bak7), as are `catalog/stations.json`, `catalog/entrances.json`, `catalog/equipment.json`,
+  `catalog/amenities.json` and `catalog/envelopes.json` (39hk-dx4f, i9wp-a4ja, 94fv-bak7, 6yjv-fk7g, vkng-7ivg). Attribution: Metropolitan
   Transportation Authority. No license is set on the datasets, so the OPEN-NY Terms of Use apply;
   see `../docs/research/data-sources.md` §5.1 (licensing decisions included).
 - `catalog/osm-platforms.json` and `catalog/osm-tracks.json` are © OpenStreetMap contributors,

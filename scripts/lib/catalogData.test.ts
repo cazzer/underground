@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { MIN_ENVELOPES } from './catalogEnvelopes.ts'
 import { stationsWithoutWay } from './catalogOsm.ts'
-import type { CatalogEntrance, CatalogEnvelope, CatalogEquipment, CatalogStation, OsmCatalogWay, SodaHeader } from './catalogTypes.ts'
+import type { CatalogAmenity, CatalogEntrance, CatalogEnvelope, CatalogEquipment, CatalogStation, OsmCatalogWay, SodaHeader } from './catalogTypes.ts'
 
 function load<T extends object>(name: string): T {
   return JSON.parse(readFileSync(new URL(`../../data/stations/catalog/${name}.json`, import.meta.url), 'utf8')) as T
@@ -12,6 +12,7 @@ function load<T extends object>(name: string): T {
 const stations = load<SodaHeader & { rows: CatalogStation[] }>('stations')
 const entrances = load<SodaHeader & { rows: CatalogEntrance[] }>('entrances')
 const equipment = load<SodaHeader & { rows: CatalogEquipment[] }>('equipment')
+const amenities = load<SodaHeader & { rows: CatalogAmenity[] }>('amenities')
 const envelopes = load<SodaHeader & { kept: number; rows: CatalogEnvelope[] }>('envelopes')
 interface OsmFile {
   baseTimestamp: string
@@ -27,12 +28,13 @@ describe('the pinned catalog', () => {
     expect(stations.rows).toHaveLength(stations.count)
     expect(entrances.rows).toHaveLength(entrances.count)
     expect(equipment.rows).toHaveLength(equipment.count)
+    expect(amenities.rows).toHaveLength(amenities.count)
     expect(envelopes.rows).toHaveLength(envelopes.kept)
     expect(envelopes.kept).toBeLessThanOrEqual(envelopes.count)
     expect(envelopes.kept).toBeGreaterThanOrEqual(MIN_ENVELOPES)
   })
   it('records its provenance', () => {
-    for (const h of [stations, entrances, equipment, envelopes]) {
+    for (const h of [stations, entrances, equipment, amenities, envelopes]) {
       expect(h.attribution).toBe('Metropolitan Transportation Authority')
       expect(h.terms).toMatch(/OPEN-NY/)
       expect(Date.parse(h.rowsUpdatedAt)).not.toBeNaN()
@@ -54,7 +56,14 @@ describe('the pinned catalog', () => {
       if (e.stationId !== null) expect(stationIds.has(e.stationId), `${e.code} station ${e.stationId}`).toBe(true)
     }
   })
+  it('ties every amenity to a station in the station list, in one month', () => {
+    const stationIds = new Set(stations.rows.map((s) => s.stationId))
+    for (const a of amenities.rows) expect(stationIds.has(a.stationId), `amenity ${a.id} station ${a.stationId}`).toBe(true)
+    expect(new Set(amenities.rows.map((a) => a.month)).size).toBe(1)
+    expect(amenities.url).toContain(amenities.rows[0]!.month)
+  })
   it('has unique keys', () => {
+    expect(new Set(amenities.rows.map((a) => a.id)).size).toBe(amenities.rows.length)
     expect(new Set(stations.rows.map((s) => s.gtfsStopId)).size).toBe(stations.rows.length)
     expect(new Set(equipment.rows.map((e) => e.code)).size).toBe(equipment.rows.length)
     const ways = [...platforms.ways, ...tracks.ways]

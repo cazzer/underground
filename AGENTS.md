@@ -99,6 +99,8 @@ so dev and preview serve under that path.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
   `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
+  `-- --only amenities.json` re-pins just `catalog/amenities.json` (dataset 6yjv-fk7g, restrooms of the latest month, MTA data under
+  OPEN-NY; no build reads it yet and it is not in `CATALOG_FILES`; the source has no hours or open status and gives the station's point).
 - `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
   within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
   `streetsData.test.ts` checks it. Rerun `data:streets`, `data:walk` and `data:search:streets` after it.
@@ -1245,7 +1247,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
-  - `data/stations/catalog/`: citywide pinned extracts (stations, entrances, equipment, envelopes,
+  - `data/stations/catalog/`: citywide pinned extracts (stations, entrances, equipment, amenities, envelopes,
     osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
     `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
     downstream), and OSM ways have none either (join by distance)

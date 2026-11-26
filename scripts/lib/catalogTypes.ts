@@ -73,6 +73,20 @@ export interface CatalogEquipment {
   platformAccess: boolean | null
 }
 
+export const AMENITY_TYPES = ['PUBLIC_RESTROOM'] as const
+
+/** One row of 6yjv-fk7g (MTA Subway Station Amenities), restrooms of one month only. Sorted by id. The station key
+ *  is the MRN of one member of a complex, and the source says nothing about where in the station the amenity is
+ *  or whether it is open. */
+export interface CatalogAmenity {
+  id: string
+  type: (typeof AMENITY_TYPES)[number]
+  /** The MTA station id (same number as `CatalogStation.stationId`, no leading zeros). */
+  stationId: string
+  /** The snapshot's month, `YYYY-MM-DD` (the first of the month). */
+  month: string
+}
+
 /** Rings are [lat, lon] pairs, closed (first point repeated last); a polygon's holes follow its outer ring. */
 export interface CatalogEnvelope {
   shapeId: string

@@ -1,8 +1,8 @@
 /** Pure trimming and validation of the raw data.ny.gov (SODA) responses for the station catalog.
  *  Everything fetched is untrusted: each field is checked here and failures name the row. */
 import { list, oneOf, optText, record, text } from './check.ts'
-import type { CatalogEntrance, CatalogEquipment, CatalogStation } from './catalogTypes.ts'
-import { STRUCTURES } from './catalogTypes.ts'
+import type { CatalogAmenity, CatalogEntrance, CatalogEquipment, CatalogStation } from './catalogTypes.ts'
+import { AMENITY_TYPES, STRUCTURES } from './catalogTypes.ts'
 import { entranceRow, epochToIso, num } from './stationSources.ts'
 
 const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
@@ -33,6 +33,19 @@ export function normalizeMrn(v: unknown, path = 'mrn'): string | null {
 export function parseCount(json: unknown, dataset: string): number {
   const row = record(list(json, `${dataset} count`)[0], `${dataset} count[0]`)
   return num(row.count, `${dataset} count[0].count`)
+}
+
+/** The `[{"max_month":"2026-10-01T00:00:00.000"}]` answer to `$select=max(month)`, as `2026-10-01`. */
+export function parseLatestMonth(json: unknown, dataset: string): string {
+  const row = record(list(json, `${dataset} max(month)`)[0], `${dataset} max(month)[0]`)
+  return monthOf(row.max_month, `${dataset} max(month)[0].max_month`)
+}
+
+/** `2026-10-01T00:00:00.000` to `2026-10-01`; anything but the first of a month is refused. */
+function monthOf(v: unknown, path: string): string {
+  const m = /^(\d{4}-\d{2})-01T00:00:00(?:\.000)?$/.exec(text(v, path))
+  if (m === null) throw new Error(`${path}: expected the first of a month at midnight, got ${JSON.stringify(v)}`)
+  return `${m[1]}-01`
 }
 
 /** A short or long page means the dataset changed mid-fetch or the limit cut it off; refuse either way. */
@@ -139,6 +152,30 @@ export function trimCatalogEquipment(rows: unknown): CatalogEquipment[] {
     .sort((a, b) => byText(a.code, b.code))
   out.forEach((e, i) => {
     if (i > 0 && out[i - 1]!.code === e.code) throw new Error(`equipment: duplicate code ${e.code}`)
+  })
+  return out
+}
+
+/** 6yjv-fk7g rows (restrooms, one month), sorted by id. The station is keyed by `station_mrn`, which is padded
+ *  or not like the E&E one, so it goes through `normalizeMrn`; name, lines, borough and the station's own point
+ *  are left out (the station list has them). A row with no id, an unknown type or no station throws. */
+export function trimCatalogAmenities(rows: unknown): CatalogAmenity[] {
+  const out = list(rows, 'amenities')
+    .map((r, i): CatalogAmenity => {
+      const at = `amenities[${i}]`
+      const row = record(r, at)
+      const stationId = normalizeMrn(row.station_mrn, `${at}.station_mrn`)
+      if (stationId === null) throw new Error(`${at}: has no station_mrn`)
+      return {
+        id: text(row.amenity_id, `${at}.amenity_id`),
+        type: oneOf(row.amenity_type, AMENITY_TYPES, `${at}.amenity_type`),
+        stationId,
+        month: monthOf(row.month, `${at}.month`),
+      }
+    })
+    .sort((a, b) => byText(a.id, b.id))
+  out.forEach((a, i) => {
+    if (i > 0 && out[i - 1]!.id === a.id) throw new Error(`amenities: duplicate id ${a.id}`)
   })
   return out
 }
