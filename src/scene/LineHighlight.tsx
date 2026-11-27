@@ -5,8 +5,7 @@
  * - theme.ts: `lineMono` (interface field and the three presets), `LinesMode`, `resolveLinesMode`,
  *   `linesMode`, `baseLineMix`
  * - renderOrder.ts: `RENDER_ORDER.lineFocus` (renumber the layers above it)
- * - AGENTS.md: the `?lines=` TEMPORARY note, `LineHighlight.tsx` in the directory map, and
- *   "line focus 2" in the render order list
+ * - AGENTS.md: `?lines=` in the TEMPORARY query flags bullet (Hard rules)
  */
 import { useFrame } from '@react-three/fiber'
 import { useMemo } from 'react'

@@ -19,8 +19,7 @@
  *   interiorDecks.ts, `deckSpans`, `strokeOrders` / `spanCarOrders`, the extra SpanCars layers in LiveTrains and
  *   `SplitAtY`)
  * - interiorModel.ts: the `interiorLook.under` check in `decksOf`
- * - AGENTS.md: the `?interior=` / `?interiorY=` TEMPORARY note, "padded hull" in the directory map
- *   (unless B wins), and "look C uses -0.6 and -0.3" in the rendering conventions (unless C wins)
+ * - AGENTS.md: `?interior=` / `?interiorY=` in the TEMPORARY query flags bullet (Hard rules)
  */
 export interface InteriorLook {
   /** A: a screen-wide veil dims the street; B: a footprint-shaped cutaway; C: no veil. */

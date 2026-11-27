@@ -3,7 +3,7 @@
  * loads no tiles), for side-by-side comparison and perf checks. Once decided, remove together:
  * - this file
  * - Scene.tsx: the `basemapLook` import and the `basemapConfig` switch (use BASEMAP directly)
- * - AGENTS.md: the `?basemap=off` TEMPORARY note in the theme bullets
+ * - AGENTS.md: `?basemap=off` in the TEMPORARY query flags bullet (Hard rules)
  */
 export type BasemapLook = 'on' | 'off'
 
