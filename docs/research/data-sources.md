@@ -414,7 +414,8 @@ Both are called only by the Worker's `GET /geocode` (never by the client), with 
   not a station).
 - **Hand-authored** into `data/stations/customer-service-centers.json` (29 entries), because no open dataset of 24-hour booths
   exists. This is MTA website content, not the open-data feeds (OPEN-NY terms do not obviously cover it) and its terms are not
-  reviewed; a licensing card will be filed before anything from it ships.
+  reviewed. Licensing decision (underground-enp.7, 2026-11-27, Caleb): ship the station ids and the verbatim "Enter at X and Y"
+  lines, credited with the page URL and retrieval date in `amenities.json`'s attribution.
 - Station agents now work outside the booths, per the MTA press release
   https://new.mta.info/press-release/mta-announces-station-agents-begin-assisting-riders-outside-of-booths-week (the 2023
   rollout; the page 301s to www.mta.info and answered 403 to automated fetch, so its text was not read here). So say "customer
