@@ -81,15 +81,18 @@ export function useStationWalkLoads(stationIds: readonly StationId[]): ReadonlyM
     const timers: ReturnType<typeof setTimeout>[] = []
     for (const id of ids) {
       if (cache.peek(id) !== undefined) continue
-      timers.push(
-        setTimeout(() => {
-          console.warn(`Walk graph of station ${id} still loading after ${WALK_DEADLINE_MS} ms; its walk draws without it`)
-          end(id, 'late')
-        }, WALK_DEADLINE_MS),
-      )
+      const timer = setTimeout(() => {
+        console.warn(`Walk graph of station ${id} still loading after ${WALK_DEADLINE_MS} ms; its walk draws without it`)
+        end(id, 'late')
+      }, WALK_DEADLINE_MS)
+      timers.push(timer)
       cache.get(id).then(
-        () => end(id, 'loaded'),
+        () => {
+          clearTimeout(timer)
+          end(id, 'loaded')
+        },
         (err: unknown) => {
+          clearTimeout(timer)
           console.error(`Failed to load the walk graph of station ${id}`, err)
           end(id, 'failed')
         },
