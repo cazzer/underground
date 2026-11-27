@@ -39,8 +39,8 @@ describe('tripDashBuffers', () => {
   })
 
   it("draws a place's walk after the stations' walks, along its path or straight, restarting each dash at 0", () => {
-    const toPlace: PlaceWalkSpan = { end: 'to', from: { x: 70, z: 0 }, to: { x: 70, z: 20 }, path: [{ x: 70, z: 0 }, { x: 80, z: 0 }, { x: 80, z: 20 }] }
-    const fromPlace: PlaceWalkSpan = { end: 'from', from: { x: -10, z: 0 }, to: { x: 0, z: 0 } }
+    const toPlace: PlaceWalkSpan = { end: 'to', from: { x: 70, z: 0 }, to: { x: 70, z: 20 }, path: [{ x: 70, z: 0 }, { x: 80, z: 0 }, { x: 80, z: 20 }], seconds: 30, estimated: false }
+    const fromPlace: PlaceWalkSpan = { end: 'from', from: { x: -10, z: 0 }, to: { x: 0, z: 0 }, seconds: 10, estimated: true }
     const b = tripDashBuffers([walk(0, 30), ...[toPlace, fromPlace]], [], PINK, colorOf)
     near(b.positions, [0, 0, 0, 30, 0, 0, 70, 0, 0, 80, 0, 0, 80, 0, 0, 80, 0, 20, -10, 0, 0, 0, 0, 0])
     near(b.distances, [0, 30, 0, 10, 10, 30, 0, 10])

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { StationId } from './schema'
 import { chooseExit, quickestExit, type ExitChoice, type ExitResult } from '../lib/exitChoice'
 import { drawnExitStop, exitLineView, finalRideStops, type ExitLabel, type ExitLineView, type StreetSource } from '../lib/exitView'
 import { stationOfStop } from '../lib/live/arrivals'
@@ -10,8 +11,7 @@ import { plannable, tripKey, type TripEnds, type TripPlanState } from '../lib/tr
 import { interiorIdOf, type IndexLoad } from './interiorLoad'
 import { useInteriorModel } from './useStationInterior'
 import { useStationStreetsLoad, type StreetLayer } from './useStationStreets'
-import type { WalkLoad } from './useStationWalk'
-import type { WalkGraph } from './walkSchema'
+import { walkLoadAt, type WalkLoad } from './useStationWalk'
 
 interface TripExitInput {
   /** The trip panel is open (covered by a train panel or not). */
@@ -29,8 +29,8 @@ interface TripExitInput {
   /** A searched place the To end was picked from (a6m): the exit is chosen for the walk to it, and a street-file walk graph
    *  is read for that; null for none (the quickest way out). */
   destination: Ground | null
-  /** The load of the To station's walk graph (`useStationWalkLoad`), for `destination`; null with none. */
-  walk: WalkLoad | null
+  /** The load of the To station's walk graph (`useStationWalkLoads`), for `destination`; null with none. */
+  walk: ReadonlyMap<StationId, WalkLoad> | null
 }
 
 export interface TripExit {
@@ -57,11 +57,6 @@ function safely(stopId: string, run: () => ExitResult): ExitChoice | null {
   }
 }
 
-/** Only the graph of the stop's own station answers for it; another member of the complex estimates its walk. */
-function graphAt(graph: WalkGraph | null, stopId: string): WalkGraph | null {
-  return graph !== null && graph.stationId === stationOfStop(stopId) ? graph : null
-}
-
 const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== null && l !== undefined
 
 /**
@@ -76,9 +71,10 @@ const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== n
  *
  * With a `destination` (the searched place the To end was picked from, a6m) the selected journey's exit is the one
  * that minimizes the walk inside the station plus the walk to it (`chooseExit`, over the station's walk graph when the
- * place is within its radius, else a straight estimate); the result waits until that graph has settled, so the exit
- * never changes after it is drawn. Every stop the panel lists gets it (a stop at another member of the complex estimates its walk), and with no destination the quickest way out.
- * This hook loads no walk graph itself: `walk` is `useStationWalkLoad`'s, for a station the journey reaches the end at.
+ * place is within its radius, else a straight estimate). Every stop the panel lists gets it, each reading its own
+ * station's graph from `walk` (`useStationWalkLoads`; this hook loads none itself) and waiting for that one alone, so a
+ * shard still loading leaves the other stops' lines in place; the exit never changes after it is drawn (a graph past
+ * its deadline is ignored). With no destination every stop gets the quickest way out.
  */
 export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allowed, destination, walk }: TripExitInput): TripExit | null {
   const ready = allowed && open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
@@ -95,10 +91,8 @@ export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allo
   // Nearly redundant since 2q7.32: every member's street file carries its complex's entrances (minus shared elevators
   // and far ones; a lead's file, which the covering file is, keeps the members' elevators), so the covering file alone usually has the exit; this second read of the member's own file stays as the fallback.
   const memberStreets = useStationStreetsLoad(interiorId && stationId !== interiorId ? stationId : null)
-  const walkSettled = destination === null || walk === null || walk.settled
-  const settled = fileStreets.settled && memberStreets.settled && walkSettled
+  const settled = fileStreets.settled && memberStreets.settled
   const [destX, destZ] = [destination?.x, destination?.z]
-  const graph = walk?.graph ?? null
   const outages = joinStationOutages(model?.interior ?? null, ene, nowS)
   const outKey = outages.outIds.join(',')
   // As the station panel: still connecting says nothing; only stale, failed or mismatched data is "unknown".
@@ -116,16 +110,19 @@ export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allo
     const file = first?.file ?? null
     served.forEach(({ stopId }) => {
       const toPoint = destX !== undefined && destZ !== undefined
+      // A stop reads its own station's graph, and waits for it alone: another station's shard still loading leaves its line.
+      const load = toPoint ? walkLoadAt(walk, stopId) : null
+      if (load !== null && !load.settled) return
       out.set(
         stopId,
         safely(stopId, () =>
-          toPoint ? chooseExit({ interior, stopId, destination: { x: destX, z: destZ }, walk: graphAt(graph, stopId), streets: file, closed }) : quickestExit({ interior, stopId, streets: file, closed }),
+          toPoint ? chooseExit({ interior, stopId, destination: { x: destX, z: destZ }, walk: load?.graph ?? null, streets: file, closed }) : quickestExit({ interior, stopId, streets: file, closed }),
         ),
       )
     })
     return out
     // `served` is read through stopIdsKey.
-  }, [stopIdsKey, model, settled, first, outKey, destX, destZ, graph])
+  }, [stopIdsKey, model, settled, first, outKey, destX, destZ, walk])
 
   return useMemo(() => {
     if (!model || !interiorId || served.length === 0 || !settled) return null

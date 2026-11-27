@@ -32,7 +32,7 @@ const place = ((): Ground => {
   })
   return { x: walk.anchor.x + walk.x[best]!, z: walk.anchor.z + walk.z[best]! }
 })()
-const placeEnd: PlaceEnd = { place, stationId: 'L08', stop: 'L08N', point: station }
+const placeEnd: PlaceEnd = { place, stationId: 'L08', stop: 'L08N', point: station, stationIds: ['L08'] }
 const straight = (a: Ground, b: Ground): number => Math.hypot(a.x - b.x, a.z - b.z)
 const graph = { graph: walk, settled: true }
 
@@ -76,6 +76,6 @@ describe('a place walk at Bedford Av', () => {
   it('past the shard radius, a straight line', () => {
     const far = { x: station.x + walk.radiusM + 100, z: station.z }
     const s = placeWalkSpan({ end: 'to', place: { ...placeEnd, place: far }, viaInterior: false, interiorOrigin: null, choice: undefined, graph })
-    expect(s).toEqual({ end: 'to', from: station, to: far })
+    expect(s).toMatchObject({ end: 'to', from: station, to: far, estimated: true })
   })
 })

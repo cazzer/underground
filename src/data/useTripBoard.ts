@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { StationId } from './schema'
 import { boardLineKey, drawnBoardStop, firstRideStops, type BoardLine } from '../lib/boardView'
 import { chooseEntry, quickestEntry, type BoardChoice, type BoardResult } from '../lib/exitChoice'
 import { exitLineView, type ExitLabel, type StreetSource } from '../lib/exitView'
@@ -12,8 +13,7 @@ import type { StationInterior } from './stationSchema'
 import { interiorIdOf, type IndexLoad } from './interiorLoad'
 import { useInteriorModel } from './useStationInterior'
 import { useStationStreetsLoad, type StreetLayer } from './useStationStreets'
-import type { WalkLoad } from './useStationWalk'
-import type { WalkGraph } from './walkSchema'
+import { walkLoadAt, type WalkLoad } from './useStationWalk'
 
 interface TripBoardInput {
   /** The trip panel is open (covered by a train panel or not). */
@@ -32,8 +32,8 @@ interface TripBoardInput {
   allowed: boolean
   /** A searched place the From end was picked from (a6m): the way in is chosen for the walk from it; null for none (the quickest way in). */
   origin: Ground | null
-  /** The load of the From station's walk graph (`useStationWalkLoad`), for `origin`; null with none. */
-  walk: WalkLoad | null
+  /** The load of the From station's walk graph (`useStationWalkLoads`), for `origin`; null with none. */
+  walk: ReadonlyMap<StationId, WalkLoad> | null
 }
 
 export interface TripBoard {
@@ -65,11 +65,6 @@ function layoutHasNoEntry(interior: StationInterior, stopId: string): boolean {
   return r?.kind === 'none' && r.reason === 'no-entrance'
 }
 
-/** Only the graph of the stop's own station answers for it; another member of the complex estimates its walk. */
-function graphAt(graph: WalkGraph | null, stopId: string): WalkGraph | null {
-  return graph !== null && graph.stationId === stationOfStop(stopId) ? graph : null
-}
-
 const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== null && l !== undefined
 
 /**
@@ -78,11 +73,12 @@ const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== n
  * its way-in line. Nothing loads while `allowed` is false (a From filled from a location fix that the visitor has not
  * focused or picked: the request would name the fix's nearest station), and a journey that first walks to another
  * station gets no way in (that station comes from the plan). With an `origin` (the searched place the From end was
- * picked from, a6m) the selected journey's way in is the one that minimizes the walk from it plus the time inside
- * (`chooseEntry`), waiting for the walk graph to settle; this hook loads no walk graph itself (`walk` is
- * `useStationWalkLoad`'s). Every stop the panel lists gets it (a stop at another member of the complex estimates its
- * walk), and with no origin the quickest way in. Machines out of service are avoided; with no fresh outage data none
- * count as closed, and the line says a machine's status is unknown when the station panel would. Rebuilt only when what it reads changes, so refreshes keep the choice object and the drawn path.
+ * picked from, a6m) every stop the panel lists gets the way in that minimizes the walk from it plus the time inside
+ * (`chooseEntry`), each reading its own station's graph from `walk` (`useStationWalkLoads`; this hook loads none
+ * itself) and waiting for that one alone, so a shard still loading leaves the other stops' lines in place. With no
+ * origin every stop gets the quickest way in. Machines out of service are avoided; with no fresh outage data none
+ * count as closed, and the line says a machine's status is unknown when the station panel would. Rebuilt only when
+ * what it reads changes, so refreshes keep the choice object and the drawn path.
  */
 export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fromStations, allowed, origin, walk }: TripBoardInput): TripBoard | null {
   const ready = allowed && open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
@@ -96,10 +92,8 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
   const model = useInteriorModel(interiorId)
   const fileStreets = useStationStreetsLoad(interiorId)
   const memberStreets = useStationStreetsLoad(interiorId && stationId !== interiorId ? stationId : null)
-  const walkSettled = origin === null || walk === null || walk.settled
-  const settled = fileStreets.settled && memberStreets.settled && walkSettled
+  const settled = fileStreets.settled && memberStreets.settled
   const [originX, originZ] = [origin?.x, origin?.z]
-  const graph = walk?.graph ?? null
   const outages = joinStationOutages(model?.interior ?? null, ene, nowS)
   const outKey = outages.outIds.join(',')
   const known = outages.panel.kind !== 'unknown'
@@ -115,16 +109,19 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
     served.forEach(({ stopId }) => {
       const interior = model.interior
       const fromPoint = originX !== undefined && originZ !== undefined
+      // A stop reads its own station's graph, and waits for it alone: another station's shard still loading leaves its line.
+      const load = fromPoint ? walkLoadAt(walk, stopId) : null
+      if (load !== null && !load.settled) return
       out.set(
         stopId,
         safely(stopId, () =>
-          fromPoint ? chooseEntry({ interior, stopId, origin: { x: originX, z: originZ }, walk: graphAt(graph, stopId), streets, closed }) : quickestEntry({ interior, stopId, streets, closed }),
+          fromPoint ? chooseEntry({ interior, stopId, origin: { x: originX, z: originZ }, walk: load?.graph ?? null, streets, closed }) : quickestEntry({ interior, stopId, streets, closed }),
         ),
       )
     })
     return out
     // `served` is read through stopIdsKey.
-  }, [stopIdsKey, model, settled, first, outKey, originX, originZ, graph])
+  }, [stopIdsKey, model, settled, first, outKey, originX, originZ, walk])
 
   return useMemo(() => {
     if (!model || !interiorId || served.length === 0 || !settled) return null

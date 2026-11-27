@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { stationOfStop } from '../lib/live/arrivals'
+import { transferPairStations, transferStationIds } from '../lib/transferPairs'
 import { createInteriorCache } from './interiorCache'
 import { decodeStationWalk, loadStationWalk } from './loadStationWalk'
 import type { StationId, Transfer } from './schema'
-import { transferPairStations, transferStationIds } from '../lib/transferPairs'
 import type { WalkGraph } from './walkSchema'
 
 const BASE_URL = import.meta.env.BASE_URL
@@ -24,7 +25,7 @@ export interface TransferWalkLoad {
  * Loads the walk graphs of the fixed set of stations in a transfer between two complexes (85r), through the shared
  * cache; resolves once every load has settled. The set comes from the transfers file and the complexes alone: this
  * takes no station id, so the journey, the ends and the location fix cannot key it. See `useTransferWalks` for when
- * it runs and why that is allowed; everything else goes through `useStationWalk`.
+ * it runs and why that is allowed; everything else goes through `useStationWalkLoads`.
  */
 export function loadTransferWalkGraphs(
   transfers: readonly Pick<Transfer, 'from' | 'to'>[],
@@ -36,61 +37,82 @@ export function loadTransferWalkGraphs(
 }
 
 export interface WalkLoad {
-  /** The station's walk graph once loaded; null while loading, with no walk file, after a failure (logged) or with no station. */
+  /** The station's walk graph once loaded; null while loading, with no walk file, after a failure (logged) or when it came after `WALK_DEADLINE_MS`. */
   graph: WalkGraph | null
-  /** The load has resolved, failed or run past `WALK_DEADLINE_MS` (or there is no station): what is drawn from it may be decided. */
+  /** The load has resolved, failed or run past `WALK_DEADLINE_MS`: what is drawn from it may be decided. */
   settled: boolean
 }
 
-/** A hung shard stops holding a drawing back after this long: it then draws without the graph (a late graph still joins). */
+/** A hung shard stops holding a drawing back after this long: it then draws without the graph. */
 export const WALK_DEADLINE_MS = 3000
 
+const PENDING: WalkLoad = { graph: null, settled: false }
+const WITHOUT: WalkLoad = { graph: null, settled: true }
+
+/** How a load ended before it was in the cache for the render: it resolved (the cache holds it), failed, or ran past the deadline. */
+type Ended = 'loaded' | 'failed' | 'late'
+
 /**
- * A station's walk graph, loaded through the shared cache, nothing fetched until
- * `stationId` is set. `settled` is true once the load has resolved, failed (logged; the next time the station is asked
- * for, it is retried) or run past `WALK_DEADLINE_MS`, so a drawing that depends on it can wait for the answer instead of
- * drawing straight and swapping.
+ * The walk graphs of `stationIds`, loaded through the shared cache; nothing is fetched for an empty list. Each entry is
+ * `settled` once its load has resolved, failed (logged; the next time the station is asked for it is retried) or run
+ * past `WALK_DEADLINE_MS`, so a drawing that depends on it waits for the answer instead of drawing straight and
+ * swapping. A load that misses the deadline is frozen: a graph that arrives later is ignored while the station stays in
+ * the list, so a walk or exit already drawn without it never changes under the visitor. Asking again after the station
+ * left the list (the trip closed, other ends) takes whatever the cache holds.
  *
- * Privacy: the request reveals the station id to the static host, so pass only a station the user picked, focused, or
- * chose as a trip endpoint, or the station a journey reaches that end at (a6m: the walk between a searched place and
- * its end), never the station nearest a location fix without a user action. The one other caller is
- * `loadTransferWalkGraphs` above (85r). See loadStationWalk.ts.
+ * Privacy: the requests reveal the station ids to the static host, so pass only stations the user picked, focused or
+ * chose as a trip endpoint, or (a6m) the stations of the end's own complex that the trip's journeys reach that end
+ * at, for an end set from a place the visitor searched; never the station nearest a location fix without a user
+ * action. The one other caller is `loadTransferWalkGraphs` above (85r). See loadStationWalk.ts.
  */
-export function useStationWalkLoad(stationId: string | null): WalkLoad {
-  // The last station whose load settled, or whose deadline passed: set only to re-render.
-  const [settledId, setSettledId] = useState<string | null>(null)
+export function useStationWalkLoads(stationIds: readonly StationId[]): ReadonlyMap<StationId, WalkLoad> {
+  const key = stationIds.join(',')
+  const [ended, setEnded] = useState<ReadonlyMap<StationId, Ended>>(new Map())
 
   useEffect(() => {
-    if (!stationId || cache.peek(stationId) !== undefined) return
+    const ids = key === '' ? [] : key.split(',')
     let current = true
-    // A retry after a failure starts unsettled again.
-    setSettledId(null)
-    const settle = (): void => {
-      if (current) setSettledId(stationId)
+    // Forget the endings of stations no longer asked for, so asking again starts clean.
+    setEnded((prev) => (prev.size === 0 || [...prev.keys()].every((id) => ids.includes(id)) ? prev : new Map([...prev].filter(([id]) => ids.includes(id)))))
+    // The first ending stands: a graph that resolves after the deadline does not replace 'late'.
+    const end = (id: StationId, how: Ended): void => {
+      if (current) setEnded((prev) => (prev.has(id) ? prev : new Map(prev).set(id, how)))
     }
-    const timer = setTimeout(() => {
-      console.warn(`Walk graph of station ${stationId} still loading after ${WALK_DEADLINE_MS} ms; its walk draws without it`)
-      settle()
-    }, WALK_DEADLINE_MS)
-    cache.get(stationId).then(
-      () => {
-        clearTimeout(timer)
-        settle()
-      },
-      (err: unknown) => {
-        clearTimeout(timer)
-        console.error(`Failed to load the walk graph of station ${stationId}`, err)
-        settle()
-      },
-    )
+    const timers: ReturnType<typeof setTimeout>[] = []
+    for (const id of ids) {
+      if (cache.peek(id) !== undefined) continue
+      timers.push(
+        setTimeout(() => {
+          console.warn(`Walk graph of station ${id} still loading after ${WALK_DEADLINE_MS} ms; its walk draws without it`)
+          end(id, 'late')
+        }, WALK_DEADLINE_MS),
+      )
+      cache.get(id).then(
+        () => end(id, 'loaded'),
+        (err: unknown) => {
+          console.error(`Failed to load the walk graph of station ${id}`, err)
+          end(id, 'failed')
+        },
+      )
+    }
     return () => {
       current = false
-      clearTimeout(timer)
+      timers.forEach(clearTimeout)
     }
-  }, [stationId])
+  }, [key])
 
-  const peeked = stationId ? cache.peek(stationId) : null
-  const graph = peeked ?? null
-  const settled = !stationId || peeked !== undefined || settledId === stationId
-  return useMemo(() => ({ graph, settled }), [graph, settled])
+  return useMemo(() => {
+    const out = new Map<StationId, WalkLoad>()
+    for (const id of key === '' ? [] : key.split(',')) {
+      const how = ended.get(id)
+      const peeked = cache.peek(id)
+      out.set(id, how === 'late' || how === 'failed' ? WITHOUT : peeked !== undefined ? { graph: peeked, settled: true } : PENDING)
+    }
+    return out
+  }, [key, ended])
+}
+
+/** The load of the station a stop stands at, from `useStationWalkLoads`; null with no map, or for a station it was not asked about. */
+export function walkLoadAt(loads: ReadonlyMap<StationId, WalkLoad> | null, stopId: string): WalkLoad | null {
+  return loads?.get(stationOfStop(stopId)) ?? null
 }
