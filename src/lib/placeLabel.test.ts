@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GeocodeResult } from '../data/realtime'
 import type { Station } from './network'
-import { displayCase, distanceText, nearNote, placePick, placeText } from './placeLabel'
+import { displayCase, distanceText, nearNote, placePick, placeText, tripPlaceOf } from './placeLabel'
 import { toGround } from './projection'
 
 describe('displayCase', () => {
@@ -113,6 +113,12 @@ describe('placePick', () => {
     expect(nearNote(pick('street'))).toBe('Broadway, Brooklyn')
     expect(nearNote(pick('intersection'))).toBe('Broadway')
     expect(nearNote(pick('address'))).toBe('Broadway')
+  })
+
+  it("makes a trip place of a pick: the note and the place's own point (never a fix)", () => {
+    const r = result('120 BROADWAY, Manhattan')
+    const pick = placePick(r, placeText(r), stations, groups)!
+    expect(tripPlaceOf(pick)).toEqual({ note: '120 Broadway', ground: pick.ground })
   })
 
   it('is null for an empty network', () => {
