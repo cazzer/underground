@@ -83,9 +83,6 @@ export const RENDER_ORDER = {
   // The streets above the interior veil, under the interior strokes, while the interior is loaded under look A (at the
   // fainter veiled stroke, streetVeil.ts); forced either way by the TEMPORARY ?streets= (streetsLook.ts).
   streetsOver: 7.5,
-  // The focused interior's footprint at street level while a neighbour's interior shows (InteriorFocusFrame.tsx): over
-  // the veil and the veiled streets, under the trip's walks over the veil, the entrance marks and every interior stroke.
-  interiorFocusFrame: 7.52,
   // The street file's entrance marks the interior doesn't draw itself: above the veil like the interior's own
   // entrance squares, under its strokes.
   // The trip's walks above the veil while the focused interior is loaded under look A and revealing (as the streets go to

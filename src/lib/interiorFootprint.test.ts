@@ -4,7 +4,7 @@ import { NOT_INTERIOR_FILES } from '../../scripts/lib/stationIndex.ts'
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
 import { insidePolygon } from './footprintPick'
 import { fixture } from './interiorFixture'
-import { FOCUS_FRAME_PAD_M, FOOTPRINT_PAD_M, footprintLoopBuffers, interiorFootprint } from './interiorFootprint'
+import { FOCUS_FRAME_PAD_M, FOOTPRINT_PAD_M, interiorFootprint } from './interiorFootprint'
 
 const ORIGIN = { x: 500, z: -300 }
 
@@ -76,19 +76,5 @@ describe('interiorFootprint', () => {
         for (const p of pointsOf(interior)) expect(depthInside(p, fp.hull), `${f} ${pad} m ${p}`).toBeGreaterThan(pad - 1e-6)
       }
     }
-  })
-})
-
-describe('footprintLoopBuffers', () => {
-  it('closes the hull at street level in one colour, solid', () => {
-    const hull: LocalPoint[] = [
-      [0, 0],
-      [4, 0],
-      [4, 3],
-    ]
-    const b = footprintLoopBuffers(hull, [0.1, 0.2, 0.3])
-    expect([...b.positions]).toEqual([0, 0, 0, 4, 0, 0, 4, 0, 0, 4, 0, 3, 4, 0, 3, 0, 0, 0])
-    expect(Array.from(b.colors, (c) => +c.toFixed(5))).toEqual(Array(6).fill([0.1, 0.2, 0.3]).flat())
-    expect([...b.distances]).toEqual([0, 0, 0, 0, 0, 0])
   })
 })

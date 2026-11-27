@@ -2,7 +2,7 @@ import { Color } from 'three'
 import type { Level, LocalPoint, StationInterior } from '../data/stationSchema'
 import { stationAxis } from '../lib/interiorAxis'
 import { levelFadeShares } from '../lib/interiorFade'
-import { FOCUS_FRAME_PAD_M, footprintLoopBuffers, interiorFootprint, type Footprint } from '../lib/interiorFootprint'
+import { interiorFootprint, type Footprint } from '../lib/interiorFootprint'
 import { interiorFocusAnchor, levelLabels, paddedHull, type FocusAnchor, type LevelLabel } from '../lib/interiorFraming'
 import { outlineSamples, type OutlineSamples } from '../lib/interiorOutline'
 import { interiorDecks, strokeBandOf, trackDecks } from '../lib/interiorDecks'
@@ -57,8 +57,6 @@ export interface InteriorModel {
   outline: OutlineSamples
   /** Its ground footprint (interiorFootprint, FOOTPRINT_PAD_M): a neighbour's opens it on a tap (ScenePicker). */
   footprint: Footprint
-  /** The focused one's frame (InteriorFocusFrame): its own wider hull (FOCUS_FRAME_PAD_M) as a loop at street level in theme.stationFocus, group-local. */
-  focusFrame: Buffers
 }
 
 const ROLE_TOKEN: Record<InteriorRole, string> = {
@@ -173,7 +171,6 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
   const origin = toGround(interior.anchor)
   const decks = decksOf(interior)
   const footprint = interiorFootprint(interior, yScale, origin)
-  const focus = new Color(theme.stationFocus)
   const hull =
     interiorLook.veil === 'footprint'
       ? paddedHull([...interior.platforms.flatMap((p) => p.outline), ...interior.slabs.flatMap((s) => s.outline)], HULL_PAD)
@@ -196,6 +193,5 @@ export function buildInteriorModel(interior: StationInterior): InteriorModel {
     entrances: interior.entrances.map(({ x, z, type }) => ({ x, z, type })),
     outline: outlineSamples(interior, yScale),
     footprint,
-    focusFrame: footprintLoopBuffers(interiorFootprint(interior, yScale, origin, FOCUS_FRAME_PAD_M).hull, [focus.r, focus.g, focus.b]),
   }
 }

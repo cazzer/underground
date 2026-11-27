@@ -211,7 +211,6 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
             path={m === interior ? path : null}
             presence={presences.get(m.stationId)!}
             labels={m === interior}
-            frame={m === interior ? scene.store : null}
           />
         </ErrorBoundary>
       ))}
