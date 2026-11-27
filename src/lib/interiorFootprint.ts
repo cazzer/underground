@@ -9,7 +9,7 @@ export const FOCUS_FRAME_PAD_M = 14
 
 /**
  * A drawn interior's ground footprint (o3r.7): the convex hull of its platform and slab outlines and its entrances,
- * grown by a pad, plus its vertical extent. The focused interior's frame draws it; a tap inside a neighbour's opens it.
+ * grown by a pad, plus its vertical extent. A tap inside a neighbour's opens it.
  */
 export interface Footprint {
   /** Scene position of the interior's local origin (its group). */

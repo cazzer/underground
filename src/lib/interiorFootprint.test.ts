@@ -58,14 +58,14 @@ describe('interiorFootprint', () => {
     expect(() => interiorFootprint(bare, 2, ORIGIN)).toThrow(/X01/)
   })
 
-  it('holds every point at least the focus frame pad inside the frame hull, past the pick footprint', () => {
+  it('holds every point at least the wider FOCUS_FRAME_PAD_M inside a hull built with it, past the pick footprint', () => {
     const interior = fixture()
     const frame = interiorFootprint(interior, 2, ORIGIN, FOCUS_FRAME_PAD_M)
     expect(FOCUS_FRAME_PAD_M).toBeGreaterThan(FOOTPRINT_PAD_M)
     for (const p of pointsOf(interior)) expect(depthInside(p, frame.hull), `${p}`).toBeGreaterThanOrEqual(FOCUS_FRAME_PAD_M - 1e-9)
   })
 
-  it('is built for every shipped interior, the pick footprint and the frame hull holding all its points', () => {
+  it('is built for every shipped interior, the pick footprint and the FOCUS_FRAME_PAD_M hull holding all its points', () => {
     const dir = new URL('../../public/data/stations/', import.meta.url)
     const files = readdirSync(dir).filter((f) => f.endsWith('.json') && !NOT_INTERIOR_FILES.has(f))
     expect(files.length).toBeGreaterThan(200)
