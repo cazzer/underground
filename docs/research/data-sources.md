@@ -90,6 +90,7 @@ Files that matter:
 | GTFS | One coordinate per station | No levels, pathways, or entrances |
 | NY Open Data: Subway Stations [`39hk-dx4f`](https://data.ny.gov/Transportation/MTA-Subway-Stations/39hk-dx4f/about_data) | `gtfs_stop_id`, `complex_id`, `structure` (Subway/Elevated/Open Cut/…), ADA per direction | No layout |
 | Subway Entrances and Exits 2024 [`i9wp-a4ja`](https://data.ny.gov/Transportation/MTA-Subway-Entrances-and-Exits-2024/i9wp-a4ja/about_data) | Entrance lat/lon, type (Stair, Elevator, Escalator, …), entry/exit, `gtfs_stop_id` | Static; no link to mezzanine or platform |
+| Subway Station Amenities `6yjv-fk7g` (monthly snapshots since May 2026; every month so far lists the same 115 `PUBLIC_RESTROOM` rows (same amenity ids) at 59 stations, alongside 10 other amenity types: countdown clocks, help points, turnstiles and so on) | Per row `amenity_id`, `amenity_type`, `station_mrn`, `month`, plus the station's name, lines, borough and point. We pin restrooms of the latest month only (`catalog/amenities.json`, read by `npm run data:stations` into `public/data/stations/amenities.json`; re-pinned by hand with `npm run data:catalog:fetch -- --only amenities.json`) | The overview PDF: counts "reflect asset inventory rather than availability", the dataset "does not capture real-time operational status", only in-service assets are listed; the coordinates are the station's, "not necessarily the exact physical location of the amenity"; no hours or ADA status. A complex is keyed by one member's MRN (the same number as `catalog/stations.json` `stationId`, unpadded). Older months add nothing to a latest-month pin while the restroom list stays the same. OPEN-NY terms, attribution MTA |
 | E&E Asset Inventory `94fv-bak7` (updated daily) | Lat/lon per machine, `escalator_rise` (messy units), mezzanine/platform/street access flags | Messy units; MRN station codes |
 | MTA E&E feeds: `nyct%2Fnyct_ene_equipments.json`, `nyct%2Fnyct_ene.json` (outages), `…_upcoming.json` | 707 machines with `elevatorsgtfsstopid`. The `serving` text gives topology, e.g. Bedford EL359 "…to mezzanine", EL358 "mezzanine to platform". Live outages. | Free text; no stairs. The outage feed needs no API key (checked 2026-11-22), but its content-type is the literal `${header.s3FileType}` (never check it), and `isupcomingoutage` is unreliable (started outages flagged `Y`, overdue ones `N`) |
 | OSM (Overpass) | `railway=platform` closed polygons with `level`; `railway=subway` tracks; entrances; some `highway=steps` | No mezzanine/corridor areas; steps mostly lack levels |
@@ -138,19 +139,20 @@ All five are ADA-accessible in `39hk-dx4f`.
 
 ### 5.1 Station catalog datasets and licensing decisions
 
-`npm run data:catalog:fetch` pins four data.ny.gov datasets, plus OSM platform and track ways, into
+`npm run data:catalog:fetch` pins five data.ny.gov datasets, plus OSM platform and track ways, into
 `data/stations/catalog/` (sizes and counts: `data/README.md`). The `license` field in each dataset's
 view metadata (`https://data.ny.gov/api/views/<id>.json`) is **not set** for any of them, so the
-governing terms are the site-wide OPEN-NY Terms of Use. Rows updated are as of the 2026-11-21 fetch.
+governing terms are the site-wide OPEN-NY Terms of Use. Rows updated are as of the 2026-11-21 fetch (`6yjv-fk7g`: fetched and its PDF read 2026-11-26).
 
 | Dataset | Title | License field | Attribution | Rows updated | Overview PDF, "Limitations of Data Use" |
 |---|---|---|---|---|---|
 | `39hk-dx4f` | MTA Subway Stations | none | Metropolitan Transportation Authority, `https://www.mta.info/open-data` | 2026-11-21 | "There are no limitations on the data at this time." |
 | `i9wp-a4ja` | MTA Subway Entrances and Exits: 2024 | none | same | 2025-12-05 | "None." |
 | `94fv-bak7` | MTA Subway Elevator and Escalator Asset Inventory | none | same | 2026-11-21 (daily) | "There are no limitations on the data at this time." |
+| `6yjv-fk7g` | MTA Subway Station Amenities: Beginning May 2026 | none | same | 2026-11-01 (monthly) | "There are no limitations on the data at this time." |
 | `vkng-7ivg` | MTA Subway and Rail Station Envelopes | none | same | 2025-08-26 | "There are no limitations on the data at this time." It says the polygons are "for informational purposes only" |
 
-The four overview PDFs (read 2026-11-21 from data.ny.gov) state no usage limit that conflicts with our use.
+The overview PDFs (read 2026-11-21 from data.ny.gov; `6yjv-fk7g`'s on 2026-11-26) state no usage limit that conflicts with our use.
 Two data-quality notes from them matter for the catalog: the E&E "X Coordinate" and "Y Coordinate"
 are "the center of the subway station if the exact location of the subway elevator or escalator
 asset is not known", and the entrances dataset is "a point-in-time dataset as of August 2024" with
@@ -402,6 +404,25 @@ Both are called only by the Worker's `GET /geocode` (never by the client), with 
   invocation logs, which record the request URL, are off, query strings are redacted and traces are off (`worker/wrangler.jsonc`;
   `wrangler tail` may still show full URLs to whoever tails production). Responses are `Cache-Control: no-store`.
 - A GeoSearch or Photon outage shows as `incomplete` answers (not cached) or a 502, and station and street search never wait on it.
+
+### 5.5 Customer Service Centers (enp.2)
+
+- **Source:** https://www.mta.info/contact-us/customer-service-centers, retrieved 2026-11-26 (through WebFetch; curl is blocked
+  by Akamai). It lists 29 subway stations (grouped by borough, each with an "Enter at X and Y" line) "open 24/7", "staffed 24/7 by
+  New York City Transit station agents", plus two entries that are not 24/7 and are left out: St George on Staten Island (Staten
+  Island Railway, 5:30 a.m.-9 p.m., Monday-Friday, except holidays) and 3 Stone St in Lower Manhattan (an office, 9 a.m.-5 p.m.,
+  not a station).
+- **Hand-authored** into `data/stations/customer-service-centers.json` (29 entries), because no open dataset of 24-hour booths
+  exists. This is MTA website content, not the open-data feeds (OPEN-NY terms do not obviously cover it) and its terms are not
+  reviewed. Licensing decision (underground-enp.7, 2026-11-27, Caleb): ship the station ids and the verbatim "Enter at X and Y"
+  lines, credited with the page URL and retrieval date in `amenities.json`'s attribution.
+- Station agents now work outside the booths, per the MTA press release
+  https://new.mta.info/press-release/mta-announces-station-agents-begin-assisting-riders-outside-of-booths-week (the 2023
+  rollout; the page 301s to www.mta.info and answered 403 to automated fetch, so its text was not read here). So say "customer
+  service center", never "booth". UI wording: "Customer service center · staffed 24/7".
+- **No refresh path.** The page is the only source; the file goes stale as centers open or close. Reread the page and bump
+  `retrievedAt` by hand. `customerServiceCenters.test.ts` fails if a stop id or name stops matching the pinned catalog or two
+  entries share a complex, which catches renames but not a changed list.
 
 ## 6. Static-hosting fit and pipeline
 

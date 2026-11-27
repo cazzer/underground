@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertRowCount, normalizeMrn, parseCount, parseViewMeta, trimCatalogEntrances, trimCatalogEquipment, trimCatalogStations } from './catalogSoda.ts'
+import { assertRowCount, normalizeMrn, parseCount, parseLatestMonth, parseViewMeta, trimCatalogAmenities, trimCatalogEntrances, trimCatalogEquipment, trimCatalogStations } from './catalogSoda.ts'
 
 const stationRow = (over: Record<string, unknown> = {}) => ({
   gtfs_stop_id: 'L08', station_id: '120', complex_id: '120', division: 'BMT', line: 'Canarsie', stop_name: 'Bedford Av',
@@ -93,6 +93,27 @@ describe('trimCatalogEquipment', () => {
   })
   it('sorts by code', () => {
     expect(trimCatalogEquipment([{ ...elevator, equipment_code: 'EL9' }, elevator]).map((r) => r.code)).toEqual(['EL358', 'EL9'])
+  })
+})
+
+describe('trimCatalogAmenities', () => {
+  const restroom = { month: '2026-10-01T00:00:00.000', amenity_id: '403589', amenity_type: 'PUBLIC_RESTROOM', station_mrn: '330', station_name: 'Whitehall St-South Ferry', lines: '1 R W', borough: 'MANHATTAN', latitude: '40.7', longitude: '-74.0' }
+  it('keeps id, type, station and month, with a padded MRN unpadded', () => {
+    expect(trimCatalogAmenities([{ ...restroom, station_mrn: '059' }])).toEqual([{ id: '403589', type: 'PUBLIC_RESTROOM', stationId: '59', month: '2026-10-01' }])
+  })
+  it('sorts by id', () => {
+    expect(trimCatalogAmenities([{ ...restroom, amenity_id: '9' }, restroom]).map((r) => r.id)).toEqual(['403589', '9'])
+  })
+  it('throws, naming the row, on a bad type, month, station or a duplicate id', () => {
+    expect(() => trimCatalogAmenities([{ ...restroom, amenity_type: 'ELEVATOR' }])).toThrow(/amenities\[0\].amenity_type/)
+    expect(() => trimCatalogAmenities([{ ...restroom, month: '2026-10-15T00:00:00.000' }])).toThrow(/amenities\[0\].month/)
+    expect(() => trimCatalogAmenities([{ ...restroom, station_mrn: undefined }])).toThrow(/amenities\[0\]: has no station_mrn/)
+    expect(() => trimCatalogAmenities([{ ...restroom, amenity_id: undefined }])).toThrow(/amenities\[0\].amenity_id/)
+    expect(() => trimCatalogAmenities([restroom, restroom])).toThrow(/duplicate id 403589/)
+  })
+  it('reads the latest month from max(month)', () => {
+    expect(parseLatestMonth([{ max_month: '2026-10-01T00:00:00.000' }], 'x')).toBe('2026-10-01')
+    expect(() => parseLatestMonth([{}], 'x')).toThrow(/max_month/)
   })
 })
 

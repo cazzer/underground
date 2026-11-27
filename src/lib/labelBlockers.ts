@@ -1,13 +1,13 @@
 /** Screen rects one label layer leaves for another to keep clear of: each drawn interior's level labels write theirs
- *  each frame into a slot they claim, the street labels read every slot (a frame late, which is invisible for DOM
- *  text). Scene owns one, like the band view. Pure. */
+ *  each frame into a slot they claim, as do the amenity marks (StationAmenities.tsx, enp.5); the street labels read
+ *  every slot (a frame late, which is invisible for DOM text). Scene owns one, like the band view. Pure. */
 import { RECT } from './labelGeometry'
 import { MAX_VIEW_INTERIORS } from './viewStations'
 
-/** The most level labels one interior shows (a few levels); more are drawn but not kept clear of. */
+/** The most rects one slot holds (an interior's few level labels, or the amenity marks on screen); more are drawn but not kept clear of. */
 export const MAX_LEVEL_BLOCKERS = 16
-/** One slot per interior drawn at once (o3r.4). */
-export const BLOCKER_SLOTS = MAX_VIEW_INTERIORS
+/** One slot per interior drawn at once (o3r.4), plus one for the amenity marks. */
+export const BLOCKER_SLOTS = MAX_VIEW_INTERIORS + 1
 
 export interface LabelBlockers {
   /** Slot s's packed rects start at rect s * MAX_LEVEL_BLOCKERS, in canvas px (labelGeometry's RECT floats each: left, top, right, bottom). */
@@ -42,7 +42,7 @@ export function claimBlockerSlot(b: LabelBlockers): number | null {
   }
   if (!b.fullLogged) {
     b.fullLogged = true
-    console.warn(`Level labels: all ${BLOCKER_SLOTS} blocker slots are held; the street labels may cover one interior's`)
+    console.warn(`Label blockers: all ${BLOCKER_SLOTS} slots are held; the street labels may cover one layer's marks or labels`)
   }
   return null
 }
@@ -53,4 +53,19 @@ export function releaseBlockerSlot(b: LabelBlockers, slot: number): void {
   b.claimed[slot] = 0
   b.counts[slot] = 0
   b.version++
+}
+
+/** Writes packed rect `r` (canvas px) and says whether it changed. Allocation-free (per frame). */
+export function writeBlocker(rects: Float32Array, r: number, left: number, top: number, right: number, bottom: number): boolean {
+  const o = r * RECT
+  // Float32 storage: compare after the write's rounding.
+  const was0 = rects[o]
+  const was1 = rects[o + 1]
+  const was2 = rects[o + 2]
+  const was3 = rects[o + 3]
+  rects[o] = left
+  rects[o + 1] = top
+  rects[o + 2] = right
+  rects[o + 3] = bottom
+  return rects[o] !== was0 || rects[o + 1] !== was1 || rects[o + 2] !== was2 || rects[o + 3] !== was3
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import type { StationsFile } from '../data/schema'
-import { accessLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel, updatedLabel } from './labels'
+import { accessLabel, accessSpoken, amenityLabel, boroughName, multiBoroughNames, routeChipLabel, routeSpokenName, scheduleLabel, spokenSentences, updatedLabel } from './labels'
 import { stationAccess } from './network'
 
 describe('routeChipLabel', () => {
@@ -96,5 +96,45 @@ describe('updatedLabel', () => {
   it('formats the update time in New York time', () => {
     // 2026-11-21 19:41:00 UTC is 2:41 PM in New York (EST).
     expect(updatedLabel(Date.UTC(2026, 10, 21, 19, 41) / 1000)).toBe('updated 2:41 PM')
+  })
+})
+
+describe('amenityLabel', () => {
+  it('says nothing for a station with none', () => {
+    expect(amenityLabel([])).toBeNull()
+  })
+
+  it('names the kinds only, a restroom as the MTA lists it', () => {
+    expect(amenityLabel(['restroom'])).toBe('The MTA lists a restroom here.')
+    expect(amenityLabel(['csc'])).toBe('Customer service center.')
+    expect(amenityLabel(['restroom', 'csc'])).toBe('The MTA lists a restroom and a customer service center here.')
+  })
+})
+
+describe('accessSpoken', () => {
+  it('says the access label, and an outage that takes step-free access away', () => {
+    expect(accessSpoken(null, false)).toBe('')
+    expect(accessSpoken('Accessible station', false)).toBe(', Accessible station.')
+    expect(accessSpoken('Accessible station', true)).toBe(', Accessible station; no step-free access now.')
+  })
+})
+
+describe('spokenSentences', () => {
+  const skip = 'The downtown 1 train skips this station now.'
+  const amenities = 'The MTA lists a restroom here.'
+
+  it('is empty with nothing to say', () => {
+    expect(spokenSentences(true, [])).toBe('')
+    expect(spokenSentences(false, ['', null])).toBe('')
+  })
+
+  it('says each sentence in order after a space', () => {
+    expect(spokenSentences(true, [skip, amenities])).toBe(` ${skip} ${amenities}`)
+    expect(spokenSentences(true, ['', amenities])).toBe(` ${amenities}`)
+  })
+
+  it('ends the name as a sentence when no access words came first', () => {
+    expect(spokenSentences(false, [skip, amenities])).toBe(`. ${skip} ${amenities}`)
+    expect(spokenSentences(false, ['', amenities])).toBe(`. ${amenities}`)
   })
 })

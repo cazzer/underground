@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { useMemo, useRef, useState } from 'react'
+import type { AmenitiesFile } from '../data/amenitiesSchema'
 import { BASEMAP } from '../data/basemapConfig'
 import { interiorStationIds, type IndexLoad } from '../data/interiorLoad'
 import type { LiveLayer } from '../data/useLive'
@@ -44,6 +45,7 @@ import { SubwayLines } from './SubwayLines'
 import { useSceneInteriors } from './useSceneInteriors'
 import { ViewCenterSource } from './ViewCenterSource'
 import { PlacePin } from './PlacePin'
+import { StationAmenities } from './StationAmenities'
 import { YouAreHere } from './YouAreHere'
 
 /** TEMPORARY `?basemap=off` (basemapLook.ts) draws no basemap and loads no tiles. */
@@ -90,9 +92,11 @@ interface SceneProps {
   routeShown: boolean
   /** The trip's own route (useTripRoute), for the camera: its frame decisions go on under a change. */
   tripRoute: TripRouteDraw | null
+  /** The station amenities once loaded (useAmenities); null draws no amenity marks. */
+  amenities: AmenitiesFile | null
 }
 
-export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, pathLabels, tripOpen, route, routeShown, tripRoute }: SceneProps) {
+export function Scene({ network, banded, insets, live, onLiveError, interior, outOfService, focusedMarker, siblings, index, panel, here, placePin, stationPaths, pathLabels, tripOpen, route, routeShown, tripRoute, amenities }: SceneProps) {
   const trainPick = useRef<TrainPickSource | null>(null)
   /** Written by SubwayLines each frame, read by LiveTrains: lines and trains share one band view. */
   const bandView = useMemo(createBandView, [])
@@ -174,6 +178,10 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
       {placePin && <PlacePin ground={placePin} />}
+      {/* Decoration: a crash (logged) draws no amenity marks instead of blanking the scene. */}
+      <ErrorBoundary fallback={null}>
+        <StationAmenities network={network} amenities={amenities} shown={shown} presences={presences} levels={tripLevels} blockers={labelBlockers} insets={insets} panel={panel} />
+      </ErrorBoundary>
       <StationStreets
         interior={interior}
         interiorPending={!interior && !focusedMarker}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAmenities } from './data/useAmenities'
 import { useBands } from './data/useBands'
 import { useEne } from './data/useEne'
 import { useEquipmentIndex } from './data/useEquipmentIndex'
@@ -75,6 +76,8 @@ function MapView({ network, bands, live }: MapViewProps) {
   const interiorOutages = joinStationOutages(model?.interior ?? null, ene, nowS)
   // The panel also names machines only the equipment index lists (loaded on the first focus); drawing and routing stay the interior's.
   const equipment = useEquipmentIndex(focusedId, ene.configured)
+  // Restrooms and customer service centers: fetched once after mount (not gated on the Worker), retried on a focus change after a failure.
+  const amenities = useAmenities(focusedId)
   const interiorSettled = interior.index.status !== 'loading' && interior.load.status !== 'loading'
   const outages = joinPanelOutages(interiorOutages, model?.interior ?? null, interiorSettled, stationEquipment(equipment, focusedId), ene, nowS)
   // The MTA's service changes: the focused station's rows, the skip sets, the header's list and the picked one's drawing.
@@ -184,6 +187,7 @@ function MapView({ network, bands, live }: MapViewProps) {
               route={route}
               routeShown={routeShown}
               tripRoute={tripRoute}
+              amenities={amenities.state === 'ready' ? amenities.index : null}
             />
             {/* Decoration: a crash here shows the map at once. */}
             <ErrorBoundary fallback={null}>
@@ -206,6 +210,7 @@ function MapView({ network, bands, live }: MapViewProps) {
           outages={outagePanelView(outages, nowS, noStepFree)}
           changes={changes}
           skips={skips}
+          amenities={amenities.state === 'ready' ? amenities.index : null}
           changeList={changeList}
           changeNote={changeNote}
           tripLines={tripLines}

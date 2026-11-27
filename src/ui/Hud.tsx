@@ -14,6 +14,7 @@ import { markedPlacement } from '../lib/locate'
 import { usePanelCollapse } from '../lib/panelCollapse'
 import type { Network } from '../lib/network'
 import { useTrainSelection } from '../lib/trainSelection'
+import type { AmenitiesFile } from '../data/amenitiesSchema'
 import type { LocateControls } from '../data/useLocate'
 import { ArrivalsPanel } from './ArrivalsPanel'
 import { Attribution } from './Attribution'
@@ -57,6 +58,8 @@ interface HudProps {
   changes: ServiceChangeView
   /** The MTA's skip alerts, for the train panel's stops and the arrivals rows. */
   skips: AlertSkips | null
+  /** The station amenities, once loaded: the glyphs after the station panel's name. */
+  amenities: AmenitiesFile | null
   /** Every service change in effect or coming within a day: the header chip and its list panel. */
   changeList: AlertListBody
   /** The picked row's note (changeDrawNote: the drawing is ours, or nothing drew); null with no pick. */
@@ -77,7 +80,7 @@ interface HudProps {
   siblingsOf: (stationId: string) => readonly string[]
 }
 
-export function Hud({ network, live, arrivals, onInsets, interior, outages, changes, skips, changeList, changeNote, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
+export function Hud({ network, live, arrivals, onInsets, interior, outages, changes, skips, amenities, changeList, changeNote, onPanel, locate, place, linkNotice, tripLines, focusSiblings, siblingsOf }: HudProps) {
   const { focusedId, dismiss, select } = useFocus()
   const lineFilter = useLineFilter(focusedId)
   const { selectedSummary, selectedTrip, selections, notice, dismissNotice, clearTrain, following, follow, unfollow } = useTrainSelection()
@@ -239,6 +242,7 @@ export function Hud({ network, live, arrivals, onInsets, interior, outages, chan
             changes={changes}
             skips={skips}
             lineFilter={lineFilter}
+            amenities={amenities}
             onDirections={FEATURES.navigation ? (end) => openTrip(end, { stationId: focusedId, place: null }) : undefined}
             ref={panel}
             headingRef={stationHeading}

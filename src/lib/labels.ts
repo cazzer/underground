@@ -1,4 +1,5 @@
 import type { Borough } from '../data/schema'
+import type { AmenityKind } from './amenityGlyphs'
 import type { StationAccessInfo } from './network'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -36,6 +37,38 @@ export function accessLabel(access: StationAccessInfo): string | null {
   if (access.status === 'full') return 'Accessible station'
   if (access.status === 'partial') return access.note ? `Partly accessible: ${access.note}` : 'Partly accessible'
   return null
+}
+
+/**
+ * What a station's amenity glyphs say in its heading and bar, the kinds only, as one sentence: "The MTA lists a
+ * restroom here.", "Customer service center." or both. Null with none. Never a restroom's count, hours, access or
+ * open status; the note under the heading (`AmenityNote`) gives the hedge, the hours and the entrance.
+ */
+export function amenityLabel(kinds: readonly AmenityKind[]): string | null {
+  const restroom = kinds.includes('restroom')
+  const csc = kinds.includes('csc')
+  if (restroom && csc) return 'The MTA lists a restroom and a customer service center here.'
+  if (restroom) return 'The MTA lists a restroom here.'
+  if (csc) return 'Customer service center.'
+  return null
+}
+
+/** The hidden text right after a station's name: ", <access>." (with "; no step-free access now" when an outage says so), or nothing. */
+export function accessSpoken(access: string | null, noStepFreeNow: boolean): string {
+  return access === null ? '' : `, ${access}${noStepFreeNow ? '; no step-free access now' : ''}.`
+}
+
+/**
+ * Whole sentences said after a station's name and its access words, in order (empty ones left out): each after a
+ * space, the first after ". " when no access words came before it, so the name ends as a sentence too.
+ */
+export function spokenSentences(afterAccess: boolean, sentences: readonly (string | null)[]): string {
+  let out = ''
+  for (const sentence of sentences) {
+    if (sentence === null || sentence === '') continue
+    out += `${out === '' && !afterAccess ? '. ' : ' '}${sentence}`
+  }
+  return out
 }
 
 /**

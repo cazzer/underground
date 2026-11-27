@@ -18,7 +18,7 @@ export function expectStationIndex(raw: unknown, url: string): StationIndex {
     const file = fields?.file
     if (file === undefined) continue
     // A complex member's file id becomes a URL path segment, so it is a plain id naming a listed, non-alias entry.
-    if (typeof file !== 'string' || !FILE_ID.test(file) || file === 'index' || file === 'equipment') throw fail(`station ${id} has an invalid file`)
+    if (typeof file !== 'string' || !FILE_ID.test(file) || file === 'index' || file === 'equipment' || file === 'amenities') throw fail(`station ${id} has an invalid file`)
     if (file === id) throw fail(`station ${id} names itself as its file`)
     const target = Object.hasOwn(entries, file) ? entries[file] : undefined
     if (typeof target !== 'object' || target === null) throw fail(`station ${id} names an unlisted file ${file}`)

@@ -39,6 +39,7 @@ panel at an added stop says "[D] stops here (runs local)". A reroute shows only 
 header's "between X and Y"), each a plain ring, and no path ("Stations named in the MTA notice · the new route isn't drawn").
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
 With the Worker configured the search dialog also finds streets, intersections ("Bedford Av & N 7 St"), addresses and places through `/geocode` (2q7.16, 2q7.14; none of it without `VITE_RT_URL`).
+Inside 1250 m every station `amenities.json` lists draws small 3D amenity marks on the map beside its marker or its interior (enp.5).
 Trip planning is behind `FEATURES.navigation` (`src/config.ts`), off by default; `?nav=1` turns it on for that page load.
 
 ## Stack
@@ -88,7 +89,9 @@ so dev and preview serve under that path.
   committed `public/data/shapes.json` and `stations.json` (a hand-authored station wins; it prints each skipped
   candidate with its reason and each dropped source row), write `public/data/stations/equipment.json` (every revenue elevator and
   escalator of the catalog's E&E inventory with the stations that list each, a complex's machines under every member; fetched on the
-  first station focus, so outside the startup budget with its own 16 KB gzip cap), and pack `public/data/station-depths.json` (every interior's
+  first station focus, so outside the startup budget with its own 16 KB gzip cap), write `public/data/stations/amenities.json` (public
+  restrooms from the pinned `catalog/amenities.json` and the 24/7 customer service centers of `data/stations/customer-service-centers.json`, per station, a complex's under every
+  member; fetched on demand, so outside the startup budget with its own 4 KB gzip cap), and pack `public/data/station-depths.json` (every interior's
   platform tracks and rail heights; it counts toward the shared 60 KB budget). It prints a `WARNING:` line listing
   interior tracks no drawn line rides (packed as no track, so the client stays quiet about them), and fails if any
   track packs more than 2 m off its runs. Offline.
@@ -99,6 +102,8 @@ so dev and preview serve under that path.
 - `npm run data:catalog:fetch`: uses the network (data.ny.gov, Overpass); re-pins the citywide catalog in
   `data/stations/catalog/`. Review the diff, then rerun `data:access` and `data:stations` (the generated interiors
   are built from it; `generatedOutputs.test.ts` fails while they are stale). `npm run data` reads only `catalog/stations.json`.
+  `-- --only amenities.json` re-pins just `catalog/amenities.json` (dataset 6yjv-fk7g, restrooms of the latest month, MTA data under
+  OPEN-NY; `data:stations` reads it for `stations/amenities.json` (not through `CATALOG_FILES`, which is the generator's), so a re-pin needs a `data:stations` rerun or `amenitiesOutputs.test.ts` fails; the source has no hours or open status and gives the station's point).
 - `npm run data:streets:fetch -- [--no-walk]`: uses the network (Overpass, by hand); re-pins the OSM streets and walking ways
   within 300 m of any station point into `data/streets/` (a manifest plus sharded `cell-*.json`; ODbL). Review the diff;
   `streetsData.test.ts` checks it. Rerun `data:streets`, `data:walk` and `data:search:streets` after it.
@@ -218,6 +223,11 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   (0.35: a suspended stretch's route colour mixed this far toward the background, at least 1.45x its dimmed route, 1.51x
   for SI, and 2:1 on the background, 2.04:1 SI) and `changeSuspendedDashPx` / `GapPx` (5 / 4, CSS px at the view's target).
   Car tokens `trainCarSideShade`, `trainCarEndShade` are linear multipliers of a car's route color.
+  Amenity tokens (enp.5, themeAmenity.test.ts): `amenityMark` (the dim ink `inkDim`, the extruded pictograms' tops, so they sit back
+  from the station markers) and `amenitySideShade` (0.6, a linear multiplier for their walls, baked as vertex colors); tops and walls
+  each at least 3:1 on the background, the walls at least 1.3:1 under the tops, and apart from the focus, location, pin, exit and rim
+  colors, also under simulated red-green color blindness (below MIN_CVD_DISTANCE only for the exit path, 0.057, and the rim, 0.035,
+  each a line or ring, pinned as such: `CVD_FLOOR`).
   `bandPitchPx` (2.5) is the gap between routes drawn side by side in a shared corridor.
 - `src/scene/`: the r3f scene
   - `Scene.tsx` canvas; `CameraRig.tsx` MapControls,
@@ -263,7 +273,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     "Show fewer" or the outage disclosure never move the camera, even tapped within 2 s), a fly request, or its expiry; after it, of the panel's changes
     only a user collapse or expand moves the camera. What can still grow a bare station's phone panel after landing: the "Out of
     service (N)" disclosure once the equipment index or /ene joins, "status unavailable", the "Service changes (N)" disclosure or "Service changes unavailable" once /alerts joins, the first arrivals and their "Show all N
-    destinations" button, arrivals notes. An interior's panel size alone still never moves the camera. On a 390×844 phone (free
+    destinations" button, arrivals notes, the amenity note once the amenities file joins (enp.4; it is fetched on mount, so usually in first). An interior's panel size alone still never moves the camera. On a 390×844 phone (free
     bottom 393.5 px under the open panel, 690 px under the bar) 127 lands with 10 of its 16 marks and 120 with 2 of 6; collapsed, all
     of both; the outage disclosure arriving (52 px) reframes 127 from 8 to 10 and leaves 120 at 2 (`panelGrow.data.test.ts`);
     `useRouteFlight.ts` the route view's frame, a trip's or a picked service change's (2q7.45.5, 08r.6; see Rendering conventions: `lib/routeFrame.ts` the route's ground points and `frameTopDown`, the pure top-down fit into the free rect;
@@ -355,6 +365,30 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     `YouAreHere.tsx` the location marker (constant-size reticle ringed by a thin background halo inside a translucent
     accuracy disc; `hereShape.ts` its line buffers; no event handlers, so it never takes a pick);
     `PlacePin.tsx` the searched place's pin (a diamond outline and centre dot, `placePinShape.ts`, inside a thin background halo band, constant screen size, `theme.placePin`; no event handlers; Scene mounts it while the place line shows);
+    `StationAmenities.tsx` (enp.5, in a null-fallback ErrorBoundary, not keyed) the amenity marks of every station group `amenities.json`
+    lists (App's `useAmenities`, through Scene; not the view set, so it fetches nothing and never pops with the view's ranking),
+    laid out in idle time (`useAmenityLayout.ts`: requestIdleCallback with a 500 ms timeout, a 16 ms setTimeout without it; the track grid a few shapes a
+    slice, then a few groups a slice, each slice at most `SLICE_MS` 3 ms past its first step; no marks until done): per amenity a flat
+    background plate (`plateGeometry`) and an extruded `theme.amenityMark` prism per `GLYPHS` piece (`glyphGeometry` in
+    `amenityGeometry.ts`: per piece its outward walls shaded `amenitySideShade`, then its top, no bottom, pieces in the glyph's
+    far-to-near order so a nearer piece paints over a farther one with depth testing off; `AMENITY_HEIGHT` 0.14 glyph units). A
+    station's marks run in a row across the screen in the panel's order (`rowCentreInto` in `lib/amenityPlacement.ts`), one 3 px gap
+    apart, anchored on its clear bearing just past its marker; the glyph `AMENITY_HALF_PX` 9 px half (3.5 m floor), plate
+    `PLATE_HALF` 1.35 of it, a 3 px gap (1 m floor) (`amenitySizes.ts`); height × `depthScaleY(depthFactor(d))`, so flat top-down;
+    yawed to the controls' azimuth (`writeChordMatrix`) so it reads upright at any turn; opacity `interiorOpacity(d)` (nothing from
+    1250 m out, the group hidden). The row clears the marker as the focus ring draws it, or the trip mark's halo while the trip shows.
+    A mark whose station a shown interior covers slides (a straight blend by the presence) to a row just off that interior's
+    footprint hull plus the focus frame's extra 8 m (`useAmenityCovers.ts` over `lib/amenityCovered.ts`' `coveredRow`, chosen when
+    the shown interiors or the canvas size change, or the panel is first measured; never on a panel resize), and hands off from its copy under the veil to one over
+    it, both always at full ink (`tierShare`: the over glyph grows to full size by half way and its plate draws only then, the
+    under copy whole until that point, so the ink never dips below the dimmer copy; `amenityFrame.test.ts`), a part at share 0 collapsing to
+    scale 0. Six InstancedMeshes (plate, restroom, csc per tier), two shared materials (opacity written only on change, never a JSX
+    prop), stable ref callbacks; per frame (`amenityFrame.ts`) matrices only when the distance, azimuth, depth, trip flag or a
+    presence changed, colors only when a presence did; allocation-free. It claims one `LabelBlockers` slot (`useAmenityBlockers.ts`:
+    the projected rects of the 16 on-screen plates nearest the view's target) so the street labels keep clear. No handlers, not in
+    ScenePicker. Dev only: `__underground.amenityMarks()` (`useAmenityProbe.ts`: per mark station, kind, tier, ground, px, plate half
+    px, opacity). Not yet obstacles: the street files' entrance squares (none before those load), the banded lines' offset, a start
+    mark grown round the location reticle;
     `cameraDistance.ts` helpers; `renderOrder.ts` (also `strokeOrders` and `spanCarOrders`, the per-band and per-deck orders)
   - `SpanCars.tsx` / `useSpanCars.ts` the above-veil copies of the cars on a revealed station's platforms, one layer
     per platform deck (LiveTrains keeps three, splitting the spans with `deckSpans`; deck k's layer holds deck k of every
@@ -484,7 +518,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
     x presence at 1 as Stations.tsx collapses it, blocks nothing: a per-frame `LabelContext.markerHidden` flag; a change
     to it bumps `markersVersion`, which places the labels again without rebuilding the DOM)
     and the focus ring (sized as Stations.tsx and FocusRing.tsx draw
-    them now; an entrance ignores a marker its own mark sits in), and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, a slot claimed by each interior that has labels, today the focused one alone (`claimBlockerSlot` / `releaseBlockerSlot`, `BLOCKER_SLOTS` 3, `MAX_LEVEL_BLOCKERS` 16 each; the street labels read every slot; the label divs are `aria-hidden`),
+    them now; an entrance ignores a marker its own mark sits in), and the level labels (`useLevelLabels` writes their rects into Scene's `LabelBlockers`, `src/lib/labelBlockers.ts`, a slot claimed by each interior that has labels, today the focused one alone (`claimBlockerSlot` / `releaseBlockerSlot`, `BLOCKER_SLOTS` 4: one per view interior plus one the amenity marks hold, `MAX_LEVEL_BLOCKERS` 16 each, `writeBlocker`; the street labels read every slot; the label divs are `aria-hidden`),
     at priority 0 each frame; read a frame late); street names also keep clear of every drawn interior's outlines
     (`InteriorModel.outline`, `src/lib/interiorOutline.ts`, padded by half their screen spacing; the first
     `MAX_LABEL_INTERIORS`). Each run of blocked rects (the fixed ones, each layer's marks, the markers and ring, each
@@ -555,8 +589,15 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `src/ui/MapReveal.tsx` the opening reveal: an aria-hidden, pointer-events-none `theme.background` cover after `<Scene>` (inside its ErrorBoundary, in a null-fallback one of its own), wiped open from the middle of the free area (`interiorFreeRect`: the HUD bands and the station panel left out; insets and panel kept in refs, read once) as a radial gradient over `REVEAL_MS` (1 s of its own clock, ease-out cubic, soft edge `REVEAL_FEATHER_SHARE` 0.18 of the farthest-viewport-corner radius), started on the rAF after r3f's second after-render tick (`addAfterEffect`, so Scene is untouched; the first real frame is drawn by then); the clock advances by at most `REVEAL_MAX_STEP_MS` (34 ms) a frame from the rAF timestamps, so a stall slows the wipe instead of jumping it; under reduced motion a 200 ms opacity fade on the same clock; a throw in a frame logs and unmounts it (fails open); unmounted when done. Pure maths in `src/lib/mapReveal.ts`.
 - `src/ui/Hud.tsx`: Tailwind overlay (its bottom slot renders the panel `frontPanel()` (`lib/panelCollapseState.ts`) names; `useHudInsets.ts` reports `onInsets`: the top band from the header's bottom, the bottom band from the footer (Attribution) alone, never the panel sharing its slot, which reports through `onPanel` (`lib/hudInsets.ts`, pure), before the scene mounts and again, only when the value changed, on a resize of the root, header or footer, so a rotation or a header status line adding a row updates them; a changed inset starts no flight (a flight in progress retargets, a followed train re-centres, the zoom-out limit and a focused orbit's pivot follow the new free area), and the opening city fit and a point flight already set off keep the value they read; the header has a `from-canvas` to transparent gradient behind it, `pointer-events-none`, so strokes panned under its text stay out of the way; title, live status, a screen-reader-only announcer for the gone notice, arrivals
   panel: the station name, a focusable heading (`tabIndex -1`) that ends with the access glyph (`StationName` in `AccessIcon.tsx`: an aria-hidden glyph kept on the last word
-  plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible) and, for partly accessible stations only,
-  a dim aria-hidden `PartialAccessNote` line, then the "Directions from here" / "Directions to here" buttons (`openTrip`, below), then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only; `ArrivalsList.tsx`: on a stacked panel only the 3 destinations due soonest (`lib/live/arrivalsCollapse.ts`; the focused row's destination is always kept, in place of the latest, and if a row still unmounts with focus it goes to the heading) and one "Show all N destinations" / "Show fewer" button (aria-expanded, keeps focus; keyed `arrivals-<id>` so a new station, or the panel coming back after a train pick, starts collapsed); collapsed, the rows sit at the fixed height of three two-line-destination rows (`CollapsedSizer`), so polls neither grow nor shrink the panel; above the list a `LineFilter.tsx` group ("Filter by line") of one toggle chip per line of the station (a complex: every member's routes, in route order; none under two lines), fixed by the station so no poll adds, removes or moves one (`aria-pressed`, a 44 px target round the 36 px chip, pressed = ink fill; named "Show only the A train"; a line with nothing due is dimmed at opacity 50 with an `aria-description` "No trains due", never removed), pure in `lib/live/lineFilter.ts` (`lineKey` folds an express into its line, 6X into 6; `stationLines`, `linesDue`, `toggledFilter`, `filterArrivals`): one line at a time, tap it again for all; the filter applies first, then the collapse (so "Show all N" counts the line's destinations); the choice lives in `useLineFilter.ts`, called in Hud, so it survives a train panel covering the station panel and arrivals coming and going, and only a tap or a station change ends it (reads as unset, and is dropped, at another station); a chosen line with nothing due says "No upcoming A trains" (holding the collapsed height on a stacked panel) or its feed note ("Live times unavailable for A"); feed-only routes (reroutes) show under all lines only; a tap sets one polite sr-only line ("Showing A trains, 3 destinations" / "Showing all trains", emptied after 6 s; polls never touch it); a chip that unmounts holding focus (a status message replaced the list) sends it to the heading; expanded on a stacked panel, the list scrolls by whole rows in a TrainStops-style scroller (`useListScroll`'s `rowSelector` `li[data-group]`, a focusable region while it overflows or holds focus, a "more below" fade), desktop uncapped; the row, sizer and "Show all" parts are in `ArrivalRows.tsx`; a row whose train the map draws is a button that selects the soonest such train, `selectableArrival` over `ArrivalGroup.tripKeys` and `ArrivalsSource.drawnKeys`, so the keyboard reaches trains; the others are `aria-disabled` no-ops that look like text, so a poll never drops focus; every enabled row has an `aria-description` naming the arrival it picks; a row whose route and direction the MTA's alert says skip this station (any member) keeps its predicted times and adds a dim aria-hidden "skips this station" note ("probably skips this station" for a guess; no "per MTA notice") that is also said in the row's name (an sr-only ", skips this station" after the times, so it doesn't depend on hints), and the collapsed sizer reserves one note line while any route there skips it (`stationHasSkip`)), nothing else; the station panel has no ×: its down chevron (`CollapseButton` in `PanelBar.tsx`, `usePanelToggle.ts`) collapses it to a one-line bar in the same `aside` (`ExpandBar`: the station name with its access glyph, plus an up chevron; the body stays mounted but `hidden`, so list states and scroll survive; the aside's padding drops, so the HUD's panel observer reports the smaller rect and the free area grows), tapping the bar expands it, the collapse is sticky for the session (it survives station changes, auto-focus drops and a trip or train in front), the panel's `headingRef` points at the heading, or at the bar while collapsed, so every focus return lands on what shows, and each toggle moves focus to the bar or the heading one frame later (a touch user leaves a station by zooming or panning away; Esc dismisses it); closing the station panel (Esc) moves focus to the Search button; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
+  plus sr-only ", <accessLabel>." text, so the heading announces it; none for stations that aren't accessible), then the amenity glyphs (enp.4: restroom
+  and 24/7 customer service center, `AmenityIcons` in `AmenityIcon.tsx`, inline SVG in currentColor from `lib/amenityGlyphs.ts`, aria-hidden, in the same
+  nowrap span, the card context only, so search rows never show them; a complex shows its members' union, `groupAmenities`; the heading's and the
+  collapsed bar's hidden text says the kinds only, after the access words and after the skip notice (so the skip stays what a rider hears first):
+  `amenityLabel` in `labels.ts`, "The MTA lists a restroom here." / "Customer service center." / "The MTA lists a restroom and a customer service
+  center here.", joined by `accessSpoken` and `spokenSentences`; never a count, hours, access or open status) and, for partly accessible stations only,
+  a dim aria-hidden `PartialAccessNote` line, then for a station with amenities a dim `AmenityNote` line, the glyphs' legend, read by screen readers
+  (not a live region): "Restroom listed by the MTA · Customer service center, staffed 24/7 · Enter at 42 St and Park Av" (the entrance quoted from
+  the MTA page as is; each dot said as a full stop), then the "Directions from here" / "Directions to here" buttons (`openTrip`, below), then `InteriorStatus` and the arrival rows (their "Arrivals" heading is sr-only; `ArrivalsList.tsx`: on a stacked panel only the 3 destinations due soonest (`lib/live/arrivalsCollapse.ts`; the focused row's destination is always kept, in place of the latest, and if a row still unmounts with focus it goes to the heading) and one "Show all N destinations" / "Show fewer" button (aria-expanded, keeps focus; keyed `arrivals-<id>` so a new station, or the panel coming back after a train pick, starts collapsed); collapsed, the rows sit at the fixed height of three two-line-destination rows (`CollapsedSizer`), so polls neither grow nor shrink the panel; above the list a `LineFilter.tsx` group ("Filter by line") of one toggle chip per line of the station (a complex: every member's routes, in route order; none under two lines), fixed by the station so no poll adds, removes or moves one (`aria-pressed`, a 44 px target round the 36 px chip, pressed = ink fill; named "Show only the A train"; a line with nothing due is dimmed at opacity 50 with an `aria-description` "No trains due", never removed), pure in `lib/live/lineFilter.ts` (`lineKey` folds an express into its line, 6X into 6; `stationLines`, `linesDue`, `toggledFilter`, `filterArrivals`): one line at a time, tap it again for all; the filter applies first, then the collapse (so "Show all N" counts the line's destinations); the choice lives in `useLineFilter.ts`, called in Hud, so it survives a train panel covering the station panel and arrivals coming and going, and only a tap or a station change ends it (reads as unset, and is dropped, at another station); a chosen line with nothing due says "No upcoming A trains" (holding the collapsed height on a stacked panel) or its feed note ("Live times unavailable for A"); feed-only routes (reroutes) show under all lines only; a tap sets one polite sr-only line ("Showing A trains, 3 destinations" / "Showing all trains", emptied after 6 s; polls never touch it); a chip that unmounts holding focus (a status message replaced the list) sends it to the heading; expanded on a stacked panel, the list scrolls by whole rows in a TrainStops-style scroller (`useListScroll`'s `rowSelector` `li[data-group]`, a focusable region while it overflows or holds focus, a "more below" fade), desktop uncapped; the row, sizer and "Show all" parts are in `ArrivalRows.tsx`; a row whose train the map draws is a button that selects the soonest such train, `selectableArrival` over `ArrivalGroup.tripKeys` and `ArrivalsSource.drawnKeys`, so the keyboard reaches trains; the others are `aria-disabled` no-ops that look like text, so a poll never drops focus; every enabled row has an `aria-description` naming the arrival it picks; a row whose route and direction the MTA's alert says skip this station (any member) keeps its predicted times and adds a dim aria-hidden "skips this station" note ("probably skips this station" for a guess; no "per MTA notice") that is also said in the row's name (an sr-only ", skips this station" after the times, so it doesn't depend on hints), and the collapsed sizer reserves one note line while any route there skips it (`stationHasSkip`)), nothing else; the station panel has no ×: its down chevron (`CollapseButton` in `PanelBar.tsx`, `usePanelToggle.ts`) collapses it to a one-line bar in the same `aside` (`ExpandBar`: the station name with its access and amenity glyphs, plus an up chevron; the body stays mounted but `hidden`, so list states and scroll survive; the aside's padding drops, so the HUD's panel observer reports the smaller rect and the free area grows), tapping the bar expands it, the collapse is sticky for the session (it survives station changes, auto-focus drops and a trip or train in front), the panel's `headingRef` points at the heading, or at the bar while collapsed, so every focus return lands on what shows, and each toggle moves focus to the bar or the heading one frame later (a touch user leaves a station by zooming or panning away; Esc dismisses it); closing the station panel (Esc) moves focus to the Search button; `TrainPanel.tsx` holds the selected-train panel, which covers the station panel and takes focus on
   each pick (one row under the heading: "Following" with a Stop button while the camera follows the train, else a "Follow
   train" button; the same button node, so toggling keeps focus and the panel's size; its `TrainStops.tsx` lists the next stops: 3 rows, "Show all N stops", a 15 s tick; a next stop the MTA's skip alert says this train's route and direction skip (`lib/live/alertSkips.ts`, below) is struck through with no clock or minutes, a dim aria-hidden "skips · per MTA notice" under it (never the strike alone) and one sr-only sentence "skips 125 St, per MTA notice" in place of its name and times (the stop the train stands at is never marked); a guessed skip (`probable`) keeps its row and times under "probably skips · per MTA notice", spoken after the ETA as "probably skipped, per MTA notice" (the name is already read); on phones the expanded list is capped at whole rows by
   `useListScroll.ts` (rows are the list's children, or its `rowSelector` matches), about 5 rows or a quarter of the screen, with a "more below" fade), and the "no longer tracked" panel shown for 10 s; Esc or × closes the train first (the train panel and the gone notice keep ×; the station and trip panels have none), then the
@@ -622,6 +663,25 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   `OrbitHint.tsx` the header's muted turn hint under the status lines (right- or Shift-drag; two fingers on a
   coarse pointer), shown while a station is focused and no train is followed, until the session's first user turn (about 17° of an armed gesture on one focused station; flights, springs and the cap don't count; `src/lib/orbitTurned.ts`)
 - `src/lib/`: pure logic
+  - `amenityGlyphs.ts` (enp.4, pure) the amenity glyphs: `AmenityKind` ('restroom', 'csc'), `AMENITY_ORDER`, `GLYPHS` (convex CCW
+    polygons in [-1, 1], y up, far to near: pieces sharing an x run top to bottom, so enp.5 can extrude them flat; restroom: two figures,
+    octagon heads over a 0.2 neck, a rectangle torso and a dress, each over one block of legs; csc: an "i", its dot 0.3 clear of the stem; `AmenityIcons` cuts each SVG's viewBox to the glyph's own width), `amenityKinds`, `groupAmenities` (a complex's union, the first
+    member's center entrance); `amenityGlyphs.test.ts` holds the shape rules
+  - `amenityPlacement.ts` (enp.5, pure) the amenity marks' ground layout: `groupMarks` / `amenityMarks` (per listed group, its kinds
+    in order, `k` of `n` in one row), `clearBearing` (of 16 bearings, north preferred, then NE, NW, E, W, SE, SW, S, then the
+    half-winds: the one whose row, north-up squares at a 500 and a 1000 m view (`plateProbes` in scene/amenitySizes.ts), keeps farthest
+    from track segments near (`trackGrid.ts`: the distinct tracks in 100 m cells, built a shape at a time, `addShape`, `segmentsNear`)
+    and other station points less 6 m, within 80 m; a near-tie within 3 m (at most half the best) goes to the earlier), `rowCentreInto`
+    (a row across the screen: its first plate on the anchor when the bearing points right on screen, its last when left, its middle
+    straight up or down, pushed out so no plate comes nearer than the anchor), `hullReach`, `bandReach` (the hull within a lateral
+    band), `plateReach` (a yawed plate's reach along the bearing); `amenityCovered.ts` `coveredRow` (a covered row: from the hull's
+    middle along the bearing whose band reach is least plus the frame's 8 m, among those whose every plate a landing on the interior,
+    landingAzimuth and frameInterior at LANDING_DISTANCE as interiorFlight lands, shows inside the free rect less 4 px; `fits` false
+    when none does) and `orbitProjector` (an orbit camera's ground-to-screen, checked against three's). `amenityPlacement.data.test.ts`:
+    each shape and group in a few ms (the grid about 13 ms in all, the slowest group about 6 ms cold); at 500 m every plate of a row
+    clears every track by 1 m at 65 of 68 groups (Grand Central and Fulton St touch one, 14 St-Union Sq 1.0 m);
+    `amenityCovered.data.test.ts`: every covered row of a listed interior (Union Sq, Woodlawn and 11 generated) lands inside the free
+    rect at a 390x844 phone with its station panel open and at 1440x900
   - `stationGroups.ts` a complex as one station (`StationGroup`: the lead's id, point, borough and leadId; the most common member name,
     `otherNames` the rest; routes and stops the union; `groupAccess`: all full is full, else a partly accessible note naming the fully
     accessible routes and each partial member's own; `stationLeads` validates stations.json `complexes`); `Network.stationGroups`
@@ -1245,7 +1305,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 - `public/favicon.svg` (also the logo mark) and `public/apple-touch-icon.png`, rendered from
   `data/icons/apple-touch-icon.svg` (thinner strokes for 180 px; rebuild command in its header)
 - `data/stations/`: authored station interiors and pinned source extracts (not shipped); see `data/README.md`
-  - `data/stations/catalog/`: citywide pinned extracts (stations, entrances, equipment, envelopes,
+  - `data/stations/catalog/`: citywide pinned extracts (stations, entrances, equipment, amenities, envelopes,
     osm-platforms, osm-tracks), written only by `scripts/fetch-station-catalog.ts`. Rows are keyed by
     `gtfsStopId`/`stationId`/`complexId`; envelopes have no station key (join by containment or name
     downstream), and OSM ways have none either (join by distance)
@@ -1266,7 +1326,7 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   merge (its connector half, with the walkway and `area` rules and the containment check, is `lib/stationConnectors.ts`);
   `lib/stationMembers.ts` the complex helpers (`membersOf`, `trackOwner`, `checkMembers`; the client has its own copy
   in `interiorLoad.ts`); `lib/complexFixture.ts` the tests' two-member complex; `lib/stationProvenance.ts` (`markGenerated`: authored to generated, depth sources, archetype and
-  confidence) and `lib/stationIndex.ts` (`buildStationIndex`, `NOT_INTERIOR_FILES`) and `lib/equipmentIndex.ts` (`buildEquipmentIndex`, `cleanServing`: `stations/equipment.json` from the catalog) are pure, and `build-stations.ts`
+  confidence) and `lib/stationIndex.ts` (`buildStationIndex`, `NOT_INTERIOR_FILES`) and `lib/equipmentIndex.ts` (`buildEquipmentIndex`, `cleanServing`: `stations/equipment.json` from the catalog) and `lib/amenitiesIndex.ts` (`buildAmenitiesIndex`: `stations/amenities.json`) are pure, and `build-stations.ts`
   joins the generated stations to the authored ones (hand-authored wins); `lib/catalog*.ts` trim the catalog fetch (`catalogData.test.ts` checks the committed files)
   - Archetype classifier (offline, nothing ships): `lib/archetype.ts` (`classifyStation`: facts to archetype,
     params, confidence and a reason per deduction; `INTERIOR_MIN_CONFIDENCE` 0.7), `stationFacts.ts` (its input
@@ -1484,13 +1544,14 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
   0.40 and highway 0.41 (all depthWrite off too, since cars on a station ramp run below the street), lines 1, station tie 1.5, line focus 2, trip route 2.1 (`TripLines.tsx`), a service change's suspended stretch 2.15 (`TripLines.tsx`, dashed), a straight-drawn trip ride 2.2 (`TripDashes.tsx`),
   you-are-here accuracy disc 0.5 and edge 0.6, station fill 3, station ring 4, trip mark halo 4.4, trip walks 4.45
   (`TripDashes.tsx`; 7.55 above the veil while look A's veil is up (`veiled`: any interior drawn, and the focused station's own when one is focused) and it reveals), trip mark ring 4.5 and dot 4.55
-  (`TripMarks.tsx`), train halo 5,
+  (`TripMarks.tsx`), amenity plate 4.57, csc glyph 4.6 and restroom glyph 4.605 (`StationAmenities.tsx`), train halo 5,
   car halo 5.5, trains 6, the selected train's outline shells 6.03 (rim) and 6.06 (gap) while the other trains are still dots
   (carMix below 1; painted before any body, which covers their inside), otherwise 6.51 and 6.52 (after the bodies,
   depth-tested against them), selected train rim 6.1, halo 6.15 and dot 6.2, you-are-here halo 6.4, cars 6.5,
   a picked service change's skip marks 6.53 (halo), 6.535 (ring) and 6.54 (cross; over every train and car, TripMarks.tsx),
   you-are-here reticle 6.55, the place pin's halo 6.57 and the pin 6.58, the focused interior's footprint frame 7.52 (over the veil and the
   veiled streets, under the trip's walks over the veil; `InteriorFocusFrame.tsx`), street-file entrance marks 7.6 (above the veil at 7, under the interior strokes),
+  a covered station's amenity plate 7.61 and glyphs 7.62 (csc) and 7.625 (restroom) (cross-fading from 4.57 to 4.605 by that interior's presence),
   above-veil platform cars 9.45 (footprints), 9.5 (bodies), then 9.51 (selected rim shell) and 9.52 (gap shell),
   at a multi-deck interior the band between decks 9.53 (fine) and 9.54 (strong) and the next deck's cars 9.55 to
   9.565 (a third deck: 9.57 to 9.595; `strokeOrders`, `spanCarOrders`),
@@ -1656,7 +1717,7 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   its interior is `stations/<file>.json`), validated as a plain id naming a listed non-alias entry. The client fetches it on mount, after the startup files and not
   render-blocking, so it is outside the 60 KB startup budget and has its own cap (the build fails above 8 KB
   gzipped); a station not listed never fetches an interior, and until it loads (or if it fails, retried on the next
-  focus change) no station shows an interior panel. The object's key order lists integer-like ids first; don't rely on it. `index` and `equipment` are not valid station ids (`stations/index.json` and `stations/equipment.json` share the directory).
+  focus change) no station shows an interior panel. The object's key order lists integer-like ids first; don't rely on it. `index`, `equipment` and `amenities` are not valid station ids (`stations/index.json`, `stations/equipment.json` and `stations/amenities.json` share the directory).
 - `public/data/stations/equipment.json` (`EquipmentIndexFile`, `src/data/equipmentSchema.ts`, format 1) lists every revenue
   elevator and escalator of the pinned E&E inventory by equipment code (`machines`: `kind` and the inventory's `serving` text, cleaned,
   never truncated) and, per GTFS station, the codes of every machine in its complex (`stations`: a complex's machines under every
@@ -1665,6 +1726,19 @@ NY Open Data entrance, and E&E extracts (`<id>.sources.json`).
   Terms of Use (no OSM content). Fetched on the first station focus and only while `/ene` is configured, so it is outside the 60 KB
   startup budget with its own cap (the build fails above 16 KB gzipped; 13.0 KB today). Non-revenue machines, machines with no
   station and codes the Worker's `/ene` reader would reject are left out and logged. Key order is not an API.
+- `public/data/stations/amenities.json` (`AmenitiesFile`, `src/data/amenitiesSchema.ts`, format 1, enp.3) lists, per GTFS station, the amenities
+  in its complex (`stations`: `restrooms`, the count of public restrooms the pinned data.ny.gov 6yjv-fk7g snapshot lists, and `csc`,
+  `{ entrance }`, a staffed 24/7 customer service center with the mta.info page's own entrance text), expanded to every member of the
+  station's complex through the catalog (a restroom row's MRN can cover several GTFS stops; a center names one stop, not necessarily the
+  lead; every member gets the same entry; a station with neither has no key). The source says nothing of where in the station a restroom
+  is or whether it is open. Built by `data:stations` (`scripts/lib/amenitiesIndex.ts`, offline, from `data/stations/catalog/amenities.json`,
+  `data/stations/customer-service-centers.json` and the committed stations.json; a row at a station the catalog lacks, a repeated id, mixed
+  months or two centers in one complex fail the build, a complex stations.json lacks is logged and left out). It carries
+  `restroomsUpdatedAt`, `restroomsMonth` and `cscRetrievedAt` and no build time (`amenitiesOutputs.test.ts` compares it exactly), and
+  is MTA data under the OPEN-NY Terms of Use plus the MTA's public Customer Service Centers page (no OSM content); `attribution` names both.
+  Fetched once after mount by `src/data/useAmenities.ts` (App; not gated on the Worker; `loadAmenities.ts`' `expectAmenities` checks the format,
+  the text fields and every entry; a failure is logged and retried on the next focus change), so it is outside the 60 KB startup budget with its own cap (the build fails
+  above 4 KB gzipped; 1.1 KB today: 91 stations with restrooms, 51 with a center, 101 in all). Key order is not an API.
 - `public/data/station-depths.json` (`PackedDepthsFile`, format 2) is packed from every interior, authored and
   generated, by the same build (`scripts/lib/depthsPack.ts`), small enough for the startup budget. A complex file
   contributes one entry per member (each track goes to the member whose id is the longest prefix of its stop).
@@ -1816,7 +1890,7 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
 - **Static GTFS is processed at build time only.** `scripts/` turns the regular zip
   into `public/data/*.json`; the supplemented zip becomes `timetable/dated/` in each Pages deploy, never in git (`npm run data:dated`). The 60 KB gzip budget (`scripts/lib/budget.ts`) is the one size limit, shared by
   every top-level `public/data/*.json` the client loads up front, `station-depths.json` included (59.2 KB today,
-  about 800 B of headroom; the depths file is about 1.6 KB of it; `route/transfers.json` is on demand, in the trip planner's chunk, with its own cap); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), 16 KB for `public/data/stations/equipment.json`; the Worker's `worker/data/streetIndex.json` is outside `public/data` and has a raw cap of its own).
+  about 800 B of headroom; the depths file is about 1.6 KB of it; `route/transfers.json` is on demand, in the trip planner's chunk, with its own cap); `data`, `data:access` and `data:stations` each fail above it. Per-station interiors, street, walk and timetable files don't count (they have their own caps in `budget.ts`: 16 KB gzipped each for streets, 64 KB for walk, a total for each of those two, 48 KB per `public/data/timetable/` file (the dated ones too, plus a total for `timetable/dated/`), 16 KB for `public/data/stations/equipment.json`, 4 KB for `public/data/stations/amenities.json`; the Worker's `worker/data/streetIndex.json` is outside `public/data` and has a raw cap of its own).
 - **Data refresh is automated.** `.github/workflows/refresh-data.yml` runs daily and
   opens or updates one PR on `chore/data-refresh` when `npm run data`, then `npm run data:stations` (the
   generated interiors follow the new shapes and stations), then `npm run data:streets` (the street files follow

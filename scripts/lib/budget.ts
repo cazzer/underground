@@ -13,6 +13,8 @@ export const INDEX_GZIP_CAP_BYTES = 8_000
 /** stations/equipment.json loads on the first station focus, outside the budget above, with its own cap: the measured
  *  12,896 B (node zlib level 9, fall 2026) plus about a quarter. */
 export const EQUIPMENT_GZIP_CAP_BYTES = 16_000
+/** stations/amenities.json loads on demand, outside the budget above, with its own cap (about 100 stations; the cap leaves room for growth). */
+export const AMENITIES_GZIP_CAP_BYTES = 4_000
 
 /** public/data/route/transfers.json loads when the trip panel plans, outside the budget above: the measured 970 B
  *  (node zlib level 9, fall 2026) plus about a quarter. */
@@ -91,6 +93,11 @@ export function checkIndexCap(index: RenderedFile): number {
 /** The equipment index must fit its own cap; returns its gzip size. */
 export function checkEquipmentCap(file: RenderedFile): number {
   return checkFileCap(file, EQUIPMENT_GZIP_CAP_BYTES)
+}
+
+/** The amenities file must fit its own cap; returns its gzip size. */
+export function checkAmenitiesCap(file: RenderedFile): number {
+  return checkFileCap(file, AMENITIES_GZIP_CAP_BYTES)
 }
 
 /** The dated timetable files together must fit their total cap; returns their gzip total. */

@@ -2,23 +2,28 @@
  *  data/stations/<id>.sources.json, and generated ones from the station catalog (data/stations/catalog/) with the
  *  committed public/data/shapes.json and stations.json (scripts/lib/generate.ts; a hand-authored station wins),
  *  public/data/stations/index.json (which stations have an interior), public/data/stations/equipment.json (every revenue
- *  elevator and escalator and the stations that list it: scripts/lib/equipmentIndex.ts, from the catalog), and public/data/station-depths.json (every interior's
+ *  elevator and escalator and the stations that list it: scripts/lib/equipmentIndex.ts, from the catalog), public/data/stations/amenities.json
+ *  (public restrooms and customer service centers per station, a complex's under every member: scripts/lib/amenitiesIndex.ts, from the catalog and
+ *  data/stations/customer-service-centers.json), and public/data/station-depths.json (every interior's
  *  platform tracks, packed: scripts/lib/depthsPack.ts). Offline: the network is only used by fetch-station-sources.ts.
  *  The only IO here; the merge is scripts/lib/stationMerge.ts. Everything is built in memory first. */
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import type { ShapesFile, StationsFile } from '../src/data/schema.ts'
 import type { StationInterior } from '../src/data/stationSchema.ts'
+import type { CatalogAmenity } from './lib/catalogTypes.ts'
 import { TRACK_OFFSET_M } from '../src/lib/trackOffset.ts'
 import type { AuthoredStation, StationSources } from './lib/stationInputs.ts'
 import { checkComplexLeads } from './lib/stationComplexes.ts'
-import { checkBudget, checkEquipmentCap, checkIndexCap, committedGzip, EQUIPMENT_GZIP_CAP_BYTES, GZIP_BUDGET_BYTES, INDEX_GZIP_CAP_BYTES, renderedFile } from './lib/budget.ts'
+import { AMENITIES_GZIP_CAP_BYTES, checkAmenitiesCap, checkBudget, checkEquipmentCap, checkIndexCap, committedGzip, EQUIPMENT_GZIP_CAP_BYTES, GZIP_BUDGET_BYTES, INDEX_GZIP_CAP_BYTES, renderedFile } from './lib/budget.ts'
+import { buildAmenitiesIndex } from './lib/amenitiesIndex.ts'
+import { parseCustomerServiceCenters } from './lib/customerServiceCenters.ts'
 import { buildEquipmentIndex } from './lib/equipmentIndex.ts'
 import { drawnLines, PACK_TOL_M, packStationDepths, renderPackedDepths } from './lib/depthsPack.ts'
 import { generateStations } from './lib/generate.ts'
 import { CATALOG_FILES, generatorCatalog, generatorLines } from './lib/generatorInputs.ts'
 import { buildStationDepths } from './lib/stationDepths.ts'
-import { buildStationIndex, EQUIPMENT_FILE, INDEX_FILE, NOT_INTERIOR_FILES } from './lib/stationIndex.ts'
+import { AMENITIES_FILE, buildStationIndex, EQUIPMENT_FILE, INDEX_FILE, NOT_INTERIOR_FILES } from './lib/stationIndex.ts'
 import { buildStationInterior } from './lib/stationMerge.ts'
 import { membersOf } from './lib/stationMembers.ts'
 import { markGenerated } from './lib/stationProvenance.ts'
@@ -105,6 +110,13 @@ function main(): void {
   for (const line of equipmentBuild.log) console.log(`equipment: ${line}`)
   const equipment = renderedFile(EQUIPMENT_FILE, toStableJson(equipmentBuild.file, 2))
   checkEquipmentCap(equipment)
+  // amenities.json loads on demand: outside the budget too, with its own cap, checked before any write.
+  const amenitiesCatalog = readJson<{ rowsUpdatedAt: string; rows: CatalogAmenity[] }>(new URL('amenities.json', CATALOG_DIR))
+  const centers = parseCustomerServiceCenters(readJson<unknown>(new URL('customer-service-centers.json', IN_DIR)))
+  const amenitiesBuild = buildAmenitiesIndex(catalog.stations, amenitiesCatalog, centers, knownStations)
+  for (const line of amenitiesBuild.log) console.log(`amenities: ${line}`)
+  const amenities = renderedFile(AMENITIES_FILE, toStableJson(amenitiesBuild.file, 2))
+  checkAmenitiesCap(amenities)
   // The client loads station-depths.json up front, so it shares the 60 KB budget with the GTFS files (the one limit).
   const total = checkBudget([depths], committedGzip(DATA_DIR, new Set([DEPTHS])))
   const files = interiors.map((interior) => ({ id: interior.stationId, json: toStableJson(interior, 2) }))
@@ -131,6 +143,9 @@ function main(): void {
   console.log(`stations/${INDEX}: ${index.raw} bytes (${index.gzip} gzipped, cap ${INDEX_GZIP_CAP_BYTES})`)
   writeFileSync(new URL(EQUIPMENT_FILE, OUT_DIR), equipment.text)
   console.log(`stations/${EQUIPMENT_FILE}: ${equipment.raw} bytes (${equipment.gzip} gzipped, cap ${EQUIPMENT_GZIP_CAP_BYTES}), ${Object.keys(equipmentBuild.file.machines).length} machines at ${Object.keys(equipmentBuild.file.stations).length} stations`)
+  writeFileSync(new URL(AMENITIES_FILE, OUT_DIR), amenities.text)
+  const amenityStations = Object.values(amenitiesBuild.file.stations)
+  console.log(`stations/${AMENITIES_FILE}: ${amenities.raw} bytes (${amenities.gzip} gzipped, cap ${AMENITIES_GZIP_CAP_BYTES}), ${amenityStations.filter((a) => a.restrooms !== undefined).length} stations with restrooms, ${amenityStations.filter((a) => a.csc !== undefined).length} with a customer service center, ${amenityStations.length} in all`)
   writeFileSync(new URL(DEPTHS, DATA_DIR), depths.text)
   console.log(`${DEPTHS}: ${depths.raw} bytes (${depths.gzip} gzipped)`)
   console.log(`public/data total gzip: ${total} B (budget ${GZIP_BUDGET_BYTES} B)`)

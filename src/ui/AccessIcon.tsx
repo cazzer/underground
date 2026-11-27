@@ -1,5 +1,10 @@
-import { accessLabel } from '../lib/labels'
+import type { AmenityKind } from '../lib/amenityGlyphs'
+import { accessLabel, accessSpoken, spokenSentences } from '../lib/labels'
 import type { StationAccessInfo } from '../lib/network'
+import { AmenityIcons } from './AmenityIcon'
+
+const NO_AMENITIES: readonly AmenityKind[] = []
+const NO_SENTENCES: readonly string[] = []
 
 interface AccessGlyphProps {
   className: string
@@ -31,6 +36,11 @@ interface AccessIconProps {
   context: 'card' | 'row'
 }
 
+/** The access glyph's colour class, which the amenity glyphs beside it share: dim for a partly accessible station. */
+function accessTone(access: StationAccessInfo): 'text-ink' | 'text-ink-dim' {
+  return access.status === 'partial' ? 'text-ink-dim' : 'text-ink'
+}
+
 /** The visible mark only; `StationName` gives screen readers the label as text. */
 function AccessIcon({ access, context }: AccessIconProps) {
   const partial = access.status === 'partial'
@@ -38,7 +48,7 @@ function AccessIcon({ access, context }: AccessIconProps) {
 
   return (
     <span aria-hidden="true" className="ml-1 inline-flex items-baseline gap-1">
-      <AccessGlyph className={`size-[0.9em] ${partial ? 'text-ink-dim' : 'text-ink'}`} />
+      <AccessGlyph className={`size-[0.9em] ${accessTone(access)}`} />
       {partly}
     </span>
   )
@@ -48,24 +58,32 @@ interface StationNameProps extends AccessIconProps {
   name: string
   /** An outage leaves the station with no step-free way out right now: the hidden text says so after the label. */
   noStepFreeNow?: boolean
+  /** The station's amenity glyphs (restroom, customer service center), drawn after the access glyph; the card context only. Their words are the caller's, in `alsoSaid`. */
+  amenities?: readonly AmenityKind[]
+  /** Whole sentences said after the access words, in order (a skip notice, then the amenities' `amenityLabel`); empty ones are left out. */
+  alsoSaid?: readonly (string | null)[]
 }
 
 /**
- * The station name, then its access icon; the last word and the icon wrap together, so the icon never sits
- * alone. Screen readers get ", <accessLabel>." as hidden text instead of the icon, so a heading or option name
- * is real text with fixed punctuation. A search row also shows a partly accessible station's note after the icon.
+ * The station name, then its access icon and amenity glyphs; the last word and the icons wrap together, so an icon
+ * never sits alone. Screen readers get ", <accessLabel>." and then `alsoSaid` as hidden text instead of the icons,
+ * so a heading or option name is real text with fixed punctuation. A search row shows no amenities, and shows a
+ * partly accessible station's note after the icon.
  */
-export function StationName({ name, access, context, noStepFreeNow = false }: StationNameProps) {
+export function StationName({ name, access, context, noStepFreeNow = false, amenities = NO_AMENITIES, alsoSaid = NO_SENTENCES }: StationNameProps) {
   const label = accessLabel(access)
-  if (label === null) return name
+  const kinds = context === 'card' ? amenities : NO_AMENITIES
+  const said = accessSpoken(label, noStepFreeNow) + spokenSentences(label !== null, alsoSaid)
+  if (said === '' && kinds.length === 0) return name
   const cut = name.lastIndexOf(' ') + 1
   return (
     <>
       {name.slice(0, cut)}
       <span className="whitespace-nowrap">
         {name.slice(cut)}
-        <AccessIcon access={access} context={context} />
-        <span className="sr-only">, {label}{noStepFreeNow ? "; no step-free access now" : ""}.</span>
+        {label !== null && <AccessIcon access={access} context={context} />}
+        <AmenityIcons kinds={kinds} tone={accessTone(access)} />
+        {said !== '' && <span className="sr-only">{said}</span>}
       </span>
       {context === 'row' && access.note && (
         <span aria-hidden="true" className="text-xs text-ink-dim">
