@@ -11,9 +11,7 @@ import { useLocate } from './data/useLocate'
 import { useStationHash } from './data/useStationHash'
 import { NO_SIBLINGS } from './data/interiorLoad'
 import { useStationInterior } from './data/useStationInterior'
-import { useTripBoard } from './data/useTripBoard'
-import { useTripExit } from './data/useTripExit'
-import { useTripRoute } from './data/useTripRoute'
+import { useTripDraw } from './data/useTripDraw'
 import { useTripTransfers } from './data/useTripTransfers'
 import { usePlaceLine } from './ui/usePlaceLine'
 import { FocusProvider, useFocus } from './lib/focus'
@@ -83,31 +81,6 @@ function MapView({ network, bands, live }: MapViewProps) {
   // The MTA's service changes: the focused station's rows, the skip sets, the header's list and the picked one's drawing.
   const { changes, skips, changeList, changeNote, changeRoute } = useServiceChanges({ network, paths, focusedId, nowS, lookup: live.lookup, lookupFailed: live.lookupFailed })
   const trip = useTrip()
-  // The quickest way out at the trip's To station: drawn there, and named in the trip panel.
-  // Only once the visitor chose the To (an end filled from the fix, then swapped there, waits for a focus or pick).
-  const tripExit = useTripExit({
-    open: trip.open,
-    ends: trip.ends,
-    plan: trip.plan,
-    index: interior.index,
-    ene,
-    nowS,
-    selected: trip.selectedJourney,
-    allowed: trip.fixEnd !== 'to',
-  })
-  // The selected journey's ride legs on the drawn lines; drawn (and the network dimmed) while the trip panel is in front.
-  const tripRoute = useTripRoute({
-    network,
-    paths,
-    open: trip.open,
-    plan: trip.plan,
-    selection: trip.selection,
-    journey: trip.selectedJourney,
-  })
-  // A picked service change draws in the trip's place while the changes list is in front (a trip under it waits).
-  const { front } = usePanelCollapse()
-  const route = changeRoute?.route ?? tripRoute
-  const routeShown = route !== null && (route.kind === 'change' ? front === 'changes' : front === 'trip')
   // A complex is one station (the catalog's complex): its other members, for the trip panel and directions.
   const siblingsOf = useCallback(
     (id: string): readonly string[] => network.groupById.get(id)?.memberIds.filter((m) => m !== id) ?? NO_SIBLINGS,
@@ -115,18 +88,15 @@ function MapView({ network, bands, live }: MapViewProps) {
   )
   const fromId = trip.ends.from
   const fromStations = useMemo(() => new Set(fromId === null ? [] : [fromId, ...siblingsOf(fromId)]), [fromId, siblingsOf])
-  // The quickest way in at the From station, only once the visitor chose it (a From filled from the fix waits for a focus or pick).
-  const tripBoard = useTripBoard({
-    open: trip.open,
-    ends: trip.ends,
-    plan: trip.plan,
-    index: interior.index,
-    ene,
-    nowS,
-    selected: trip.selectedJourney,
-    fromStations,
-    allowed: trip.fixEnd !== 'from',
-  })
+  // The selected journey on the drawn lines (drawn, and the network dimmed, while the trip panel is in front), its way out at
+  // the To station and its way in at the From station, each chosen only once the visitor chose that end (an end filled from the fix
+  // waits for a focus or pick), and the walks to and from the places the ends were searched from.
+  const tripDraw = useTripDraw({ network, paths, trip, index: interior.index, ene, nowS, fromStations })
+  const { exit: tripExit, board: tripBoard, route: tripRoute } = tripDraw
+  // A picked service change draws in the trip's place while the changes list is in front (a trip under it waits).
+  const { front } = usePanelCollapse()
+  const route = changeRoute?.route ?? tripRoute
+  const routeShown = route !== null && (route.kind === 'change' ? front === 'changes' : front === 'trip')
   const names = useMemo(() => tripNamesOf(network), [network])
   // The changes of trains inside hand-authored complexes: described in the trip panel, drawn in their interiors.
   const tripTransfers = useTripTransfers({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, names, selected: trip.selectedJourney })

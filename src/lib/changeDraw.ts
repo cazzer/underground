@@ -119,7 +119,7 @@ export function serviceChangeDraw(alert: ServiceAlert, ctx: ChangeDrawContext, k
     return { x: pos.x, z: pos.z }
   })
   return {
-    route: { kind: 'change', key, rides, suspended, straights: [], walks: [], marks: [...marks.values()], stations: ids, frameStations, faint: false },
+    route: { kind: 'change', key, rides, suspended, straights: [], walks: [], placeWalks: [], places: [], marks: [...marks.values()], stations: ids, frameStations, faint: false },
     probable,
     basis,
   }

@@ -44,7 +44,7 @@ interface TripDashesProps {
 }
 
 /**
- * The trip's walks between stations (theme.exitPath), dashed over the marks' halo discs and under their rings (above the
+ * The trip's walks between stations and between an end's station and its searched place (theme.exitPath), dashed over the marks' halo discs and under their rings (above the
  * veil while the focused interior is loaded under look A and revealing), and its rides found on no drawn shape (their
  * route color, straight through their stops), dashed over the ride legs and under the station markers. Two plain dashed
  * layers, every vertex at y 0 (the street, like the station points the walks join, so the depth factor never moves
@@ -56,12 +56,14 @@ interface TripDashesProps {
 export function TripDashes({ network, route, levels, overVeil }: TripDashesProps) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const walks = route?.walks
+  const placeWalks = route?.placeWalks
   const straights = route?.straights
+  // The walks between stations, then the walks to and from the searched places.
   const walkBuffers = useMemo(() => {
-    if (!walks) return null
+    if (!walks || !placeWalks) return null
     const pink = new Color(theme.exitPath)
-    return tripDashBuffers(walks, [], [pink.r, pink.g, pink.b], () => null)
-  }, [walks])
+    return tripDashBuffers([...walks, ...placeWalks], [], [pink.r, pink.g, pink.b], () => null)
+  }, [walks, placeWalks])
   const straightBuffers = useMemo(
     () => (straights ? tripDashBuffers([], straights, [0, 0, 0], straightColor(routeColorMap(network, theme.routeLineMix))) : null),
     [network, straights],

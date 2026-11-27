@@ -3,7 +3,7 @@ import { chooseExit, quickestExit, type ExitChoice, type ExitResult } from '../l
 import { drawnExitStop, exitLineView, finalRideStops, type ExitLabel, type ExitLineView, type StreetSource } from '../lib/exitView'
 import { stationOfStop } from '../lib/live/arrivals'
 import { joinStationOutages, type EneInput } from '../lib/live/eneJoin'
-import type { Ground } from '../lib/projection'
+import { toGround, type Ground } from '../lib/projection'
 import type { TripJourney } from '../lib/route/plan'
 import { selectedFirst } from '../lib/tripSelection'
 import { plannable, tripKey, type TripEnds, type TripPlanState } from '../lib/tripView'
@@ -36,6 +36,8 @@ interface TripExitInput {
 export interface TripExit {
   /** The To station's interior file id: the path draws only while that interior is the focused one. */
   interiorId: string
+  /** The scene position of that interior's origin: its local points (a choice's exit or entrance) are relative to it. */
+  origin: Ground
   /** The way out the map draws: the selected journey's; null when it ends on foot. */
   drawn: ExitChoice | null
   /** The street label naming the drawn exit, which the map's street labels place first and tint. */
@@ -137,7 +139,7 @@ export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allo
       if (i === 0 && stop.stopId === drawnStop) mapLabel = view.mapLabel
       for (const id of stop.tripIds) lines.set(id, view)
     })
-    return { interiorId, drawn: served[0]!.stopId === drawnStop ? (choices.get(served[0]!.stopId) ?? null) : null, mapLabel, lines }
+    return { interiorId, origin: toGround(model.interior.anchor), drawn: served[0]!.stopId === drawnStop ? (choices.get(served[0]!.stopId) ?? null) : null, mapLabel, lines }
     // `served` is read through servedKey: a refresh with the same stops and trips keeps the result.
   }, [servedKey, drawnStop, interiorId, model, settled, first, second, choices, known])
 }

@@ -4,7 +4,7 @@ import { chooseEntry, quickestEntry, type BoardChoice, type BoardResult } from '
 import { exitLineView, type ExitLabel, type StreetSource } from '../lib/exitView'
 import { stationOfStop } from '../lib/live/arrivals'
 import { joinStationOutages, type EneInput } from '../lib/live/eneJoin'
-import type { Ground } from '../lib/projection'
+import { toGround, type Ground } from '../lib/projection'
 import type { TripJourney } from '../lib/route/plan'
 import { selectedFirst } from '../lib/tripSelection'
 import { plannable, tripKey, type TripEnds, type TripPlanState } from '../lib/tripView'
@@ -39,6 +39,8 @@ interface TripBoardInput {
 export interface TripBoard {
   /** The From station's interior file id: the path draws only while that interior is the focused one. */
   interiorId: string
+  /** The scene position of that interior's origin: its local points (a choice's exit or entrance) are relative to it. */
+  origin: Ground
   /** The way in the map draws: the selected journey's; null when it walks to another station first. */
   drawn: BoardChoice | null
   /** The street label naming the drawn way in's entrance, which the map's street labels place first and tint. */
@@ -144,7 +146,7 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
     })
     const lead = choices.get(served[0]!.stopId)
     const drawn = served[0]!.stopId === drawnStop && lead?.kind === 'board' ? lead : null
-    return { interiorId, drawn, mapLabel, lines }
+    return { interiorId, origin: toGround(model.interior.anchor), drawn, mapLabel, lines }
     // `served` is read through servedKey: a refresh with the same stops and trips keeps the result.
   }, [servedKey, drawnStop, interiorId, model, settled, first, second, choices, known])
 }

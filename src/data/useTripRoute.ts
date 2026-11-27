@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { TripIndexFile } from './schema'
 import type { Network, ShapePath } from '../lib/network'
+import type { PlaceWalkSpan } from '../lib/placeWalk'
+import type { Ground } from '../lib/projection'
 import type { TripJourney } from '../lib/route/plan'
 import { legStationPoints } from '../lib/routeFrame'
 import type { TripRouteDraw } from '../lib/tripLineBuffers'
@@ -20,6 +22,10 @@ interface TripRouteInput {
   selection: TripSelection
   /** The journey the map draws (useTrip's `selectedJourney`). */
   journey: TripJourney | null
+  /** The selected journey's walks between an end's station and its searched place (`usePlaceWalkSpans`, a6m), those that have settled. */
+  placeWalks: readonly PlaceWalkSpan[]
+  /** Where the searched places of the trip's ends are: pinned, and fitted by the route frame, whether or not their walk has settled. */
+  places: readonly Ground[]
 }
 
 type Patterns = TripIndexFile['patterns']
@@ -42,8 +48,10 @@ function legsKeyOf(journey: TripJourney): string {
  * nothing draws. A failed load logs once and draws by geometry. A walk between two complexes' stations follows the street
  * network (`useTransferWalks`, 85r) and waits for its walk graphs to settle, so it never draws straight and then swaps;
  * with no path it stays the straight dash, warned once. A journey that can't be mapped logs and draws nothing.
+ * The walks to and from a searched place (a6m) and the places themselves are the caller's, added to the draw after
+ * the spans are found, so a walk settling never rebuilds the ride legs; the places join the route frame's points at once.
  */
-export function useTripRoute({ network, paths, open, plan, selection, journey }: TripRouteInput): TripRouteDraw | null {
+export function useTripRoute({ network, paths, open, plan, selection, journey, placeWalks, places }: TripRouteInput): TripRouteDraw | null {
   const enabled = open && plan.status === 'ready' && selection.view !== 'none' && journey !== null
   const [patterns, setPatterns] = useState<Patterns | typeof NO_PATTERNS | null>(null)
   useEffect(() => {
@@ -76,7 +84,7 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
     [legsKey, stops],
   )
   const walkDep: TransferWalks | null = crossWalk ? walkGraphs : null
-  const built = useMemo((): { draw: Omit<TripRouteDraw, 'kind' | 'key' | 'faint'>; fallbacks: [string, string][] } | null => {
+  const built = useMemo((): { draw: Omit<TripRouteDraw, 'kind' | 'key' | 'faint' | 'placeWalks' | 'places'>; fallbacks: [string, string][] } | null => {
     if (legsKey === null || journey === null || patterns === null) return null
     try {
       const spans = journeySpans(journey.legs, { shapes: paths, stopStations: stops, patterns: patterns === NO_PATTERNS ? undefined : patterns })
@@ -114,5 +122,9 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
   const faint = selection.view === 'list'
   // Nothing to draw (no leg mapped and no walk between stations): nothing shows, so the network isn't dimmed either.
   const any = drawn !== null && (drawn.rides.length > 0 || drawn.straights.length > 0 || drawn.walks.length > 0)
-  return useMemo(() => (any && drawn && key !== null ? { kind: 'trip' as const, key, ...drawn, faint } : null), [any, drawn, key, faint])
+  const frameStations = useMemo(() => (drawn === null || places.length === 0 ? (drawn?.frameStations ?? []) : [...drawn.frameStations, ...places]), [drawn, places])
+  return useMemo(
+    () => (any && drawn && key !== null ? { kind: 'trip' as const, key, ...drawn, placeWalks, places, frameStations, faint } : null),
+    [any, drawn, key, faint, placeWalks, places, frameStations],
+  )
 }

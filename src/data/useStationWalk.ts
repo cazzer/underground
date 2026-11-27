@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createInteriorCache } from './interiorCache'
 import { decodeStationWalk, loadStationWalk } from './loadStationWalk'
 import type { StationId, Transfer } from './schema'
@@ -89,7 +89,8 @@ export function useStationWalkLoad(stationId: string | null): WalkLoad {
     }
   }, [stationId])
 
-  if (!stationId) return { graph: null, settled: true }
-  const graph = cache.peek(stationId) ?? null
-  return { graph, settled: graph !== null || settledId === stationId || cache.peek(stationId) === null }
+  const peeked = stationId ? cache.peek(stationId) : null
+  const graph = peeked ?? null
+  const settled = !stationId || peeked !== undefined || settledId === stationId
+  return useMemo(() => ({ graph, settled }), [graph, settled])
 }
