@@ -36,6 +36,11 @@ interface AccessIconProps {
   context: 'card' | 'row'
 }
 
+/** The access glyph's colour class, which the amenity glyphs beside it share: dim for a partly accessible station. */
+function accessTone(access: StationAccessInfo): 'text-ink' | 'text-ink-dim' {
+  return access.status === 'partial' ? 'text-ink-dim' : 'text-ink'
+}
+
 /** The visible mark only; `StationName` gives screen readers the label as text. */
 function AccessIcon({ access, context }: AccessIconProps) {
   const partial = access.status === 'partial'
@@ -43,7 +48,7 @@ function AccessIcon({ access, context }: AccessIconProps) {
 
   return (
     <span aria-hidden="true" className="ml-1 inline-flex items-baseline gap-1">
-      <AccessGlyph className={`size-[0.9em] ${partial ? 'text-ink-dim' : 'text-ink'}`} />
+      <AccessGlyph className={`size-[0.9em] ${accessTone(access)}`} />
       {partly}
     </span>
   )
@@ -77,7 +82,7 @@ export function StationName({ name, access, context, noStepFreeNow = false, amen
       <span className="whitespace-nowrap">
         {name.slice(cut)}
         {label !== null && <AccessIcon access={access} context={context} />}
-        <AmenityIcons kinds={kinds} />
+        <AmenityIcons kinds={kinds} tone={accessTone(access)} />
         {said !== '' && <span className="sr-only">{said}</span>}
       </span>
       {context === 'row' && access.note && (

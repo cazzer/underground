@@ -23,16 +23,18 @@ const SVGS: Record<AmenityKind, GlyphSvg> = { restroom: glyphSvg('restroom'), cs
 
 interface AmenityIconsProps {
   kinds: readonly AmenityKind[]
+  /** The access glyph's colour class beside them (`text-ink-dim` at a partly accessible station), so the icons match. */
+  tone: 'text-ink' | 'text-ink-dim'
 }
 
 /**
- * The visible amenity glyphs, drawn in currentColor (text-ink here) at the access glyph's height, each as wide as
- * its own shape; `StationName`'s caller gives screen readers the words.
+ * The visible amenity glyphs, drawn in currentColor (the access glyph's `tone`) at the access glyph's height, each as
+ * wide as its own shape; `StationName`'s caller gives screen readers the words.
  */
-export function AmenityIcons({ kinds }: AmenityIconsProps) {
+export function AmenityIcons({ kinds, tone }: AmenityIconsProps) {
   if (kinds.length === 0) return null
   return (
-    <span aria-hidden="true" className="ml-1 inline-flex items-baseline gap-1 text-ink">
+    <span aria-hidden="true" className={`ml-1 inline-flex items-baseline gap-1 ${tone}`}>
       {kinds.map((kind) => (
         <svg key={kind} viewBox={SVGS[kind].viewBox} focusable="false" className="h-[0.9em] w-auto">
           {SVGS[kind].points.map((points) => (
