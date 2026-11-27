@@ -80,9 +80,9 @@ const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== n
  * station gets no way in (that station comes from the plan). With an `origin` (the searched place the From end was
  * picked from, a6m) the selected journey's way in is the one that minimizes the walk from it plus the time inside
  * (`chooseEntry`), waiting for the walk graph to settle; this hook loads no walk graph itself (`walk` is
- * `useStationWalkLoad`'s). Every stop the panel lists gets it (a stop at another member of the complex estimates its walk), and with no origin the quickest way in. Machines out of service are avoided;
- * with no fresh outage data none count as closed, and the line says a machine's status is unknown when the station
- * panel would. Rebuilt only when what it reads changes, so refreshes keep the choice object and the drawn path.
+ * `useStationWalkLoad`'s). Every stop the panel lists gets it (a stop at another member of the complex estimates its
+ * walk), and with no origin the quickest way in. Machines out of service are avoided; with no fresh outage data none
+ * count as closed, and the line says a machine's status is unknown when the station panel would. Rebuilt only when what it reads changes, so refreshes keep the choice object and the drawn path.
  */
 export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fromStations, allowed, origin, walk }: TripBoardInput): TripBoard | null {
   const ready = allowed && open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
