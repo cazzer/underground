@@ -45,6 +45,12 @@ describe('interior band and deck render orders', () => {
     expect(RENDER_ORDER.tripWalkOver).toBeLessThan(RENDER_ORDER.streetEntrance)
   })
 
+  it("draw a trip's place pins above the veil, over the walks and under the entrance marks, the halo under the pin", () => {
+    expect(RENDER_ORDER.tripPlacePinHaloOver).toBeGreaterThan(RENDER_ORDER.tripWalkOver)
+    expect(RENDER_ORDER.tripPlacePinOver).toBeGreaterThan(RENDER_ORDER.tripPlacePinHaloOver)
+    expect(RENDER_ORDER.tripPlacePinOver).toBeLessThan(RENDER_ORDER.streetEntrance)
+  })
+
   it("draw a straight-drawn ride over the ride legs and under the station markers", () => {
     expect(RENDER_ORDER.tripLine).toBeLessThan(RENDER_ORDER.tripStraight)
     expect(RENDER_ORDER.tripStraight).toBeLessThan(RENDER_ORDER.stationFill)

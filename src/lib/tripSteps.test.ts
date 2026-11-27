@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StationLayout } from '../data/interiorLoad'
+import type { PlaceWalkInfos } from './placeWalk'
 import { activeStepKey, journeyItinerary, stepStatus, type ItineraryRow, type StepContext, type TripStep } from './tripSteps'
 import type { ChangeLegView, RideLegView, WalkLegView } from './tripView'
 
@@ -14,7 +15,7 @@ const ride = (routeId: string, from: [string, string, string], to: [string, stri
   stopsText: '3 stops',
 })
 const change = (stationId: string, name: string, minutes: number | null, transferKey = 'k'): ChangeLegView => ({ kind: 'change', stationId, name, minutes, transferKey })
-const walk = (toStationId: string, to: string): WalkLegView => ({ kind: 'walk', toStationId, to, minutes: 5 })
+const walk = (toStationId: string, to: string): WalkLegView => ({ kind: 'walk', from: 'Origin St', toStationId, to, minutes: 5 })
 
 const ctx = (over: Partial<StepContext> & { layouts?: Record<string, StationLayout> } = {}): StepContext => {
   const { layouts = {}, ...rest } = over
@@ -27,12 +28,13 @@ const ctx = (over: Partial<StepContext> & { layouts?: Record<string, StationLayo
     hasTransferPath: () => false,
     fixPending: null,
     noWayIn: false,
+    placeWalks: { from: null, to: null },
     ...rest,
   }
 }
 
 const steps = (rows: ItineraryRow[]): TripStep[] => rows.flatMap((r) => (r.kind === 'step' ? [r.step] : []))
-const shape = (rows: ItineraryRow[]): string[] => rows.map((r) => (r.kind === 'step' ? r.step.key : `leg:${r.index}`))
+const shape = (rows: ItineraryRow[]): string[] => rows.map((r) => (r.kind === 'step' ? r.step.key : r.kind === 'leg' ? `leg:${r.index}` : `place:${r.end}`))
 
 const BEDFORD = ['L08', 'Bedford Av', '8:04'] as [string, string, string]
 const UNION_OFF = ['L03', '14 St-Union Sq', '8:12'] as [string, string, string]
@@ -159,6 +161,41 @@ describe('stepStatus', () => {
   it('stays quiet for an authored station with no path yet', () => {
     expect(stepStatus('exit', 'authored', false)).toBeNull()
     expect(stepStatus('change', 'authored', false)).toBeNull()
+  })
+})
+
+describe('journeyItinerary with place walks', () => {
+  const one = [ride('L', BEDFORD, UNION_OFF)]
+  const walks = (over: Partial<PlaceWalkInfos> = {}): PlaceWalkInfos => ({
+    from: { place: 'Driggs Av & N 5 St', minutes: 3, estimated: false },
+    to: { place: 'Bedford Av & N 4 St', minutes: 4, estimated: true },
+    ...over,
+  })
+  const places = (rows: ItineraryRow[]) => rows.flatMap((r) => (r.kind === 'place' ? [r] : []))
+
+  it('puts the From walk before the first row and the To walk after the last, as plain rows that are no steps', () => {
+    const rows = journeyItinerary(one, ctx({ placeWalks: walks() }))
+    expect(shape(rows)).toEqual(['place:from', 'board:0', 'leg:0', 'exit:0', 'place:to'])
+    expect(steps(rows).map((s) => s.spoken.slice(0, 11))).toEqual(['Step 1 of 2', 'Step 2 of 2'])
+  })
+
+  it('words each row with the place, the minutes and "about" for an estimate, with a sentence naming the station', () => {
+    const [from, to] = places(journeyItinerary(one, ctx({ placeWalks: walks() })))
+    expect(from).toMatchObject({ end: 'from', text: 'Walk from Driggs Av & N 5 St · 3 min', spoken: 'Walk 3 minutes from Driggs Av & N 5 St to Bedford Av.' })
+    expect(to).toMatchObject({ end: 'to', text: 'Walk to Bedford Av & N 4 St · about 4 min', spoken: 'Walk about 4 minutes from 14 St-Union Sq to Bedford Av & N 4 St.' })
+  })
+
+  it('says one minute in the singular, and adds no row for an end with no place walk', () => {
+    const rows = journeyItinerary(one, ctx({ placeWalks: walks({ from: { place: 'Home', minutes: 1, estimated: false }, to: null }) }))
+    expect(shape(rows)).toEqual(['place:from', 'board:0', 'leg:0', 'exit:0'])
+    expect(places(rows)[0]!.spoken).toBe('Walk 1 minute from Home to Bedford Av.')
+  })
+
+  it('names the station from a trailing walk leg\'s end and a leading one\'s start', () => {
+    const rows = journeyItinerary([walk('L03', '14 St-Union Sq'), ride('L', UNION_OFF, TIMES), walk('127', 'Times Sq-42 St')], ctx({ placeWalks: walks() }))
+    const [from, to] = places(rows)
+    expect(from!.spoken).toContain('to Origin St.')
+    expect(to!.spoken).toContain('from Times Sq-42 St to')
   })
 })
 

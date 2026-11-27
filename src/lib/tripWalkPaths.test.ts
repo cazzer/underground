@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { WalkGraph } from '../data/walkSchema'
 import type { Ground } from './projection'
-import { MAX_SNAP_M, transferWalkPath, withWalkPaths } from './tripWalkPaths'
+import { MAX_SNAP_M, transferWalkPath, walkPathIn, withWalkPaths } from './tripWalkPaths'
 import type { WalkSpan } from './tripSpans'
 import { walkGraph } from './walkFixture'
 
@@ -61,6 +61,28 @@ describe('transferWalkPath', () => {
     const r = transferWalkPath(at(block, 0, 0), at(block, 100, 0), 'A', 'B', graphs(['A', block]))
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toMatch(/700 m against 100 m/)
+  })
+})
+
+describe('walkPathIn', () => {
+  it('follows the street from a station point to a place on it', () => {
+    const r = walkPathIn(ell, at(ell, 0, 0), at(ell, 100, 60))
+    if (!r.ok) throw new Error(r.reason)
+    expectPath(r.path, [at(ell, 0, 0), at(ell, 100, 0), at(ell, 100, 60)])
+    expect(r.meters).toBeCloseTo(160, 6)
+  })
+
+  it('fails for a place past the graph radius, even one the graph could reach', () => {
+    const long = walkGraph([[0, 0], [500, 0]], [{ nodes: [0, 1] }], 300)
+    expect(walkPathIn(long, at(long, 0, 0), at(long, 450, 0))).toMatchObject({ ok: false, reason: 'the place is past the walk graph' })
+  })
+
+  it('fails for a place off the graph, and for a detour past 2.5x', () => {
+    expect(walkPathIn(ell, at(ell, 0, 0), at(ell, 100, 100 + MAX_SNAP_M + 20))).toMatchObject({ ok: false })
+    const block = walkGraph([[0, 0], [0, 200], [100, 200], [100, 0]], [{ nodes: [0, 1] }, { nodes: [1, 2] }, { nodes: [2, 3] }])
+    const r = walkPathIn(block, at(block, 0, 0), at(block, 100, 0))
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/500 m against 100 m/)
   })
 })
 

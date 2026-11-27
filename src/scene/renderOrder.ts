@@ -88,6 +88,9 @@ export const RENDER_ORDER = {
   // The trip's walks above the veil while the focused interior is loaded under look A and revealing (as the streets go to
   // 7.5), so they read like the way out's walk outside.
   tripWalkOver: 7.55,
+  // A trip's place pins above the veil with its walks (PlacePin.tsx `trip`): the halo, then the diamond and dot.
+  tripPlacePinHaloOver: 7.56,
+  tripPlacePinOver: 7.565,
   streetEntrance: 7.6,
   // The amenity marks of a station a shown interior covers, above the veil like its entrance marks, under its strokes.
   amenityPlateOver: 7.61,

@@ -4,6 +4,7 @@ import { nearestStation, type NearestStation } from './locate'
 import type { Station } from './network'
 import { toGround, type Ground } from './projection'
 import type { StationGroup } from './stationGroups'
+import type { TripPlace } from './trip'
 
 const SMALL_WORDS = new Set(['of', 'the', 'and', 'at', 'on', 'in', 'for', 'de', 'la'])
 /** Vowel-less abbreviations that are words, not initials: "ST" is "St", "JFK" stays "JFK". */
@@ -94,6 +95,11 @@ export interface PlacePick {
 /** What a trip end's "near …" note calls the place: a street by its full label ("Broadway, Brooklyn", since "Broadway" alone is four streets), anything else by its name. */
 export function nearNote(pick: Pick<PlacePick, 'kind' | 'name' | 'label'>): string {
   return pick.kind === 'street' ? pick.label : pick.name
+}
+
+/** The trip place a place pick makes of an end: the note and the place's own point, never the fix. */
+export function tripPlaceOf(pick: Pick<PlacePick, 'kind' | 'name' | 'label' | 'ground'>): TripPlace {
+  return { note: nearNote(pick), ground: pick.ground }
 }
 
 function pickKind(word: PlaceText['kindWord']): PlacePick['kind'] {

@@ -1,8 +1,9 @@
 /**
  * Which exit to take: for a destination and the stop a rider gets off at, the street exit that minimizes the walk
  * inside the station (platform to street, `routesToStreet`) plus the walk outside it (the station's walk shard when
- * the destination is within its radius, else a straight-line estimate). And the quickest way in where a rider boards
- * (`quickestEntry`). Pure; every input is passed in.
+ * the destination is within its radius, else a straight-line estimate: outsideWalk.ts). And the quickest way in where a
+ * rider boards (`quickestEntry`), or in from a point (`chooseEntry`: the same walk run the other way). Pure; every
+ * input is passed in.
  */
 import type { StationId, StopId } from '../data/schema'
 import type { StationInterior } from '../data/stationSchema'
@@ -10,10 +11,8 @@ import type { StationStreets, StreetJoin } from '../data/streetSchema'
 import type { WalkGraph } from '../data/walkSchema'
 import { routesFromStreet, routesToStreet, type InStationRoute } from './interiorGraph'
 import { toGround, type Ground } from './projection'
-import { routeWalk, snapToWalk, walkQuery, WALK_SPEED_MPS, type WalkSource } from './walkRoute'
+import { chooseOutside, type ExitWalk } from './outsideWalk'
 
-/** A straight line to the destination is walked this much farther, around blocks, past the shard's reach. */
-export const WALK_DETOUR = 1.3
 /** An interior entrance and a street-file entrance are one when within this many meters (and of one type). */
 export const STREET_MATCH_M = 1.5
 
@@ -31,12 +30,6 @@ export interface ExitChoiceInput {
   /** Connector ids out of service. */
   closed?: ReadonlySet<string>
 }
-
-export type ExitWalk =
-  /** Over the walk graph: scene points from the exit to the destination. */
-  | { kind: 'route'; points: Ground[]; meters: number; seconds: number }
-  /** Past the graph's reach: the straight line, priced with `WALK_DETOUR`. */
-  | { kind: 'estimate'; meters: number; seconds: number }
 
 export interface ExitChoice extends Omit<InStationRoute, 'seconds'> {
   kind: 'exit'
@@ -62,12 +55,15 @@ export type ExitResult = ExitChoice | { kind: 'none'; reason: 'no-track' | 'no-e
 /**
  * The quickest way in for a rider boarding at `stopId`: the exit's shape read the other way. `exit` is the entry the
  * rider comes in by, `connectorIds` and `areaIds` still run platform to street (against travel), `inStationS` is the
- * time from the street to the track, and there is no walk outside.
+ * time from the street to the track, and the walk outside exists only for `chooseEntry` (from a point).
  */
 export interface BoardChoice extends Omit<ExitChoice, 'kind' | 'walk' | 'destination'> {
   kind: 'board'
-  walk: null
+  /** The walk outside from `origin` to the entrance, points running origin to entrance; null for the quickest way in. */
+  walk: ExitWalk | null
   destination: null
+  /** Scene ground the rider comes from (a searched place; never the location fix); null for the quickest way in. */
+  origin: Ground | null
 }
 
 export type BoardResult = BoardChoice | { kind: 'none'; reason: 'no-track' | 'no-entrance' }
@@ -111,65 +107,6 @@ function stationOf(interior: StationInterior, stopId: StopId): StationId {
   return interior.memberStationIds?.includes(parent) ? parent : interior.stationId
 }
 
-interface Outside {
-  route: InStationRoute
-  walk: ExitWalk
-  totalS: number
-}
-
-function straightLine(from: Ground, to: Ground): number {
-  return Math.hypot(to.x - from.x, to.z - from.z)
-}
-
-/** Over the walk graph, from every exit at once; null when the destination or no exit can be snapped to it. */
-function walkOutside(
-  routes: InStationRoute[],
-  exitScene: Ground[],
-  destination: Ground,
-  walk: WalkGraph,
-  stepFree: boolean,
-): Outside | null {
-  const q = walkQuery(walk, { stepFree })
-  const local = (g: Ground): Ground => ({ x: g.x - walk.anchor.x, z: g.z - walk.anchor.z })
-  const target = snapToWalk(q, local(destination))
-  if (!target) return null
-  const sources: WalkSource[] = []
-  const origin: number[] = []
-  routes.forEach((route, i) => {
-    const snap = snapToWalk(q, local(exitScene[i]!))
-    if (!snap) return
-    sources.push({ snap, startS: route.seconds + snap.offsetM / WALK_SPEED_MPS })
-    origin.push(i)
-  })
-  const path = routeWalk(q, sources, target)
-  if (!path) return null
-  const i = origin[path.source]!
-  const route = routes[i]!
-  const snap = sources[path.source]!.snap
-  const lastLeg = target.offsetM / WALK_SPEED_MPS
-  const points = [exitScene[i]!, ...path.points.map((p) => ({ x: p.x + walk.anchor.x, z: p.z + walk.anchor.z })), destination]
-  return {
-    route,
-    totalS: path.seconds + lastLeg,
-    walk: { kind: 'route', points, meters: snap.offsetM + path.meters + target.offsetM, seconds: path.seconds - route.seconds + lastLeg },
-  }
-}
-
-/** Past the graph: the exit that minimizes its in-station time plus the straight line at `WALK_DETOUR`. */
-function estimateOutside(routes: InStationRoute[], exitScene: Ground[], destination: Ground): Outside {
-  let best = 0
-  let bestS = Infinity
-  routes.forEach((route, i) => {
-    const s = route.seconds + (straightLine(exitScene[i]!, destination) * WALK_DETOUR) / WALK_SPEED_MPS
-    if (s < bestS) {
-      best = i
-      bestS = s
-    }
-  })
-  const meters = straightLine(exitScene[best]!, destination)
-  return { route: routes[best]!, totalS: bestS, walk: { kind: 'estimate', meters, seconds: (meters * WALK_DETOUR) / WALK_SPEED_MPS } }
-}
-
 type QuickestInput = Omit<ExitChoiceInput, 'destination' | 'walk'>
 
 /** The chosen route as an `ExitChoice`, with its walk outside (none for the quickest way out). */
@@ -207,8 +144,7 @@ export function chooseExit(input: ExitChoiceInput): ExitResult {
   if (routes.length === 0) return { kind: 'none', reason: 'no-exit' }
   const origin = toGround(interior.anchor)
   const exitScene = routes.map((r) => ({ x: origin.x + r.exit.point[0], z: origin.z + r.exit.point[1] }))
-  const inReach = walk !== null && Math.hypot(destination.x - walk.anchor.x, destination.z - walk.anchor.z) <= walk.radiusM
-  const outside = (inReach ? walkOutside(routes, exitScene, destination, walk, stepFree) : null) ?? estimateOutside(routes, exitScene, destination)
+  const outside = chooseOutside(routes, exitScene, destination, walk, stepFree)
   return choiceOf(input, outside.route, { walk: outside.walk, destination, totalS: outside.totalS })
 }
 
@@ -233,5 +169,36 @@ export function quickestEntry(input: QuickestInput): BoardResult {
   if (routes === null) return { kind: 'none', reason: 'no-track' }
   if (routes.length === 0) return { kind: 'none', reason: 'no-entrance' }
   const choice = choiceOf(input, routes[0]!, { walk: null, destination: null, totalS: routes[0]!.seconds })
-  return { ...choice, kind: 'board', walk: null, destination: null }
+  return { ...choice, kind: 'board', walk: null, destination: null, origin: null }
+}
+
+export interface EntryChoiceInput extends QuickestInput {
+  /** Scene ground the rider comes from: a searched place. */
+  origin: Ground
+  /** The station's walk graph, once loaded; null to estimate. */
+  walk: WalkGraph | null
+}
+
+/**
+ * The best way in for a rider coming from `origin` and boarding at `stopId`: the entry minimizing the walk outside
+ * (over the station's graph when the origin is within its radius, else a straight estimate) plus the time inside
+ * (`routesFromStreet`). The graph is undirected, so the walk is searched entrance to origin and its points reversed to
+ * run origin to entrance. `none` as for `quickestEntry`. Throws when the walk graph is another station's.
+ */
+export function chooseEntry(input: EntryChoiceInput): BoardResult {
+  const { interior, stopId, origin, walk } = input
+  const stepFree = input.stepFree === true
+  const stationId = stationOf(interior, stopId)
+  if (walk !== null && walk.stationId !== stationId) {
+    throw new Error(`The walk graph is for station ${walk.stationId}, but stop ${stopId} is at ${stationId}`)
+  }
+  const routes = routesFromStreet(interior, stopId, { stepFree, closed: input.closed })
+  if (routes === null) return { kind: 'none', reason: 'no-track' }
+  if (routes.length === 0) return { kind: 'none', reason: 'no-entrance' }
+  const at = toGround(interior.anchor)
+  const entryScene = routes.map((r) => ({ x: at.x + r.exit.point[0], z: at.z + r.exit.point[1] }))
+  const outside = chooseOutside(routes, entryScene, origin, walk, stepFree)
+  const walkIn: ExitWalk = outside.walk.kind === 'route' ? { ...outside.walk, points: [...outside.walk.points].reverse() } : outside.walk
+  const choice = choiceOf(input, outside.route, { walk: walkIn, destination: null, totalS: outside.totalS })
+  return { ...choice, kind: 'board', walk: walkIn, destination: null, origin }
 }

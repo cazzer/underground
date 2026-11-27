@@ -4,6 +4,7 @@ import { routeSpokenName } from './labels'
 import { DEPARTURE_NOW_UNDER_S, stationOfStop } from './live/arrivals'
 import { clockNow } from './live/clock'
 import { nyClockTime, stopEta, stopEtaSpoken } from './live/trainStops'
+import type { PlaceWalkInfo, PlaceWalkInfos } from './placeWalk'
 import type { OverlayCounts } from './route/overlay'
 import type { TripJourney, TripRideLeg } from './route/plan'
 import { isChangeWalk, transferLegKey } from './transferView'
@@ -113,6 +114,8 @@ export interface ChangeLegView {
 }
 export interface WalkLegView {
   kind: 'walk'
+  /** The station it leaves. */
+  from: string
   toStationId: StationId
   to: string
   minutes: number
@@ -145,12 +148,32 @@ export interface JourneyView {
   source: JourneySource
   sourceText: string
   legs: LegView[]
+  /** The walks to and from a searched place, as the summary says them ("3 min walk first", "arrive about 1:04 on foot");
+   *  empty with no place walk. They do not change the router's times above. */
+  walkNotes: string[]
   spoken: string
 }
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 const transfersTextOf = (n: number): string => (n === 0 ? 'No changes' : plural(n, 'change'))
 const walkMinutes = (durationS: number): number => Math.max(1, Math.round(durationS / 60))
+const aboutMin = (w: PlaceWalkInfo): string => `${w.estimated ? 'about ' : ''}${w.minutes} min`
+
+/** The summary's words for the walks to and from a searched place: what shows (chips) and what is said. */
+function placeWalkSummary(j: TripJourney, walks: PlaceWalkInfos): { notes: string[]; spoken: string } {
+  const notes: string[] = []
+  const said: string[] = []
+  if (walks.from) {
+    notes.push(`${aboutMin(walks.from)} walk first`)
+    said.push(`Starts with a ${walks.from.estimated ? 'roughly ' : ''}${walks.from.minutes}-minute walk from ${walks.from.place}.`)
+  }
+  if (walks.to) {
+    const clock = nyClockTime(j.arriveAt + walks.to.minutes * 60)
+    notes.push(`arrive ${walks.to.estimated ? 'about' : 'at'} ${clock} on foot`)
+    said.push(`Then a ${walks.to.estimated ? 'roughly ' : ''}${walks.to.minutes}-minute walk to ${walks.to.place}, arriving ${walks.to.estimated ? 'about' : 'at'} ${clock}.`)
+  }
+  return { notes, spoken: said.length > 0 ? `${said.join(' ')} ` : '' }
+}
 
 function legViews(j: TripJourney, names: TripNames): LegView[] {
   const at = (stop: string, time: number): PlaceTime => {
@@ -178,7 +201,7 @@ function legViews(j: TripJourney, names: TripNames): LegView[] {
       const minutes = leg.durationS > 0 ? walkMinutes(leg.durationS) : null
       return { kind: 'change', stationId: toStationId, name: names.station(toStationId), minutes, transferKey: transferLegKey(leg, next) }
     }
-    return { kind: 'walk', toStationId, to: names.station(toStationId), minutes: walkMinutes(leg.durationS) }
+    return { kind: 'walk', from: names.station(stationOfStop(leg.fromStop)), toStationId, to: names.station(toStationId), minutes: walkMinutes(leg.durationS) }
   })
 }
 
@@ -186,7 +209,7 @@ function legViews(j: TripJourney, names: TripNames): LegView[] {
  * One journey as the panel and the screen reader read it. It departs when the first train does, not when the
  * rider starts walking to it; a walk-only journey departs when it starts.
  */
-export function journeyView(j: TripJourney, nowS: number, names: TripNames): JourneyView {
+export function journeyView(j: TripJourney, nowS: number, names: TripNames, walks: PlaceWalkInfos | null = null): JourneyView {
   const rides = j.legs.filter((l): l is TripRideLeg => l.kind === 'ride')
   const departAt = rides[0]?.departAt ?? j.departAt
   const eta = stopEta(departAt, nowS, DEPARTURE_NOW_UNDER_S)
@@ -196,9 +219,10 @@ export function journeyView(j: TripJourney, nowS: number, names: TripNames): Jou
   const arriveClock = nyClockTime(j.arriveAt)
   const source = journeySource(j)
   const via = routes.length > 0 ? `: ${routes.map((r) => routeSpokenName(names.route(r))).join(', then ')}` : ''
+  const walk = walks === null ? null : placeWalkSummary(j, walks)
   const spoken =
     `Leaves ${stopEtaSpoken(eta)}. Arrives ${arriveClock}. ${plural(minutes, 'minute')}, ${transfersText.toLowerCase()}${via}. ` +
-    `${SOURCE_TEXT[source]}.`
+    `${walk?.spoken ?? ''}${SOURCE_TEXT[source]}.`
   return {
     key: journeyKey(j),
     departClock: eta.clock,
@@ -210,6 +234,7 @@ export function journeyView(j: TripJourney, nowS: number, names: TripNames): Jou
     source,
     sourceText: SOURCE_TEXT[source],
     legs: legViews(j, names),
+    walkNotes: walk?.notes ?? [],
     spoken,
   }
 }
@@ -244,8 +269,9 @@ export function tripNamesOf(network: {
 }
 
 /** The journeys of a ready plan as views; none otherwise. */
-export function planViews(plan: TripPlanState, nowS: number, names: TripNames): JourneyView[] {
+export function planViews(plan: TripPlanState, nowS: number, names: TripNames, placeWalks: { key: string; walks: PlaceWalkInfos } | null = null): JourneyView[] {
   if (plan.status !== 'ready') return []
   const keys = journeyKeys(plan.journeys)
-  return plan.journeys.map((j, i) => ({ ...journeyView(j, nowS, names), key: keys[i]! }))
+  // The place walks are those of the one journey the map draws, so only it says them.
+  return plan.journeys.map((j, i) => ({ ...journeyView(j, nowS, names, placeWalks !== null && placeWalks.key === keys[i] ? placeWalks.walks : null), key: keys[i]! }))
 }

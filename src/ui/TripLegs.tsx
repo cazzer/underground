@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { boardLineKey, type BoardLine } from '../lib/boardView'
 import type { ExitLineView } from '../lib/exitView'
 import { routeSpokenName } from '../lib/labels'
+import type { PlaceWalkInfos } from '../lib/placeWalk'
 import type { Network } from '../lib/network'
 import type { TransferLineView } from '../lib/transferView'
 import type { StationLayout } from '../data/interiorLoad'
@@ -96,6 +97,8 @@ export interface JourneyLegsProps {
   boards: ReadonlyMap<string, BoardLine> | null
   /** The trip end filled from the location fix and not yet picked or focused: its step says to tap it. */
   fixPending: 'from' | 'to' | null
+  /** The walks to and from the searched places of the ends, for the journey the map draws: they bracket its rows. */
+  placeWalks: PlaceWalkInfos
   /** The pressed step's key while it holds. */
   activeStep: string | null
   /** A step was pressed: flies to its station and makes it the active step. */
@@ -107,7 +110,7 @@ export interface JourneyLegsProps {
  * step. A step is a button that flies to its station, with the way through it (the change's transfer line, the exit line)
  * beside the button, never inside it.
  */
-export function JourneyLegs({ network, view, drawnKeys, onShowTrain, exits, transfers, layoutOf, boards, fixPending, activeStep, onStep }: JourneyLegsProps) {
+export function JourneyLegs({ network, view, drawnKeys, onShowTrain, exits, transfers, layoutOf, boards, fixPending, placeWalks, activeStep, onStep }: JourneyLegsProps) {
   // Keyed by the first ride and the station it boards at, so a journey that walks to another station first finds none.
   const firstRide = view.legs.find((l): l is RideLegView => l.kind === 'ride')
   const board = firstRide ? (boards?.get(boardLineKey(firstRide.tripId, firstRide.board.stationId)) ?? null) : null
@@ -120,12 +123,21 @@ export function JourneyLegs({ network, view, drawnKeys, onShowTrain, exits, tran
     hasTransferPath: (key) => transfers?.has(key) === true,
     fixPending,
     noWayIn: board?.kind === 'no-entrance',
+    placeWalks,
   }
   const rows = journeyItinerary(view.legs, ctx)
   const firstBoard = rows.find((r) => r.kind === 'step' && r.step.kind === 'board')
   return (
     <ol className="flex flex-col gap-2 pb-3 pl-1 text-sm">
       {rows.map((row) => {
+        if (row.kind === 'place') {
+          return (
+            <li key={`place:${row.end}`} className="text-ink-dim">
+              <span aria-hidden="true">{row.text}</span>
+              <span className="sr-only">{row.spoken}</span>
+            </li>
+          )
+        }
         if (row.kind === 'leg') {
           return <Leg key={`leg:${row.index}`} network={network} leg={row.leg} showOff={row.showOff} offPlace={row.offPlace} mixed={view.source === 'mixed'} drawnKeys={drawnKeys} onShowTrain={onShowTrain} />
         }

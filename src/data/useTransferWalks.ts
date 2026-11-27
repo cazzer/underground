@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Network } from '../lib/network'
 import type { StationId } from './schema'
-import { loadTransferWalkGraphs } from './useStationWalk'
+import { loadTransferWalkGraphs, WALK_DEADLINE_MS } from './useStationWalk'
 import type { WalkGraph } from './walkSchema'
 
 export interface TransferWalks {
@@ -14,9 +14,6 @@ export interface TransferWalks {
 }
 
 const NONE: TransferWalks = { graphs: new Map(), settled: false, failed: false }
-
-/** After this long a hung shard no longer holds the route back: the walks without a graph draw straight. */
-export const WALK_DEADLINE_MS = 3000
 
 /**
  * The walk graphs of every station in a transfer between two complexes (transfers.json; a handful, 5 stations today), so

@@ -7,13 +7,14 @@ import type { ArrivalsSource } from '../lib/live/arrivals'
 import { markedPlacement } from '../lib/locate'
 import type { BoardLine } from '../lib/boardView'
 import type { ExitLineView } from '../lib/exitView'
-import { nearNote } from '../lib/placeLabel'
-import { HERE_NOTE } from '../lib/searchHere'
+import { tripPlaceOf } from '../lib/placeLabel'
+import { HERE_PLACE } from '../lib/searchHere'
 import type { Network } from '../lib/network'
 import type { TransferLineView } from '../lib/transferView'
 import { useTrainSelection } from '../lib/trainSelection'
 import { useTrip } from '../lib/trip'
 import { tripBarText } from '../lib/tripBar'
+import type { PlaceWalkInfos } from '../lib/placeWalk'
 import { planViews, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
 import { CollapseButton, ExpandBar } from './PanelBar'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
@@ -36,6 +37,8 @@ export interface TripLines {
   index: IndexLoad
   /** The way in at the From station of each journey that boards its first train there, by `boardLineKey` of that ride. */
   boards: ReadonlyMap<string, BoardLine> | null
+  /** The walks to and from the places the ends were searched from, for the journey the map draws. */
+  placeWalks: PlaceWalkInfos
 }
 
 interface TripPanelProps {
@@ -109,7 +112,9 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
   }, [retrying, plan, headingRef])
 
   const names = tripNamesOf(network)
-  const views = planViews(plan, tripNowS(arrivals, performance.now(), Date.now()), names)
+  // The place walks are the drawn journey's: the summary says them only once that journey is the opened one.
+  const placeWalks = selection.view === 'detail' && selection.openedKey !== null ? { key: selection.openedKey, walks: lines.placeWalks } : null
+  const views = planViews(plan, tripNowS(arrivals, performance.now(), Date.now()), names, placeWalks)
   const bar = tripBarText(ends, (id) => network.groupById.get(id)?.name ?? id)
   const message = tripMessage(ends, plan, showLoading)
   const placement = markedPlacement(locate.state)
@@ -194,6 +199,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
               transfers: lines.transfers,
               layoutOf: (id) => layoutOf(id, lines.index),
               boards: lines.boards,
+              placeWalks: lines.placeWalks,
               fixPending: fixEnd,
               activeStep,
               onStep: stepTo,
@@ -210,8 +216,8 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
         label={GEOCODE_URL ? 'Trip from: search stations and places' : 'Trip from: search stations'}
         placeholder={GEOCODE_URL ? 'From station or address' : 'From station'}
         onChoose={(id) => setEnd('from', id)}
-        onChoosePlace={(p) => setEnd('from', p.nearest.id, nearNote(p))}
-        onChooseHere={(id) => setEnd('from', id, HERE_NOTE)}
+        onChoosePlace={(p) => setEnd('from', p.nearest.id, tripPlaceOf(p))}
+        onChooseHere={(id) => setEnd('from', id, HERE_PLACE)}
       />
       <StationSearch
         ref={toSearch}
@@ -220,8 +226,8 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
         label={GEOCODE_URL ? 'Trip to: search stations and places' : 'Trip to: search stations'}
         placeholder={GEOCODE_URL ? 'To station or address' : 'To station'}
         onChoose={(id) => setEnd('to', id)}
-        onChoosePlace={(p) => setEnd('to', p.nearest.id, nearNote(p))}
-        onChooseHere={(id) => setEnd('to', id, HERE_NOTE)}
+        onChoosePlace={(p) => setEnd('to', p.nearest.id, tripPlaceOf(p))}
+        onChooseHere={(id) => setEnd('to', id, HERE_PLACE)}
       />
     </aside>
   )

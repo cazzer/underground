@@ -23,6 +23,11 @@ export function JourneyChips({ network, view, className }: JourneyChipsProps) {
       <span className="whitespace-nowrap">
         {view.departAway === 'Now' ? 'Leaves now' : `Leaves in ${view.departAway}`} · {view.sourceText}
       </span>
+      {view.walkNotes.map((note) => (
+        <span key={note} className="whitespace-nowrap">
+          {note}
+        </span>
+      ))}
     </span>
   )
 }

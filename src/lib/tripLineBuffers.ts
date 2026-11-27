@@ -7,6 +7,7 @@
 import type { ShapeId, StationId } from '../data/schema'
 import { BAND_INPUTS, type LineBuffers, type Rgb } from './lineBuffers'
 import type { ShapePath } from './network'
+import type { PlaceWalkSpan } from './placeWalk'
 import type { Ground } from './projection'
 import type { TripMark } from './tripMarks'
 import type { RideShapeSpan, RideStraightSpan, WalkSpan } from './tripSpans'
@@ -28,6 +29,10 @@ export interface TripRouteDraw {
   straights: readonly RideStraightSpan[]
   /** Its walks between stations, a complex's members aside (TripDashes). */
   walks: readonly WalkSpan[]
+  /** Its walks between an end's station and the searched place that end was picked from, in walking order (TripDashes, after `walks`); a settling one is absent. */
+  placeWalks: readonly PlaceWalkSpan[]
+  /** Where those searched places are (PlacePin), whether or not their walk has settled; the route frame fits them. */
+  places: readonly Ground[]
   /** Where it boards, changes and alights, or the stations a change skips (TripMarks). */
   marks: readonly TripMark[]
   /** Every station it calls at (a change: every station the MTA lists): their rings stay full while the network dims. */

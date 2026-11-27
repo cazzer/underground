@@ -8,9 +8,9 @@ import { announcementFor, nextErrorSpoken, searchEmptyText, type ErrorSpoken } f
 import { multiBoroughNames } from '../lib/labels'
 import type { Network } from '../lib/network'
 import type { StationGroup } from '../lib/stationGroups'
-import { nearNote, placePick, type PlacePick } from '../lib/placeLabel'
+import { placePick, tripPlaceOf, type PlacePick } from '../lib/placeLabel'
 import { enterTarget, searchItems, type SearchItem } from '../lib/searchItems'
-import { HERE_NOTE, searchStatusText } from '../lib/searchHere'
+import { HERE_PLACE, searchStatusText } from '../lib/searchHere'
 import { rowActions } from '../lib/searchRowActions'
 import { searchNav, type NavSpot } from '../lib/searchNav'
 import { buildSearchIndex, SEARCH_LIMIT, searchStations } from '../lib/stationSearch'
@@ -140,7 +140,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
     if (item.kind === 'station') onDirections(end, { stationId: item.station.id, place: null })
     else {
       const pick = placeOf(item)
-      onDirections(end, { stationId: pick.nearest.id, place: nearNote(pick) })
+      onDirections(end, { stationId: pick.nearest.id, place: tripPlaceOf(pick) })
     }
     close()
   }
@@ -150,7 +150,7 @@ export function StationSearch({ network, onChoose, onChoosePlace, onDirections, 
   }
   const directionsHere = (end: TripEnd) => {
     if (!onDirections || !here.row) throw new Error('Directions were picked from a location row that offers none')
-    onDirections(end, { stationId: here.row.nearestId, place: HERE_NOTE })
+    onDirections(end, { stationId: here.row.nearestId, place: HERE_PLACE })
     close()
   }
   const focusSpot = (spot: NavSpot) => {

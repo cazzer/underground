@@ -105,12 +105,14 @@ export function useStationInterior(
 
 /**
  * A station interior's model by file id (`interiorIdOf`), from the same cache as the focused interior, so it is the
- * same object once that station is focused. Null while loading, with no id, or after a failure (logged). Fetches only
- * an id the visitor chose (a trip's To station), like the focused one.
+ * same object once that station is focused. `model` is null while loading, with no id, or after a failure (logged);
+ * `failed` says it was the failure, so a drawing that waits for the interior can go on without it. Fetches only an
+ * id the visitor chose (a trip's To station), like the focused one.
  */
-export function useInteriorModel(id: string | null): InteriorModel | null {
+export function useInteriorModelLoad(id: string | null): { model: InteriorModel | null; failed: boolean } {
   // The last id whose load settled: set only to re-render once the cache holds it.
   const [, setLoadedId] = useState<string | null>(null)
+  const [failedId, setFailedId] = useState<string | null>(null)
   useEffect(() => {
     if (!id || cache.peek(id)) return
     let cancelled = false
@@ -118,13 +120,24 @@ export function useInteriorModel(id: string | null): InteriorModel | null {
       () => {
         if (!cancelled) setLoadedId(id)
       },
-      (err: unknown) => console.error(`Failed to load the interior of station ${id}`, err),
+      (err: unknown) => {
+        console.error(`Failed to load the interior of station ${id}`, err)
+        if (!cancelled) setFailedId(id)
+      },
     )
     return () => {
       cancelled = true
+      // Coming back to a failed station starts clean, not with its old failure.
+      setFailedId(null)
     }
   }, [id])
-  return (id && cache.peek(id)) || null
+  const model = (id && cache.peek(id)) || null
+  return { model, failed: id !== null && model === null && failedId === id }
+}
+
+/** `useInteriorModelLoad`'s model alone: null while loading, with no id, or after a failure. */
+export function useInteriorModel(id: string | null): InteriorModel | null {
+  return useInteriorModelLoad(id).model
 }
 
 const NO_MODELS: ReadonlyMap<string, InteriorModel> = new Map()
