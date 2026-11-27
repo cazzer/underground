@@ -178,9 +178,6 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
       {placePin && <PlacePin ground={placePin} />}
-      {/* The searched places the trip's ends were picked from, while the trip route shows (the place line's own pin, if on one of them, is not drawn twice). */}
-      {drawn?.kind === 'trip' &&
-        drawn.places.map((g, i) => (placePin !== null && placePin.x === g.x && placePin.z === g.z ? null : <PlacePin key={`${i}:${g.x},${g.z}`} ground={g} />))}
       {/* Decoration: a crash (logged) draws no amenity marks instead of blanking the scene. */}
       <ErrorBoundary fallback={null}>
         <StationAmenities network={network} amenities={amenities} shown={shown} presences={presences} levels={tripLevels} blockers={labelBlockers} insets={insets} panel={panel} />

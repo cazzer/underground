@@ -4,7 +4,7 @@
 import type { StopId } from '../data/schema'
 import type { StationInterior } from '../data/stationSchema'
 import type { StationStreets } from '../data/streetSchema'
-import { STREET_MATCH_M, streetEntranceIndex, walkMinutes, type BoardChoice, type ExitChoice } from './exitChoice'
+import { STREET_MATCH_M, streetEntranceIndex, type BoardChoice, type ExitChoice } from './exitChoice'
 import type { StreetExit } from './interiorGraph'
 import { interiorBounds } from './interiorFraming'
 import { MERGE_M, type EntranceText } from './entranceText'
@@ -120,15 +120,13 @@ export function machinesUsed(route: { connectorIds: readonly string[] }, interio
 }
 
 /**
- * The trip panel's exit line. "Quickest way out: Bedford Av & N 7 St" for the quickest way out (no destination), "Exit
- * at …" toward a point; with no street label, the way from the station's middle ("toward the northeast"). The note
- * holds the label's tail, "probably" on an estimated layout, the walk on, and "elevator status unknown" (or
- * escalator) when the route rides one and the station panel would call machine status unknown (`closedKnown` false).
- * The way in at the From station (a `BoardChoice`) reads the same: "Quickest way in: Bedford Av & N 7 St", or with no
- * street label "Quickest way in: northeast entrance"; a machine whose status is unknown is named in the order the rider
- * meets it. A way in chosen for a walk from a searched place (`origin`, a6m) reads "Enter at Bedford Av & N 7 St", or
- * with no label "Enter at the northeast entrance", the walk first: "after 3 min walk" ("about" when estimated), spoken
- * "After a 3 minute walk."
+ * The trip panel's exit line: "Quickest way out: Bedford Av & N 7 St" at the To station, "Quickest way in: Bedford Av &
+ * N 7 St" at the From station (a `BoardChoice`), whether or not a searched place picked the exit or entrance (the
+ * walk to or from it is its own itinerary row, tripSteps.ts). With no street label, the way from the station's middle
+ * ("toward the northeast", "northeast entrance"). The note holds the label's tail, "probably" on an estimated layout,
+ * and "elevator status unknown" (or escalator) when the route rides one and the station panel would call machine
+ * status unknown (`closedKnown` false); a way in names the machine whose status is unknown in the order the rider
+ * meets it.
  */
 export function exitLineView(
   choice: ExitChoice | BoardChoice,
@@ -138,19 +136,14 @@ export function exitLineView(
 ): ExitLineView {
   const label = labelOf(choice, interior, sources)
   const board = choice.kind === 'board'
-  const fromPlace = choice.kind === 'board' && choice.origin !== null
   const compass = compassOf(interior, choice.exit.point)
-  const head = label ? label.head : fromPlace ? `the ${compass} entrance` : board ? `${compass} entrance` : `toward the ${compass}`
-  const lead = fromPlace ? 'Enter at' : board ? 'Quickest way in:' : choice.destination === null ? 'Quickest way out:' : label ? 'Exit at' : 'Exit'
+  const head = label ? label.head : board ? `${compass} entrance` : `toward the ${compass}`
+  const lead = board ? 'Quickest way in:' : 'Quickest way out:'
   const unknown = closedKnown ? [] : board ? machinesMet(choice, interior) : machinesUsed(choice, interior)
   const status = unknown.length > 0 ? `${unknown.join(' and ')} status unknown` : null
-  const walk = choice.walk
-  const minutes = walk && walkMinutes(walk.seconds)
-  const walkText = walk === null ? null : walk.kind === 'estimate' ? `about ${minutes} min walk` : fromPlace ? `after ${minutes} min walk` : `then ${minutes} min walk`
   const tail = label && label.tail !== '' ? label.tail : null
-  const note = [tail, choice.probable ? 'probably' : null, walkText, status].filter((p): p is string => p !== null)
+  const note = [tail, choice.probable ? 'probably' : null, status].filter((p): p is string => p !== null)
   const sentences = [`${lead} ${streetSpoken(head)}${tail ? `, ${streetSpoken(tail.replaceAll(' · ', ', '))}` : ''}.`]
-  if (walk) sentences.push(`${fromPlace ? (walk.kind === 'route' ? 'After a' : 'After about a') : walk.kind === 'route' ? 'Then a' : 'About a'} ${minutes} minute walk.`)
   if (status) sentences.push(`${capitalize(status)}.`)
   if (choice.probable) sentences.push('Probably: the station layout is estimated.')
   const origin = toGround(interior.anchor)

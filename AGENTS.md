@@ -99,8 +99,12 @@ Worker (own package and lockfile; `npm --prefix worker ci` once):
   `outsideWalk.ts` (the walk outside a station, shared by `chooseExit` and `chooseEntry` in `exitChoice.ts`: To is the
   chosen exit to the place, From the place to the chosen entrance, over the station's shard when the place is within its
   radius, else a straight dash), `walkPathIn` in `tripWalkPaths.ts`; `data/usePlaceWalks.ts` and `data/useTripDraw.ts`
-  wire them (ends, shards, exit and board choice, spans, route); `TripDashes.tsx` draws them with the transfer walks and
-  `Scene.tsx` pins each place (`PlacePin`). `ExitPath.tsx` draws no walk outside: the dashed map walk is its only drawing.
+  wire them (ends, shards, exit and board choice, spans, route); every listed stop of an end reads its own station's
+  shard and waits for it alone, and a shard past its 3 s deadline is ignored so a drawn exit never changes;
+  `TripDashes.tsx` draws them with the transfer walks and `TripPlacePins.tsx` (in `SubwayLines`, held with the route)
+  pins each place (`PlacePin`: faint-dimmed, above the veil with the walks). The panel adds a plain "Walk to/from <place>
+  · N min" row to the opened journey (`tripSteps.ts`) and the walk to its summary (`tripView.ts`); the exit and way-in
+  lines keep "Quickest way out/in". `ExitPath.tsx` draws no walk outside: the dashed map walk is its only drawing.
 - `src/data/`: loaders, hooks and file contracts (`schema.ts`, `stationSchema.ts`, `streetSchema.ts`,
   `timetableSchema.ts`, `walkSchema.ts`, `equipmentSchema.ts`; `realtime.ts` re-exports the Worker's contracts).
 - `public/data/`: generated JSON (never hand-edit). `data/`: pinned sources (stations, catalog, streets, basemap
@@ -247,17 +251,20 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   view-driven station sets are empty until the user moves the view or picks a station or place (the location cap,
   `lib/basemap/locationCapHandle.ts`).
 - **Station-named fetches reveal the station id to the static host.** Walk shards: only for a station the user
-  picked, focused or chose as a trip end (`useStationWalkLoad`), never one the camera merely shows. One exception (85r,
+  picked, focused or chose as a trip end (`useStationWalkLoads`), never one the camera merely shows. One exception (85r,
   `useTransferWalks`): once a trip plan is ready (`FEATURES.navigation`) the shards of every station in a transfer
   between two complexes (transfers.json; a handful, 5 stations today) load together: the same set for every plan,
   whatever the ends (a fix-filled end included, which still fetches nothing of its own), fixed by the static data,
   once per page load at the first ready plan (a failed load is asked for again when the trip next opens; a hung one
   stops holding the route back after 3 s), so the walks draw along streets without revealing which the rider uses;
-  never at startup. A second exception (a6m): an end set from a place the visitor searched loads the walk shard of the
-  station its journey reaches that end at (`usePlaceWalkGraphs`, a station of the end's own complex, the one the visitor
-  chose that end for); never for "My location", for an end filled from the fix, or keyed by the fix. The place's point
-  stays in memory (trip state only) and is never sent, stored, logged or put in a URL. Interiors and street
-  files: also for stations the camera shows (the view and prefetch sets, camera-driven, empty under the location
+  never at startup. A second exception (a6m): once a plan for the current ends is ready with the trip open
+  (`FEATURES.navigation`), never at startup, an end set from a place the visitor searched loads the walk shards of the
+  stations the plan's journeys reach that end at (`usePlaceWalkGraphs`: every listed member stop of the end's own
+  complex, the complex the visitor chose that end for). Never for a "near you" end ("My location", "Nearest to you"),
+  never for an end filled from the fix, and never keyed by the fix. The place's point lives in memory only (trip state):
+  it is never in a request of its own, stored, logged or put in a URL; the camera may frame it like any other trip
+  point, and the camera-driven loads (the view and prefetch sets, the geocode focus) follow the camera as usual.
+  Interiors and street files: also for stations the camera shows (the view and prefetch sets, camera-driven, empty under the location
   cap). None is ever keyed by the fix or `nearestStation`. A trip end filled from the fix fetches nothing until the
   user picks or focuses it. Trip transfers load every authored interior so the change station isn't revealed (revisit
   above about 8 authored files).

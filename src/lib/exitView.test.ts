@@ -105,7 +105,7 @@ describe('exitLineView', () => {
     expect(exitEntranceIndex({ ...view.mapLabel!, type: 'Elevator' }, other)).toBe(-1)
   })
 
-  it('takes a merged twin’s label, and words a point target as Exit at', () => {
+  it('takes a merged twin’s label, and keeps the quickest-way lead for a place target: the walk is its own row', () => {
     const file = streets(interior, [[20, 10, {}], [9, 10, {}]])
     const labels = entranceTexts(file)
     expect(labels.map((l) => l.index)).toEqual([0])
@@ -113,11 +113,11 @@ describe('exitLineView', () => {
     const o = toGround(interior.anchor)
     const toward: ExitChoice = { ...choice, destination: { x: o.x + 60, z: o.z }, walk: { kind: 'route', points: [], meters: 150, seconds: 130 } }
     const view = exitLineView(toward, interior, [{ file, labels }], true)
-    expect(view.text).toBe('Exit at Bedford Av & N 7 St')
+    expect(view.text).toBe('Quickest way out: Bedford Av & N 7 St')
     // The exit is the merged twin (file entrance 1): it resolves to that index, a member of row 0.
     expect(exitEntranceIndex(view.mapLabel!, file)).toBe(1)
-    expect(view.note).toBe('NE corner · then 3 min walk')
-    expect(view.spoken).toContain('Then a 3 minute walk.')
+    expect(view.note).toBe('NE corner')
+    expect(view.spoken).toBe('Quickest way out: Bedford Avenue and North 7 Street, northeast corner.')
   })
 
   it('falls back to a compass way from the station without labels', () => {
@@ -128,11 +128,11 @@ describe('exitLineView', () => {
     expect(view.mapLabel).toEqual({ x: o.x + 9, z: o.z + 10, type: 'Stair' })
     const estimate: ExitChoice = { ...choice, destination: { x: 0, z: 0 }, walk: { kind: 'estimate', meters: 900, seconds: 700 } }
     const point = exitLineView(estimate, interior, [], true)
-    expect(point.text).toMatch(/^Exit toward the /)
-    expect(point.note).toBe('about 12 min walk')
+    expect(point.text).toMatch(/^Quickest way out: toward the /)
+    expect(point.note).toBeNull()
   })
 
-  it('words a way in chosen for a walk from a place as Enter at, the walk first', () => {
+  it('keeps the quickest-way-in lead for a way in chosen for a place, with no walk in its note or sentence', () => {
     const file = streets(interior, [[9, 10, {}]])
     const labels = entranceTexts(file)
     const entry = quickestEntry({ interior, stopId: 'X01N' })
@@ -140,16 +140,12 @@ describe('exitLineView', () => {
     const o = toGround(interior.anchor)
     const routed: BoardChoice = { ...entry, origin: { x: o.x + 60, z: o.z }, walk: { kind: 'route', points: [], meters: 150, seconds: 130 } }
     const view = exitLineView(routed, interior, [{ file, labels }], true)
-    expect(view.text).toBe('Enter at Bedford Av & N 7 St')
-    expect(view.note).toBe('NE corner · after 3 min walk')
-    expect(view.spoken).toBe('Enter at Bedford Avenue and North 7 Street, northeast corner. After a 3 minute walk.')
-    const estimated: BoardChoice = { ...routed, walk: { kind: 'estimate', meters: 900, seconds: 700 } }
-    const bare = exitLineView(estimated, interior, [], true)
-    expect(bare.text).toMatch(/^Enter at the (east|southeast|northeast) entrance$/)
-    expect(bare.note).toBe('about 12 min walk')
-    expect(bare.spoken).toContain('After about a 12 minute walk.')
-    // With no origin it is still the quickest way in.
-    expect(exitLineView(entry, interior, [{ file, labels }], true).text).toBe('Quickest way in: Bedford Av & N 7 St')
+    expect(view.text).toBe('Quickest way in: Bedford Av & N 7 St')
+    expect(view.note).toBe('NE corner')
+    expect(view.spoken).toBe('Quickest way in: Bedford Avenue and North 7 Street, northeast corner.')
+    const bare = exitLineView({ ...routed, walk: { kind: 'estimate', meters: 900, seconds: 700 } }, interior, [], true)
+    expect(bare.text).toMatch(/^Quickest way in: (east|southeast|northeast) entrance$/)
+    expect(bare.note).toBeNull()
   })
 
   it('says probably on an estimated layout', () => {

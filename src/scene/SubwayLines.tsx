@@ -18,6 +18,7 @@ import { RENDER_ORDER } from './renderOrder'
 import { TripDashes } from './TripDashes'
 import { TripLines } from './TripLines'
 import { TripMarks } from './TripMarks'
+import { TripPlacePins } from './TripPlacePins'
 import { useHeld } from './useHeld'
 import { routeLineBuffers, useLineLayer } from './useLineLayer'
 import { usePlatformFade } from './usePlatformFade'
@@ -106,6 +107,7 @@ export function SubwayLines({ network, paths, interiorSpans, veiled, view, route
       <ErrorBoundary key={boundaryKey} fallback={null} onError={() => setCrashedKey(boundaryKey)}>
         <TripLines network={network} paths={paths} route={held} levels={levels} interiorSpans={interiorSpans} />
         <TripDashes network={network} route={held} levels={levels} overVeil={veiled} />
+        <TripPlacePins route={held} levels={levels} overVeil={veiled} />
         <TripMarks marks={held?.marks ?? null} hidden={markHidden} fix={fix} levels={levels} look={held?.kind ?? 'trip'} />
       </ErrorBoundary>
     </>

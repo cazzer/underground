@@ -49,6 +49,29 @@ function journey(legs: TripLeg[], transfers: number, departAt?: number): TripJou
   }
 }
 
+describe('journeyView with place walks', () => {
+  const walks = {
+    from: { place: 'Driggs Av & N 5 St', minutes: 3, estimated: false },
+    to: { place: 'Bedford Av & N 4 St', minutes: 4, estimated: true },
+  }
+  const j = () => journey([ride('L', 'L08', 'L03', T, T + 480)], 0)
+
+  it('adds the walk first and the arrival on foot to the summary and the spoken sentence, leaving the router times', () => {
+    const plain = journeyView(j(), NOW, names)
+    const v = journeyView(j(), NOW, names, walks)
+    expect(v.walkNotes).toEqual(['3 min walk first', 'arrive about 8:24 on foot'])
+    expect(v.spoken).toContain('Starts with a 3-minute walk from Driggs Av & N 5 St.')
+    expect(v.spoken).toContain('Then a roughly 4-minute walk to Bedford Av & N 4 St, arriving about 8:24.')
+    expect([v.arriveClock, v.minutes, v.departClock]).toEqual([plain.arriveClock, plain.minutes, plain.departClock])
+    expect(plain.walkNotes).toEqual([])
+  })
+
+  it('says "about" for an estimated From walk and "at" for a routed arrival', () => {
+    const v = journeyView(j(), NOW, names, { from: { place: 'Home', minutes: 5, estimated: true }, to: { place: 'Work', minutes: 2, estimated: false } })
+    expect(v.walkNotes).toEqual(['about 5 min walk first', 'arrive at 8:22 on foot'])
+  })
+})
+
 describe('journeyView', () => {
   it('reads one ride: clocks, headsign, stop count and names', () => {
     const v = journeyView(journey([ride('L', 'L08', 'L03', T, T + 480)], 0), NOW, names)

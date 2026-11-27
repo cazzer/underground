@@ -92,7 +92,7 @@ function MapView({ network, bands, live }: MapViewProps) {
   // the To station and its way in at the From station, each chosen only once the visitor chose that end (an end filled from the fix
   // waits for a focus or pick), and the walks to and from the places the ends were searched from.
   const tripDraw = useTripDraw({ network, paths, trip, index: interior.index, ene, nowS, fromStations })
-  const { exit: tripExit, board: tripBoard, route: tripRoute } = tripDraw
+  const { exit: tripExit, board: tripBoard, route: tripRoute, placeWalks } = tripDraw
   // A picked service change draws in the trip's place while the changes list is in front (a trip under it waits).
   const { front } = usePanelCollapse()
   const route = changeRoute?.route ?? tripRoute
@@ -101,8 +101,8 @@ function MapView({ network, bands, live }: MapViewProps) {
   // The changes of trains inside hand-authored complexes: described in the trip panel, drawn in their interiors.
   const tripTransfers = useTripTransfers({ open: trip.open, ends: trip.ends, plan: trip.plan, index: interior.index, ene, nowS, names, selected: trip.selectedJourney })
   const tripLines = useMemo(
-    () => ({ exits: tripExit?.lines ?? null, transfers: tripTransfers.lines, index: interior.index, boards: tripBoard?.lines ?? null }),
-    [tripExit?.lines, tripTransfers.lines, interior.index, tripBoard?.lines],
+    () => ({ exits: tripExit?.lines ?? null, transfers: tripTransfers.lines, index: interior.index, boards: tripBoard?.lines ?? null, placeWalks }),
+    [tripExit?.lines, tripTransfers.lines, interior.index, tripBoard?.lines, placeWalks],
   )
   const exitDraw = tripExit?.drawn ?? null
   const exitInterior = tripExit?.interiorId ?? null

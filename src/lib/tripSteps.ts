@@ -1,5 +1,6 @@
 /** The opened journey as an itinerary: Board, Change and Exit steps between its ride and walk rows, each with its status and one spoken sentence. Pure. */
 import type { StationLayout } from '../data/interiorLoad'
+import type { PlaceWalkInfo, PlaceWalkInfos } from './placeWalk'
 import type { ChangeLegView, LegView, RideLegView } from './tripView'
 
 export type StepKind = 'board' | 'change' | 'exit'
@@ -27,6 +28,8 @@ export interface TripStep {
 
 export type ItineraryRow =
   | { kind: 'step'; step: TripStep }
+  /** The walk between a searched place and the station: leading at From, trailing at To. Plain text, no step. */
+  | { kind: 'place'; end: 'from' | 'to'; text: string; spoken: string }
   /**
    * `showOff`: the ride row says when it gets off (the next row is not the Exit step, which has the time). `offPlace`:
    * and where, when a walk follows (the next row is a walk, not a Change or Board step that names the station).
@@ -50,6 +53,8 @@ export interface StepContext {
   fixPending: 'from' | 'to' | null
   /** The From station's layout has no way in to the first train's track (every entrance to it is exit-only). */
   noWayIn: boolean
+  /** The walks to and from the places the ends were searched from, for the journey the map draws; none for any other. */
+  placeWalks: PlaceWalkInfos
 }
 
 const NO_LAYOUT = 'No station layout'
@@ -167,7 +172,8 @@ function finish(drafts: readonly Draft[], ctx: StepContext): Map<string, TripSte
  * The journey's rows in travel order. A Board step comes before the first ride and before any ride that follows a plain
  * walk between stations (the walk stays its own row), a Change step replaces each change leg and names the next
  * train, and the Exit step follows the last ride at its alight station, with a trailing walk after it. Leading walks
- * come before the first Board. A walk-only journey has no steps.
+ * come before the first Board. A walk-only journey has no steps. The walks to and from a searched place are plain rows
+ * before the first and after the last.
  */
 export function journeyItinerary(legs: readonly LegView[], ctx: StepContext): ItineraryRow[] {
   const drafts: Draft[] = []
@@ -197,7 +203,31 @@ export function journeyItinerary(legs: readonly LegView[], ctx: StepContext): It
     }
     if (exit) rows.push({ kind: 'step', step: exit })
   })
+  // The walks to and from a searched place bracket the journey: the From walk leads, the To walk trails.
+  if (ctx.placeWalks.from) rows.unshift(placeRow('from', ctx.placeWalks.from, endStationName(legs, 'from')))
+  if (ctx.placeWalks.to) rows.push(placeRow('to', ctx.placeWalks.to, endStationName(legs, 'to')))
   return rows
+}
+
+const minutesText = (n: number): string => `${n} minute${n === 1 ? '' : 's'}`
+
+/** The row for a place walk: "Walk to Bedford Av & N 4 St · 3 min" at To, "Walk from …" at From, "about" for an estimate. */
+function placeRow(end: 'from' | 'to', w: PlaceWalkInfo, station: string): ItineraryRow {
+  const about = w.estimated ? 'about ' : ''
+  const text = `Walk ${end === 'from' ? 'from' : 'to'} ${w.place} · ${about}${w.minutes} min`
+  const spoken =
+    end === 'from'
+      ? `Walk ${about}${minutesText(w.minutes)} from ${w.place} to ${station}.`
+      : `Walk ${about}${minutesText(w.minutes)} from ${station} to ${w.place}.`
+  return { kind: 'place', end, text, spoken }
+}
+
+/** The station a journey starts or ends at, for the place walk's sentence: its first or last leg's. */
+function endStationName(legs: readonly LegView[], end: 'from' | 'to'): string {
+  const leg = end === 'from' ? legs[0] : legs.at(-1)
+  if (leg?.kind === 'ride') return end === 'from' ? leg.board.name : leg.alight.name
+  if (leg?.kind === 'walk') return end === 'to' ? leg.to : 'the station'
+  return leg?.kind === 'change' ? leg.name : 'the station'
 }
 
 /** The stored step as active: only while the opened journey and the focused station are still the ones it was pressed on. */

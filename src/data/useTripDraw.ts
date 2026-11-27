@@ -1,5 +1,6 @@
 import type { EneInput } from '../lib/live/eneJoin'
 import type { Network, ShapePath } from '../lib/network'
+import type { PlaceWalkInfos } from '../lib/placeWalk'
 import type { TripRouteDraw } from '../lib/tripLineBuffers'
 import type { TripEnd, TripPlaces } from '../lib/trip'
 import type { TripSelection } from '../lib/tripSelection'
@@ -39,6 +40,8 @@ export interface TripDraw {
   board: TripBoard | null
   /** The selected journey on the map: its rides, walks (between stations and to and from the searched places) and marks. */
   route: TripRouteDraw | null
+  /** The settled walks to and from the ends' searched places in the panel's words (the drawn journey's). */
+  placeWalks: PlaceWalkInfos
 }
 
 /**
@@ -77,7 +80,7 @@ export function useTripDraw({ network, paths, trip, index, ene, nowS, fromStatio
     origin: placeEnds.from?.place ?? null,
     walk: graphs.from,
   })
-  const { placeWalks, places } = usePlaceWalkSpans({ ends: placeEnds, graphs, trip, fromStations, index, exit, board })
+  const { placeWalks, places, infos } = usePlaceWalkSpans({ ends: placeEnds, graphs, trip, fromStations, index, exit, board })
   const route = useTripRoute({ network, paths, open, plan, selection, journey: selectedJourney, placeWalks, places })
-  return { exit, board, route }
+  return { exit, board, route, placeWalks: infos }
 }

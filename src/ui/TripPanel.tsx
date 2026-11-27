@@ -14,6 +14,7 @@ import type { TransferLineView } from '../lib/transferView'
 import { useTrainSelection } from '../lib/trainSelection'
 import { useTrip } from '../lib/trip'
 import { tripBarText } from '../lib/tripBar'
+import type { PlaceWalkInfos } from '../lib/placeWalk'
 import { planViews, tripMessage, tripNamesOf, tripNowS } from '../lib/tripView'
 import { CollapseButton, ExpandBar } from './PanelBar'
 import { StationSearch, type StationSearchHandle } from './StationSearch'
@@ -36,6 +37,8 @@ export interface TripLines {
   index: IndexLoad
   /** The way in at the From station of each journey that boards its first train there, by `boardLineKey` of that ride. */
   boards: ReadonlyMap<string, BoardLine> | null
+  /** The walks to and from the places the ends were searched from, for the journey the map draws. */
+  placeWalks: PlaceWalkInfos
 }
 
 interface TripPanelProps {
@@ -109,7 +112,9 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
   }, [retrying, plan, headingRef])
 
   const names = tripNamesOf(network)
-  const views = planViews(plan, tripNowS(arrivals, performance.now(), Date.now()), names)
+  // The place walks are the drawn journey's: the summary says them only once that journey is the opened one.
+  const placeWalks = selection.view === 'detail' && selection.openedKey !== null ? { key: selection.openedKey, walks: lines.placeWalks } : null
+  const views = planViews(plan, tripNowS(arrivals, performance.now(), Date.now()), names, placeWalks)
   const bar = tripBarText(ends, (id) => network.groupById.get(id)?.name ?? id)
   const message = tripMessage(ends, plan, showLoading)
   const placement = markedPlacement(locate.state)
@@ -194,6 +199,7 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
               transfers: lines.transfers,
               layoutOf: (id) => layoutOf(id, lines.index),
               boards: lines.boards,
+              placeWalks: lines.placeWalks,
               fixPending: fixEnd,
               activeStep,
               onStep: stepTo,
