@@ -9,7 +9,7 @@ import { journeyKey, type TripSelection } from '../lib/tripSelection'
 import { journeySpans, stopStations, type RideShapeSpan, type RideStraightSpan, type WalkSpan } from '../lib/tripSpans'
 import type { TripPlanState } from '../lib/tripView'
 import { withWalkPaths } from '../lib/tripWalkPaths'
-import { useTransferWalks } from './useTransferWalks'
+import { useTransferWalks, type TransferWalks } from './useTransferWalks'
 
 interface TripRouteInput {
   network: Network
@@ -69,20 +69,23 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
   const walkGraphs = useTransferWalks(network, open && plan.status === 'ready')
   const legsKey = enabled && journey ? legsKeyOf(journey) : null
   const key = enabled && journey ? journeyKey(journey) : null
-  const drawn = useMemo((): Omit<TripRouteDraw, 'kind' | 'key' | 'faint'> | null => {
+  // Only a journey with a walk between complexes reads the walk graphs, so the others don't rebuild when they settle.
+  const crossWalk = useMemo(
+    () => journey !== null && journey.legs.some((l) => l.kind === 'walk' && !l.sameStation && stops.get(l.fromStop)?.leadId !== stops.get(l.toStop)?.leadId),
+    // `journey` is a new object on every replan; `legsKey` says when its legs really change.
+    [legsKey, stops],
+  )
+  const walkDep: TransferWalks | null = crossWalk ? walkGraphs : null
+  const built = useMemo((): { draw: Omit<TripRouteDraw, 'kind' | 'key' | 'faint'>; fallbacks: [string, string][] } | null => {
     if (legsKey === null || journey === null || patterns === null) return null
     try {
       const spans = journeySpans(journey.legs, { shapes: paths, stopStations: stops, patterns: patterns === NO_PATTERNS ? undefined : patterns })
       // A walk between complexes follows the streets once the shards settle; until then nothing draws.
       const crossWalks = spans.filter((s): s is WalkSpan => s.kind === 'walk' && !s.sameComplex)
-      if (crossWalks.length > 0 && !walkGraphs.settled) return null
-      const walks = withWalkPaths(crossWalks, walkGraphs.graphs, (w, reason) => {
-        const pair = `${w.fromStationId}>${w.toStationId}`
-        if (warnedWalks.has(pair)) return
-        warnedWalks.add(pair)
-        console.warn(`Trip walk ${w.fromStationId} to ${w.toStationId} drawn straight: ${reason}`)
-      })
-      return {
+      if (crossWalks.length > 0 && !walkDep?.settled) return null
+      const fallbacks: [string, string][] = []
+      const walks = withWalkPaths(crossWalks, walkDep?.graphs ?? new Map(), (w, reason) => fallbacks.push([`${w.fromStationId}>${w.toStationId}`, reason]))
+      const draw = {
         rides: spans.filter((s): s is RideShapeSpan => s.kind === 'ride'),
         straights: spans.filter((s): s is RideStraightSpan => s.kind === 'straight'),
         // A walk between a complex's members is a change inside one station as the UI shows it: its marks say so.
@@ -92,12 +95,22 @@ export function useTripRoute({ network, paths, open, plan, selection, journey }:
         stations: tripStationIds(journey.legs, stops),
         frameStations: legStationPoints(journey.legs, stops),
       }
+      return { draw, fallbacks }
     } catch (err) {
       console.error(`Trip route: ${err instanceof Error ? err.message : String(err)}; not drawn`)
       return null
     }
     // `journey` is a new object on every replan; `legsKey` says when its legs really change.
-  }, [legsKey, patterns, paths, stops, walkGraphs])
+  }, [legsKey, patterns, paths, stops, walkDep])
+  const drawn = built?.draw ?? null
+  // Each walk left straight is warned about once per pair per page load.
+  useEffect(() => {
+    for (const [pair, reason] of built?.fallbacks ?? []) {
+      if (warnedWalks.has(pair)) continue
+      warnedWalks.add(pair)
+      console.warn(`Trip walk ${pair.replace('>', ' to ')} drawn straight: ${reason}`)
+    }
+  }, [built])
   const faint = selection.view === 'list'
   // Nothing to draw (no leg mapped and no walk between stations): nothing shows, so the network isn't dimmed either.
   const any = drawn !== null && (drawn.rides.length > 0 || drawn.straights.length > 0 || drawn.walks.length > 0)

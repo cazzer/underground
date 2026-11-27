@@ -6,7 +6,8 @@
  *
  * Each pair is routed in both stations' shards (a shard is complete within its radius of its own station and partial
  * beyond) and the shorter path wins, so the result never depends on which way the trip walks; a walk the other way
- * gets the reversed polyline.
+ * gets the reversed polyline. Each graph returns its fastest path by time (roads cost x1.3); the two candidates are
+ * compared by length, and `MAX_DETOUR` caps length.
  */
 import type { StationId } from '../data/schema'
 import type { WalkGraph } from '../data/walkSchema'

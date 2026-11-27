@@ -5,6 +5,10 @@
  * a station the user picked, focused, or chose as a trip endpoint. A caller never derives the id from a location fix
  * (`nearestStation` in locate.ts) without a user action, and no request carries the fix or a destination: the URL
  * names a station and nothing else. Routing runs on the device.
+ *
+ * One exception (85r): `useTransferWalks` loads the shards of every station in a transfer between two complexes (a
+ * fixed set from the static transfers and complexes, the same for every plan, whatever the ends) at the first ready
+ * trip plan, so a trip's walk between stations draws along streets without revealing which one the rider uses.
  */
 import { toGround } from '../lib/projection'
 import { deltaDecode } from './codec'
