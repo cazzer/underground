@@ -28,7 +28,7 @@ export function legStationPoints(legs: readonly TripLeg[], stopStations: Readonl
   })
 }
 
-/** Every ground point the route draws: each ride's stretch of its shape, a straight ride's and a walk's points, and `stations`. */
+/** Every ground point the route draws: each ride's stretch of its shape, a straight ride's points and a walk's street path (else its ends), and `stations`. */
 export function routeFramePoints(spans: readonly TripSpan[], shapeById: ReadonlyMap<string, SpanShape>, stations: readonly Ground[]): Ground[] {
   const out: Ground[] = []
   for (const span of spans) {
@@ -37,6 +37,7 @@ export function routeFramePoints(spans: readonly TripSpan[], shapeById: Readonly
       if (!shape) throw new Error(`Trip span rides shape "${span.shapeId}", which the map does not draw`)
       out.push(...spanPoints(shape, span.d0, span.d1))
     } else if (span.kind === 'straight') out.push(...span.points)
+    else if (span.path) out.push(...span.path)
     else out.push(span.from, span.to)
   }
   out.push(...stations)

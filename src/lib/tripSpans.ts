@@ -57,6 +57,8 @@ export interface WalkSpan {
   sameComplex: boolean
   from: Ground
   to: Ground
+  /** The walk along the street network, `from` to `to` (85r: tripWalkPaths.ts); absent, it is the straight line. */
+  path?: readonly Ground[]
 }
 export type TripSpan = RideSpan | WalkSpan
 

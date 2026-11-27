@@ -143,7 +143,7 @@ export function useRouteFlight({ controls, camera, flight, layout, network, flyR
     kindMemo.framed = token
     if (decision === 'skip' || draw === null || token === null) return
     try {
-      const points = routeFramePoints([...draw.rides, ...draw.suspended, ...draw.straights], network.shapeById, draw.frameStations)
+      const points = routeFramePoints([...draw.rides, ...draw.suspended, ...draw.straights, ...draw.walks], network.shapeById, draw.frameStations)
       const l = layout.current
       const dest = routeDestination(points, l, camera.fov)
       startFlight(dest)
