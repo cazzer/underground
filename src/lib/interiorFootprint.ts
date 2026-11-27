@@ -1,17 +1,15 @@
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
 import type { Ground } from './projection'
 import { paddedHull } from './interiorFraming'
-import type { Buffers, Rgb } from './interiorSegments'
 
 /** How far the footprint reaches past the interior's outlines and entrances, meters. */
 export const FOOTPRINT_PAD_M = 6
-/** How far the focused interior's frame (InteriorFocusFrame) stands off them: wider than the pick footprint, so at phone
- *  zoom the loop clears the entrance squares by a clear gap and doesn't read as a path between them. */
+/** A wider pad than the pick footprint: the clearance a covered station's amenity row keeps off its interior (useAmenityCovers). */
 export const FOCUS_FRAME_PAD_M = 14
 
 /**
  * A drawn interior's ground footprint (o3r.7): the convex hull of its platform and slab outlines and its entrances,
- * grown by a pad, plus its vertical extent. The focused interior's frame draws it; a tap inside a neighbour's opens it.
+ * grown by a pad, plus its vertical extent. A tap inside a neighbour's opens it.
  */
 export interface Footprint {
   /** Scene position of the interior's local origin (its group). */
@@ -59,18 +57,4 @@ export function interiorFootprint(interior: StationInterior, yScale: number, ori
     yLow: Math.min(0, ...ys) * yScale,
     yHigh: Math.max(0, ...ys) * yScale,
   }
-}
-
-/** The hull as a closed loop of segments at y 0 (group-local), all in `rgb` (linear), solid (zero dash distances). */
-export function footprintLoopBuffers(hull: readonly LocalPoint[], rgb: Rgb): Buffers {
-  const n = hull.length
-  const positions = new Float32Array(n * 6)
-  const colors = new Float32Array(n * 6)
-  for (let i = 0; i < n; i++) {
-    const a = hull[i]!
-    const b = hull[(i + 1) % n]!
-    positions.set([a[0], 0, a[1], b[0], 0, b[1]], i * 6)
-    colors.set([rgb[0], rgb[1], rgb[2], rgb[0], rgb[1], rgb[2]], i * 6)
-  }
-  return { positions, colors, distances: new Float32Array(n * 2) }
 }

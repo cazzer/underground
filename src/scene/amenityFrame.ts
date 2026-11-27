@@ -32,7 +32,7 @@ export interface AmenityFrame {
   /** Per mark, the shown interior covering its station (its presence), or null. */
   cover: (Presence | null)[]
   /** Per covered mark, its row's origin and bearing past that interior (coveredRow) and how far the hull, plus the
-   *  focus frame's extra pad, reaches along it from there, meters. */
+   *  covered row's extra clearance (FOCUS_FRAME_PAD_M), reaches along it from there, meters. */
   coverOX: Float32Array
   coverOZ: Float32Array
   coverX: Float32Array

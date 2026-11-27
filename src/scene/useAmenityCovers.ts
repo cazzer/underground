@@ -10,7 +10,7 @@ import type { AmenityFrame } from './amenityFrame'
 import { markSizesInto, newMarkSizes } from './amenitySizes'
 import type { InteriorModel } from './interiorModel'
 
-/** How far a covered row keeps past the pick footprint: out to the focused interior's frame loop. */
+/** How far a covered row keeps past the pick footprint: a clearance off the interior (FOCUS_FRAME_PAD_M). */
 const FRAME_EXTRA_M = FOCUS_FRAME_PAD_M - FOOTPRINT_PAD_M
 /** The camera's field of view (Scene's Canvas). */
 const FOV_DEG = 35

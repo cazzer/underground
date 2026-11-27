@@ -23,7 +23,7 @@ const SVGS: Record<AmenityKind, GlyphSvg> = { restroom: glyphSvg('restroom'), cs
 
 interface AmenityIconsProps {
   kinds: readonly AmenityKind[]
-  /** The access glyph's colour class beside them (`text-ink-dim` at a partly accessible station), so the icons match. */
+  /** The access glyph's colour class beside them (`text-ink-dim` in the station panel), so the icons match. */
   tone: 'text-ink' | 'text-ink-dim'
 }
 
