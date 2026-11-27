@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Connector, StationInterior } from '../data/stationSchema'
 import type { StationStreets, StreetEntrance } from '../data/streetSchema'
 import { entranceTexts } from './entranceText'
-import { quickestExit, type ExitChoice } from './exitChoice'
+import { quickestEntry, quickestExit, type BoardChoice, type ExitChoice } from './exitChoice'
 import { drawnExitStop, exitEntranceIndex, exitLineView, finalRideStops, streetSpoken } from './exitView'
 import { fixture } from './interiorFixture'
 import { toGround } from './projection'
@@ -130,6 +130,26 @@ describe('exitLineView', () => {
     const point = exitLineView(estimate, interior, [], true)
     expect(point.text).toMatch(/^Exit toward the /)
     expect(point.note).toBe('about 12 min walk')
+  })
+
+  it('words a way in chosen for a walk from a place as Enter at, the walk first', () => {
+    const file = streets(interior, [[9, 10, {}]])
+    const labels = entranceTexts(file)
+    const entry = quickestEntry({ interior, stopId: 'X01N' })
+    if (entry.kind !== 'board') throw new Error(entry.reason)
+    const o = toGround(interior.anchor)
+    const routed: BoardChoice = { ...entry, origin: { x: o.x + 60, z: o.z }, walk: { kind: 'route', points: [], meters: 150, seconds: 130 } }
+    const view = exitLineView(routed, interior, [{ file, labels }], true)
+    expect(view.text).toBe('Enter at Bedford Av & N 7 St')
+    expect(view.note).toBe('NE corner · after 3 min walk')
+    expect(view.spoken).toBe('Enter at Bedford Avenue and North 7 Street, northeast corner. After a 3 minute walk.')
+    const estimated: BoardChoice = { ...routed, walk: { kind: 'estimate', meters: 900, seconds: 700 } }
+    const bare = exitLineView(estimated, interior, [], true)
+    expect(bare.text).toMatch(/^Enter at the (east|southeast|northeast) entrance$/)
+    expect(bare.note).toBe('about 12 min walk')
+    expect(bare.spoken).toContain('After about a 12 minute walk.')
+    // With no origin it is still the quickest way in.
+    expect(exitLineView(entry, interior, [{ file, labels }], true).text).toBe('Quickest way in: Bedford Av & N 7 St')
   })
 
   it('says probably on an estimated layout', () => {

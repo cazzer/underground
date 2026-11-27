@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { chooseExit, quickestExit, type ExitChoice, type ExitResult } from '../lib/exitChoice'
 import { drawnExitStop, exitLineView, finalRideStops, type ExitLabel, type ExitLineView, type StreetSource } from '../lib/exitView'
 import { stationOfStop } from '../lib/live/arrivals'
@@ -10,7 +10,8 @@ import { plannable, tripKey, type TripEnds, type TripPlanState } from '../lib/tr
 import { interiorIdOf, type IndexLoad } from './interiorLoad'
 import { useInteriorModel } from './useStationInterior'
 import { useStationStreetsLoad, type StreetLayer } from './useStationStreets'
-import { useStationWalk } from './useStationWalk'
+import type { WalkLoad } from './useStationWalk'
+import type { WalkGraph } from './walkSchema'
 
 interface TripExitInput {
   /** The trip panel is open (covered by a train panel or not). */
@@ -25,6 +26,11 @@ interface TripExitInput {
   /** The visitor chose the To station (it was not filled from a location fix, or they have since picked or focused
    *  it, `fixEnd`): only then are its files fetched. */
   allowed: boolean
+  /** A searched place the To end was picked from (a6m): the exit is chosen for the walk to it, and a street-file walk graph
+   *  is read for that; null for none (the quickest way out). */
+  destination: Ground | null
+  /** The load of the To station's walk graph (`useStationWalkLoad`), for `destination`; null with none. */
+  walk: WalkLoad | null
 }
 
 export interface TripExit {
@@ -49,6 +55,11 @@ function safely(stopId: string, run: () => ExitResult): ExitChoice | null {
   }
 }
 
+/** Only the graph of the stop's own station answers for it; another member of the complex estimates its walk. */
+function graphAt(graph: WalkGraph | null, stopId: string): WalkGraph | null {
+  return graph !== null && graph.stationId === stationOfStop(stopId) ? graph : null
+}
+
 const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== null && l !== undefined
 
 /**
@@ -61,11 +72,13 @@ const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== n
  * way into a street name. Rebuilt only when what it reads changes (string keys), so the 30 s refresh and live polls
  * keep the same choice object and the drawn path's buffers.
  *
- * DEV only: `__underground.exitTo(x, z)` aims the drawn exit at a scene point (its station's walk graph then loads),
- * `exitTo(null)` clears it (`exitTo(x)` alone warns and does nothing). Production never fetches a walk graph here.
- * Remove when 2q7.14 supplies the point.
+ * With a `destination` (the searched place the To end was picked from, a6m) the selected journey's exit is the one
+ * that minimizes the walk inside the station plus the walk to it (`chooseExit`, over the station's walk graph when the
+ * place is within its radius, else a straight estimate); the result waits until that graph has settled, so the exit
+ * never changes after it is drawn. Every stop the panel lists gets it (a stop at another member of the complex estimates its walk), and with no destination the quickest way out.
+ * This hook loads no walk graph itself: `walk` is `useStationWalkLoad`'s, for a station the journey reaches the end at.
  */
-export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allowed }: TripExitInput): TripExit | null {
+export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allowed, destination, walk }: TripExitInput): TripExit | null {
   const ready = allowed && open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
   const stops = ready && plan.status === 'ready' ? finalRideStops(selectedFirst(plan.journeys, selected)) : []
   // Only the selected journey's own exit draws: one that ends on foot has none, whatever the others do.
@@ -80,26 +93,14 @@ export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allo
   // Nearly redundant since 2q7.32: every member's street file carries its complex's entrances (minus shared elevators
   // and far ones; a lead's file, which the covering file is, keeps the members' elevators), so the covering file alone usually has the exit; this second read of the member's own file stays as the fallback.
   const memberStreets = useStationStreetsLoad(interiorId && stationId !== interiorId ? stationId : null)
-  const settled = fileStreets.settled && memberStreets.settled
-  const [target, setTarget] = useState<Ground | null>(null)
-  const walk = useStationWalk(import.meta.env.DEV && target && interiorId ? stationId : null)
+  const walkSettled = destination === null || walk === null || walk.settled
+  const settled = fileStreets.settled && memberStreets.settled && walkSettled
+  const [destX, destZ] = [destination?.x, destination?.z]
+  const graph = walk?.graph ?? null
   const outages = joinStationOutages(model?.interior ?? null, ene, nowS)
   const outKey = outages.outIds.join(',')
   // As the station panel: still connecting says nothing; only stale, failed or mismatched data is "unknown".
   const known = outages.panel.kind !== 'unknown'
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    const exitTo = (x: number | null, z?: number): void => {
-      if (x === null) return setTarget(null)
-      if (z === undefined) return console.warn('exitTo needs a scene x and z (or null to clear); nothing changed')
-      setTarget({ x, z })
-    }
-    window.__underground = { ...window.__underground, exitTo }
-    return () => {
-      if (window.__underground) delete window.__underground.exitTo
-    }
-  }, [])
 
   const first = fileStreets.layer ?? memberStreets.layer
   const second = fileStreets.layer ? memberStreets.layer : null
@@ -111,18 +112,18 @@ export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allo
     const interior = model.interior
     const closed = new Set(outKey === '' ? [] : outKey.split(','))
     const file = first?.file ?? null
-    served.forEach(({ stopId }, i) => {
-      const toPoint = i === 0 && target !== null
+    served.forEach(({ stopId }) => {
+      const toPoint = destX !== undefined && destZ !== undefined
       out.set(
         stopId,
         safely(stopId, () =>
-          toPoint ? chooseExit({ interior, stopId, destination: target, walk, streets: file, closed }) : quickestExit({ interior, stopId, streets: file, closed }),
+          toPoint ? chooseExit({ interior, stopId, destination: { x: destX, z: destZ }, walk: graphAt(graph, stopId), streets: file, closed }) : quickestExit({ interior, stopId, streets: file, closed }),
         ),
       )
     })
     return out
     // `served` is read through stopIdsKey.
-  }, [stopIdsKey, model, settled, first, outKey, target, walk])
+  }, [stopIdsKey, model, settled, first, outKey, destX, destZ, graph])
 
   return useMemo(() => {
     if (!model || !interiorId || served.length === 0 || !settled) return null

@@ -1,19 +1,19 @@
 /**
  * The station path drawn over an interior: from the platform track a rider steps off, along each connector exactly
- * where it is drawn (`planEnds`), to its street exit and along the walk outside (an `ExitChoice`), to the entry it was
- * reached from (a `BoardChoice`, the way in, drawn as an exit with no walk outside), or to the next train's track (a
- * `TransferChoice`, with a second marker there). Group-local
+ * where it is drawn (`planEnds`), to its street exit (an `ExitChoice`), to the entry it was reached from (a
+ * `BoardChoice`, the way in, drawn as an exit), or to the next train's track (a `TransferChoice`, with a second
+ * marker there). The walk outside the station is not drawn here: the map's dashed walk (TripDashes) is the only
+ * drawing of it, at every zoom. Group-local
  * buffers like the interior's (y × yScale, before the depth factor), in the interior's stroke bands and cut at each
  * deck's train roof the way its connectors are, so the part of the path a lifted train stands in front of stays under
  * it. Pure.
  */
 import type { LocalPoint, StationInterior } from '../data/stationSchema'
 import { connectorContext } from './interiorGeometry'
-import { bandSinks, dist3, restroke } from './interiorPathStrokes'
+import { bandSinks, restroke } from './interiorPathStrokes'
 import { walkOf, type StationPathChoice, type TrackAt, type Walk } from './interiorPathWalk'
 import type { Buffers, Rgb, Vec3 } from './interiorSegments'
 import { nearestOnPolyline, slicePolyline } from './planGeometry'
-import { toGround } from './projection'
 
 export type { StationPathChoice } from './interiorPathWalk'
 
@@ -118,9 +118,8 @@ export function stationPathPoints(
 /**
  * The station path, one layer per stroke band: the centerline (dashed when `dashInStation`), the board marker (the
  * stretch of track at rail height where the rider is assumed to stand in the train, `boardHalfM` either side of the
- * start), with `restroke` each connector taken. An exit or a way in adds its entrance square (with `restroke`), an exit the walk outside
- * (solid over the walk graph, a dashed straight line when estimated); a transfer adds the same marker on the next
- * train's track where the path meets it. Throws when the choice doesn't fit the interior.
+ * start), with `restroke` each connector taken. An exit or a way in adds its entrance square (with `restroke`); a
+ * transfer adds the same marker on the next train's track where the path meets it. Throws when the choice doesn't fit the interior.
  */
 export function exitPathBuffers(interior: StationInterior, choice: StationPathChoice, opts: ExitPathOptions): ExitPathLayers {
   const { rgb, yScale } = opts
@@ -137,15 +136,6 @@ export function exitPathBuffers(interior: StationInterior, choice: StationPathCh
   }
 
   const street = ctx.streetIndex
-  const origin = toGround(interior.anchor)
-  if (choice.kind === 'exit' && choice.walk?.kind === 'route') {
-    const local = choice.walk.points.map((g): Vec3 => [g.x - origin.x, 0, g.z - origin.z])
-    for (let i = 1; i < local.length; i++) if (dist3(local[i - 1]!, local[i]!) > 1e-6) levelSink(street).segment(local[i - 1]!, local[i]!, rgb)
-  } else if (choice.kind === 'exit' && choice.walk?.kind === 'estimate' && choice.destination) {
-    const to: Vec3 = [choice.destination.x - origin.x, 0, choice.destination.z - origin.z]
-    levelSink(street).segment([choice.exit.point[0], 0, choice.exit.point[1]], to, rgb, rgb, true)
-    dashed = true
-  }
 
   // A marker: the stretch of track at rail height around the point (kept on the track); returns its ends and middle.
   const markerAt = (at: TrackAt): Vec3[] => {

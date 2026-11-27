@@ -210,27 +210,16 @@ describe('exitPathBuffers', () => {
     expect(Math.min(...clamped.flatMap((s) => [s.a[0]!, s.b[0]!]))).toBeCloseTo(-25, 4)
   })
 
-  it('draws a walk-graph route at the street, solid and local, over the trains below ground', () => {
+  it('draws no walk outside the station, whatever the choice carries: the map\'s dashed walk is the only drawing of it', () => {
     const o = toGround(interior.anchor)
     const at = (x: number, z: number) => ({ x: o.x + x, z: o.z + z })
+    const bare = exitPathBuffers(interior, choice, opts({ decks }))
     const routed: ExitChoice = { ...choice, destination: at(50, 20), walk: { kind: 'route', points: [at(9, 10), at(9, 20), at(50, 20)], meters: 51, seconds: 40 } }
-    const layers = exitPathBuffers(interior, routed, opts({ decks }))
-    const street = segs(layers.bands[1]!).filter((s) => s.a[1] === 0 && s.b[1] === 0 && s.b[2]! >= 20 - 1e-6)
-    expect(street.length).toBe(2)
-    expect(street[1]!.b[0]).toBeCloseTo(50, 6)
-    expect(street.every((s) => s.d[0] === 0 && s.d[1] === 0)).toBe(true)
-    expect(layers.dashed).toBe(false)
-  })
-
-  it('draws an estimated walk as one dashed straight line to the destination', () => {
-    const o = toGround(interior.anchor)
-    const estimated: ExitChoice = { ...choice, destination: { x: o.x + 100, z: o.z }, walk: { kind: 'estimate', meters: 91.5, seconds: 90 } }
-    const layers = exitPathBuffers(interior, estimated, opts({ decks }))
-    expect(layers.dashed).toBe(true)
-    const line = segs(layers.bands[1]!).filter((s) => s.d[1] > 0)
-    expect(line.length).toBe(1)
-    expect(line[0]!.a).toEqual([9, 0, 10])
-    expect(line[0]!.b[0]).toBeCloseTo(100, 6)
-    expect(line[0]!.b[2]).toBeCloseTo(0, 6)
+    const estimated: ExitChoice = { ...choice, destination: at(100, 0), walk: { kind: 'estimate', meters: 91.5, seconds: 90 } }
+    for (const walked of [routed, estimated]) {
+      const layers = exitPathBuffers(interior, walked, opts({ decks }))
+      expect(layers.bands.map((b) => [...b.positions])).toEqual(bare.bands.map((b) => [...b.positions]))
+      expect(layers.dashed).toBe(false)
+    }
   })
 })

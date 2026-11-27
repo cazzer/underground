@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 import { boardLineKey, drawnBoardStop, firstRideStops, type BoardLine } from '../lib/boardView'
-import { quickestEntry, type BoardChoice, type BoardResult } from '../lib/exitChoice'
+import { chooseEntry, quickestEntry, type BoardChoice, type BoardResult } from '../lib/exitChoice'
 import { exitLineView, type ExitLabel, type StreetSource } from '../lib/exitView'
 import { stationOfStop } from '../lib/live/arrivals'
 import { joinStationOutages, type EneInput } from '../lib/live/eneJoin'
+import type { Ground } from '../lib/projection'
 import type { TripJourney } from '../lib/route/plan'
 import { selectedFirst } from '../lib/tripSelection'
 import { plannable, tripKey, type TripEnds, type TripPlanState } from '../lib/tripView'
@@ -11,6 +12,8 @@ import type { StationInterior } from './stationSchema'
 import { interiorIdOf, type IndexLoad } from './interiorLoad'
 import { useInteriorModel } from './useStationInterior'
 import { useStationStreetsLoad, type StreetLayer } from './useStationStreets'
+import type { WalkLoad } from './useStationWalk'
+import type { WalkGraph } from './walkSchema'
 
 interface TripBoardInput {
   /** The trip panel is open (covered by a train panel or not). */
@@ -27,6 +30,10 @@ interface TripBoardInput {
   /** The visitor chose the From station (it was not filled from a location fix, or they have since focused it): only
    *  then are its files fetched. */
   allowed: boolean
+  /** A searched place the From end was picked from (a6m): the way in is chosen for the walk from it; null for none (the quickest way in). */
+  origin: Ground | null
+  /** The load of the From station's walk graph (`useStationWalkLoad`), for `origin`; null with none. */
+  walk: WalkLoad | null
 }
 
 export interface TripBoard {
@@ -56,6 +63,11 @@ function layoutHasNoEntry(interior: StationInterior, stopId: string): boolean {
   return r?.kind === 'none' && r.reason === 'no-entrance'
 }
 
+/** Only the graph of the stop's own station answers for it; another member of the complex estimates its walk. */
+function graphAt(graph: WalkGraph | null, stopId: string): WalkGraph | null {
+  return graph !== null && graph.stationId === stationOfStop(stopId) ? graph : null
+}
+
 const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== null && l !== undefined
 
 /**
@@ -63,11 +75,14 @@ const isLayer = (l: StreetLayer | null | undefined): l is StreetLayer => l !== n
  * is ready, the From station's interior and street files load and every journey that boards its first train there gets
  * its way-in line. Nothing loads while `allowed` is false (a From filled from a location fix that the visitor has not
  * focused or picked: the request would name the fix's nearest station), and a journey that first walks to another
- * station gets no way in (that station comes from the plan). Never a walk graph. Machines out of service are avoided;
+ * station gets no way in (that station comes from the plan). With an `origin` (the searched place the From end was
+ * picked from, a6m) the selected journey's way in is the one that minimizes the walk from it plus the time inside
+ * (`chooseEntry`), waiting for the walk graph to settle; this hook loads no walk graph itself (`walk` is
+ * `useStationWalkLoad`'s). Every stop the panel lists gets it (a stop at another member of the complex estimates its walk), and with no origin the quickest way in. Machines out of service are avoided;
  * with no fresh outage data none count as closed, and the line says a machine's status is unknown when the station
  * panel would. Rebuilt only when what it reads changes, so refreshes keep the choice object and the drawn path.
  */
-export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fromStations, allowed }: TripBoardInput): TripBoard | null {
+export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fromStations, allowed, origin, walk }: TripBoardInput): TripBoard | null {
   const ready = allowed && open && plannable(ends) && plan.status === 'ready' && plan.key === tripKey(ends.from, ends.to)
   const stops = ready && plan.status === 'ready' ? firstRideStops(selectedFirst(plan.journeys, selected), fromStations) : []
   const drawnStop = selected ? drawnBoardStop(selected, fromStations) : null
@@ -79,7 +94,10 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
   const model = useInteriorModel(interiorId)
   const fileStreets = useStationStreetsLoad(interiorId)
   const memberStreets = useStationStreetsLoad(interiorId && stationId !== interiorId ? stationId : null)
-  const settled = fileStreets.settled && memberStreets.settled
+  const walkSettled = origin === null || walk === null || walk.settled
+  const settled = fileStreets.settled && memberStreets.settled && walkSettled
+  const [originX, originZ] = [origin?.x, origin?.z]
+  const graph = walk?.graph ?? null
   const outages = joinStationOutages(model?.interior ?? null, ene, nowS)
   const outKey = outages.outIds.join(',')
   const known = outages.panel.kind !== 'unknown'
@@ -92,10 +110,19 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
     if (!model || !settled) return out
     const closed = new Set(outKey === '' ? [] : outKey.split(','))
     const streets = first?.file ?? null
-    for (const { stopId } of served) out.set(stopId, safely(stopId, () => quickestEntry({ interior: model.interior, stopId, streets, closed })))
+    served.forEach(({ stopId }) => {
+      const interior = model.interior
+      const fromPoint = originX !== undefined && originZ !== undefined
+      out.set(
+        stopId,
+        safely(stopId, () =>
+          fromPoint ? chooseEntry({ interior, stopId, origin: { x: originX, z: originZ }, walk: graphAt(graph, stopId), streets, closed }) : quickestEntry({ interior, stopId, streets, closed }),
+        ),
+      )
+    })
     return out
     // `served` is read through stopIdsKey.
-  }, [stopIdsKey, model, settled, first, outKey])
+  }, [stopIdsKey, model, settled, first, outKey, originX, originZ, graph])
 
   return useMemo(() => {
     if (!model || !interiorId || served.length === 0 || !settled) return null

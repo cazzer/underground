@@ -126,7 +126,9 @@ export function machinesUsed(route: { connectorIds: readonly string[] }, interio
  * escalator) when the route rides one and the station panel would call machine status unknown (`closedKnown` false).
  * The way in at the From station (a `BoardChoice`) reads the same: "Quickest way in: Bedford Av & N 7 St", or with no
  * street label "Quickest way in: northeast entrance"; a machine whose status is unknown is named in the order the rider
- * meets it.
+ * meets it. A way in chosen for a walk from a searched place (`origin`, a6m) reads "Enter at Bedford Av & N 7 St", or
+ * with no label "Enter at the northeast entrance", the walk first: "after 3 min walk" ("about" when estimated), spoken
+ * "After a 3 minute walk."
  */
 export function exitLineView(
   choice: ExitChoice | BoardChoice,
@@ -136,17 +138,19 @@ export function exitLineView(
 ): ExitLineView {
   const label = labelOf(choice, interior, sources)
   const board = choice.kind === 'board'
-  const head = label ? label.head : board ? `${compassOf(interior, choice.exit.point)} entrance` : `toward the ${compassOf(interior, choice.exit.point)}`
-  const lead = board ? 'Quickest way in:' : choice.destination === null ? 'Quickest way out:' : label ? 'Exit at' : 'Exit'
+  const fromPlace = choice.kind === 'board' && choice.origin !== null
+  const compass = compassOf(interior, choice.exit.point)
+  const head = label ? label.head : fromPlace ? `the ${compass} entrance` : board ? `${compass} entrance` : `toward the ${compass}`
+  const lead = fromPlace ? 'Enter at' : board ? 'Quickest way in:' : choice.destination === null ? 'Quickest way out:' : label ? 'Exit at' : 'Exit'
   const unknown = closedKnown ? [] : board ? machinesMet(choice, interior) : machinesUsed(choice, interior)
   const status = unknown.length > 0 ? `${unknown.join(' and ')} status unknown` : null
   const walk = choice.walk
   const minutes = walk && walkMinutes(walk.seconds)
-  const walkText = walk === null ? null : walk.kind === 'route' ? `then ${minutes} min walk` : `about ${minutes} min walk`
+  const walkText = walk === null ? null : walk.kind === 'estimate' ? `about ${minutes} min walk` : fromPlace ? `after ${minutes} min walk` : `then ${minutes} min walk`
   const tail = label && label.tail !== '' ? label.tail : null
   const note = [tail, choice.probable ? 'probably' : null, walkText, status].filter((p): p is string => p !== null)
   const sentences = [`${lead} ${streetSpoken(head)}${tail ? `, ${streetSpoken(tail.replaceAll(' · ', ', '))}` : ''}.`]
-  if (walk) sentences.push(`${walk.kind === 'route' ? 'Then a' : 'About a'} ${minutes} minute walk.`)
+  if (walk) sentences.push(`${fromPlace ? (walk.kind === 'route' ? 'After a' : 'After about a') : walk.kind === 'route' ? 'Then a' : 'About a'} ${minutes} minute walk.`)
   if (status) sentences.push(`${capitalize(status)}.`)
   if (choice.probable) sentences.push('Probably: the station layout is estimated.')
   const origin = toGround(interior.anchor)

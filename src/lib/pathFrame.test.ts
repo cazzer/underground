@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Connector, StationInterior } from '../data/stationSchema'
-import { quickestExit, type ExitChoice } from './exitChoice'
+import { quickestEntry, quickestExit, type BoardChoice, type ExitChoice } from './exitChoice'
 import { priorityFrameOf, priorityLanding, priorityTiers } from './pathFrame'
 import { framedCount } from './freeFrame'
 import { fixture } from './interiorFixture'
@@ -66,6 +66,19 @@ describe('priorityFrameOf with a path', () => {
     const walk = { kind: 'route' as const, points: [{ x: origin.x + 9, z: origin.z + 10 }, { x: origin.x + 40, z: origin.z + 30 }], meters: 40, seconds: 30 }
     const f = priorityFrameOf(model, { ...choice(), walk }, [], [origin], OPTS)!
     expect(f.wanted.slice(-2)).toEqual(walk.points.map((g) => ({ x: g.x, y: 0, z: g.z })))
+  })
+
+  it("adds a way in's walk from its place too: the street points, or for an estimate the place", () => {
+    const r = quickestEntry({ interior, stopId: 'X01N' })
+    if (r.kind !== 'board') throw new Error(r.reason)
+    const place = { x: origin.x + 80, z: origin.z + 30 }
+    const points = [place, { x: origin.x + 9, z: origin.z + 30 }, { x: origin.x + 9, z: origin.z + 10 }]
+    const routed: BoardChoice = { ...r, origin: place, walk: { kind: 'route', points, meters: 90, seconds: 70 } }
+    expect(priorityFrameOf(model, routed, [], [origin], OPTS)!.wanted.slice(-3)).toEqual(points.map((g) => ({ x: g.x, y: 0, z: g.z })))
+    const estimated: BoardChoice = { ...r, origin: place, walk: { kind: 'estimate', meters: 90, seconds: 90 } }
+    expect(priorityFrameOf(model, estimated, [], [origin], OPTS)!.wanted.at(-1)).toEqual({ x: place.x, y: 0, z: place.z })
+    // The quickest way in has no walk to add.
+    expect(priorityFrameOf(model, r, [], [origin], OPTS)!.wanted).toHaveLength(priorityFrameOf(model, routed, [], [origin], OPTS)!.wanted.length - points.length)
   })
 
   it("returns null, logging once, for a choice that doesn't fit the interior", () => {

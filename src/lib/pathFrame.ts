@@ -40,7 +40,7 @@ export interface PriorityFrame {
   /**
    * In priority order: the path's marker ends at rail height (the board marker's, then a transfer's second) and its
    * centerline, the out-of-service machines' ends, the interior's outline per level (convex hull vertices, nearest the
-   * path's board first, else nearest the machines' middle), then an exit's walk outside.
+   * path's board first, else nearest the machines' middle), then the exit's or way in's walk outside.
    */
   wanted: FramePoint[]
   /** How many of `wanted` come first as the path itself (the marker ends and the centerline); 0 with no path. */
@@ -100,13 +100,15 @@ export function priorityFrameOf(
   })
   hull.sort((a, b) => a.d - b.d)
 
+  // The walk outside, from the exit or to the entrance: its street points, or for an estimate the place it runs to or from.
+  const end = path?.kind === 'exit' ? path.destination : path?.kind === 'board' ? path.origin : null
   const walk: FramePoint[] =
-    !points || path?.kind !== 'exit'
+    !points || (path?.kind !== 'exit' && path?.kind !== 'board')
       ? []
       : path.walk?.kind === 'route'
         ? path.walk.points.map((g) => ({ x: g.x, y: 0, z: g.z }))
-        : path.walk?.kind === 'estimate' && path.destination
-          ? [{ x: path.destination.x, y: 0, z: path.destination.z }]
+        : path.walk?.kind === 'estimate' && end
+          ? [{ x: end.x, y: 0, z: end.z }]
           : []
 
   const b = interiorBounds(interior)

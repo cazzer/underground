@@ -35,33 +35,61 @@ export function loadTransferWalkGraphs(
   return Promise.all(ids.map((id) => cache.get(id).then((graph) => on.loaded(id, graph), (err: unknown) => on.failed(id, err)))).then(() => undefined)
 }
 
+export interface WalkLoad {
+  /** The station's walk graph once loaded; null while loading, with no walk file, after a failure (logged) or with no station. */
+  graph: WalkGraph | null
+  /** The load has resolved, failed or run past `WALK_DEADLINE_MS` (or there is no station): what is drawn from it may be decided. */
+  settled: boolean
+}
+
+/** A hung shard stops holding a drawing back after this long: it then draws without the graph (a late graph still joins). */
+export const WALK_DEADLINE_MS = 3000
+
 /**
- * A station's walk graph, once loaded; null while loading, with no station, with no walk file, or after a failure
- * (logged). Nothing is fetched until `stationId` is set.
+ * A station's walk graph, loaded through the shared cache, nothing fetched until
+ * `stationId` is set. `settled` is true once the load has resolved, failed (logged; the next time the station is asked
+ * for, it is retried) or run past `WALK_DEADLINE_MS`, so a drawing that depends on it can wait for the answer instead of
+ * drawing straight and swapping.
  *
  * Privacy: the request reveals the station id to the static host, so pass only a station the user picked, focused, or
- * chose as a trip endpoint, never the station nearest a location fix without a user action. The one other caller is
+ * chose as a trip endpoint, or the station a journey reaches that end at (a6m: the walk between a searched place and
+ * its end), never the station nearest a location fix without a user action. The one other caller is
  * `loadTransferWalkGraphs` above (85r). See loadStationWalk.ts.
  */
-export function useStationWalk(stationId: string | null): WalkGraph | null {
-  // The last station whose load settled: set only to re-render once the cache holds it.
-  const [, setLoadedId] = useState<string | null>(null)
+export function useStationWalkLoad(stationId: string | null): WalkLoad {
+  // The last station whose load settled, or whose deadline passed: set only to re-render.
+  const [settledId, setSettledId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!stationId || cache.peek(stationId) !== undefined) return
-    let cancelled = false
+    let current = true
+    // A retry after a failure starts unsettled again.
+    setSettledId(null)
+    const settle = (): void => {
+      if (current) setSettledId(stationId)
+    }
+    const timer = setTimeout(() => {
+      console.warn(`Walk graph of station ${stationId} still loading after ${WALK_DEADLINE_MS} ms; its walk draws without it`)
+      settle()
+    }, WALK_DEADLINE_MS)
     cache.get(stationId).then(
       () => {
-        if (!cancelled) setLoadedId(stationId)
+        clearTimeout(timer)
+        settle()
       },
       (err: unknown) => {
+        clearTimeout(timer)
         console.error(`Failed to load the walk graph of station ${stationId}`, err)
+        settle()
       },
     )
     return () => {
-      cancelled = true
+      current = false
+      clearTimeout(timer)
     }
   }, [stationId])
 
-  return (stationId && cache.peek(stationId)) || null
+  if (!stationId) return { graph: null, settled: true }
+  const graph = cache.peek(stationId) ?? null
+  return { graph, settled: graph !== null || settledId === stationId || cache.peek(stationId) === null }
 }
