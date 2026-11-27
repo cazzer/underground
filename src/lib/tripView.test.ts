@@ -127,7 +127,7 @@ describe('journeyView', () => {
   it('shows a walk between stations as "Walk to Y" with its minutes', () => {
     const legs = [ride('L', 'L08', '635', T, T + 600), walk('635N', '630N', T + 600, 300, false), ride('4', '630', 'L03', T + 960, T + 1200)]
     const v = journeyView(journey(legs, 2), NOW, names)
-    expect(v.legs[1]).toEqual({ kind: 'walk', toStationId: '630', to: 'Lexington Av/63 St', minutes: 5 })
+    expect(v.legs[1]).toEqual({ kind: 'walk', from: '14 St-Union Sq', toStationId: '630', to: 'Lexington Av/63 St', minutes: 5 })
     expect(v.transfersText).toBe('2 changes')
   })
 

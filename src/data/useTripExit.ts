@@ -102,6 +102,13 @@ export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allo
   const second = fileStreets.layer ? memberStreets.layer : null
   // The choices hang on the stops alone: a poll that swaps a train for its live twin keeps them, and the drawn path.
   const stopIdsKey = served.map((s) => s.stopId).join(',')
+  // What each stop's choice reads of `walk`: whether its station's shard has settled, and whether it brought a graph.
+  const walkKey = served
+    .map((s) => {
+      const load = walkLoadAt(walk, s.stopId)
+      return `${s.stopId}${load === null ? '-' : load.settled ? (load.graph ? 'g' : 's') : 'p'}`
+    })
+    .join(',')
   const choices = useMemo(() => {
     const out = new Map<string, ExitChoice | null>()
     if (!model || !settled) return out
@@ -121,8 +128,8 @@ export function useTripExit({ open, ends, plan, index, ene, nowS, selected, allo
       )
     })
     return out
-    // `served` is read through stopIdsKey.
-  }, [stopIdsKey, model, settled, first, outKey, destX, destZ, walk])
+    // `served` is read through stopIdsKey, and `walk` through walkKey.
+  }, [stopIdsKey, model, settled, first, outKey, destX, destZ, walkKey])
 
   return useMemo(() => {
     if (!model || !interiorId || served.length === 0 || !settled) return null

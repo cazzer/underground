@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { stationOfStop } from '../lib/live/arrivals'
 import { transferPairStations, transferStationIds } from '../lib/transferPairs'
 import { createInteriorCache } from './interiorCache'
@@ -66,8 +66,11 @@ type Ended = 'loaded' | 'failed' | 'late'
  * action. The one other caller is `loadTransferWalkGraphs` above (85r). See loadStationWalk.ts.
  */
 export function useStationWalkLoads(stationIds: readonly StationId[]): ReadonlyMap<StationId, WalkLoad> {
-  const key = stationIds.join(',')
-  const [ended, setEnded] = useState<ReadonlyMap<StationId, Ended>>(new Map())
+  const key = [...stationIds].sort().join(',')
+  const [ended, setEnded] = useState<ReadonlyMap<StationId, Ended>>(() => new Map())
+  // Read by the effect, which must not start a station's load again when only another id joined the list.
+  const endedRef = useRef(ended)
+  endedRef.current = ended
 
   useEffect(() => {
     const ids = key === '' ? [] : key.split(',')
@@ -80,7 +83,8 @@ export function useStationWalkLoads(stationIds: readonly StationId[]): ReadonlyM
     }
     const timers: ReturnType<typeof setTimeout>[] = []
     for (const id of ids) {
-      if (cache.peek(id) !== undefined) continue
+      // Loaded, or already ended (failed or late) while it stayed in the list: no second timer, warning or fetch.
+      if (cache.peek(id) !== undefined || endedRef.current.has(id)) continue
       const timer = setTimeout(() => {
         console.warn(`Walk graph of station ${id} still loading after ${WALK_DEADLINE_MS} ms; its walk draws without it`)
         end(id, 'late')

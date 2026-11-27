@@ -177,7 +177,8 @@ export function Scene({ network, banded, insets, live, onLiveError, interior, ou
         </ErrorBoundary>
       )}
       {here && <YouAreHere ground={here.ground} accuracyM={here.accuracyM} />}
-      {placePin && <PlacePin ground={placePin} />}
+      {/* The place line's pin yields to a trip's at the same point, so that one's dim and easing apply (TripPlacePins). */}
+      {placePin && !(drawn?.kind === 'trip' && drawn.places.some((g) => g.x === placePin.x && g.z === placePin.z)) && <PlacePin ground={placePin} />}
       {/* Decoration: a crash (logged) draws no amenity marks instead of blanking the scene. */}
       <ErrorBoundary fallback={null}>
         <StationAmenities network={network} amenities={amenities} shown={shown} presences={presences} levels={tripLevels} blockers={labelBlockers} insets={insets} panel={panel} />

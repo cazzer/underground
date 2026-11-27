@@ -116,7 +116,6 @@ export function useInteriorModelLoad(id: string | null): { model: InteriorModel 
   useEffect(() => {
     if (!id || cache.peek(id)) return
     let cancelled = false
-    setFailedId(null)
     cache.get(id).then(
       () => {
         if (!cancelled) setLoadedId(id)
@@ -128,6 +127,8 @@ export function useInteriorModelLoad(id: string | null): { model: InteriorModel 
     )
     return () => {
       cancelled = true
+      // Coming back to a failed station starts clean, not with its old failure.
+      setFailedId(null)
     }
   }, [id])
   const model = (id && cache.peek(id)) || null

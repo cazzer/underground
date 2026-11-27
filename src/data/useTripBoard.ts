@@ -101,6 +101,13 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
   const first = fileStreets.layer ?? memberStreets.layer
   const second = fileStreets.layer ? memberStreets.layer : null
   const stopIdsKey = served.map((s) => s.stopId).join(',')
+  // What each stop's choice reads of `walk`: whether its station's shard has settled, and whether it brought a graph.
+  const walkKey = served
+    .map((s) => {
+      const load = walkLoadAt(walk, s.stopId)
+      return `${s.stopId}${load === null ? '-' : load.settled ? (load.graph ? 'g' : 's') : 'p'}`
+    })
+    .join(',')
   const choices = useMemo(() => {
     const out = new Map<string, BoardResult | null>()
     if (!model || !settled) return out
@@ -120,8 +127,8 @@ export function useTripBoard({ open, ends, plan, index, ene, nowS, selected, fro
       )
     })
     return out
-    // `served` is read through stopIdsKey.
-  }, [stopIdsKey, model, settled, first, outKey, originX, originZ, walk])
+    // `served` is read through stopIdsKey, and `walk` through walkKey.
+  }, [stopIdsKey, model, settled, first, outKey, originX, originZ, walkKey])
 
   return useMemo(() => {
     if (!model || !interiorId || served.length === 0 || !settled) return null

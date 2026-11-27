@@ -226,7 +226,7 @@ function placeRow(end: 'from' | 'to', w: PlaceWalkInfo, station: string): Itiner
 function endStationName(legs: readonly LegView[], end: 'from' | 'to'): string {
   const leg = end === 'from' ? legs[0] : legs.at(-1)
   if (leg?.kind === 'ride') return end === 'from' ? leg.board.name : leg.alight.name
-  if (leg?.kind === 'walk') return end === 'to' ? leg.to : 'the station'
+  if (leg?.kind === 'walk') return end === 'to' ? leg.to : leg.from
   return leg?.kind === 'change' ? leg.name : 'the station'
 }
 

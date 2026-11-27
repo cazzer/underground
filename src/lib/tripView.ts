@@ -114,6 +114,8 @@ export interface ChangeLegView {
 }
 export interface WalkLegView {
   kind: 'walk'
+  /** The station it leaves. */
+  from: string
   toStationId: StationId
   to: string
   minutes: number
@@ -199,7 +201,7 @@ function legViews(j: TripJourney, names: TripNames): LegView[] {
       const minutes = leg.durationS > 0 ? walkMinutes(leg.durationS) : null
       return { kind: 'change', stationId: toStationId, name: names.station(toStationId), minutes, transferKey: transferLegKey(leg, next) }
     }
-    return { kind: 'walk', toStationId, to: names.station(toStationId), minutes: walkMinutes(leg.durationS) }
+    return { kind: 'walk', from: names.station(stationOfStop(leg.fromStop)), toStationId, to: names.station(toStationId), minutes: walkMinutes(leg.durationS) }
   })
 }
 

@@ -15,7 +15,7 @@ const ride = (routeId: string, from: [string, string, string], to: [string, stri
   stopsText: '3 stops',
 })
 const change = (stationId: string, name: string, minutes: number | null, transferKey = 'k'): ChangeLegView => ({ kind: 'change', stationId, name, minutes, transferKey })
-const walk = (toStationId: string, to: string): WalkLegView => ({ kind: 'walk', toStationId, to, minutes: 5 })
+const walk = (toStationId: string, to: string): WalkLegView => ({ kind: 'walk', from: 'Origin St', toStationId, to, minutes: 5 })
 
 const ctx = (over: Partial<StepContext> & { layouts?: Record<string, StationLayout> } = {}): StepContext => {
   const { layouts = {}, ...rest } = over
@@ -191,10 +191,10 @@ describe('journeyItinerary with place walks', () => {
     expect(places(rows)[0]!.spoken).toBe('Walk 1 minute from Home to Bedford Av.')
   })
 
-  it('names the station from a trailing walk leg, and says "the station" for a leading one', () => {
+  it('names the station from a trailing walk leg\'s end and a leading one\'s start', () => {
     const rows = journeyItinerary([walk('L03', '14 St-Union Sq'), ride('L', UNION_OFF, TIMES), walk('127', 'Times Sq-42 St')], ctx({ placeWalks: walks() }))
     const [from, to] = places(rows)
-    expect(from!.spoken).toContain('to the station.')
+    expect(from!.spoken).toContain('to Origin St.')
     expect(to!.spoken).toContain('from Times Sq-42 St to')
   })
 })
