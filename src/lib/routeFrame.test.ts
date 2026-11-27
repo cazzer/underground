@@ -151,6 +151,14 @@ describe('routeFramePoints', () => {
     expect(routeFramePoints([straight, walk], shapes, stations)).toEqual([{ x: 1, z: 2 }, { x: 3, z: 4 }, { x: 5, z: 6 }, { x: 9, z: 9 }, { x: 7, z: 8 }])
   })
 
+  it('takes a walk\'s street path in place of its ends, so a detour past the stations is framed', () => {
+    const walk: TripSpan = {
+      kind: 'walk', legIndex: 1, fromStationId: 'A', toStationId: 'B', sameComplex: false, from: { x: 5, z: 6 }, to: { x: 9, z: 9 },
+      path: [{ x: 5, z: 6 }, { x: 5, z: 90 }, { x: 9, z: 9 }],
+    }
+    expect(routeFramePoints([walk], shapes, [])).toEqual([{ x: 5, z: 6 }, { x: 5, z: 90 }, { x: 9, z: 9 }])
+  })
+
   it('names a shape the map does not draw', () => {
     const span: TripSpan = { kind: 'ride', legIndex: 0, routeId: 'X', shapeId: 'gone', d0: 0, d1: 1, maxOffsetM: 0, matched: 'route' }
     expect(() => routeFramePoints([span], shapes, [])).toThrow(/gone/)

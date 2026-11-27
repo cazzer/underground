@@ -88,7 +88,11 @@ Worker (own package and lockfile; `npm --prefix worker ci` once):
 - `src/lib/`: pure logic, tests colocated (the `*.tsx` files are React contexts: focus, trip, panel collapse, train
   selection). `live/` the live layer's helpers, `realtime/` realtime-to-position,
   `route/` the RAPTOR trip router, `basemap/` tile maths and decoding. Also network/bands/corridors, interior geometry,
-  framing, focus, labels and declutter, exit/transfer choice, search.
+  framing, focus, labels and declutter, exit/transfer choice, search. A trip's walks between stations of different
+  complexes follow the street network (85r): `transferPairs.ts` (the transfer pairs), `tripWalkPaths.ts` (routes each
+  pair over `walkRoute.ts` on either station's shard, shorter wins, straight dash where no path or past 2.5x the
+  straight line; sets `WalkSpan.path`, which `tripDashBuffers.ts` and `routeFrame.ts` read); `data/useTransferWalks.ts`
+  loads the shards and `useTripRoute.ts` holds the route until they settle. Same-complex walks stay undrawn.
 - `src/data/`: loaders, hooks and file contracts (`schema.ts`, `stationSchema.ts`, `streetSchema.ts`,
   `timetableSchema.ts`, `walkSchema.ts`, `equipmentSchema.ts`; `realtime.ts` re-exports the Worker's contracts).
 - `public/data/`: generated JSON (never hand-edit). `data/`: pinned sources (stations, catalog, streets, basemap
@@ -235,7 +239,11 @@ Sources, sizes, and terms are in `docs/research/data-sources.md`. Constraints:
   view-driven station sets are empty until the user moves the view or picks a station or place (the location cap,
   `lib/basemap/locationCapHandle.ts`).
 - **Station-named fetches reveal the station id to the static host.** Walk shards: only for a station the user
-  picked, focused or chose as a trip end (`useStationWalk`), never one the camera merely shows. Interiors and street
+  picked, focused or chose as a trip end (`useStationWalk`), never one the camera merely shows. One exception (85r,
+  `useTransferWalks`): once a trip plan is ready (`FEATURES.navigation`) the shards of every station in a transfer
+  between two complexes (transfers.json; today 5 stations, 3 pairs) load together, a set fixed by the static data and
+  never the journey's, so the walks between stations draw along streets without revealing which the rider uses; never
+  at startup. Interiors and street
   files: also for stations the camera shows (the view and prefetch sets, camera-driven, empty under the location
   cap). None is ever keyed by the fix or `nearestStation`. A trip end filled from the fix fetches nothing until the
   user picks or focuses it. Trip transfers load every authored interior so the change station isn't revealed (revisit

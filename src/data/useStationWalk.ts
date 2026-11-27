@@ -12,6 +12,14 @@ const BASE_URL = import.meta.env.BASE_URL
 const cache = createInteriorCache((id) => loadStationWalk(BASE_URL, id).then((file) => file && decodeStationWalk(file)))
 
 /**
+ * A station's walk graph through the shared cache (null: no walk file). For `useTransferWalks`, which loads a fixed
+ * set of shards; see its header for why that is allowed. Everything else goes through `useStationWalk`.
+ */
+export function loadWalkGraph(stationId: string): Promise<WalkGraph | null> {
+  return cache.get(stationId)
+}
+
+/**
  * A station's walk graph, once loaded; null while loading, with no station, with no walk file, or after a failure
  * (logged). Nothing is fetched until `stationId` is set.
  *

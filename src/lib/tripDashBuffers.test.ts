@@ -29,6 +29,14 @@ describe('tripDashBuffers', () => {
     near(b.distances, [0, 30])
   })
 
+  it('draws a walk with a street path as one segment per leg of it, distances accumulating from 0', () => {
+    const streets: WalkSpan = { ...walk(0, 30), path: [{ x: 0, z: 0 }, { x: 30, z: 0 }, { x: 30, z: 40 }] }
+    const b = tripDashBuffers([streets, walk(50, 70)], [], PINK, colorOf)
+    near(b.positions, [0, 0, 0, 30, 0, 0, 30, 0, 0, 30, 0, 40, 50, 0, 0, 70, 0, 0])
+    near(b.distances, [0, 30, 30, 70, 0, 20])
+    near(b.colors.subarray(0, 3), [...PINK])
+  })
+
   it('draws a straight ride through its stops with cumulative distances, in its route color', () => {
     const b = tripDashBuffers([], [straight('G', [{ x: 0, z: 0 }, { x: 3, z: 4 }, { x: 3, z: 14 }])], PINK, colorOf)
     near(b.positions, [0, 0, 0, 3, 0, 4, 3, 0, 4, 3, 0, 14])

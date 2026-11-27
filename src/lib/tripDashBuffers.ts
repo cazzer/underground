@@ -1,6 +1,6 @@
 /**
- * The trip's dashed links (TripDashes.tsx, 2q7.45.4) as plain line buffers. Pure. A walk between two stations is one
- * segment between their points in the walk color; a ride the map can't find on a drawn shape (a `straight` span) is
+ * The trip's dashed links (TripDashes.tsx, 2q7.45.4) as plain line buffers. Pure. A walk between two stations is its
+ * street path (`path`) in the walk color, else one segment between their points; a ride the map can't find on a drawn shape (a `straight` span) is
  * the polyline through its stops in its route's color. Both at the ground (y 0), unbanded. Each polyline's dash
  * distances (world meters along it) restart at 0, so every link starts on a dash.
  */
@@ -27,7 +27,7 @@ export function tripDashBuffers(
   walkRgb: Rgb,
   colorOf: (span: RideStraightSpan) => Rgb | null,
 ): TripDashBuffers {
-  const lines: { points: readonly Ground[]; color: Rgb }[] = walks.map((w) => ({ points: [w.from, w.to], color: walkRgb }))
+  const lines: { points: readonly Ground[]; color: Rgb }[] = walks.map((w) => ({ points: w.path ?? [w.from, w.to], color: walkRgb }))
   for (const s of straights) {
     const color = colorOf(s)
     if (color) lines.push({ points: s.points, color })
