@@ -7,8 +7,8 @@ import type { ArrivalsSource } from '../lib/live/arrivals'
 import { markedPlacement } from '../lib/locate'
 import type { BoardLine } from '../lib/boardView'
 import type { ExitLineView } from '../lib/exitView'
-import { nearNote } from '../lib/placeLabel'
-import { HERE_NOTE } from '../lib/searchHere'
+import { tripPlaceOf } from '../lib/placeLabel'
+import { HERE_PLACE } from '../lib/searchHere'
 import type { Network } from '../lib/network'
 import type { TransferLineView } from '../lib/transferView'
 import { useTrainSelection } from '../lib/trainSelection'
@@ -210,8 +210,8 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
         label={GEOCODE_URL ? 'Trip from: search stations and places' : 'Trip from: search stations'}
         placeholder={GEOCODE_URL ? 'From station or address' : 'From station'}
         onChoose={(id) => setEnd('from', id)}
-        onChoosePlace={(p) => setEnd('from', p.nearest.id, nearNote(p))}
-        onChooseHere={(id) => setEnd('from', id, HERE_NOTE)}
+        onChoosePlace={(p) => setEnd('from', p.nearest.id, tripPlaceOf(p))}
+        onChooseHere={(id) => setEnd('from', id, HERE_PLACE)}
       />
       <StationSearch
         ref={toSearch}
@@ -220,8 +220,8 @@ export function TripPanel({ network, arrivals, locate, covered, headingRef, focu
         label={GEOCODE_URL ? 'Trip to: search stations and places' : 'Trip to: search stations'}
         placeholder={GEOCODE_URL ? 'To station or address' : 'To station'}
         onChoose={(id) => setEnd('to', id)}
-        onChoosePlace={(p) => setEnd('to', p.nearest.id, nearNote(p))}
-        onChooseHere={(id) => setEnd('to', id, HERE_NOTE)}
+        onChoosePlace={(p) => setEnd('to', p.nearest.id, tripPlaceOf(p))}
+        onChooseHere={(id) => setEnd('to', id, HERE_PLACE)}
       />
     </aside>
   )

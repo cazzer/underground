@@ -4,6 +4,7 @@ import type { StationsFile } from '../data/schema'
 import type { ArrivalsSource } from './live/arrivals'
 import type { TripJourney } from './route/plan'
 import { useFocus } from './focus'
+import type { Ground } from './projection'
 import { useTrainSelection } from './trainSelection'
 import { journeyKeys, reconcileOpened, tripSelection, type OpenedJourney, type TripSelection } from './tripSelection'
 import { afterFocus, afterPick, fixEndOf } from './tripFix'
@@ -12,10 +13,19 @@ import { plannable, tripKey, type TripEnds, type TripPlanState } from './tripVie
 
 export type TripEnd = keyof TripEnds
 
-/** The place an end was picked from, per end: "120 Broadway" beside its nearest station. A note, not a point: planning reads `ends` only. */
+/**
+ * A searched place an end was picked from: "120 Broadway" beside its nearest station. `ground` is the place's own scene
+ * point (what the user searched for, never the location fix; null for "My location", which has none to draw), which the
+ * walk between it and the end's station is drawn to. Planning reads `ends` only. Memory only: no URL, storage or log.
+ */
+export interface TripPlace {
+  note: string
+  ground: Ground | null
+}
+
 export interface TripPlaces {
-  from: string | null
-  to: string | null
+  from: TripPlace | null
+  to: TripPlace | null
 }
 
 interface TripValue {
@@ -34,8 +44,8 @@ interface TripValue {
   /** Which end `fixStation` is: its interior and street files are not fetched for the trip until the visitor focuses or
    *  picks it, since the request would name the fix's nearest station. Null for none. */
   fixEnd: TripEnd | null
-  /** Sets an end to a station; `place` names the searched place it is the nearest station to (any station pick clears it). */
-  setEnd: (end: TripEnd, stationId: string, place?: string | null) => void
+  /** Sets an end to a station; `place` is the searched place it is the nearest station to (any station pick clears it). */
+  setEnd: (end: TripEnd, stationId: string, place?: TripPlace | null) => void
   swap: () => void
   retry: () => void
   /** Which view the panel shows (none, the list, or one journey's detail) and which journey is selected. */
@@ -197,7 +207,7 @@ export function TripProvider({ stations, arrivals, children }: TripProviderProps
     setPlaces((p) => (p.from === notes.from && p.to === notes.to ? p : notes))
     setOpenState(true)
   }, [])
-  const setEnd = useCallback((end: TripEnd, stationId: string, place: string | null = null) => {
+  const setEnd = useCallback((end: TripEnd, stationId: string, place: TripPlace | null = null) => {
     setEnds((e) => (e[end] === stationId ? e : { ...e, [end]: stationId }))
     // A pick is a choice; an end it replaces is no longer one (`fixEnd` is derived from the ends).
     setFixStation((f) => afterPick(f, stationId))

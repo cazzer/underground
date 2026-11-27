@@ -3,12 +3,16 @@ import type { StationId } from '../data/schema'
 import type { LocateState, MarkedPlacement } from './locate'
 import { formatDistance, locateMessage, type LocateMessage } from './locateMessage'
 import type { Station } from './network'
+import type { TripPlace } from './trip'
 import type { Ground } from './projection'
 import type { StationGroup } from './stationGroups'
 import { SEARCH_LIMIT } from './stationSearch'
 
 /** The note a trip end set from "My location" keeps, as a place's name is: "near you", spoken "nearest station to you". */
 export const HERE_NOTE = 'you'
+
+/** The trip place of an end set from "My location": the note, no point (the fix is never drawn to or sent anywhere). */
+export const HERE_PLACE: TripPlace = { note: HERE_NOTE, ground: null }
 
 export interface HereRow {
   /** The station it stands for: the group's id (a complex's lead). */

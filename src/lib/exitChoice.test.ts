@@ -4,7 +4,8 @@ import { decodeStationWalk } from '../data/loadStationWalk'
 import type { Connector, StationIndex, StationInterior } from '../data/stationSchema'
 import type { StationStreets, StreetEntrance } from '../data/streetSchema'
 import type { StationWalk } from '../data/walkSchema'
-import { chooseExit, quickestEntry, quickestExit, streetEntranceIndex, streetJoinOf, walkMinutes, WALK_DETOUR, type ExitChoice, type ExitWalk } from './exitChoice'
+import { chooseEntry, chooseExit, quickestEntry, quickestExit, streetEntranceIndex, streetJoinOf, walkMinutes, type ExitChoice } from './exitChoice'
+import { WALK_DETOUR, type ExitWalk } from './outsideWalk'
 import { fixture } from './interiorFixture'
 import { toGround } from './projection'
 import { FIXTURE_ANCHOR, walkGraph } from './walkFixture'
@@ -164,7 +165,7 @@ describe('quickestEntry', () => {
     expect(r.exit.entranceId).toBe('E1')
     expect(r.connectorIds).toEqual(['PS1', 'ST1'])
     expect(r.areaIds).toEqual(['P1', 'S1'])
-    expect([r.walk, r.destination, r.probable, r.stepFree, r.stationId, r.stopId]).toEqual([null, null, false, false, 'X01', 'X01N'])
+    expect([r.walk, r.destination, r.origin, r.probable, r.stepFree, r.stationId, r.stopId]).toEqual([null, null, null, false, false, 'X01', 'X01N'])
     expect(r.totalS).toBe(r.inStationS)
   })
 
@@ -182,6 +183,56 @@ describe('quickestEntry', () => {
     expect(quickestEntry({ interior, stopId: 'X01S' })).toEqual({ kind: 'none', reason: 'no-track' })
     expect(quickestEntry({ interior, stopId: 'X01N', closed: new Set(['PS1']) })).toEqual({ kind: 'none', reason: 'no-entrance' })
     expect(quickestEntry({ interior, stopId: 'X01N', stepFree: true })).toEqual({ kind: 'none', reason: 'no-entrance' })
+  })
+})
+
+describe('chooseEntry on a synthetic station', () => {
+  const base = { interior: twoExits(), stopId: 'X01N', walk: street }
+
+  function boardOf(result: ReturnType<typeof chooseEntry>) {
+    if (result.kind !== 'board') throw new Error(`no entry: ${result.reason}`)
+    const { walk } = result
+    if (walk === null) throw new Error('chooseEntry gave no walk')
+    return { ...result, walk }
+  }
+
+  it('takes the slower entrance when it is nearer the place, with the walk running place to entrance', () => {
+    const origin = scene(-200, 20)
+    const choice = boardOf(chooseEntry({ ...base, origin }))
+    expect(choice.exit.entranceId).toBe('E3')
+    expect(choice.connectorIds).toEqual(['PS1', 'ST3'])
+    expect(choice.origin).toEqual(origin)
+    expect(choice.walk.kind).toBe('route')
+    if (choice.walk.kind !== 'route') return
+    expect(choice.walk.points[0]).toEqual(origin)
+    expect(choice.walk.points[choice.walk.points.length - 1]).toEqual(scene(-30, 14))
+    expect(choice.walk.meters).toBeCloseTo(6 + 170, 6)
+    expect(choice.totalS).toBeCloseTo(choice.inStationS + choice.walk.seconds, 9)
+  })
+
+  it('takes the quicker way in when the walk saves less', () => {
+    const choice = boardOf(chooseEntry({ ...base, origin: scene(60, 20) }))
+    expect(choice.exit.entranceId).toBe('E1')
+  })
+
+  it('estimates a straight line past the shard radius, from the place to the entrance', () => {
+    const choice = boardOf(chooseEntry({ ...base, origin: scene(400, 0) }))
+    expect(choice.walk.kind).toBe('estimate')
+    expect(choice.walk.meters).toBeCloseTo(Math.hypot(400 - 9, 10), 6)
+    expect(choice.walk.seconds).toBeCloseTo((choice.walk.meters * WALK_DETOUR) / W, 9)
+  })
+
+  it('estimates with no walk graph', () => {
+    expect(boardOf(chooseEntry({ ...base, walk: null, origin: scene(-200, 20) })).walk.kind).toBe('estimate')
+  })
+
+  it('refuses a walk graph from another station', () => {
+    expect(() => chooseEntry({ ...base, walk: { ...street, stationId: 'X99' }, origin: scene(0, 20) })).toThrow('walk graph is for station X99, but stop X01N is at X01')
+  })
+
+  it('says why there is no way in, and honours step-free', () => {
+    expect(chooseEntry({ ...base, stopId: 'X01S', origin: scene(0, 20) })).toEqual({ kind: 'none', reason: 'no-track' })
+    expect(chooseEntry({ ...base, stepFree: true, origin: scene(0, 20) })).toEqual({ kind: 'none', reason: 'no-entrance' })
   })
 })
 

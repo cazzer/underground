@@ -1,8 +1,8 @@
 import type { Ref, RefObject } from 'react'
-import type { TripEnd, TripPlaces } from '../lib/trip'
+import type { TripEnd, TripPlace, TripPlaces } from '../lib/trip'
 import type { TripEnds as Ends } from '../lib/tripView'
 import type { Network } from '../lib/network'
-import { HERE_NOTE } from '../lib/searchHere'
+import { HERE_PLACE } from '../lib/searchHere'
 import { isTripEnd } from '../lib/tripEnds'
 
 interface TripEndsProps {
@@ -20,7 +20,7 @@ interface TripEndsProps {
   rows: { from: RefObject<HTMLButtonElement | null>; to: RefObject<HTMLButtonElement | null> }
   /** Opens that end's search. The row has already taken focus, so the dialog hands it back there. */
   onPick: (end: TripEnd) => void
-  onSet: (end: TripEnd, stationId: string, place?: string | null) => void
+  onSet: (end: TripEnd, stationId: string, place?: TripPlace | null) => void
   onSwap: () => void
 }
 
@@ -75,7 +75,7 @@ export function TripEnds({ network, ends, places, focusedId, focusSiblings, near
     button.focus({ preventScroll: true })
     onPick(end)
   }
-  const set = (end: TripEnd, stationId: string, place: string | null = null) => {
+  const set = (end: TripEnd, stationId: string, place: TripPlace | null = null) => {
     onSet(end, stationId, place)
     requestAnimationFrame(() => rows[end].current?.focus({ preventScroll: true }))
   }
@@ -86,8 +86,8 @@ export function TripEnds({ network, ends, places, focusedId, focusSiblings, near
     <div className="mt-2">
       <div className="flex items-center gap-1">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <EndRow ref={rows.from} label="From" name={nameOf(ends.from)} near={places.from} onPress={press('from')} />
-          <EndRow ref={rows.to} label="To" name={nameOf(ends.to)} near={places.to} onPress={press('to')} />
+          <EndRow ref={rows.from} label="From" name={nameOf(ends.from)} near={places.from?.note ?? null} onPress={press('from')} />
+          <EndRow ref={rows.to} label="To" name={nameOf(ends.to)} near={places.to?.note ?? null} onPress={press('to')} />
         </div>
         <button
           type="button"
@@ -101,7 +101,7 @@ export function TripEnds({ network, ends, places, focusedId, focusSiblings, near
         </button>
       </div>
       {nearest !== null && nearestId !== null && (
-        <button type="button" onClick={() => set('from', nearestId, HERE_NOTE)} className={`${LINK} -ml-2`}>
+        <button type="button" onClick={() => set('from', nearestId, HERE_PLACE)} className={`${LINK} -ml-2`}>
           Nearest to you: {nearest}
         </button>
       )}

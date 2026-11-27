@@ -13,6 +13,7 @@ import type { StationId } from '../data/schema'
 import type { WalkGraph } from '../data/walkSchema'
 import type { Ground } from './projection'
 import type { WalkSpan } from './tripSpans'
+import { withinWalkReach } from './outsideWalk'
 import { routeWalk, snapToWalk, walkQuery, type WalkQuery } from './walkRoute'
 
 /** A station point farther than this from the walk graph's nearest edge is not on it (meters). */
@@ -93,6 +94,21 @@ export function transferWalkPath(
   if (!best) return { ok: false, reason: loaded === 0 ? 'no walk graph loaded' : 'no path on the walk graph' }
   if (bestM > straight * MAX_DETOUR) return { ok: false, reason: `path ${Math.round(bestM)} m against ${Math.round(straight)} m straight` }
   return { ok: true, path: forward ? best : [...best].reverse(), meters: bestM }
+}
+
+/**
+ * The street path from `from` to `to` over one station's graph, for the walk between a station and a searched place
+ * (a6m): fails, with the reason, when `to` lies past the graph's radius (the shard is partial there), when either end
+ * is not within `MAX_SNAP_M` of an edge or no path connects them, or when the path is over `MAX_DETOUR` times the straight line.
+ */
+export function walkPathIn(graph: WalkGraph, from: Ground, to: Ground): WalkPathResult {
+  if (!withinWalkReach(graph, to)) return { ok: false, reason: 'the place is past the walk graph' }
+  const path = routeIn(graph, from, to)
+  if (!path) return { ok: false, reason: 'no path on the walk graph' }
+  const meters = lengthOf(path)
+  const straight = Math.hypot(to.x - from.x, to.z - from.z)
+  if (meters > straight * MAX_DETOUR) return { ok: false, reason: `path ${Math.round(meters)} m against ${Math.round(straight)} m straight` }
+  return { ok: true, path, meters }
 }
 
 /**

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { MarkedPlacement } from './locate'
+import type { TripPlace } from './trip'
 import { directionsTrip, type DirectionsInput } from './tripDirections'
+
+const place = (note: string, ground: TripPlace['ground'] = { x: 12, z: -34 }): TripPlace => ({ note, ground })
 
 const fixAt = (id: string): MarkedPlacement =>
   ({
@@ -61,8 +64,8 @@ describe('directionsTrip', () => {
   })
 
   it('keeps the earlier other end, and its note', () => {
-    const t = run({ current: { from: 'A', to: 'B' }, currentPlaces: { from: '120 Broadway', to: null } })
-    expect(t).toEqual({ ends: { from: 'A', to: 'X' }, places: { from: '120 Broadway', to: null }, empty: null, fixStation: null })
+    const t = run({ current: { from: 'A', to: 'B' }, currentPlaces: { from: place('120 Broadway'), to: null } })
+    expect(t).toEqual({ ends: { from: 'A', to: 'X' }, places: { from: place('120 Broadway'), to: null }, empty: null, fixStation: null })
   })
 
   it('keeps an earlier end over the fix and the focused station', () => {
@@ -71,8 +74,8 @@ describe('directionsTrip', () => {
   })
 
   it('goes the way back: directions from the old To', () => {
-    const t = run({ end: 'from', target: { stationId: 'B', place: null }, current: { from: 'A', to: 'B' }, currentPlaces: { from: 'Home', to: 'Work' } })
-    expect(t).toEqual({ ends: { from: 'B', to: 'A' }, places: { from: null, to: 'Home' }, empty: null, fixStation: null })
+    const t = run({ end: 'from', target: { stationId: 'B', place: null }, current: { from: 'A', to: 'B' }, currentPlaces: { from: place('Home'), to: place('Work') } })
+    expect(t).toEqual({ ends: { from: 'B', to: 'A' }, places: { from: null, to: place('Home') }, empty: null, fixStation: null })
   })
 
   it('directions to the old From swaps likewise', () => {
@@ -85,8 +88,14 @@ describe('directionsTrip', () => {
   })
 
   it('sets the target place note, and a station pick clears the end note', () => {
-    expect(run({ target: { stationId: 'X', place: '120 Broadway' }, focusedId: 'F' }).places).toEqual({ from: null, to: '120 Broadway' })
-    expect(run({ current: { from: 'A', to: 'X' }, currentPlaces: { from: null, to: 'Old place' } }).places.to).toBeNull()
+    expect(run({ target: { stationId: 'X', place: place('120 Broadway') }, focusedId: 'F' }).places).toEqual({ from: null, to: place('120 Broadway') })
+    expect(run({ current: { from: 'A', to: 'X' }, currentPlaces: { from: null, to: place('Old place') } }).places.to).toBeNull()
+  })
+
+  it("carries a place's point with its note, and a here place keeps none", () => {
+    const here: TripPlace = { note: 'you', ground: null }
+    const t = run({ target: { stationId: 'X', place: place('120 Broadway') }, current: { from: 'A', to: null }, currentPlaces: { from: here, to: null } })
+    expect(t.places).toEqual({ from: here, to: place('120 Broadway', { x: 12, z: -34 }) })
   })
 
   it('flags the end station the fix filled, only when the fix candidate wins', () => {

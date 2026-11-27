@@ -1,12 +1,12 @@
 /** Which ends a directions pick gives the trip. Pure; no React, fetch or storage. */
 import type { MarkedPlacement } from './locate'
-import type { TripEnd, TripPlaces } from './trip'
+import type { TripEnd, TripPlace, TripPlaces } from './trip'
 import type { TripEnds } from './tripView'
 
 /** What a directions pick names: a station, or a searched place's nearest station plus the place's name. */
 export interface DirectionsTarget {
   stationId: string
-  place: string | null
+  place: TripPlace | null
 }
 
 export interface DirectionsInput {
@@ -37,7 +37,7 @@ export interface DirectionsTrip {
 
 interface Candidate {
   id: string | null
-  note: string | null
+  note: TripPlace | null
   /** The station came from the fix, not the visitor. */
   fromFix: boolean
 }
@@ -52,7 +52,7 @@ function pair<T>(end: TripEnd, picked: T, other: T): { from: T; to: T } {
  * first of: the trip's earlier other end (an end already chosen stays), the marked fix's nearest station (From
  * only: a fix is where you start), the focused station, the trip's earlier picked end (so "Directions from B" on A
  * to B gives the way back, B to A). Each must be neither the target nor in its complex. An earlier end keeps its
- * note; nothing else carries one. The two ends are never the same station, nor two of one complex. `fixStation` names
+ * place; nothing else carries one. The two ends are never the same station, nor two of one complex. `fixStation` names
  * the other end when it came from the fix (now, or as an earlier end that did and was never chosen since).
  */
 export function directionsTrip({ end, target, current, currentPlaces, focusedId, siblingsOf, fix, fixStation }: DirectionsInput): DirectionsTrip {
