@@ -8,8 +8,7 @@
  * - StationStreets.tsx: the `streetsLook` import and the forced cases of `streetMode` (keep the auto rule)
  * - theme.ts: the `?streets=` sentence in the `streetStroke` doc; theme.test.ts: the "(?streets=under)" veiled-floor
  *   case, which then only guards look A without an interior loaded (drop it if the veil never covers the streets)
- * - AGENTS.md, three places: the `?streets=` TEMPORARY note in the theme bullets, "`streetsLook.ts` TEMPORARY
- *   override" in the StationStreets.tsx directory entry, and "TEMPORARY `?streets=`" in the render-order list
+ * - AGENTS.md: `?streets=` in the TEMPORARY query flags bullet (Hard rules)
  */
 export type StreetsLook = 'auto' | 'under' | 'over'
 
