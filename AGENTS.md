@@ -39,7 +39,7 @@ panel at an added stop says "[D] stops here (runs local)". A reroute shows only 
 header's "between X and Y"), each a plain ring, and no path ("Stations named in the MTA notice · the new route isn't drawn").
 A faint citywide basemap (roads, water, parks from the pinned tile release) draws under the lines for everyone since ost.9.3.
 With the Worker configured the search dialog also finds streets, intersections ("Bedford Av & N 7 St"), addresses and places through `/geocode` (2q7.16, 2q7.14; none of it without `VITE_RT_URL`).
-Trip planning is behind `FEATURES.navigation` (`src/config.ts`), off by default.
+Trip planning is behind `FEATURES.navigation` (`src/config.ts`), off by default; `?nav=1` turns it on for that page load.
 
 ## Stack
 Vite 8, React 19, TypeScript (strict), Tailwind v4 (`@tailwindcss/vite`), three.js,
@@ -168,8 +168,8 @@ Worker (its own package and lockfile; run `npm --prefix worker ci` once):
 
 ## Directory map
 - `src/main.tsx`, `src/App.tsx`, `src/index.css`: entry, root layout, Tailwind + theme CSS vars
-- `src/config.ts`: build-time feature switches, plain constants (no remote flag service). `FEATURES.navigation` (default
-  false, 2q7.51): off, the HUD offers no directions (no From/To on search rows, no "Directions from/to here", no trip panel or
+- `src/config.ts`: feature switches, plain constants (no remote flag service) plus `?nav=` read at load. `FEATURES.navigation` (default
+  false, 2q7.51; `?nav=1`, `on` or `true` turns it on for that page load, `resolveNavigation`, 2q7.52): off, the HUD offers no directions (no From/To on search rows, no "Directions from/to here", no trip panel or
   `TripAnnouncer`), so the trip never opens and nothing trip-only draws or loads (the router chunk, timetables, transfers,
   the trip's interiors and street files; `tripPatterns()` loads only as `useNormalStops`' fallback, below); search, its flights and the location row are unchanged. True restores navigation.
 - `src/theme.ts`: all colors, line widths, fonts. Blueprint is the only theme (the user's pick): don't add
